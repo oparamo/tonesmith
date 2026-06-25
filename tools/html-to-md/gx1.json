@@ -1,0 +1,20 @@
+{
+  "selectors": {
+    "tocMenu":    "schema-toc-menu",
+    "tocSubmenu": "schema-toc-submenu",
+    "tocLink":    "schema-toc-link",
+    "invisible":  "invisible"
+  },
+  "manuals": {
+    "param": {
+      "toc":    "core/docs/GX-1 Parameter Guide _ Sound List.html",
+      "output": "core/docs/gx1/gx1_parameter_guide.md",
+      "title":  "GX-1 Parameter Guide / Sound List"
+    },
+    "ref": {
+      "toc":    "core/docs/GX-1 Reference Manual.html",
+      "output": "core/docs/gx1/gx1_reference_manual.md",
+      "title":  "GX-1 Reference Manual"
+    }
+  }
+}

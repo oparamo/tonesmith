@@ -1,0 +1,43 @@
+{
+  "name": "@tonesmith/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit && tsup && tsc -p tsconfig.dts.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "gen:bad-bunny": "tsx examples/gx1/bad-bunny.ts",
+    "gen:gilmour": "tsx examples/gx1/gilmour.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oparamo/tonesmith.git",
+    "directory": "core"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "tsx": "4.22.4",
+    "vitest": "4.1.9"
+  }
+}

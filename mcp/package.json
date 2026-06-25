@@ -1,0 +1,32 @@
+{
+  "name": "@tonesmith/mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "tonesmith-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && tsup",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@tonesmith/core": "workspace:*",
+    "zod": "4.4.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oparamo/tonesmith.git",
+    "directory": "mcp"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "8.5.1"
+  }
+}
