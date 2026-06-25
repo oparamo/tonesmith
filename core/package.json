@@ -21,7 +21,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:bad-bunny": "tsx examples/gx1/bad-bunny.ts",
-    "gen:gilmour": "tsx examples/gx1/gilmour.ts"
+    "gen:gilmour": "tsx examples/gx1/gilmour.ts",
+    "coverage": "vitest run --coverage"
   },
   "publishConfig": {
     "access": "public"
@@ -38,6 +39,7 @@
   "devDependencies": {
     "tsup": "8.5.1",
     "tsx": "4.22.4",
+    "@vitest/coverage-v8": "4.1.9",
     "vitest": "4.1.9"
   }
 }
