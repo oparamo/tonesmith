@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
-import { patchUtils } from "tonesmith";
+import { patchUtils } from "@tonesmith/core";
 import { ok, err, requireDriver } from "../common";
 
 const registerWriteField = (server: McpServer): void => {

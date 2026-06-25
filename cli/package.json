@@ -1,5 +1,5 @@
 {
-  "name": "tonesmith-cli",
+  "name": "@tonesmith/cli",
   "version": "0.1.0",
   "type": "module",
   "bin": {
@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && tsup"
   },
   "dependencies": {
-    "tonesmith": "workspace:*",
+    "@tonesmith/core": "workspace:*",
     "commander": "15.0.0"
   },
   "publishConfig": {

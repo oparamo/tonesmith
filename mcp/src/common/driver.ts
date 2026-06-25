@@ -1,5 +1,5 @@
-import { registry } from "tonesmith";
-import type { PatchDriver } from "tonesmith";
+import { registry } from "@tonesmith/core";
+import type { PatchDriver } from "@tonesmith/core";
 
 const requireDriver = (device: string): PatchDriver => {
   const driver = registry.getDriver(device);

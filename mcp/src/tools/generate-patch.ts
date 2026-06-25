@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
-import { gx1 } from "tonesmith";
+import { gx1 } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl } = gx1;
 import { FxBlockSchema, ok, err } from "../common";
 
