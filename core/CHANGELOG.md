@@ -1,0 +1,11 @@
+# @tonesmith/core
+
+## 0.2.0
+
+### Minor Changes
+
+- 30f4684: Initial public release: TypeScript monorepo toolkit for reading, editing, and building BOSS GX-1 `.tsl` patch files. Includes core codec library, CLI, and MCP server.
+
+### Patch Changes
+
+- e58c1d1: Add test coverage for patch-utils, registry, GX-1 tsl I/O, and builder. Vitest v8 coverage with 90% thresholds on all metrics.
