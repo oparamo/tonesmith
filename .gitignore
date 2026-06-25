@@ -1,0 +1,9 @@
+.DS_Store
+*.tsl.bak
+
+# Node
+node_modules/
+dist/
+
+# Generated preset outputs (regenerate via pnpm gen:*)
+core/examples/**/*.tsl
