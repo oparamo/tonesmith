@@ -9,7 +9,7 @@
  * in `constants.ts` remain the authoritative byte-index lists and must stay in sync.
  * The drift-guard test in `capabilities.test.ts` enforces that.
  */
-import type { DeviceCapabilities, CapabilityItem } from "../../types/index";
+import type { DeviceCapabilities, CapabilityItem } from "../../types";
 
 // ---------------------------------------------------------------------------
 // FX1/FX2/FX3 — the 39 selectable effects

@@ -1,5 +1,5 @@
-import { RAW } from "../common/index";
-import type { Patch, RawParamSet } from "../types/index";
+import { RAW } from "../common";
+import type { Patch, RawParamSet } from "../types";
 import { bytesFromHex } from "./primitives";
 import { decodeFxParams, encodeFxParams } from "./fx-params";
 import {

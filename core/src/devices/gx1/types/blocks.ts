@@ -1,4 +1,4 @@
-import type { RAW } from "../common/index";
+import type { RAW } from "../common";
 import type { FxParams } from "./tsl";
 
 interface FxBlock {

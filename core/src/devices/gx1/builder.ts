@@ -1,4 +1,4 @@
-import type { Patch, FxParams } from "./types/index";
+import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
 
 const HIGH_CUT_MAP: Record<string, number> = {

@@ -1,4 +1,4 @@
-import { driver as gx1 } from "./gx1/index";
+import { driver as gx1 } from "./gx1";
 
 const drivers = [gx1];
 

@@ -8,9 +8,9 @@ import {
   CHAIN_NAMES, CHAIN_IDS,
   NS_DETECT, FV_CURVE, TWIST_MODES,
   FX_SUBTYPE_LISTS,
-} from "../common/index";
-import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "../types/index";
-import { RAW } from "../common/index";
+} from "../common";
+import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "../types";
+import { RAW } from "../common";
 import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
 import { u8, signed, lookup, u16be, decodeFields, encodeFields, type FieldCodec } from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";

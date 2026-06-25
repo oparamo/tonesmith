@@ -1,4 +1,4 @@
-import type { CliDescriptor } from "../../types/index";
+import type { CliDescriptor } from "../../types";
 import { configureGx1Commands } from "./command";
 
 const gx1Cli: CliDescriptor = {

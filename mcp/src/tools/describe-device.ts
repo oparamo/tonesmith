@@ -1,6 +1,6 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
-import { ok, err, requireDriver } from "../common/index";
+import { ok, err, requireDriver } from "../common";
 
 const registerDescribeDevice = (server: McpServer): void => {
   server.registerTool(

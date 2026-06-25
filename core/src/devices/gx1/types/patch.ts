@@ -1,5 +1,5 @@
-import type { Patch as BasePatch, PatchFile as BasePatchFile } from "../../../types/index";
-import type { RAW } from "../common/index";
+import type { Patch as BasePatch, PatchFile as BasePatchFile } from "../../../types";
+import type { RAW } from "../common";
 import type { RawParamSet, TslEnvelope } from "./tsl";
 import type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "./blocks";
 

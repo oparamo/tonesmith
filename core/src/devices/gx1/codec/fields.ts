@@ -1,5 +1,5 @@
 import { toSigned, toUnsigned, lookupName } from "./primitives";
-import type { FxParams } from "../types/index";
+import type { FxParams } from "../types";
 
 // ── FieldCodec interface ───────────────────────────────────────────────────────
 

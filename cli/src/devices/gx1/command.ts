@@ -4,7 +4,7 @@ import { patchUtils } from "@tonesmith/core";
 import { basename, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { printPatch } from "./print";
-import { printGroups, printGroup, printItem } from "../../common/index";
+import { printGroups, printGroup, printItem } from "../../common";
 
 const run = (action: () => void): void => {
   try {

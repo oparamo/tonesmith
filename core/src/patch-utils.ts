@@ -1,4 +1,4 @@
-import type { Patch } from "./types/index";
+import type { Patch } from "./types";
 
 /**
  * Resolve a patch reference (numeric index string or exact name) to an array index.

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
 import {
   registerListDevices,
   registerReadPatch,
   registerGeneratePatch,
   registerWriteField,
   registerDescribeDevice,
-} from "./tools/index";
+} from "./tools";
 
 const server = new McpServer({ name: "@tonesmith/mcp", version: "0.1.0" });
 

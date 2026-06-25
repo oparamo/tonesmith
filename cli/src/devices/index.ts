@@ -1,5 +1,5 @@
-import type { CliDescriptor } from "../types/index";
-import { gx1Cli } from "./gx1/index";
+import type { CliDescriptor } from "../types";
+import { gx1Cli } from "./gx1";
 
 const devices: CliDescriptor[] = [gx1Cli];
 

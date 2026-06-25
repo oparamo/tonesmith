@@ -1,6 +1,6 @@
-import type { RawPatch, PatchDriver } from "../../types/index";
-import type { Patch, PatchFile, RawParamSet } from "./types/index";
-import { decodePatch as codecDecodePatch, encodePatch as codecEncodePatch } from "./codec/index";
+import type { RawPatch, PatchDriver } from "../../types";
+import type { Patch, PatchFile, RawParamSet } from "./types";
+import { decodePatch as codecDecodePatch, encodePatch as codecEncodePatch } from "./codec";
 import {
   blankPatch as tslBlankPatch,
   newFile as tslNewFile,
