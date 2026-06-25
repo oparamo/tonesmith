@@ -1,12 +1,12 @@
-import { drivers } from "./devices/index.js";
-import { registerDriver } from "./registry.js";
+import { drivers } from "./devices";
+import { registerDriver } from "./registry";
 
 for (const driver of drivers) {
   registerDriver(driver);
 }
 
-export type { Patch, PatchFile, RawPatch, PatchDriver, DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec } from "./types/index.js";
-export * as patchUtils from "./patch-utils.js";
-export * as registry from "./registry.js";
+export type { Patch, PatchFile, RawPatch, PatchDriver, DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec } from "./types";
+export * as patchUtils from "./patch-utils";
+export * as registry from "./registry";
 
-export * as gx1 from "./devices/gx1/index.js";
+export * as gx1 from "./devices/gx1";

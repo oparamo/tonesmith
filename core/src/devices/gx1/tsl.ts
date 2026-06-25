@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { decodePatch, encodePatch, hexFromBytes } from "./codec/index.js";
-import { encodeName } from "./codec/blocks.js";
-import { RAW } from "./common/index.js";
-import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types/index.js";
+import { decodePatch, encodePatch, hexFromBytes } from "./codec";
+import { encodeName } from "./codec/blocks";
+import { RAW } from "./common";
+import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types";
 
 const ZEROS_251 = hexFromBytes(new Array(251).fill(0));
 

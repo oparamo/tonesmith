@@ -1,13 +1,13 @@
-import type { RawPatch, PatchDriver } from "../../types/index.js";
-import type { Patch, PatchFile, RawParamSet } from "./types/index.js";
-import { decodePatch as codecDecodePatch, encodePatch as codecEncodePatch } from "./codec/index.js";
+import type { RawPatch, PatchDriver } from "../../types";
+import type { Patch, PatchFile, RawParamSet } from "./types";
+import { decodePatch as codecDecodePatch, encodePatch as codecEncodePatch } from "./codec";
 import {
   blankPatch as tslBlankPatch,
   newFile as tslNewFile,
   readFile as tslReadFile,
   writeFile as tslWriteFile,
-} from "./tsl.js";
-import { gx1Capabilities } from "./capabilities.js";
+} from "./tsl";
+import { gx1Capabilities } from "./capabilities";
 
 // Arrow wrappers narrow the PatchDriver contract to the concrete GX-1 file type,
 // keeping the driver fully typed without widening the concrete file I/O functions.

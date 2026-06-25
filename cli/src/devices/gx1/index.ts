@@ -1,5 +1,5 @@
-import type { CliDescriptor } from "../../types/index.js";
-import { configureGx1Commands } from "./command.js";
+import type { CliDescriptor } from "../../types";
+import { configureGx1Commands } from "./command";
 
 const gx1Cli: CliDescriptor = {
   id: "gx1",

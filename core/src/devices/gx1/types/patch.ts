@@ -1,7 +1,7 @@
-import type { Patch as BasePatch, PatchFile as BasePatchFile } from "../../../types/index.js";
-import type { RAW } from "../common/index.js";
-import type { RawParamSet, TslEnvelope } from "./tsl.js";
-import type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "./blocks.js";
+import type { Patch as BasePatch, PatchFile as BasePatchFile } from "../../../types";
+import type { RAW } from "../common";
+import type { RawParamSet, TslEnvelope } from "./tsl";
+import type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "./blocks";
 
 interface Patch extends BasePatch {
   memo: string;

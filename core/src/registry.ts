@@ -1,4 +1,4 @@
-import type { PatchDriver } from "./types/index.js";
+import type { PatchDriver } from "./types";
 
 const drivers = new Map<string, PatchDriver>();
 

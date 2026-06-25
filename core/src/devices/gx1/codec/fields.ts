@@ -1,5 +1,5 @@
-import { toSigned, toUnsigned, lookupName } from "./primitives.js";
-import type { FxParams } from "../types/index.js";
+import { toSigned, toUnsigned, lookupName } from "./primitives";
+import type { FxParams } from "../types";
 
 // ── FieldCodec interface ───────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
-import type { Patch, FxParams } from "./types/index.js";
-import { blankPatch, newFile, writeFile } from "./tsl.js";
+import type { Patch, FxParams } from "./types";
+import { blankPatch, newFile, writeFile } from "./tsl";
 
 const HIGH_CUT_MAP: Record<string, number> = {
   "2.2kHz": 20, "2.5kHz": 21, "2.8kHz": 22, "3.0kHz": 23,

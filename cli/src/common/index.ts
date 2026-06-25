@@ -1,1 +1,1 @@
-export * from "./capabilities-print.js";
+export * from "./capabilities-print";

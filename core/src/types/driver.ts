@@ -1,5 +1,5 @@
-import type { Patch, PatchFile, RawPatch } from "./patch.js";
-import type { DeviceCapabilities } from "./capabilities.js";
+import type { Patch, PatchFile, RawPatch } from "./patch";
+import type { DeviceCapabilities } from "./capabilities";
 
 interface PatchDriver<T extends Patch = Patch> {
   readonly id: string;

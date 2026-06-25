@@ -3,10 +3,10 @@ import {
   WAH_TYPES, ROTARY_SPEED, FB_MODE, RING_INTL, HUM_VOWELS,
   SBEND_PITCH, SLICER_PAT, HARMONIST_HR, HARMONIST_KEY,
   REV_TYPES,
-} from "../common/index.js";
-import type { FxParams } from "../types/index.js";
-import { hexFromBytes, lookupName, lookupIndex } from "./primitives.js";
-import { u8, signed, lookup, scaled, u16be, decodeFields, encodeFields, type FieldCodec } from "./fields.js";
+} from "../common";
+import type { FxParams } from "../types";
+import { hexFromBytes, lookupName, lookupIndex } from "./primitives";
+import { u8, signed, lookup, scaled, u16be, decodeFields, encodeFields, type FieldCodec } from "./fields";
 
 // ── FX type encode / decode ───────────────────────────────────────────────────
 
