@@ -9,3 +9,4 @@ dist/
 # Generated preset outputs (regenerate via pnpm gen:*)
 core/examples/**/*.tsl
 .npmrc
+core/coverage/
