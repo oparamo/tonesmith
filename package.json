@@ -6,7 +6,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test:watch",
-    "clean": "find core cli mcp -name dist -type d -o -name '*.tsbuildinfo' | xargs rm -rf",
+    "clean": "find core cli mcp -name dist -type d | xargs rm -rf",
     "html-to-md": "tsx tools/html-to-md/index.ts",
     "html-to-md:gx1": "tsx tools/html-to-md/index.ts tools/html-to-md/gx1.json",
     "lint": "eslint core cli mcp tools",
