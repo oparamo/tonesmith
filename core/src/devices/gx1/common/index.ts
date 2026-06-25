@@ -1,2 +1,2 @@
-export * from "./raw.js";
-export * from "./constants.js";
+export * from "./raw";
+export * from "./constants";

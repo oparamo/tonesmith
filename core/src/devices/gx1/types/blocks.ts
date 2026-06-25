@@ -1,5 +1,5 @@
-import type { RAW } from "../common/index.js";
-import type { FxParams } from "./tsl.js";
+import type { RAW } from "../common/index";
+import type { FxParams } from "./tsl";
 
 interface FxBlock {
   on: boolean;

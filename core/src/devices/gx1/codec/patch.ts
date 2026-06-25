@@ -1,7 +1,7 @@
-import { RAW } from "../common/index.js";
-import type { Patch, RawParamSet } from "../types/index.js";
-import { bytesFromHex } from "./primitives.js";
-import { decodeFxParams, encodeFxParams } from "./fx-params.js";
+import { RAW } from "../common/index";
+import type { Patch, RawParamSet } from "../types/index";
+import { bytesFromHex } from "./primitives";
+import { decodeFxParams, encodeFxParams } from "./fx-params";
 import {
   decodeName, encodeName,
   decodeChain, encodeChain,
@@ -12,7 +12,7 @@ import {
   decodeFxCom, encodeFxCom,
   decodeDelay, encodeDelay,
   decodeReverb, encodeReverb,
-} from "./blocks.js";
+} from "./blocks";
 
 // ── Patch decode / encode ─────────────────────────────────────────────────────
 

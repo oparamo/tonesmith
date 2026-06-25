@@ -1,3 +1,3 @@
-export * from "./response.js";
-export * from "./schemas.js";
-export * from "./driver.js";
+export * from "./response";
+export * from "./schemas";
+export * from "./driver";

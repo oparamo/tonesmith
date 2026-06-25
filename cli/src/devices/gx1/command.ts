@@ -3,8 +3,8 @@ import type { PatchDriver, gx1 } from "@tonesmith/core";
 import { patchUtils } from "@tonesmith/core";
 import { basename, extname } from "node:path";
 import { existsSync } from "node:fs";
-import { printPatch } from "./print.js";
-import { printGroups, printGroup, printItem } from "../../common/index.js";
+import { printPatch } from "./print";
+import { printGroups, printGroup, printItem } from "../../common/index";
 
 const run = (action: () => void): void => {
   try {

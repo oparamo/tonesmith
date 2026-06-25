@@ -1,3 +1,3 @@
-export { bytesFromHex, hexFromBytes } from "./primitives.js";
-export { decodeFxType, encodeFxType, decodeFxParams, encodeFxParams } from "./fx-params.js";
-export { decodePatch, encodePatch } from "./patch.js";
+export { bytesFromHex, hexFromBytes } from "./primitives";
+export { decodeFxType, encodeFxType, decodeFxParams, encodeFxParams } from "./fx-params";
+export { decodePatch, encodePatch } from "./patch";

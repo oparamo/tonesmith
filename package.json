@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -b",
+    "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test:watch",
     "clean": "find core cli mcp -name dist -type d -o -name '*.tsbuildinfo' | xargs rm -rf",
@@ -15,7 +15,7 @@
   "devDependencies": {
     "@types/node": "24.0.0",
     "eslint": "10.5.0",
-    "node-html-parser": "8.0.2",
+    "node-html-parser": "8.0.3",
     "tsx": "4.22.4",
     "typescript": "6.0.3",
     "typescript-eslint": "8.62.0"

@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readFile } from "../../../src/devices/gx1/tsl.js";
-import { encodePatch } from "../../../src/devices/gx1/codec/index.js";
-import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params.js";
-import { decodeDelay, encodeDelay, decodeReverb, encodeReverb } from "../../../src/devices/gx1/codec/blocks.js";
-import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives.js";
-import { FX_TYPES, DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX } from "../../../src/devices/gx1/common/index.js";
+import { readFile } from "../../../src/devices/gx1/tsl";
+import { encodePatch } from "../../../src/devices/gx1/codec/index";
+import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
+import { decodeDelay, encodeDelay, decodeReverb, encodeReverb } from "../../../src/devices/gx1/codec/blocks";
+import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
+import { FX_TYPES, DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX } from "../../../src/devices/gx1/common/index";
 
 const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
 

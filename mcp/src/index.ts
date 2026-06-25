@@ -7,7 +7,7 @@ import {
   registerGeneratePatch,
   registerWriteField,
   registerDescribeDevice,
-} from "./tools/index.js";
+} from "./tools/index";
 
 const server = new McpServer({ name: "@tonesmith/mcp", version: "0.1.0" });
 

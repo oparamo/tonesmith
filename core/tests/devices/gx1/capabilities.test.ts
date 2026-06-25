@@ -8,9 +8,9 @@ import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES,
   ODDS_TYPES, DLY_TYPES, REV_TYPES,
   FX_SUBTYPE_LISTS,
-} from "../../../src/devices/gx1/common/index.js";
-import { gx1Capabilities } from "../../../src/devices/gx1/capabilities.js";
-import type { CapabilityItem } from "../../../src/types/index.js";
+} from "../../../src/devices/gx1/common/index";
+import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
+import type { CapabilityItem } from "../../../src/types/index";
 
 const groupItems = (groupId: string): CapabilityItem[] =>
   gx1Capabilities.groups.find(g => g.id === groupId)?.items ?? [];

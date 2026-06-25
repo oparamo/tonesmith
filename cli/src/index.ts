@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { registry } from "@tonesmith/core";
-import { devices } from "./devices/index.js";
+import { devices } from "./devices/index";
 
 const program = new Command();
 program
