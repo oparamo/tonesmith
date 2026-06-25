@@ -4,6 +4,7 @@
 # Node
 node_modules/
 dist/
+*.tsbuildinfo
 
 # Generated preset outputs (regenerate via pnpm gen:*)
 core/examples/**/*.tsl

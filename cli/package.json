@@ -1,0 +1,16 @@
+{
+  "name": "@tonesmith/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tonesmith": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tonesmith/core": "workspace:*",
+    "commander": "15.0.0"
+  }
+}
