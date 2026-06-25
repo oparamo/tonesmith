@@ -14,6 +14,18 @@
     "@tonesmith/core": "workspace:*",
     "zod": "4.4.3"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oparamo/tonesmith.git",
+    "directory": "mcp"
+  },
+  "license": "MIT",
   "devDependencies": {
     "tsup": "8.5.1"
   }
