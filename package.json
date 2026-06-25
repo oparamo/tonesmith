@@ -10,9 +10,13 @@
     "html-to-md": "tsx tools/html-to-md/index.ts",
     "html-to-md:gx1": "tsx tools/html-to-md/index.ts tools/html-to-md/gx1.json",
     "lint": "eslint core cli mcp tools",
-    "lint:fix": "eslint core cli mcp tools --fix"
+    "lint:fix": "eslint core cli mcp tools --fix",
+    "changeset": "changeset",
+    "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "0.7.0",
+    "@changesets/cli": "2.31.0",
     "@types/node": "24.0.0",
     "eslint": "10.5.0",
     "node-html-parser": "8.0.3",
