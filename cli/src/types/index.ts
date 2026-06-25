@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type { PatchDriver } from "@tonesmith/core";
+import type { PatchDriver } from "tonesmith";
 
 type CliDescriptor = {
   id: string;

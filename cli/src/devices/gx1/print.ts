@@ -1,4 +1,4 @@
-import type { gx1 } from "@tonesmith/core";
+import type { gx1 } from "tonesmith";
 
 const fmt = (d: Record<string, unknown>): string =>
   Object.entries(d).map(([k, v]) => `${k}=${String(v)}`).join("  ");

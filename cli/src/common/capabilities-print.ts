@@ -1,4 +1,4 @@
-import type { DeviceCapabilities, CapabilityGroup, CapabilityItem } from "@tonesmith/core";
+import type { DeviceCapabilities, CapabilityGroup, CapabilityItem } from "tonesmith";
 
 const RESET  = "\x1b[0m";
 const BOLD   = "\x1b[1m";

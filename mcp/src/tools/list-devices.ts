@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
-import { registry } from "@tonesmith/core";
+import { registry } from "tonesmith";
 import { ok } from "../common";
 
 const registerListDevices = (server: McpServer): void => {

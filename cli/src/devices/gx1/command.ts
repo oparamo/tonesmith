@@ -1,6 +1,6 @@
 import type { Command } from "commander";
-import type { PatchDriver, gx1 } from "@tonesmith/core";
-import { patchUtils } from "@tonesmith/core";
+import type { PatchDriver, gx1 } from "tonesmith";
+import { patchUtils } from "tonesmith";
 import { basename, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { printPatch } from "./print";

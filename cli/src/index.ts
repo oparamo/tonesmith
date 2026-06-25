@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { registry } from "@tonesmith/core";
+import { registry } from "tonesmith";
 import { devices } from "./devices";
 
 const program = new Command();

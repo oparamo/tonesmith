@@ -35,12 +35,12 @@ importers:
 
   cli:
     dependencies:
-      '@tonesmith/core':
-        specifier: workspace:*
-        version: link:../core
       commander:
         specifier: 15.0.0
         version: 15.0.0
+      tonesmith:
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       tsup:
         specifier: 8.5.1
@@ -63,7 +63,7 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.4.3)
-      '@tonesmith/core':
+      tonesmith:
         specifier: workspace:*
         version: link:../core
       zod:
