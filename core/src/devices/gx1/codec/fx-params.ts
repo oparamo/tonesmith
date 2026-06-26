@@ -237,12 +237,12 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   // DELAY as an FX slot type (separate from the dedicated DLY block):
   "DELAY": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4), u8("direct", 5),
+    u16be("time", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4), u8("direct", 5),
   ],
   // REVERB as an FX slot type (separate from the dedicated REV block):
   "REVERB": [
-    lookup("type", 0, REV_TYPES), scaled("time_s", 1, 0.1),
-    u8("pre_delay_ms", 2), u8("level", 3), u8("direct", 4),
+    lookup("type", 0, REV_TYPES), scaled("time", 1, 0.1),
+    u8("pre_delay", 2), u8("level", 3), u8("direct", 4),
   ],
 };
 

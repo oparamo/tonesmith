@@ -191,37 +191,37 @@ const encodeFxCom = (block: FxBlock): string[] => {
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
   ],
   "ANALOG": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
   ],
   "MODULATE": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
     u8("mod_rate", 7), u8("mod_depth", 8),
   ],
   "ANLG MOD": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
     u8("mod_rate", 7), u8("mod_depth", 8),
   ],
   "PAN": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
     u8("tap_time", 7),
   ],
   "REVERSE": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
     u8("trigger", 7),
   ],
   "SPACE ECHO": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
     u8("head", 7),
   ],
   "SHIMMER": [
-    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
     signed("pitch", 7, 24), u8("balance", 8),
   ],
   "WARP": [
-    u16be("time_ms", 0), u8("trigger", 2), u8("level", 3),
+    u16be("time", 0), u8("trigger", 2), u8("level", 3),
   ],
   "TWIST": [
     lookup("mode", 0, TWIST_MODES),
@@ -271,25 +271,25 @@ const decodeReverb = (hexList: string[]): ReverbBlock => {
 
   if ((STANDARD_REVERB_TYPES as readonly string[]).includes(reverbType)) {
     Object.assign(block, {
-      time_s:       Math.round(bytes[2]! * 0.1 * 10) / 10,
+      time:       Math.round(bytes[2]! * 0.1 * 10) / 10,
       tone:         toSigned(bytes[3]!),
       density:      bytes[4]! + 1,
       level:        bytes[5]!,
-      pre_delay_ms: bytes[7]!,
+      pre_delay: bytes[7]!,
       direct:       bytes[8]!,
     });
   } else if (reverbType === "SHIMMER") {
     Object.assign(block, {
-      time_s:       Math.round(bytes[2]! * 0.1 * 10) / 10,
+      time:       Math.round(bytes[2]! * 0.1 * 10) / 10,
       tone:         toSigned(bytes[3]!),
       level:        bytes[4]!,
-      pre_delay_ms: bytes[5]!,
+      pre_delay: bytes[5]!,
       pitch:        bytes[6]! - 24,
       pitch_lvl:    bytes[7]!,
     });
   } else if (reverbType === "SUB DELAY") {
     Object.assign(block, {
-      time_ms:  (bytes[2]! << 8) | bytes[3]!,
+      time:     (bytes[2]! << 8) | bytes[3]!,
       feedback: bytes[4]!,
       level:    bytes[5]!,
       high_cut: bytes[6]!,
@@ -315,21 +315,21 @@ const encodeReverb = (block: ReverbBlock): string[] => {
   const get = (key: string, fallback = 0): number => (block[key] as number) ?? fallback;
 
   if ((STANDARD_REVERB_TYPES as readonly string[]).includes(block.type)) {
-    bytes[2] = Math.round(get("time_s") / 0.1);
+    bytes[2] = Math.round(get("time") / 0.1);
     bytes[3] = toUnsigned(get("tone"));
     bytes[4] = get("density") - 1;
     bytes[5] = get("level");
-    bytes[7] = get("pre_delay_ms");
+    bytes[7] = get("pre_delay");
     bytes[8] = get("direct");
   } else if (block.type === "SHIMMER") {
-    bytes[2] = Math.round(get("time_s") / 0.1);
+    bytes[2] = Math.round(get("time") / 0.1);
     bytes[3] = toUnsigned(get("tone"));
     bytes[4] = get("level");
-    bytes[5] = get("pre_delay_ms");
+    bytes[5] = get("pre_delay");
     bytes[6] = get("pitch") + 24;
     bytes[7] = get("pitch_lvl");
   } else if (block.type === "SUB DELAY") {
-    const ms = get("time_ms");
+    const ms = get("time");
     bytes[2] = ms >> 8;
     bytes[3] = ms & 0xFF;
     bytes[4] = get("feedback");

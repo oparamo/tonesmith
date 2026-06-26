@@ -27,7 +27,11 @@ interface FieldCodec {
 const u8 = (name: string, offset: number): FieldCodec => ({
   name,
   decode: bytes => bytes[offset]!,
-  encode: (value, bytes) => { bytes[offset] = (value as number) & 0xFF; },
+  encode: (value, bytes) => {
+    const n = value as number;
+    if (n < 0 || n > 255) throw new RangeError(`${name}: value ${n} out of u8 range (0–255)`);
+    bytes[offset] = n;
+  },
 });
 
 /**

@@ -137,10 +137,10 @@ describe("ns", () => {
 describe("delay", () => {
   it("sets all delay fields", () => {
     const p = basePatch("Test");
-    delay(p, "STANDARD", 400, 50, 60, "FLAT");
+    delay(p, "STANDARD", 7, 50, 60, "FLAT");
     expect(p.delay.on).toBe(true);
     expect(p.delay.type).toBe("STANDARD");
-    expect(p.delay.time_ms).toBe(400);
+    expect(p.delay.time).toBe(7);
     expect(p.delay.feedback).toBe(50);
     expect(p.delay.level).toBe(60);
     expect(p.delay.high_cut).toBe(HIGH_CUT_MAP["FLAT"]);
@@ -148,25 +148,25 @@ describe("delay", () => {
 
   it("resolves high cut string to its numeric value", () => {
     const p = basePatch("Test");
-    delay(p, "ANALOG", 200, 40, 50, "2kHz");
+    delay(p, "ANALOG", 1, 40, 50, "2kHz");
     expect(p.delay.high_cut).toBe(HIGH_CUT_MAP["2kHz"]);
   });
 
   it("falls back to FLAT (29) for an unrecognized high cut string", () => {
     const p = basePatch("Test");
-    delay(p, "PAN", 300, 30, 40, "UNKNOWN");
+    delay(p, "PAN", 1, 30, 40, "UNKNOWN");
     expect(p.delay.high_cut).toBe(29);
   });
 
   it("merges extra params", () => {
     const p = basePatch("Test");
-    delay(p, "MODULATE", 250, 50, 50, "FLAT", true, { mod_rate: 5 });
+    delay(p, "MODULATE", 1, 50, 50, "FLAT", true, { mod_rate: 5 });
     expect((p.delay as Record<string, unknown>).mod_rate).toBe(5);
   });
 
   it("can disable delay", () => {
     const p = basePatch("Test");
-    delay(p, "STANDARD", 400, 50, 60, "FLAT", false);
+    delay(p, "STANDARD", 7, 50, 60, "FLAT", false);
     expect(p.delay.on).toBe(false);
   });
 });
@@ -177,9 +177,9 @@ describe("reverb", () => {
     reverb(p, "HALL M", 2.5, 80, 10, 5, 7, 90);
     expect(p.reverb.on).toBe(true);
     expect(p.reverb.type).toBe("HALL M");
-    expect(p.reverb.time_s).toBe(2.5);
+    expect(p.reverb.time).toBe(2.5);
     expect(p.reverb.level).toBe(80);
-    expect(p.reverb.pre_delay_ms).toBe(10);
+    expect(p.reverb.pre_delay).toBe(10);
     expect(p.reverb.tone).toBe(5);
     expect(p.reverb.density).toBe(7);
     expect(p.reverb.direct).toBe(90);
@@ -188,7 +188,7 @@ describe("reverb", () => {
   it("uses sensible defaults for optional params", () => {
     const p = basePatch("Test");
     reverb(p, "ROOM S", 1.0, 70);
-    expect(p.reverb.pre_delay_ms).toBe(0);
+    expect(p.reverb.pre_delay).toBe(0);
     expect(p.reverb.tone).toBe(0);
     expect(p.reverb.density).toBe(5);
     expect(p.reverb.direct).toBe(100);

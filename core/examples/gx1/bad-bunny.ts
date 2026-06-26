@@ -9,7 +9,7 @@ amp(ol1, "TRNSPRNT", 12, 48, 45, 55, '1x12"', "RIBON121");
 fx(ol1, "fx1", "CHORUS", "STEREO", { rate: 20, depth: 35, level: 60, pre_delay: 5 });
 clearOdds(ol1);
 ns(ol1, 18, 40);
-delay(ol1, "ANALOG", 400, 30, 48, "FLAT");
+delay(ol1, "ANALOG", 1, 30, 48, "FLAT");
 reverb(ol1, "SHIMMER", 4.0, 55, 25, -3, 5, 100, true, { pitch: 12, pitch_lvl: 28 });
 patches.push(ol1);
 
@@ -19,7 +19,7 @@ amp(dtmf1, "DELUXE", 14, 58, 52, 50, '1x12"', "RIBON121");
 fx(dtmf1, "fx1", "COMPRESSOR", "ORANGE", { sustain: 35, attack: 65, level: 55 });
 clearOdds(dtmf1);
 ns(dtmf1, 20, 40);
-delay(dtmf1, "ANALOG", 360, 22, 38, "2kHz");
+delay(dtmf1, "ANALOG", 1, 22, 38, "2kHz");
 reverb(dtmf1, "HALL M", 3.0, 42, 30, -12, 4, 100);
 patches.push(dtmf1);
 
@@ -30,7 +30,7 @@ fx(dtmf2, "fx1", "ENHANCER", null, { sens: 65, level: 58, low: 0, low_freq: 0, h
 fx(dtmf2, "fx2", "HIGH GEQ", null, { "250Hz": 4, "500Hz": 2, "1kHz": 3, "2kHz": -3, "4kHz": -6, "8kHz": 0, level: 20 });
 clearOdds(dtmf2);
 ns(dtmf2, 20, 40);
-delay(dtmf2, "ANALOG", 360, 22, 38, "2kHz");
+delay(dtmf2, "ANALOG", 1, 22, 38, "2kHz");
 reverb(dtmf2, "HALL M", 3.0, 42, 30, -12, 4, 100);
 patches.push(dtmf2);
 
@@ -41,7 +41,7 @@ fx(nev1, "fx1", "COMPRESSOR", "BOSS COMP", { sustain: 45, attack: 40, level: 60 
 fx(nev1, "fx2", "CHORUS", "STEREO", { rate: 10, depth: 20, level: 45, pre_delay: 4 });
 clearOdds(nev1);
 ns(nev1, 22, 38);
-delay(nev1, "STANDARD", 320, 18, 35, "4kHz");
+delay(nev1, "STANDARD", 7, 18, 35, "4kHz");
 reverb(nev1, "HALL S", 2.2, 38, 15, -3, 5, 100);
 patches.push(nev1);
 
@@ -51,7 +51,7 @@ amp(mm1, "BOUTIQUE", 38, 52, 58, 65, '2x12"', "DYN57");
 fx(mm1, "fx1", "COMPRESSOR", "BOSS COMP", { sustain: 55, attack: 30, level: 62 });
 odds(mm1, "BLUES OD", 18, 8, 65);
 ns(mm1, 40, 25);
-delay(mm1, "STANDARD", 280, 20, 38, "FLAT");
+delay(mm1, "STANDARD", 7, 20, 38, "FLAT");
 reverb(mm1, "ROOM S", 1.4, 28, 8, 3, 6, 100);
 patches.push(mm1);
 
@@ -61,7 +61,7 @@ amp(pdc1, "TRNSPRNT", 10, 45, 65, 58, "ORIGINAL", "CND451");
 fx(pdc1, "fx1", "COMPRESSOR", "ORANGE", { sustain: 30, attack: 70, level: 55 });
 clearOdds(pdc1);
 ns(pdc1, 20, 50);
-delay(pdc1, "ANALOG", 240, 15, 28, "2.5kHz");
+delay(pdc1, "ANALOG", 1, 15, 28, "2.5kHz");
 reverb(pdc1, "ROOM S", 1.8, 32, 10, -5, 3, 100);
 patches.push(pdc1);
 
@@ -72,7 +72,7 @@ fx(uc1, "fx1", "COMPRESSOR", "BOSS COMP", { sustain: 48, attack: 45, level: 60 }
 fx(uc1, "fx2", "CHORUS", "STEREO", { rate: 14, depth: 25, level: 50, pre_delay: 5 });
 clearOdds(uc1);
 ns(uc1, 22, 45);
-delay(uc1, "ANALOG", 420, 25, 40, "2.5kHz");
+delay(uc1, "ANALOG", 1, 25, 40, "2.5kHz");
 reverb(uc1, "HALL M", 2.8, 40, 20, -8, 5, 100);
 patches.push(uc1);
 

@@ -101,7 +101,7 @@ const ns = (p: Patch, threshold: number, release: number, on = true): void => {
 const delay = (
   p: Patch,
   type: string,
-  timeMs: number,
+  time: number,
   feedback: number,
   level: number,
   highCutStr = "FLAT",
@@ -111,7 +111,7 @@ const delay = (
   const hc = HIGH_CUT_MAP[highCutStr] ?? 29;
   p.delay.on = on;
   p.delay.type = type;
-  p.delay.time_ms = timeMs;
+  p.delay.time = time;
   p.delay.feedback = feedback;
   p.delay.level = level;
   p.delay.high_cut = hc;
@@ -121,9 +121,9 @@ const delay = (
 const reverb = (
   p: Patch,
   type: string,
-  timeS: number,
+  time: number,
   level: number,
-  preDelayMs = 0,
+  preDelay = 0,
   tone = 0,
   density = 5,
   direct = 100,
@@ -132,9 +132,9 @@ const reverb = (
 ): void => {
   p.reverb.on = on;
   p.reverb.type = type;
-  p.reverb.time_s = timeS;
+  p.reverb.time = time;
   p.reverb.level = level;
-  p.reverb.pre_delay_ms = preDelayMs;
+  p.reverb.pre_delay = preDelay;
   p.reverb.tone = tone;
   p.reverb.density = density;
   p.reverb.direct = direct;
