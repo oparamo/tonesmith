@@ -148,8 +148,8 @@ describe("delay", () => {
 
   it("resolves high cut string to its numeric value", () => {
     const p = basePatch("Test");
-    delay(p, "ANALOG", 200, 40, 50, "2.2kHz");
-    expect(p.delay.high_cut).toBe(HIGH_CUT_MAP["2.2kHz"]);
+    delay(p, "ANALOG", 200, 40, 50, "2kHz");
+    expect(p.delay.high_cut).toBe(HIGH_CUT_MAP["2kHz"]);
   });
 
   it("falls back to FLAT (29) for an unrecognized high cut string", () => {

@@ -1,10 +1,15 @@
 import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
 
+// 1/3-octave series from 20Hz to 12.5kHz (indices 0–28), then FLAT (29).
+// Confirmed anchor: raw 25 = 6.3kHz (verified against real device readings).
 const HIGH_CUT_MAP: Record<string, number> = {
-  "2.2kHz": 20, "2.5kHz": 21, "2.8kHz": 22, "3.0kHz": 23,
-  "3.15kHz": 24, "3.2kHz": 24, "3.5kHz": 25, "4.0kHz": 26,
-  "4.5kHz": 27, "5.0kHz": 28, "FLAT": 29,
+  "20Hz": 0,   "25Hz": 1,   "31.5Hz": 2, "40Hz": 3,  "50Hz": 4,
+  "63Hz": 5,   "80Hz": 6,   "100Hz": 7,  "125Hz": 8, "160Hz": 9,
+  "200Hz": 10, "250Hz": 11, "315Hz": 12, "400Hz": 13, "500Hz": 14,
+  "630Hz": 15, "800Hz": 16, "1kHz": 17,  "1.25kHz": 18, "1.6kHz": 19,
+  "2kHz": 20,  "2.5kHz": 21, "3.15kHz": 22, "4kHz": 23,
+  "5kHz": 24,  "6.3kHz": 25, "8kHz": 26, "10kHz": 27, "12.5kHz": 28, "FLAT": 29,
 };
 
 // Node name strings match CHAIN_NAMES in constants.ts (empirically validated by round-trip tests).
