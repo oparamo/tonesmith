@@ -19,7 +19,7 @@ amp(dtmf1, "DELUXE", 14, 58, 52, 50, '1x12"', "RIBON121");
 fx(dtmf1, "fx1", "COMPRESSOR", "ORANGE", { sustain: 35, attack: 65, level: 55 });
 clearOdds(dtmf1);
 ns(dtmf1, 20, 40);
-delay(dtmf1, "ANALOG", 360, 22, 38, "2.2kHz");
+delay(dtmf1, "ANALOG", 360, 22, 38, "2kHz");
 reverb(dtmf1, "HALL M", 3.0, 42, 30, -12, 4, 100);
 patches.push(dtmf1);
 
@@ -30,7 +30,7 @@ fx(dtmf2, "fx1", "ENHANCER", null, { sens: 65, level: 58, low: 0, low_freq: 0, h
 fx(dtmf2, "fx2", "HIGH GEQ", null, { "250Hz": 4, "500Hz": 2, "1kHz": 3, "2kHz": -3, "4kHz": -6, "8kHz": 0, level: 20 });
 clearOdds(dtmf2);
 ns(dtmf2, 20, 40);
-delay(dtmf2, "ANALOG", 360, 22, 38, "2.2kHz");
+delay(dtmf2, "ANALOG", 360, 22, 38, "2kHz");
 reverb(dtmf2, "HALL M", 3.0, 42, 30, -12, 4, 100);
 patches.push(dtmf2);
 
@@ -41,7 +41,7 @@ fx(nev1, "fx1", "COMPRESSOR", "BOSS COMP", { sustain: 45, attack: 40, level: 60 
 fx(nev1, "fx2", "CHORUS", "STEREO", { rate: 10, depth: 20, level: 45, pre_delay: 4 });
 clearOdds(nev1);
 ns(nev1, 22, 38);
-delay(nev1, "STANDARD", 320, 18, 35, "4.0kHz");
+delay(nev1, "STANDARD", 320, 18, 35, "4kHz");
 reverb(nev1, "HALL S", 2.2, 38, 15, -3, 5, 100);
 patches.push(nev1);
 
