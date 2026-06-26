@@ -50,7 +50,7 @@ describe("GX-1 round-trip", () => {
 // encode are true inverses) for all ~40 types, not just those in the fixture.
 
 describe("FX param map symmetry (all types)", () => {
-  const zeroBytes = new Array(32).fill(0) as number[];
+  const zeroBytes = new Array(251).fill(0) as number[];
 
   for (const fxType of FX_TYPES) {
     it(`${fxType}: encode(decode(zeros)) equals decode(zeros)`, () => {

@@ -1,8 +1,9 @@
 import {
   FX_TYPES, FX_TYPE_IDX, FX_SUBTYPE_LISTS,
-  WAH_TYPES, ROTARY_SPEED, FB_MODE, RING_INTL, HUM_VOWELS,
+  WAH_TYPES, ROTARY_SPEED, FB_MODE, RING_INTL, HUM_VOWELS, HUM_MODES,
   SBEND_PITCH, SLICER_PAT, HARMONIST_HR, HARMONIST_KEY,
   REV_TYPES,
+  COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES,
 } from "../common";
 import type { FxParams } from "../types";
 import { hexFromBytes, lookupName, lookupIndex } from "./primitives";
@@ -48,12 +49,28 @@ const encodeFxType = (fxName: string, subtype?: string | null): [number, number]
 const WAH_FILTER   = ["LPF", "BPF", "HPF"] as const;
 const WAH_POLARITY = ["DOWN", "UP"] as const;
 
+// Known byte offsets for each FX type within the 251-byte FX param block.
+// All other effects default to offset 0 (params start at the beginning of the block).
+// Confirmed offsets (all from GLASSY DIST + SWORD LEAD + DROPTUNE RIFF diff analysis):
+//   TUNE DOWN=8, GEQ=38, HIGH GEQ=52, CHORUS=122, TREMOLO=160.
+const FX_PARAM_OFFSETS: Partial<Record<string, number>> = {
+  "TUNE DOWN": 8,
+  "GEQ":       38,
+  "HIGH GEQ":  52,
+  "CHORUS":    122,
+  "TREMOLO":   160,
+};
+
 const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
+  // COMPRESSOR: p[0]=type (stored in param block, NOT FX_COM byte[2]),
+  // p[1]=sustain, p[2]=attack, p[3]=level.
   "COMPRESSOR": [
-    u8("sustain", 0), u8("attack", 1), u8("level", 2),
+    lookup("type", 0, COMP_TYPES), u8("sustain", 1), u8("attack", 2), u8("level", 3),
   ],
+  // LIMITER: p[0]=type (stored in param block), then params shifted by one.
   "LIMITER": [
-    u8("threshold", 0), u8("ratio", 1), u8("level", 2), u8("attack", 3), u8("release", 4),
+    lookup("type", 0, LIM_TYPES),
+    u8("threshold", 1), u8("ratio", 2), u8("level", 3), u8("attack", 4), u8("release", 5),
   ],
   "ENHANCER": [
     u8("sens", 0), u8("low", 1), u8("low_freq", 2),
@@ -80,8 +97,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "AC. GTR SIM": [
     u8("body", 0), signed("low", 1), signed("high", 2), u8("level", 3),
   ],
+  // AC RESO: p[0]=type (stored in param block), then params shifted by one.
   "AC RESO": [
-    u8("reso", 0), signed("tone", 1), u8("level", 2),
+    lookup("type", 0, ACRESO_TYPES),
+    u8("reso", 1), signed("tone", 2), u8("level", 3),
   ],
   "SITAR SIM": [
     u8("sens", 0), u8("depth", 1), signed("tone", 2), u8("level", 3),
@@ -102,23 +121,29 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("mid_gain", 2, 20), signed("high_gain", 3, 20),
     u8("low_cut", 4), u8("mid_freq", 5), u8("high_cut", 6),
   ],
+  // GEQ band gains use signed(centre=20) — each band covers ±20 dB.
   "GEQ": [
-    signed("125Hz", 0), signed("250Hz", 1), signed("500Hz", 2),
-    signed("1kHz", 3),  signed("2kHz", 4),  signed("4kHz", 5),
+    signed("125Hz", 0, 20), signed("250Hz", 1, 20), signed("500Hz", 2, 20),
+    signed("1kHz",  3, 20), signed("2kHz",  4, 20), signed("4kHz",  5, 20),
     signed("level", 6, 20),
   ],
   "LOW GEQ": [
-    signed("63Hz",  0), signed("125Hz", 1), signed("250Hz", 2),
-    signed("500Hz", 3), signed("1kHz",  4), signed("2kHz",  5),
+    signed("63Hz",  0, 20), signed("125Hz", 1, 20), signed("250Hz", 2, 20),
+    signed("500Hz", 3, 20), signed("1kHz",  4, 20), signed("2kHz",  5, 20),
     signed("level", 6, 20),
   ],
+  // HIGH GEQ: params start at byte 52 of the 251-byte FX block (see FX_PARAM_OFFSETS).
+  // All bands and level use signed(centre=20). Band order: standard frequency order.
   "HIGH GEQ": [
-    signed("250Hz", 0), signed("500Hz", 1), signed("1kHz", 2),
-    signed("2kHz",  3), signed("4kHz",  4), signed("8kHz", 5),
+    signed("250Hz", 0, 20), signed("500Hz", 1, 20), signed("1kHz", 2, 20),
+    signed("2kHz",  3, 20), signed("4kHz",  4, 20), signed("8kHz", 5, 20),
     signed("level", 6, 20),
   ],
+  // CHORUS: p[0]=type (stored in param block), then params shifted by one.
+  // pre_delay stored as index × 0.5ms (e.g. 8 → 4.0ms).
   "CHORUS": [
-    u8("rate", 0), u8("depth", 1), u8("level", 2), u8("pre_delay", 3),
+    lookup("type", 0, CHORUS_TYPES),
+    u8("rate", 1), u8("depth", 2), u8("level", 3), scaled("pre_delay", 4, 0.5),
   ],
   "FLANGER": [
     u8("rate", 0), u8("depth", 1), u8("manual", 2), u8("reso", 3), u8("level", 4),
@@ -135,8 +160,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "SCRIPT PH": [
     u8("rate", 0), u8("depth", 1), u8("level", 2),
   ],
+  // CLASSIC-VIBE: p[0]=mode (stored in param block), then params shifted by one.
   "CLASSIC-VIBE": [
-    u8("rate", 0), u8("depth", 1), u8("level", 2),
+    lookup("type", 0, VIBE_MODES),
+    u8("rate", 1), u8("depth", 2), u8("level", 3),
   ],
   "ROTARY": [
     lookup("speed", 0, ROTARY_SPEED),
@@ -162,9 +189,11 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     lookup("intelligent", 0, RING_INTL),
     u8("freq", 1), u8("mod_rate", 2), u8("mod_depth", 3), u8("level", 4), u8("direct", 5),
   ],
+  // HUMANIZER: p[0]=mode (stored in param block), then params shifted by one.
   "HUMANIZER": [
-    lookup("vowel1", 0, HUM_VOWELS), lookup("vowel2", 1, HUM_VOWELS),
-    u8("sens", 2), u8("rate", 3), u8("manual", 4), u8("level", 5),
+    lookup("type", 0, HUM_MODES),
+    lookup("vowel1", 1, HUM_VOWELS), lookup("vowel2", 2, HUM_VOWELS),
+    u8("sens", 3), u8("rate", 4), u8("manual", 5), u8("level", 6),
   ],
   // PITCH SHIFT: pitch stored as (pitch + 24), range −24..+24 semitones.
   "PITCH SHIFT": [
@@ -234,7 +263,8 @@ const decodeFxParams = (fx: string, sub: string | null, bytes: number[]): FxPara
   const fields = FX_PARAM_MAPS[fx];
   if (!fields) return { unknownBytes: bytes.slice(0, 32) };
 
-  const params = decodeFields(fields, bytes);
+  const offset = FX_PARAM_OFFSETS[fx] ?? 0;
+  const params = decodeFields(fields, offset > 0 ? bytes.slice(offset) : bytes);
   if (fx === "OD/DS") params["type"] = sub ?? "";
   return params;
 };
@@ -254,7 +284,16 @@ const encodeFxParams = (
 
   const bytes = [...originalBytes];
   const fields = FX_PARAM_MAPS[fx];
-  if (fields) encodeFields(fields, params, bytes);
+  if (fields) {
+    const offset = FX_PARAM_OFFSETS[fx] ?? 0;
+    if (offset > 0) {
+      const slice = bytes.slice(offset);
+      encodeFields(fields, params, slice);
+      bytes.splice(offset, slice.length, ...slice);
+    } else {
+      encodeFields(fields, params, bytes);
+    }
+  }
   return hexFromBytes(bytes);
 };
 

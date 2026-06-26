@@ -74,8 +74,8 @@ const encodeAmp = (block: AmpBlock): string[] => {
 
 // ── OD/DS block (8 bytes) ─────────────────────────────────────────────────────
 //
-// Layout: [on, type, drive, tone(signed), level, -, -, direct]
-// Bytes 5–6 are unused — they pass through via the RAW bytes.
+// Layout: [on, type, drive, tone(signed), level, direct, -, ?]
+// Bytes 6–7 are unknown — they pass through via the RAW bytes.
 
 const decodeOdDs = (hexList: string[]): OdDsBlock => {
   const bytes = bytesFromHex(hexList);
@@ -85,7 +85,7 @@ const decodeOdDs = (hexList: string[]): OdDsBlock => {
     drive:  bytes[2]!,
     tone:   toSigned(bytes[3]!),
     level:  bytes[4]!,
-    direct: bytes[7]!,
+    direct: bytes[5]!,
     [RAW]:  bytes,
   };
 };
@@ -97,7 +97,7 @@ const encodeOdDs = (block: OdDsBlock): string[] => {
   bytes[2] = block.drive;
   bytes[3] = toUnsigned(block.tone);
   bytes[4] = block.level;
-  bytes[7] = block.direct;
+  bytes[5] = block.direct;
   return hexFromBytes(bytes);
 };
 
@@ -181,37 +181,44 @@ const encodeFxCom = (block: FxBlock): string[] => {
 //
 // Bytes 0–1 of the full block are [on, type] — handled in decodeDelay/encodeDelay.
 // Field offsets below are relative to byte 2 (the first parameter byte within the block).
+//
+// Confirmed layout (from SWORD LEAD STANDARD + FAT DIST ANALOG cross-referencing):
+//   params[0] unknown   params[1] time (note index or raw ms depending on type)
+//   params[2–3] unknown  params[4] feedback  params[5] level  params[6] high_cut
+//   params[7+] type-specific extras (positions unconfirmed, best-effort)
+//
+// WARP / TWIST / GLITCH have structurally different layouts — left at original offsets.
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
   ],
   "ANALOG": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
   ],
   "MODULATE": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("mod_rate", 5), u8("mod_depth", 6),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("mod_rate", 7), u8("mod_depth", 8),
   ],
   "ANLG MOD": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("mod_rate", 5), u8("mod_depth", 6),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("mod_rate", 7), u8("mod_depth", 8),
   ],
   "PAN": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("tap_time", 5),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("tap_time", 7),
   ],
   "REVERSE": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("trigger", 5),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("trigger", 7),
   ],
   "SPACE ECHO": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("head", 5),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("head", 7),
   ],
   "SHIMMER": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    signed("pitch", 5, 24), u8("balance", 6),
+    u8("time_ms", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    signed("pitch", 7, 24), u8("balance", 8),
   ],
   "WARP": [
     u16be("time_ms", 0), u8("trigger", 2), u8("level", 3),

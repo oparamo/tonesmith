@@ -90,14 +90,11 @@ const HARMONIST_HR = (
   )
 );
 
+// Only OD/DS stores its subtype in FX_COM byte[2].
+// COMPRESSOR, LIMITER, CHORUS, AC RESO, CLASSIC-VIBE, HUMANIZER store their
+// type/mode in param-block byte p[0] — handled in codec/fx-params.ts.
 const FX_SUBTYPE_LISTS: Record<string, readonly string[]> = {
-  "OD/DS":        ODDS_TYPES,
-  "COMPRESSOR":   COMP_TYPES,
-  "LIMITER":      LIM_TYPES,
-  "CHORUS":       CHORUS_TYPES,
-  "AC RESO":      ACRESO_TYPES,
-  "CLASSIC-VIBE": VIBE_MODES,
-  "HUMANIZER":    HUM_MODES,
+  "OD/DS": ODDS_TYPES,
 };
 
 export {
