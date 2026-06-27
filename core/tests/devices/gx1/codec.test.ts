@@ -59,7 +59,7 @@ describe("FX param map symmetry (all types)", () => {
       // Types not yet in FX_PARAM_MAPS return { unknownBytes: [...] } — skip them
       if ("unknownBytes" in decoded) return;
 
-      const reencoded = encodeFxParams(fxType, null, decoded, zeroBytes);
+      const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
       const reDecoded = decodeFxParams(fxType, null, bytesFromHex(reencoded));
 
       expect(reDecoded).toEqual(decoded);

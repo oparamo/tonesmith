@@ -49,7 +49,7 @@ const CHAIN_NAMES: Record<number, string> = {
 };
 
 const indexMap = (list: readonly string[]): Record<string, number> =>
-  Object.fromEntries(list.map((v, i) => [v, i]));
+  Object.fromEntries(list.map((value, index) => [value, index]));
 
 const FX_TYPE_IDX  = indexMap(FX_TYPES);
 const ODDS_IDX     = indexMap(ODDS_TYPES);
@@ -59,7 +59,7 @@ const MIC_TYPE_IDX = indexMap(MIC_TYPES);
 const DLY_TYPE_IDX = indexMap(DLY_TYPES);
 const REV_TYPE_IDX = indexMap(REV_TYPES);
 const CHAIN_IDS: Record<string, number> = Object.fromEntries(
-  Object.entries(CHAIN_NAMES).map(([k, v]) => [v, Number(k)])
+  Object.entries(CHAIN_NAMES).map(([numericId, name]) => [name, Number(numericId)])
 );
 
 const COMP_TYPES   = ["BOSS COMP", "D-COMP", "ORANGE", "X-COMP", "STEREO"] as const;
@@ -85,8 +85,8 @@ const HARMONIST_KEY = [
 ] as const;
 
 const HARMONIST_HR = (
-  [-2, -1, 0, 1, 2].flatMap(n =>
-    ["m2", "M2", "m3", "M3", "P4", "P5", "m6", "M6", "m7", "M7"].map(d => `${n}:${d}`)
+  [-2, -1, 0, 1, 2].flatMap(octave =>
+    ["m2", "M2", "m3", "M3", "P4", "P5", "m6", "M6", "m7", "M7"].map(interval => `${octave}:${interval}`)
   )
 );
 

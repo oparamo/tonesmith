@@ -22,26 +22,26 @@ import {
  * the RAW symbol so encodePatch can start from it and overwrite only known fields.
  */
 const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
-  const ps = raw.paramSet;
+  const paramSet = raw.paramSet;
 
   const patch: Patch = {
-    name:   decodeName(ps["MEMORY%COM"]!),
+    name:   decodeName(paramSet["MEMORY%COM"]!),
     memo:   raw.memo ?? "",
-    chain:  decodeChain(ps["MEMORY%CHAIN"]!),
-    amp:    decodeAmp(ps["MEMORY%AMP"]!),
-    odds:   decodeOdDs(ps["MEMORY%ODDS"]!),
-    ns:     decodeNs(ps["MEMORY%NS"]!),
-    fv:     decodeFv(ps["MEMORY%FV"]!),
-    delay:  decodeDelay(ps["MEMORY%DLY"]!),
-    reverb: decodeReverb(ps["MEMORY%REV"]!),
-    fx1: { ...decodeFxCom(ps["MEMORY%FX1_COM"]!), params: {} },
-    fx2: { ...decodeFxCom(ps["MEMORY%FX2_COM"]!), params: {} },
-    fx3: { ...decodeFxCom(ps["MEMORY%FX3_COM"]!), params: {} },
-    [RAW]: ps,
+    chain:  decodeChain(paramSet["MEMORY%CHAIN"]!),
+    amp:    decodeAmp(paramSet["MEMORY%AMP"]!),
+    odds:   decodeOdDs(paramSet["MEMORY%ODDS"]!),
+    ns:     decodeNs(paramSet["MEMORY%NS"]!),
+    fv:     decodeFv(paramSet["MEMORY%FV"]!),
+    delay:  decodeDelay(paramSet["MEMORY%DLY"]!),
+    reverb: decodeReverb(paramSet["MEMORY%REV"]!),
+    fx1: { ...decodeFxCom(paramSet["MEMORY%FX1_COM"]!), params: {} },
+    fx2: { ...decodeFxCom(paramSet["MEMORY%FX2_COM"]!), params: {} },
+    fx3: { ...decodeFxCom(paramSet["MEMORY%FX3_COM"]!), params: {} },
+    [RAW]: paramSet,
   };
 
   // Effects in this set store their type/mode in param-block byte p[0] rather than
-  // in FX_COM byte[2]. After decoding, promote params["type"] back to block.subtype
+  // in FX_COM byte[2]. After decoding, promote params["type"] back to block.subType
   // so the display layer can show e.g. "COMPRESSOR (D-COMP)".
   const PARAM_SUBTYPE_EFFECTS = new Set([
     "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER",
@@ -52,11 +52,11 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     const block = patch[fxKey];
     const params = decodeFxParams(
       block.type,
-      block.subtype,
-      bytesFromHex(ps[`MEMORY%${slot}`]!),
+      block.subType,
+      bytesFromHex(paramSet[`MEMORY%${slot}`]!),
     );
     if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params["type"] === "string") {
-      block.subtype = params["type"];
+      block.subType = params["type"];
     }
     block.params = params;
   }
@@ -70,26 +70,26 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
  * fields this codec knows about — unknown/unreversed bytes are preserved exactly.
  */
 const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
-  const ps: RawParamSet = { ...patch[RAW] };
+  const paramSet: RawParamSet = { ...patch[RAW] };
 
-  ps["MEMORY%COM"]   = encodeName(patch.name);
-  ps["MEMORY%CHAIN"] = encodeChain(patch.chain);
-  ps["MEMORY%AMP"]   = encodeAmp(patch.amp);
-  ps["MEMORY%ODDS"]  = encodeOdDs(patch.odds);
-  ps["MEMORY%NS"]    = encodeNs(patch.ns);
-  ps["MEMORY%FV"]    = encodeFv(patch.fv);
-  ps["MEMORY%DLY"]   = encodeDelay(patch.delay);
-  ps["MEMORY%REV"]   = encodeReverb(patch.reverb);
+  paramSet["MEMORY%COM"]   = encodeName(patch.name);
+  paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain);
+  paramSet["MEMORY%AMP"]   = encodeAmp(patch.amp);
+  paramSet["MEMORY%ODDS"]  = encodeOdDs(patch.odds);
+  paramSet["MEMORY%NS"]    = encodeNs(patch.ns);
+  paramSet["MEMORY%FV"]    = encodeFv(patch.fv);
+  paramSet["MEMORY%DLY"]   = encodeDelay(patch.delay);
+  paramSet["MEMORY%REV"]   = encodeReverb(patch.reverb);
 
   for (const slot of ["FX1", "FX2", "FX3"] as const) {
     const fxKey = slot.toLowerCase() as "fx1" | "fx2" | "fx3";
     const block = patch[fxKey];
-    ps[`MEMORY%${slot}_COM`] = encodeFxCom(block);
+    paramSet[`MEMORY%${slot}_COM`] = encodeFxCom(block);
     const originalParamBytes = bytesFromHex(patch[RAW][`MEMORY%${slot}`]!);
-    ps[`MEMORY%${slot}`] = encodeFxParams(block.type, block.subtype, block.params, originalParamBytes);
+    paramSet[`MEMORY%${slot}`] = encodeFxParams(block.type, block.params, originalParamBytes);
   }
 
-  return { memo: patch.memo, paramSet: ps };
+  return { memo: patch.memo, paramSet };
 };
 
 export { decodePatch, encodePatch };

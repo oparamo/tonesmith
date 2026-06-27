@@ -15,10 +15,10 @@ import type { CapabilityItem } from "../../../src/types";
 const groupItems = (groupId: string): CapabilityItem[] =>
   gx1Capabilities.groups.find(g => g.id === groupId)?.items ?? [];
 
-const allSubtypeIds = (items: CapabilityItem[]): Set<string> => {
+const allSubTypeIds = (items: CapabilityItem[]): Set<string> => {
   const ids = new Set<string>();
   for (const item of items) {
-    for (const sub of item.subtypes ?? []) {
+    for (const sub of item.subTypes ?? []) {
       ids.add(sub.id);
     }
   }
@@ -75,26 +75,26 @@ describe("GX-1 capabilities drift guard", () => {
     }
   });
 
-  it("covers every FX_SUBTYPE_LISTS entry as subtypes of the corresponding FX item", () => {
+  it("covers every FX_SUBTYPE_LISTS entry as subTypes of the corresponding FX item", () => {
     const fxItems = groupItems("fx");
-    const subtypeMap = allSubtypeIds(fxItems);
+    const subTypeMap = allSubTypeIds(fxItems);
 
-    for (const [fxType, subtypes] of Object.entries(FX_SUBTYPE_LISTS)) {
+    for (const [fxType, subTypes] of Object.entries(FX_SUBTYPE_LISTS)) {
       const fxItem = fxItems.find(i => i.id === fxType);
       expect(
         fxItem,
         `FX item "${fxType}" from FX_SUBTYPE_LISTS is missing from capabilities.groups.fx`
       ).toBeDefined();
 
-      const itemSubtypeIds = new Set((fxItem?.subtypes ?? []).map(s => s.id));
-      for (const subId of subtypes) {
+      const itemSubTypeIds = new Set((fxItem?.subTypes ?? []).map(s => s.id));
+      for (const subId of subTypes) {
         expect(
-          itemSubtypeIds,
+          itemSubTypeIds,
           `Subtype "${subId}" of FX type "${fxType}" is missing from capabilities`
         ).toContain(subId);
       }
-      // suppress "used before assigned" lint note for subtypeMap
-      void subtypeMap;
+      // suppress "used before assigned" lint note for subTypeMap
+      void subTypeMap;
     }
   });
 });

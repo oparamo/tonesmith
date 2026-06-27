@@ -2,11 +2,11 @@
 
 /** Convert an array of two-character hex strings to a byte array. */
 const bytesFromHex = (hexList: string[]): number[] =>
-  hexList.map(x => parseInt(x, 16));
+  hexList.map(hex => parseInt(hex, 16));
 
 /** Convert a byte array to an array of two-character uppercase hex strings. */
 const hexFromBytes = (byteList: number[]): string[] =>
-  byteList.map(b => b.toString(16).toUpperCase().padStart(2, "0"));
+  byteList.map(byte => byte.toString(16).toUpperCase().padStart(2, "0"));
 
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────

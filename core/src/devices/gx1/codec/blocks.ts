@@ -30,7 +30,7 @@ const encodeName = (name: string, length = 16): string[] => {
 // ── Chain block ───────────────────────────────────────────────────────────────
 
 const decodeChain = (hexList: string[]): string[] =>
-  bytesFromHex(hexList).map(v => CHAIN_NAMES[v] ?? `?${v}`);
+  bytesFromHex(hexList).map(chainId => CHAIN_NAMES[chainId] ?? `?${chainId}`);
 
 const encodeChain = (names: string[]): string[] =>
   hexFromBytes(names.map(name => CHAIN_IDS[name] ?? 0));
@@ -152,27 +152,27 @@ const encodeFv = (block: FvBlock): string[] => {
 };
 
 
-// ── FX_COM block (on/type/subtype header, 3 bytes) ────────────────────────────
+// ── FX_COM block (on/type/subType header, 3 bytes) ────────────────────────────
 
 const decodeFxCom = (hexList: string[]): Omit<FxBlock, "params"> => {
   const bytes = bytesFromHex(hexList);
-  const [fxType, subtype] = decodeFxType(bytes[1]!, bytes[2]!);
-  return { on: Boolean(bytes[0]), type: fxType, subtype, [RAW]: bytes };
+  const [fxType, subType] = decodeFxType(bytes[1]!, bytes[2]!);
+  return { on: Boolean(bytes[0]), type: fxType, subType, [RAW]: bytes };
 };
 
 const encodeFxCom = (block: FxBlock): string[] => {
   const bytes = [...block[RAW]];
   bytes[0] = Number(block.on);
-  const [typeByte, subtypeByte] = encodeFxType(block.type, block.subtype);
+  const [typeByte, subTypeByte] = encodeFxType(block.type, block.subType);
   bytes[1] = typeByte;
   // TODO: review whether byte 2 should always be zeroed or preserved when the fx
-  // type has no subtype, or when the subtype was decoded as unknown. Currently we
+  // type has no subType, or when the subType was decoded as unknown. Currently we
   // preserve it in both cases to avoid corrupting data we don't fully understand.
-  const subtypeIsKnown =
+  const subTypeIsKnown =
     FX_SUBTYPE_LISTS[block.type] !== undefined &&
-    block.subtype !== null &&
-    !String(block.subtype).startsWith("UNKNOWN_");
-  if (subtypeIsKnown) bytes[2] = subtypeByte;
+    block.subType !== null &&
+    !String(block.subType).startsWith("UNKNOWN_");
+  if (subTypeIsKnown) bytes[2] = subTypeByte;
   return hexFromBytes(bytes);
 };
 
@@ -184,40 +184,40 @@ const encodeFxCom = (block: FxBlock): string[] => {
 //
 // Confirmed layout (from SWORD LEAD STANDARD + FAT DIST ANALOG cross-referencing):
 //   params[0] unknown   params[1] time (note index or raw ms depending on type)
-//   params[2–3] unknown  params[4] feedback  params[5] level  params[6] high_cut
+//   params[2–3] unknown  params[4] feedback  params[5] level  params[6] highCut
 //   params[7+] type-specific extras (positions unconfirmed, best-effort)
 //
 // WARP / TWIST / GLITCH have structurally different layouts — left at original offsets.
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
   ],
   "ANALOG": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
   ],
   "MODULATE": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
-    u8("mod_rate", 7), u8("mod_depth", 8),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    u8("modRate", 7), u8("modDepth", 8),
   ],
   "ANLG MOD": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
-    u8("mod_rate", 7), u8("mod_depth", 8),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    u8("modRate", 7), u8("modDepth", 8),
   ],
   "PAN": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
-    u8("tap_time", 7),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    u8("tapTime", 7),
   ],
   "REVERSE": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
     u8("trigger", 7),
   ],
   "SPACE ECHO": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
     u8("head", 7),
   ],
   "SHIMMER": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("high_cut", 6),
+    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
     signed("pitch", 7, 24), u8("balance", 8),
   ],
   "WARP": [
@@ -225,7 +225,7 @@ const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "TWIST": [
     lookup("mode", 0, TWIST_MODES),
-    u8("trigger", 1), u8("level", 2), u8("rise_time", 3), u8("fall_time", 4), u8("fade_time", 5),
+    u8("trigger", 1), u8("level", 2), u8("riseTime", 3), u8("fallTime", 4), u8("fadeTime", 5),
   ],
   "GLITCH": [
     u8("trigger", 0), u8("time", 1), u8("glitch", 2), u8("balance", 3),
@@ -275,7 +275,7 @@ const decodeReverb = (hexList: string[]): ReverbBlock => {
       tone:         toSigned(bytes[3]!),
       density:      bytes[4]! + 1,
       level:        bytes[5]!,
-      pre_delay: bytes[7]!,
+      preDelay: bytes[7]!,
       direct:       bytes[8]!,
     });
   } else if (reverbType === "SHIMMER") {
@@ -283,20 +283,20 @@ const decodeReverb = (hexList: string[]): ReverbBlock => {
       time:       Math.round(bytes[2]! * 0.1 * 10) / 10,
       tone:         toSigned(bytes[3]!),
       level:        bytes[4]!,
-      pre_delay: bytes[5]!,
+      preDelay: bytes[5]!,
       pitch:        bytes[6]! - 24,
-      pitch_lvl:    bytes[7]!,
+      pitchLvl:    bytes[7]!,
     });
   } else if (reverbType === "SUB DELAY") {
     Object.assign(block, {
       time:     (bytes[2]! << 8) | bytes[3]!,
       feedback: bytes[4]!,
       level:    bytes[5]!,
-      high_cut: bytes[6]!,
+      highCut: bytes[6]!,
     });
   } else if (reverbType === "TERA ECHO") {
     Object.assign(block, {
-      s_time:   bytes[2]!,
+      time:   bytes[2]!,
       tone:     toSigned(bytes[3]!),
       level:    bytes[4]!,
       feedback: bytes[5]!,
@@ -312,36 +312,36 @@ const encodeReverb = (block: ReverbBlock): string[] => {
   bytes[0] = Number(block.on);
   bytes[1] = lookupIndex(REV_TYPE_IDX, block.type, "REV type");
 
-  const get = (key: string, fallback = 0): number => (block[key] as number) ?? fallback;
+  const getParam = (key: string, fallback = 0): number => (block[key] as number) ?? fallback;
 
   if ((STANDARD_REVERB_TYPES as readonly string[]).includes(block.type)) {
-    bytes[2] = Math.round(get("time") / 0.1);
-    bytes[3] = toUnsigned(get("tone"));
-    bytes[4] = get("density") - 1;
-    bytes[5] = get("level");
-    bytes[7] = get("pre_delay");
-    bytes[8] = get("direct");
+    bytes[2] = Math.round(getParam("time") / 0.1);
+    bytes[3] = toUnsigned(getParam("tone"));
+    bytes[4] = getParam("density") - 1;
+    bytes[5] = getParam("level");
+    bytes[7] = getParam("preDelay");
+    bytes[8] = getParam("direct");
   } else if (block.type === "SHIMMER") {
-    bytes[2] = Math.round(get("time") / 0.1);
-    bytes[3] = toUnsigned(get("tone"));
-    bytes[4] = get("level");
-    bytes[5] = get("pre_delay");
-    bytes[6] = get("pitch") + 24;
-    bytes[7] = get("pitch_lvl");
+    bytes[2] = Math.round(getParam("time") / 0.1);
+    bytes[3] = toUnsigned(getParam("tone"));
+    bytes[4] = getParam("level");
+    bytes[5] = getParam("preDelay");
+    bytes[6] = getParam("pitch") + 24;
+    bytes[7] = getParam("pitchLvl");
   } else if (block.type === "SUB DELAY") {
-    const ms = get("time");
+    const ms = getParam("time");
     bytes[2] = ms >> 8;
     bytes[3] = ms & 0xFF;
-    bytes[4] = get("feedback");
-    bytes[5] = get("level");
-    bytes[6] = get("high_cut");
+    bytes[4] = getParam("feedback");
+    bytes[5] = getParam("level");
+    bytes[6] = getParam("highCut");
   } else if (block.type === "TERA ECHO") {
-    bytes[2] = get("s_time");
-    bytes[3] = toUnsigned(get("tone"));
-    bytes[4] = get("level");
-    bytes[5] = get("feedback");
-    bytes[6] = get("direct");
-    bytes[7] = get("trigger");
+    bytes[2] = getParam("time");
+    bytes[3] = toUnsigned(getParam("tone"));
+    bytes[4] = getParam("level");
+    bytes[5] = getParam("feedback");
+    bytes[6] = getParam("direct");
+    bytes[7] = getParam("trigger");
   }
   return hexFromBytes(bytes);
 };

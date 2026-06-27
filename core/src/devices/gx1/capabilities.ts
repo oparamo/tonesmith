@@ -20,7 +20,7 @@ const FX_ITEMS = [
     id: "COMPRESSOR",
     name: "Compressor",
     description: "Produces a long sustain by evening out the volume level of the input signal. Attenuates loud peaks and boosts quiet signals.",
-    subtypes: [
+    subTypes: [
       { id: "BOSS COMP", name: "BOSS Comp", description: "Models a BOSS CS-3.", models: "BOSS CS-3" },
       { id: "D-COMP",    name: "D-Comp",    description: "Models a MXR Dyna Comp.", models: "MXR Dyna Comp" },
       { id: "ORANGE",    name: "Orange",    description: "Modeled on the Dan Armstrong ORANGE SQUEEZER.", models: "Dan Armstrong Orange Squeezer" },
@@ -37,7 +37,7 @@ const FX_ITEMS = [
     id: "LIMITER",
     name: "Limiter",
     description: "Attenuates loud input levels to prevent distortion, acting as a ceiling on the signal level.",
-    subtypes: [
+    subTypes: [
       { id: "BOSS",       name: "BOSS",        description: "Stereo limiter — general-purpose limiting with a clean character." },
       { id: "RACK 160D",  name: "Rack 160D",   description: "Models a dbx 160X.", models: "dbx 160X" },
       { id: "VTG RACK U", name: "Vintage Rack U", description: "Models a UREI 1178.", models: "UREI 1178" },
@@ -94,7 +94,7 @@ const FX_ITEMS = [
     id: "FIXED WAH",
     name: "Fixed Wah",
     description: "Static wah effect — the pedal is stopped at a fixed midrange position, producing a vowel-filter tone.",
-    subtypes: [
+    subTypes: [
       { id: "CRY WAH",  name: "Cry Wah",   description: "Models the CRY BABY wah pedal popular in the '70s.", models: "Dunlop Cry Baby" },
       { id: "VO WAH",   name: "Vox Wah",   description: "Models the VOX V846.", models: "VOX V846" },
       { id: "FAT WAH",  name: "Fat Wah",   description: "Wah with a bold, thick tone." },
@@ -147,7 +147,7 @@ const FX_ITEMS = [
     id: "AC RESO",
     name: "Acoustic Resonance",
     description: "Changes the pickup sound of an acoustic-electric guitar, creating a richer mic-like sound.",
-    subtypes: [
+    subTypes: [
       { id: "NATURAL", name: "Natural", description: "Natural, uncolored acoustic resonance." },
       { id: "WIDE",    name: "Wide",    description: "Full sound with emphasized body resonance." },
       { id: "BRIGHT",  name: "Bright",  description: "Brilliant sound extending into the high range." },
@@ -189,7 +189,7 @@ const FX_ITEMS = [
     id: "OD/DS",
     name: "Overdrive/Distortion",
     description: "Overdrive and distortion effect that distorts the sound to create sustain. The type selects from 35 classic pedal models.",
-    subtypes: [
+    subTypes: [
       { id: "MID BOOST",  name: "Mid Boost",   description: "Booster with unique midrange characteristics. Good for solos placed before the amp." },
       { id: "CLEAN BST",  name: "Clean Boost",  description: "Booster with a punchy clean tone." },
       { id: "TREBLE BST", name: "Treble Boost", description: "Bright booster with treble emphasis." },
@@ -293,7 +293,7 @@ const FX_ITEMS = [
     id: "CHORUS",
     name: "Chorus",
     description: "Adds a slightly pitch-modulated copy of the signal to create spaciousness, depth, and a shimmering quality.",
-    subtypes: [
+    subTypes: [
       { id: "MONO",    name: "Mono",    description: "Mono chorus — same sound output from both L and R channels." },
       { id: "DIR/EFX", name: "Dir/Efx", description: "Stereo chorus using spatial synthesis: direct in L, effect in R." },
       { id: "STEREO",  name: "Stereo",  description: "Stereo chorus — different chorus applied to L and R channels." },
@@ -345,7 +345,7 @@ const FX_ITEMS = [
     id: "CLASSIC-VIBE",
     name: "Classic Vibe",
     description: "Resembles a phaser but provides a unique undulation that a regular phaser cannot achieve — the rotary-speaker-like Uni-Vibe character.",
-    subtypes: [
+    subTypes: [
       { id: "CHORUS",  name: "Chorus",  description: "Direct sound and effect sound are mixed together." },
       { id: "VIBRATO", name: "Vibrato", description: "Only the effect sound is output — full pitch modulation." },
     ],
@@ -429,7 +429,7 @@ const FX_ITEMS = [
     id: "HUMANIZER",
     name: "Humanizer",
     description: "Alters the guitar signal to produce human-like vocalized sounds by cycling between two selectable vowels.",
-    subtypes: [
+    subTypes: [
       { id: "PICKING", name: "Picking", description: "Vowels switch in response to picking — picking triggers the vowel change." },
       { id: "AUTO",    name: "Auto",    description: "Vowels switch automatically based on rate and depth." },
     ],
@@ -560,7 +560,7 @@ const FX_ITEMS = [
 // OD/DS block — separate overdrive/distortion block (same types as above OD/DS subtype list)
 // ---------------------------------------------------------------------------
 
-const ODDS_ITEMS = FX_ITEMS.find(f => f.id === "OD/DS")!.subtypes as unknown as CapabilityItem[];
+const ODDS_ITEMS = FX_ITEMS.find(f => f.id === "OD/DS")!.subTypes as unknown as CapabilityItem[];
 
 // ---------------------------------------------------------------------------
 // AMP models

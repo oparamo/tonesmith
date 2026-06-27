@@ -9,8 +9,8 @@ import { printGroups, printGroup, printItem } from "../../common";
 const run = (action: () => void): void => {
   try {
     action();
-  } catch (e) {
-    console.error(e instanceof Error ? e.message : String(e));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 };
@@ -24,9 +24,9 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
       const indices = ref !== undefined
         ? [patchUtils.resolvePatchIndex(patchFile.patches, ref)]
-        : Array.from({ length: patchFile.patches.length }, (_, i) => i);
-      for (const i of indices) {
-        printPatch(patchFile.patches[i]! as gx1.Patch, i);
+        : Array.from({ length: patchFile.patches.length }, (_, index) => index);
+      for (const patchIndex of indices) {
+        printPatch(patchFile.patches[patchIndex]! as gx1.Patch, patchIndex);
       }
       console.info();
     }));
@@ -38,9 +38,9 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       const patchFile = driver.readFile(file);
       const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
       const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
-      for (const kv of fields) {
-        const eqIdx = kv.indexOf("=");
-        patchUtils.setByPath(patch, `${block}.${kv.slice(0, eqIdx)}`, patchUtils.coerceValue(kv.slice(eqIdx + 1)));
+      for (const fieldAssignment of fields) {
+        const separatorIndex = fieldAssignment.indexOf("=");
+        patchUtils.setByPath(patch, `${block}.${fieldAssignment.slice(0, separatorIndex)}`, patchUtils.coerceValue(fieldAssignment.slice(separatorIndex + 1)));
       }
       driver.writeFile(patchFile, file);
       console.info(`Wrote ${file} — patch ${idx} ${block} updated`);
@@ -62,53 +62,53 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
   gx1
     .command("new <file> [setName] [nPatches]")
     .description("create a blank .tsl file")
-    .action((file: string, setName?: string, nPatchesStr?: string) => run(() => {
+    .action((file: string, setName?: string, patchCountStr?: string) => run(() => {
       if (existsSync(file)) {
         console.error(`${file} already exists — refusing to overwrite`);
         process.exit(1);
       }
       const name = setName ?? basename(file, extname(file));
-      const n = nPatchesStr !== undefined ? parseInt(nPatchesStr, 10) : 1;
-      const patchFile = driver.newFile(name, n);
+      const patchCount = patchCountStr !== undefined ? parseInt(patchCountStr, 10) : 1;
+      const patchFile = driver.newFile(name, patchCount);
       driver.writeFile(patchFile, file);
-      console.info(`Created ${file} — ${n} blank patch(es), set name '${name}'`);
+      console.info(`Created ${file} — ${patchCount} blank patch(es), set name '${name}'`);
     }));
 
   gx1
     .command("capabilities [group] [item]")
     .description("browse supported effects, amp models, and other device capabilities")
-    .action((group?: string, item?: string) => run(() => {
+    .action((groupId?: string, item?: string) => run(() => {
       const caps = driver.capabilities;
 
-      if (!group) {
+      if (!groupId) {
         printGroups(caps);
         return;
       }
 
-      const grp = caps.groups.find(g => g.id === group.toLowerCase());
-      if (!grp) {
+      const group = caps.groups.find(capGroup => capGroup.id === groupId.toLowerCase());
+      if (!group) {
         throw new Error(
-          `Unknown group "${group}". Available: ${caps.groups.map(g => g.id).join(", ")}`
+          `Unknown group "${groupId}". Available: ${caps.groups.map(capGroup => capGroup.id).join(", ")}`
         );
       }
 
       if (!item) {
-        printGroup(grp);
+        printGroup(group);
         return;
       }
 
       // Match by id (exact, case-insensitive) or by name prefix
       const itemUpper = item.toUpperCase();
       const found =
-        grp.items.find(i => i.id.toUpperCase() === itemUpper) ??
-        grp.items.find(i => i.name.toUpperCase().startsWith(itemUpper));
+        group.items.find(capItem => capItem.id.toUpperCase() === itemUpper) ??
+        group.items.find(capItem => capItem.name.toUpperCase().startsWith(itemUpper));
       if (!found) {
         throw new Error(
-          `Unknown item "${item}" in group "${group}". Available: ${grp.items.map(i => i.id).join(", ")}`
+          `Unknown item "${item}" in group "${groupId}". Available: ${group.items.map(capItem => capItem.id).join(", ")}`
         );
       }
 
-      printItem(grp, found);
+      printItem(group, found);
     }));
 };
 

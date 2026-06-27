@@ -4,7 +4,7 @@ import type { FxParams } from "./tsl";
 interface FxBlock {
   on: boolean;
   type: string;
-  subtype: string | null;
+  subType: string | null;
   params: FxParams;
   [RAW]: number[];
 }

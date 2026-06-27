@@ -6,11 +6,11 @@ const patches = [];
 // OL-1  Ojitos Lindos — FX1 (Chorus) → AMP → NS → DELAY → SHIMMER REV
 const ol1 = basePatch("OL-1 OJITOS", "FX1>AMP>NS>DLY>REV");
 amp(ol1, "TRNSPRNT", 12, 48, 45, 55, '1x12"', "RIBON121");
-fx(ol1, "fx1", "CHORUS", "STEREO", { rate: 20, depth: 35, level: 60, pre_delay: 5 });
+fx(ol1, "fx1", "CHORUS", "STEREO", { rate: 20, depth: 35, level: 60, preDelay: 5 });
 clearOdds(ol1);
 ns(ol1, 18, 40);
 delay(ol1, "ANALOG", 1, 30, 48, "FLAT");
-reverb(ol1, "SHIMMER", 4.0, 55, 25, -3, 5, 100, true, { pitch: 12, pitch_lvl: 28 });
+reverb(ol1, "SHIMMER", 4.0, 55, 25, -3, 5, 100, true, { pitch: 12, pitchLvl: 28 });
 patches.push(ol1);
 
 // DTMF-1  Warm — FX1 (Compressor) → AMP → NS → DELAY → REVERB
@@ -26,7 +26,7 @@ patches.push(dtmf1);
 // DTMF-2  Lo-Fi — FX1 (Enhancer) → AMP → FX2 (High GEQ) → NS → DELAY → REVERB
 const dtmf2 = basePatch("DTMF-2 LOFI", "FX1>AMP>FX2>NS>DLY>REV");
 amp(dtmf2, "TRNSPRNT", 8, 58, 52, 50, '1x12"', "RIBON121");
-fx(dtmf2, "fx1", "ENHANCER", null, { sens: 65, level: 58, low: 0, low_freq: 0, high: 0, high_freq: 0 });
+fx(dtmf2, "fx1", "ENHANCER", null, { sens: 65, level: 58, low: 0, lowFreq: 0, high: 0, highFreq: 0 });
 fx(dtmf2, "fx2", "HIGH GEQ", null, { "250Hz": 4, "500Hz": 2, "1kHz": 3, "2kHz": -3, "4kHz": -6, "8kHz": 0, level: 20 });
 clearOdds(dtmf2);
 ns(dtmf2, 20, 40);
@@ -38,7 +38,7 @@ patches.push(dtmf2);
 const nev1 = basePatch("NEV-1 NEVERIT", "FX1>AMP>FX2>NS>DLY>REV");
 amp(nev1, "TWIN", 16, 50, 42, 65, "ORIGINAL", "CND87");
 fx(nev1, "fx1", "COMPRESSOR", "BOSS COMP", { sustain: 45, attack: 40, level: 60 });
-fx(nev1, "fx2", "CHORUS", "STEREO", { rate: 10, depth: 20, level: 45, pre_delay: 4 });
+fx(nev1, "fx2", "CHORUS", "STEREO", { rate: 10, depth: 20, level: 45, preDelay: 4 });
 clearOdds(nev1);
 ns(nev1, 22, 38);
 delay(nev1, "STANDARD", 7, 18, 35, "4kHz");
@@ -69,7 +69,7 @@ patches.push(pdc1);
 const uc1 = basePatch("UC-1 UN COCO", "FX1>AMP>FX2>NS>DLY>REV");
 amp(uc1, "DELUXE", 20, 55, 50, 58, '1x12"', "RIBON121");
 fx(uc1, "fx1", "COMPRESSOR", "BOSS COMP", { sustain: 48, attack: 45, level: 60 });
-fx(uc1, "fx2", "CHORUS", "STEREO", { rate: 14, depth: 25, level: 50, pre_delay: 5 });
+fx(uc1, "fx2", "CHORUS", "STEREO", { rate: 14, depth: 25, level: 50, preDelay: 5 });
 clearOdds(uc1);
 ns(uc1, 22, 45);
 delay(uc1, "ANALOG", 1, 25, 40, "2.5kHz");

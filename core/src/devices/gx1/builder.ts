@@ -31,13 +31,13 @@ const CHAINS: Record<string, string[]> = {
 const basePatch = (name: string, chainKey = "FX1>AMP>NS>DLY>REV"): Patch => {
   const chain = CHAINS[chainKey];
   if (chain === undefined) throw new Error(`Unknown chain preset: ${chainKey}`);
-  const p = blankPatch(name);
-  p.chain = chain;
-  return p;
+  const patch = blankPatch(name);
+  patch.chain = chain;
+  return patch;
 };
 
 const amp = (
-  p: Patch,
+  patch: Patch,
   type: string,
   gain: number,
   bass: number,
@@ -47,59 +47,59 @@ const amp = (
   mic = "DYN57",
   level = 100,
 ): void => {
-  p.amp.on = true;
-  p.amp.type = type;
-  p.amp.gain = gain;
-  p.amp.bass = bass;
-  p.amp.middle = mid;
-  p.amp.treble = treble;
-  p.amp.speaker = speaker;
-  p.amp.mic = mic;
-  p.amp.level = level;
+  patch.amp.on = true;
+  patch.amp.type = type;
+  patch.amp.gain = gain;
+  patch.amp.bass = bass;
+  patch.amp.middle = mid;
+  patch.amp.treble = treble;
+  patch.amp.speaker = speaker;
+  patch.amp.mic = mic;
+  patch.amp.level = level;
 };
 
 const odds = (
-  p: Patch,
+  patch: Patch,
   type: string,
   drive: number,
   tone: number,
   level: number,
   direct = 0,
 ): void => {
-  p.odds.on = true;
-  p.odds.type = type;
-  p.odds.drive = drive;
-  p.odds.tone = tone;
-  p.odds.level = level;
-  p.odds.direct = direct;
+  patch.odds.on = true;
+  patch.odds.type = type;
+  patch.odds.drive = drive;
+  patch.odds.tone = tone;
+  patch.odds.level = level;
+  patch.odds.direct = direct;
 };
 
-const clearOdds = (p: Patch): void => {
-  p.odds.on = false;
+const clearOdds = (patch: Patch): void => {
+  patch.odds.on = false;
 };
 
 const fx = (
-  p: Patch,
+  patch: Patch,
   slot: "fx1" | "fx2" | "fx3",
   fxType: string,
-  subtype: string | null = null,
+  subType: string | null = null,
   params: FxParams = {},
 ): void => {
-  const block = p[slot];
+  const block = patch[slot];
   block.on = true;
   block.type = fxType;
-  block.subtype = subtype;
+  block.subType = subType;
   block.params = params;
 };
 
-const ns = (p: Patch, threshold: number, release: number, on = true): void => {
-  p.ns.on = on;
-  p.ns.threshold = threshold;
-  p.ns.release = release;
+const ns = (patch: Patch, threshold: number, release: number, on = true): void => {
+  patch.ns.on = on;
+  patch.ns.threshold = threshold;
+  patch.ns.release = release;
 };
 
 const delay = (
-  p: Patch,
+  patch: Patch,
   type: string,
   time: number,
   feedback: number,
@@ -108,18 +108,18 @@ const delay = (
   on = true,
   extra: Record<string, unknown> = {},
 ): void => {
-  const hc = HIGH_CUT_MAP[highCutStr] ?? 29;
-  p.delay.on = on;
-  p.delay.type = type;
-  p.delay.time = time;
-  p.delay.feedback = feedback;
-  p.delay.level = level;
-  p.delay.high_cut = hc;
-  Object.assign(p.delay, extra);
+  const highCut = HIGH_CUT_MAP[highCutStr] ?? 29;
+  patch.delay.on = on;
+  patch.delay.type = type;
+  patch.delay.time = time;
+  patch.delay.feedback = feedback;
+  patch.delay.level = level;
+  patch.delay.highCut = highCut;
+  Object.assign(patch.delay, extra);
 };
 
 const reverb = (
-  p: Patch,
+  patch: Patch,
   type: string,
   time: number,
   level: number,
@@ -130,15 +130,15 @@ const reverb = (
   on = true,
   extra: Record<string, unknown> = {},
 ): void => {
-  p.reverb.on = on;
-  p.reverb.type = type;
-  p.reverb.time = time;
-  p.reverb.level = level;
-  p.reverb.pre_delay = preDelay;
-  p.reverb.tone = tone;
-  p.reverb.density = density;
-  p.reverb.direct = direct;
-  Object.assign(p.reverb, extra);
+  patch.reverb.on = on;
+  patch.reverb.type = type;
+  patch.reverb.time = time;
+  patch.reverb.level = level;
+  patch.reverb.preDelay = preDelay;
+  patch.reverb.tone = tone;
+  patch.reverb.density = density;
+  patch.reverb.direct = direct;
+  Object.assign(patch.reverb, extra);
 };
 
 const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {

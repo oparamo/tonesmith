@@ -44,8 +44,8 @@ const blankPatch = (name = "NEW PATCH"): Patch => {
   return decodePatch({ memo: "", paramSet: ps });
 };
 
-const newFile = (setName: string, nPatches = 1): PatchFile => {
-  const patches = Array.from({ length: nPatches }, () => blankPatch());
+const newFile = (setName: string, patchCount = 1): PatchFile => {
+  const patches = Array.from({ length: patchCount }, () => blankPatch());
   const envelope: TslEnvelope = { name: setName, formatRev: "0000", device: "GX-1", data: [[], []] };
   return { name: setName, formatRev: "0000", device: "GX-1", patches, [RAW]: envelope };
 };
@@ -69,7 +69,7 @@ const writeFile = (file: PatchFile, path: string): void => {
     name:      file.name,
     formatRev: file.formatRev,
     data: [
-      file.patches.map(p => encodePatch(p) as unknown as RawParamSet),
+      file.patches.map(patch => encodePatch(patch) as unknown as RawParamSet),
       file[RAW].data[1],
     ],
   };

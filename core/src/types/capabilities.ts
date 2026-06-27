@@ -20,7 +20,7 @@ interface CapabilityItem {
   /** Real-world gear this item emulates, where applicable. */
   models?: string;
   /** Nested selectable variants within this item (e.g. the compressor types, drive pedal types). */
-  subtypes?: CapabilityItem[];
+  subTypes?: CapabilityItem[];
   /** Parameters specific to this item (supplement the group's shared params). */
   params?: ParamSpec[];
 }

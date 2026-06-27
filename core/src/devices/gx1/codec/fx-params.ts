@@ -12,26 +12,26 @@ import { u8, signed, lookup, scaled, u16be, decodeFields, encodeFields, type Fie
 // ── FX type encode / decode ───────────────────────────────────────────────────
 
 /**
- * Decode the two FX_COM bytes (hi=type index, lo=subtype index) into names.
+ * Decode the two FX_COM bytes (hi=type index, lo=subType index) into names.
  * Falls back to "UNKNOWN_N" for out-of-range byte values.
  */
 const decodeFxType = (hi: number, lo: number): [string, string | null] => {
   const fxName = lookupName(FX_TYPES, hi, "FX");
-  const subtypeList = FX_SUBTYPE_LISTS[fxName];
-  const subtype = subtypeList ? lookupName(subtypeList, lo) : null;
-  return [fxName, subtype];
+  const subTypeList = FX_SUBTYPE_LISTS[fxName];
+  const subType = subTypeList ? lookupName(subTypeList, lo) : null;
+  return [fxName, subType];
 };
 
 /**
- * Encode an FX type name (and optional subtype) back to two byte values.
- * When the subtype was decoded as UNKNOWN_N (out-of-range), we return 0 for the
- * subtype byte; the caller (encodeFxCom in blocks.ts) preserves the original byte.
+ * Encode an FX type name (and optional subType) back to two byte values.
+ * When the subType was decoded as UNKNOWN_N (out-of-range), we return 0 for the
+ * subType byte; the caller (encodeFxCom in blocks.ts) preserves the original byte.
  */
-const encodeFxType = (fxName: string, subtype?: string | null): [number, number] => {
+const encodeFxType = (fxName: string, subType?: string | null): [number, number] => {
   const hi = lookupIndex(FX_TYPE_IDX, fxName, "FX type");
-  const subtypeList = FX_SUBTYPE_LISTS[fxName];
-  const subtypeIsKnown = subtypeList && subtype != null && !subtype.startsWith("UNKNOWN_");
-  const lo = subtypeIsKnown ? subtypeList.indexOf(subtype) : 0;
+  const subTypeList = FX_SUBTYPE_LISTS[fxName];
+  const subTypeIsKnown = subTypeList && subType != null && !subType.startsWith("UNKNOWN_");
+  const lo = subTypeIsKnown ? subTypeList.indexOf(subType) : 0;
   return [hi, lo];
 };
 
@@ -73,8 +73,8 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("threshold", 1), u8("ratio", 2), u8("level", 3), u8("attack", 4), u8("release", 5),
   ],
   "ENHANCER": [
-    u8("sens", 0), u8("low", 1), u8("low_freq", 2),
-    u8("high", 3), u8("high_freq", 4), u8("level", 5),
+    u8("sens", 0), u8("low", 1), u8("lowFreq", 2),
+    u8("high", 3), u8("highFreq", 4), u8("level", 5),
   ],
   "TOUCH WAH": [
     lookup("filter", 0, WAH_FILTER), lookup("polarity", 1, WAH_POLARITY),
@@ -85,14 +85,14 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("rate", 1), u8("depth", 2), u8("level", 3), u8("freq", 4), u8("reso", 5),
   ],
   "FIXED WAH": [
-    lookup("wah_type", 0, WAH_TYPES), u8("freq", 1), u8("level", 2), u8("direct", 3),
+    lookup("wahType", 0, WAH_TYPES), u8("freq", 1), u8("level", 2), u8("direct", 3),
   ],
   "DEFRETTER": [
     u8("sens", 0), u8("depth", 1), signed("tone", 2), u8("level", 3),
     u8("attack", 4), u8("reso", 5), u8("direct", 6),
   ],
   "SLOW GEAR": [
-    u8("sens", 0), u8("rise_time", 1), u8("level", 2),
+    u8("sens", 0), u8("riseTime", 1), u8("level", 2),
   ],
   "AC. GTR SIM": [
     u8("body", 0), signed("low", 1), signed("high", 2), u8("level", 3),
@@ -107,8 +107,8 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("reso", 4), u8("buzz", 5), u8("direct", 6),
   ],
   "FEEDBACKER": [
-    lookup("mode", 0, FB_MODE), u8("trigger", 1), u8("depth", 2), u8("rise_time", 3),
-    u8("oct_rise_tm", 4), u8("feedback", 5), u8("oct_feedback", 6),
+    lookup("mode", 0, FB_MODE), u8("trigger", 1), u8("depth", 2), u8("riseTime", 3),
+    u8("octRiseTm", 4), u8("feedback", 5), u8("octFeedback", 6),
   ],
   // OD/DS: the drive/tone/level/direct bytes live in the param block; the "type" field
   // (which OD/DS pedal model is selected) lives in the FX_COM subtype byte, so it is
@@ -117,9 +117,9 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("drive", 0), signed("tone", 1), u8("level", 2), u8("direct", 3),
   ],
   "PARA. EQ": [
-    signed("level", 0, 20), signed("low_gain", 1, 20),
-    signed("mid_gain", 2, 20), signed("high_gain", 3, 20),
-    u8("low_cut", 4), u8("mid_freq", 5), u8("high_cut", 6),
+    signed("level", 0, 20), signed("lowGain", 1, 20),
+    signed("midGain", 2, 20), signed("highGain", 3, 20),
+    u8("lowCut", 4), u8("midFreq", 5), u8("highCut", 6),
   ],
   // GEQ band gains use signed(centre=20) — each band covers ±20 dB.
   "GEQ": [
@@ -140,10 +140,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("level", 6, 20),
   ],
   // CHORUS: p[0]=type (stored in param block), then params shifted by one.
-  // pre_delay stored as index × 0.5ms (e.g. 8 → 4.0ms).
+  // preDelay stored as index × 0.5ms (e.g. 8 → 4.0ms).
   "CHORUS": [
     lookup("type", 0, CHORUS_TYPES),
-    u8("rate", 1), u8("depth", 2), u8("level", 3), scaled("pre_delay", 4, 0.5),
+    u8("rate", 1), u8("depth", 2), u8("level", 3), scaled("preDelay", 4, 0.5),
   ],
   "FLANGER": [
     u8("rate", 0), u8("depth", 1), u8("manual", 2), u8("reso", 3), u8("level", 4),
@@ -167,10 +167,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "ROTARY": [
     lookup("speed", 0, ROTARY_SPEED),
-    u8("slow_rate", 1), u8("fast_rate", 2), u8("level", 3), u8("balance", 4), u8("drive", 5),
+    u8("slowRate", 1), u8("fastRate", 2), u8("level", 3), u8("balance", 4), u8("drive", 5),
   ],
   "VIBRATO": [
-    u8("rate", 0), u8("depth", 1), u8("level", 2), u8("rise_time", 3), u8("trigger", 4),
+    u8("rate", 0), u8("depth", 1), u8("level", 2), u8("riseTime", 3), u8("trigger", 4),
   ],
   "TREMOLO": [
     u8("rate", 0), u8("depth", 1), u8("level", 2),
@@ -187,7 +187,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "RING MOD": [
     lookup("intelligent", 0, RING_INTL),
-    u8("freq", 1), u8("mod_rate", 2), u8("mod_depth", 3), u8("level", 4), u8("direct", 5),
+    u8("freq", 1), u8("modRate", 2), u8("modDepth", 3), u8("level", 4), u8("direct", 5),
   ],
   // HUMANIZER: p[0]=mode (stored in param block), then params shifted by one.
   "HUMANIZER": [
@@ -198,7 +198,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   // PITCH SHIFT: pitch stored as (pitch + 24), range −24..+24 semitones.
   "PITCH SHIFT": [
     signed("pitch", 0, 24),
-    u8("mode", 1), u8("level", 2), u8("pre_delay", 3), u8("feedback", 4), u8("direct", 5),
+    u8("mode", 1), u8("level", 2), u8("preDelay", 3), u8("feedback", 4), u8("direct", 5),
   ],
   // HARMONIST: harmony decoded as an interval string (e.g. "0:M3") when in range,
   // or as a raw number when the index is out of the HARMONIST_HR table.
@@ -215,21 +215,21 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
       },
     },
     lookup("key", 1, HARMONIST_KEY),
-    u8("level", 2), u8("pre_delay", 3), u8("feedback", 4), u8("direct", 5),
+    u8("level", 2), u8("preDelay", 3), u8("feedback", 4), u8("direct", 5),
   ],
   "OCTAVE": [
-    u8("minus2_oct", 0), u8("minus1_oct", 1), u8("direct", 2),
+    u8("minus2Oct", 0), u8("minus1Oct", 1), u8("direct", 2),
   ],
   "HEAVY OCT": [
-    u8("minus2_oct", 0), u8("minus1_oct", 1), u8("direct", 2),
+    u8("minus2Oct", 0), u8("minus1Oct", 1), u8("direct", 2),
   ],
   "S-BEND": [
-    u8("trigger", 0), lookup("pitch", 1, SBEND_PITCH), u8("rise_time", 2), u8("fall_time", 3),
+    u8("trigger", 0), lookup("pitch", 1, SBEND_PITCH), u8("riseTime", 2), u8("fallTime", 3),
   ],
-  // PEDAL BEND: pitch_min/max stored as (value + 24), range −24..+24 semitones.
+  // PEDAL BEND: pitchMin/pitchMax stored as (value + 24), range −24..+24 semitones.
   "PEDAL BEND": [
-    signed("pitch_min", 0, 24), signed("pitch_max", 1, 24),
-    u8("pdl_pos", 2), u8("level", 3), u8("direct", 4),
+    signed("pitchMin", 0, 24), signed("pitchMax", 1, 24),
+    u8("pdlPos", 2), u8("level", 3), u8("direct", 4),
   ],
   // TUNE DOWN: pitch stored as (pitch + 12), range −12..0 semitones.
   "TUNE DOWN": [
@@ -237,12 +237,12 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   // DELAY as an FX slot type (separate from the dedicated DLY block):
   "DELAY": [
-    u16be("time", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4), u8("direct", 5),
+    u16be("time", 0), u8("feedback", 2), u8("level", 3), u8("highCut", 4), u8("direct", 5),
   ],
   // REVERB as an FX slot type (separate from the dedicated REV block):
   "REVERB": [
     lookup("type", 0, REV_TYPES), scaled("time", 1, 0.1),
-    u8("pre_delay", 2), u8("level", 3), u8("direct", 4),
+    u8("preDelay", 2), u8("level", 3), u8("direct", 4),
   ],
 };
 
@@ -259,13 +259,13 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
  * OD/DS injects the pedal model name from the FX_COM subtype byte (`sub`) rather
  * than the param block — see the "OD/DS" entry in FX_PARAM_MAPS.
  */
-const decodeFxParams = (fx: string, sub: string | null, bytes: number[]): FxParams => {
-  const fields = FX_PARAM_MAPS[fx];
+const decodeFxParams = (fxType: string, subType: string | null, bytes: number[]): FxParams => {
+  const fields = FX_PARAM_MAPS[fxType];
   if (!fields) return { unknownBytes: bytes.slice(0, 32) };
 
-  const offset = FX_PARAM_OFFSETS[fx] ?? 0;
+  const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
   const params = decodeFields(fields, offset > 0 ? bytes.slice(offset) : bytes);
-  if (fx === "OD/DS") params["type"] = sub ?? "";
+  if (fxType === "OD/DS") params["type"] = subType ?? "";
   return params;
 };
 
@@ -275,17 +275,16 @@ const decodeFxParams = (fx: string, sub: string | null, bytes: number[]): FxPara
  * When params contains `unknownBytes`, the original bytes are returned unchanged.
  */
 const encodeFxParams = (
-  fx: string,
-  _sub: string | null,
+  fxType: string,
   params: FxParams,
   originalBytes: number[],
 ): string[] => {
   if ("unknownBytes" in params) return hexFromBytes(originalBytes);
 
   const bytes = [...originalBytes];
-  const fields = FX_PARAM_MAPS[fx];
+  const fields = FX_PARAM_MAPS[fxType];
   if (fields) {
-    const offset = FX_PARAM_OFFSETS[fx] ?? 0;
+    const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
     if (offset > 0) {
       const slice = bytes.slice(offset);
       encodeFields(fields, params, slice);
