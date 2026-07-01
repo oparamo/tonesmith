@@ -1,8 +1,8 @@
 import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
+import { PARAM_SUBTYPE_EFFECTS } from "./common";
 
 // 1/3-octave series from 20Hz to 12.5kHz (indices 0–28), then FLAT (29).
-// Confirmed anchor: raw 25 = 6.3kHz (verified against real device readings).
 const HIGH_CUT_MAP: Record<string, number> = {
   "20Hz": 0,   "25Hz": 1,   "31.5Hz": 2, "40Hz": 3,  "50Hz": 4,
   "63Hz": 5,   "80Hz": 6,   "100Hz": 7,  "125Hz": 8, "160Hz": 9,
@@ -12,25 +12,19 @@ const HIGH_CUT_MAP: Record<string, number> = {
   "5kHz": 24,  "6.3kHz": 25, "8kHz": 26, "10kHz": 27, "12.5kHz": 28, "FLAT": 29,
 };
 
-// Node name strings match CHAIN_NAMES in constants.ts (empirically validated by round-trip tests).
-// FORMAT.md's node-ID table assigns different names to IDs 3–10 — the constants.ts mapping is
-// authoritative because it's derived from actual device files.
-const CHAINS: Record<string, string[]> = {
-  "FX1>AMP>NS>DLY>REV":
-    ["PFX", "FX1", "OD/DS", "NS", "AMP", "FV", "FX2", "FX3", "DLY", "REV", "INPUT", "LOOP", "OUTPUT"],
-  "FX1>AMP>FX2>NS>DLY>REV":
-    ["PFX", "FX1", "OD/DS", "NS", "AMP", "FX2", "FV", "FX3", "DLY", "REV", "INPUT", "LOOP", "OUTPUT"],
-  "FX1>AMP>NS>REV":
-    ["PFX", "FX1", "OD/DS", "NS", "AMP", "FV", "FX2", "FX3", "REV", "DLY", "INPUT", "LOOP", "OUTPUT"],
-  "FX1>OD>AMP>NS>DLY>REV":
-    ["PFX", "FX1", "OD/DS", "NS", "AMP", "FV", "FX2", "FX3", "DLY", "REV", "INPUT", "LOOP", "OUTPUT"],
-  "FX1>OD>AMP>FX2>NS>DLY>REV":
-    ["PFX", "FX1", "OD/DS", "NS", "AMP", "FX2", "FV", "FX3", "DLY", "REV", "INPUT", "LOOP", "OUTPUT"],
+// Node names match CHAIN_NAMES in constants.ts.
+const DEFAULT_CHAIN: string[] =
+  ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV", "INPUT", "LOOP", "OUTPUT"];
+
+/** Returns a new chain array with `node` relocated to sit immediately before `beforeNode`. */
+const moveBefore = (chain: string[], node: string, beforeNode: string): string[] => {
+  const without = chain.filter(n => n !== node);
+  const index = without.indexOf(beforeNode);
+  if (index < 0) throw new Error(`moveBefore: ${beforeNode} not found in chain`);
+  return [...without.slice(0, index), node, ...without.slice(index)];
 };
 
-const basePatch = (name: string, chainKey = "FX1>AMP>NS>DLY>REV"): Patch => {
-  const chain = CHAINS[chainKey];
-  if (chain === undefined) throw new Error(`Unknown chain preset: ${chainKey}`);
+const basePatch = (name: string, chain: string[] = DEFAULT_CHAIN): Patch => {
   const patch = blankPatch(name);
   patch.chain = chain;
   return patch;
@@ -89,7 +83,13 @@ const fx = (
   block.on = true;
   block.type = fxType;
   block.subType = subType;
-  block.params = params;
+  // For effects whose sub-model lives in param-block byte p[0] (not FX_COM byte[2]),
+  // the encoder reads it from params.type, not block.subType — thread it through here
+  // so callers can keep passing subType positionally without knowing that distinction.
+  block.params =
+    subType != null && PARAM_SUBTYPE_EFFECTS.has(fxType) && params["type"] === undefined
+      ? { ...params, type: subType }
+      : params;
 };
 
 const ns = (patch: Patch, threshold: number, release: number, on = true): void => {
@@ -148,4 +148,4 @@ const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
   console.info(`Saved ${outPath} (${patches.length} patches)`);
 };
 
-export { HIGH_CUT_MAP, CHAINS, basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl };
+export { HIGH_CUT_MAP, DEFAULT_CHAIN, moveBefore, basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl };

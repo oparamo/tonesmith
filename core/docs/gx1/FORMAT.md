@@ -61,14 +61,14 @@ Each byte is a node ID. The 13 positions represent the full signal path.
 |  0 | INPUT  |
 |  1 | PFX    |
 |  2 | FX1    |
-|  3 | FX2    |
-|  4 | FX3    |
-|  5 | FX3A   |
-|  6 | AMP    |
-|  7 | DLY    |
-|  8 | REV    |
-|  9 | FV     |
-| 10 | NS     |
+|  3 | OD/DS  |
+|  4 | AMP    |
+|  5 | DLY    |
+|  6 | FV     |
+|  7 | NS     |
+|  8 | FX3    |
+|  9 | FX2    |
+| 10 | REV    |
 | 11 | LOOP   |
 | 12 | OUTPUT |
 
@@ -166,8 +166,8 @@ Signed values use `raw - 50` (centre=50) unless noted. "→" means stored as raw
 **OD/DS** — p[0..3]  *(subtype comes from FX_COM byte 2)*
 `p[0]`=drive `p[1]`=tone (signed50) `p[2]`=level `p[3]`=direct
 
-**PARA. EQ** — p[0..6]  *(EQ gains use centre=20)*
-`p[0]`=level (signed20) `p[1]`=low_gain (signed20) `p[2]`=mid_gain (signed20) `p[3]`=high_gain (signed20) `p[4]`=low_cut `p[5]`=mid_freq `p[6]`=high_cut
+**PARA. EQ** — starts at offset 31; p[0..6]  *(EQ gains use centre=20)*
+`p[0]`=level (signed20) `p[1]`=lowGain (signed20) `p[2]`=highGain (signed20) `p[3]`=midFreq `p[4]`=midGain (signed20) `p[5]`=*(unknown)* `p[6]`=highCut
 
 **GEQ** — p[0..6]
 `p[0..5]`=bands 125Hz/250Hz/500Hz/1kHz/2kHz/4kHz (signed50) `p[6]`=level (signed20)

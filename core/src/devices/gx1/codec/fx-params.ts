@@ -49,16 +49,15 @@ const encodeFxType = (fxName: string, subType?: string | null): [number, number]
 const WAH_FILTER   = ["LPF", "BPF", "HPF"] as const;
 const WAH_POLARITY = ["DOWN", "UP"] as const;
 
-// Known byte offsets for each FX type within the 251-byte FX param block.
-// All other effects default to offset 0 (params start at the beginning of the block).
-// Confirmed offsets (all from GLASSY DIST + SWORD LEAD + DROPTUNE RIFF diff analysis):
-//   TUNE DOWN=8, GEQ=38, HIGH GEQ=52, CHORUS=122, TREMOLO=160.
+// Byte offset where each listed type's param block begins within the 251-byte FX block.
+// Unlisted types start at offset 0.
 const FX_PARAM_OFFSETS: Partial<Record<string, number>> = {
   "TUNE DOWN": 8,
   "GEQ":       38,
   "HIGH GEQ":  52,
   "CHORUS":    122,
   "TREMOLO":   160,
+  "PARA. EQ":  31,
 };
 
 const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
@@ -116,10 +115,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "OD/DS": [
     u8("drive", 0), signed("tone", 1), u8("level", 2), u8("direct", 3),
   ],
+  // midFreq/highCut are frequency-index numbers (indices into the same series as HIGH_CUT_MAP).
   "PARA. EQ": [
-    signed("level", 0, 20), signed("lowGain", 1, 20),
-    signed("midGain", 2, 20), signed("highGain", 3, 20),
-    u8("lowCut", 4), u8("midFreq", 5), u8("highCut", 6),
+    signed("level", 0, 20), signed("lowGain", 1, 20), signed("highGain", 2, 20),
+    u8("midFreq", 3), signed("midGain", 4, 20), u8("highCut", 6),
   ],
   // GEQ band gains use signed(centre=20) — each band covers ±20 dB.
   "GEQ": [

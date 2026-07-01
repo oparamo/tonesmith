@@ -6,13 +6,13 @@ import {
   DLY_TYPES, DLY_TYPE_IDX,
   REV_TYPES, REV_TYPE_IDX,
   CHAIN_NAMES, CHAIN_IDS,
-  NS_DETECT, FV_CURVE, TWIST_MODES,
+  NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
   FX_SUBTYPE_LISTS,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "../types";
 import { RAW } from "../common";
 import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
-import { u8, signed, lookup, u16be, decodeFields, encodeFields, type FieldCodec } from "./fields";
+import { u8, signed, lookup, u16be, nibbleTriplet, decodeFields, encodeFields, type FieldCodec } from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";
 
 // ── Name block ────────────────────────────────────────────────────────────────
@@ -182,43 +182,40 @@ const encodeFxCom = (block: FxBlock): string[] => {
 // Bytes 0–1 of the full block are [on, type] — handled in decodeDelay/encodeDelay.
 // Field offsets below are relative to byte 2 (the first parameter byte within the block).
 //
-// Confirmed layout (from SWORD LEAD STANDARD + FAT DIST ANALOG cross-referencing):
-//   params[0] unknown   params[1] time (note index or raw ms depending on type)
-//   params[2–3] unknown  params[4] feedback  params[5] level  params[6] highCut
-//   params[7+] type-specific extras (positions unconfirmed, best-effort)
-//
-// WARP / TWIST / GLITCH have structurally different layouts — left at original offsets.
+// STANDARD stores time as a u16be (ms). ANALOG and the modulated types (MODULATE, ANLG MOD,
+// PAN, REVERSE, SPACE ECHO, SHIMMER) store time as a nibbleTriplet (12-bit hex-digit encoding).
+// WARP, TWIST, GLITCH have structurally different layouts — see their field definitions below.
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    u16be("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
   ],
   "ANALOG": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
   ],
   "MODULATE": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
     u8("modRate", 7), u8("modDepth", 8),
   ],
   "ANLG MOD": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
     u8("modRate", 7), u8("modDepth", 8),
   ],
   "PAN": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
-    u8("tapTime", 7),
+    nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    u8("tapTime", 9),
   ],
   "REVERSE": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
-    u8("trigger", 7),
+    nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    lookup("trigger", 10, ON_OFF),
   ],
   "SPACE ECHO": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
-    u8("head", 7),
+    nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    lookup("head", 15, SPACE_ECHO_HEAD),
   ],
   "SHIMMER": [
-    u8("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
-    signed("pitch", 7, 24), u8("balance", 8),
+    nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    signed("pitch", 16, 24), u8("balance", 17),
   ],
   "WARP": [
     u16be("time", 0), u8("trigger", 2), u8("level", 3),

@@ -3,7 +3,8 @@ import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  CHAINS,
+  DEFAULT_CHAIN,
+  moveBefore,
   basePatch,
   amp,
   odds,
@@ -17,24 +18,32 @@ import {
 } from "../../../src/devices/gx1/builder";
 
 describe("basePatch", () => {
-  it("defaults to FX1>AMP>NS>DLY>REV chain", () => {
+  it("defaults to DEFAULT_CHAIN", () => {
     const patch = basePatch("Lead");
-    expect(patch.chain).toEqual(CHAINS["FX1>AMP>NS>DLY>REV"]);
+    expect(patch.chain).toEqual(DEFAULT_CHAIN);
   });
 
-  it("accepts each valid chain preset", () => {
-    for (const key of Object.keys(CHAINS)) {
-      const patch = basePatch("Test", key);
-      expect(patch.chain).toEqual(CHAINS[key]);
-    }
-  });
-
-  it("throws for an unknown chain key", () => {
-    expect(() => basePatch("Bad", "UNKNOWN>CHAIN")).toThrow(/Unknown chain preset/);
+  it("accepts a custom chain array", () => {
+    const custom = moveBefore(DEFAULT_CHAIN, "OD/DS", "FX1");
+    const patch = basePatch("Test", custom);
+    expect(patch.chain).toEqual(custom);
   });
 
   it("sets the patch name", () => {
     expect(basePatch("My Patch").name).toBe("My Patch");
+  });
+});
+
+describe("moveBefore", () => {
+  it("relocates a node to sit immediately before another, preserving the rest", () => {
+    const result = moveBefore(DEFAULT_CHAIN, "OD/DS", "FX1");
+    expect(result.indexOf("OD/DS")).toBe(result.indexOf("FX1") - 1);
+    expect(result).toHaveLength(DEFAULT_CHAIN.length);
+    expect(new Set(result)).toEqual(new Set(DEFAULT_CHAIN));
+  });
+
+  it("throws when beforeNode isn't found in the chain", () => {
+    expect(() => moveBefore(DEFAULT_CHAIN, "FX2", "NOT-A-NODE")).toThrow(/not found in chain/);
   });
 });
 

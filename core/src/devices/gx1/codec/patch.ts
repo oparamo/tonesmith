@@ -1,4 +1,4 @@
-import { RAW } from "../common";
+import { RAW, PARAM_SUBTYPE_EFFECTS } from "../common";
 import type { Patch, RawParamSet } from "../types";
 import { bytesFromHex } from "./primitives";
 import { decodeFxParams, encodeFxParams } from "./fx-params";
@@ -43,10 +43,6 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
   // Effects in this set store their type/mode in param-block byte p[0] rather than
   // in FX_COM byte[2]. After decoding, promote params["type"] back to block.subType
   // so the display layer can show e.g. "COMPRESSOR (D-COMP)".
-  const PARAM_SUBTYPE_EFFECTS = new Set([
-    "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER",
-  ]);
-
   for (const slot of ["FX1", "FX2", "FX3"] as const) {
     const fxKey = slot.toLowerCase() as "fx1" | "fx2" | "fx3";
     const block = patch[fxKey];

@@ -44,8 +44,8 @@ const REV_TYPES = [
 ] as const;
 
 const CHAIN_NAMES: Record<number, string> = {
-  0: "INPUT", 1: "PFX", 2: "FX1", 3: "OD/DS", 4: "FX3", 5: "DLY",
-  6: "FV", 7: "NS", 8: "AMP", 9: "FX2", 10: "REV", 11: "LOOP", 12: "OUTPUT",
+  0: "INPUT", 1: "PFX", 2: "FX1", 3: "OD/DS", 4: "AMP", 5: "DLY",
+  6: "FV", 7: "NS", 8: "FX3", 9: "FX2", 10: "REV", 11: "LOOP", 12: "OUTPUT",
 };
 
 const indexMap = (list: readonly string[]): Record<string, number> =>
@@ -78,6 +78,9 @@ const SLICER_PAT   = Array.from({ length: 20 }, (_, i) => `PATTERN ${i + 1}`);
 const NS_DETECT    = ["INPUT", "NS INPUT"] as const;
 const FV_CURVE     = ["SLOW1", "SLOW2", "NORMAL", "FAST"] as const;
 const TWIST_MODES  = ["TAPE", "TAPE-ECH", "REVERSE"] as const;
+const ON_OFF       = ["OFF", "ON"] as const;
+// Playback head combinations.
+const SPACE_ECHO_HEAD = ["1", "1+2", "1+3", "2+3", "1+2+3"] as const;
 
 const HARMONIST_KEY = [
   "Am", "Bbm", "Bm", "Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m",
@@ -97,6 +100,14 @@ const FX_SUBTYPE_LISTS: Record<string, readonly string[]> = {
   "OD/DS": ODDS_TYPES,
 };
 
+// Effects whose sub-model selector lives in param-block byte p[0] (read/written via
+// FX_PARAM_MAPS' lookup("type", 0, ...) field) rather than in FX_COM byte[2]. Used by
+// both the decoder (to promote params.type back to block.subType for display) and the
+// fx() builder (to thread a subType argument into params.type so it actually encodes).
+const PARAM_SUBTYPE_EFFECTS = new Set([
+  "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER",
+]);
+
 export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES,
   CHAIN_NAMES,
@@ -104,6 +115,6 @@ export {
   CHAIN_IDS,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, RING_INTL, SBEND_PITCH, FB_MODE,
-  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES,
-  HARMONIST_KEY, HARMONIST_HR, FX_SUBTYPE_LISTS,
+  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
+  HARMONIST_KEY, HARMONIST_HR, FX_SUBTYPE_LISTS, PARAM_SUBTYPE_EFFECTS,
 };

@@ -86,6 +86,21 @@ const u16be = (name: string, offset: number): FieldCodec => ({
   },
 });
 
+/**
+ * A 12-bit value split across three consecutive bytes, one hex digit (nibble)
+ * per byte, most-significant first.
+ */
+const nibbleTriplet = (name: string, offset: number): FieldCodec => ({
+  name,
+  decode: bytes => bytes[offset]! * 256 + bytes[offset + 1]! * 16 + bytes[offset + 2]!,
+  encode: (value, bytes) => {
+    const n = value as number;
+    bytes[offset]     = (n >> 8) & 0xF;
+    bytes[offset + 1] = (n >> 4) & 0xF;
+    bytes[offset + 2] = n & 0xF;
+  },
+});
+
 
 // ── Generic walkers ───────────────────────────────────────────────────────────
 
@@ -109,4 +124,4 @@ const encodeFields = (fields: FieldCodec[], params: FxParams, bytes: number[]): 
 };
 
 export type { FieldCodec };
-export { u8, signed, lookup, scaled, u16be, decodeFields, encodeFields };
+export { u8, signed, lookup, scaled, u16be, nibbleTriplet, decodeFields, encodeFields };
