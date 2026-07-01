@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 import { readFile } from "../../../src/devices/gx1/tsl";
 import { encodePatch } from "../../../src/devices/gx1/codec";
 import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
-import { decodeDelay, encodeDelay, decodeReverb, encodeReverb } from "../../../src/devices/gx1/codec/blocks";
+import {
+  decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain,
+} from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import { FX_TYPES, DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX } from "../../../src/devices/gx1/common";
 
@@ -105,4 +107,52 @@ describe("Reverb block symmetry (all types)", () => {
       expect(reDecoded).toEqual(decoded);
     });
   }
+});
+
+
+// ── Chain block (real device values) ─────────────────────────────────────────
+//
+// MEMORY%CHAIN is a linked list (see CHAIN_BLOCK_ORDER in common/constants.ts), not a
+// positional array — byte 0 is whichever block comes first, and byte
+// (1 + CHAIN_BLOCK_ORDER.indexOf(name)) is the firmware value of whatever follows that
+// specific block. These byte arrays are real values read off a GX-1 after performing
+// each reorder on the device itself, not self-consistency round-trips.
+
+describe("Chain block (real device values)", () => {
+  const DEFAULT_BYTES = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
+  const DEFAULT_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"];
+  const FX2_FX3_SWAP_BYTES = [1, 2, 3, 4, 7, 9, 5, 8, 6, 10, 0, 11, 12];
+  const FX2_FX3_SWAP_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX3", "FX2", "DLY", "REV"];
+  const AMP_OD_DS_SWAP_BYTES = [1, 2, 4, 7, 3, 6, 9, 8, 5, 10, 0, 11, 12];
+  const AMP_OD_DS_SWAP_ORDER = ["PFX", "FX1", "AMP", "OD/DS", "NS", "FV", "FX2", "FX3", "DLY", "REV"];
+
+  it("decodes the untouched default chain", () => {
+    expect(decodeChain(hexFromBytes(DEFAULT_BYTES))).toEqual(DEFAULT_ORDER);
+  });
+
+  it("decodes an FX2/FX3 swap", () => {
+    expect(decodeChain(hexFromBytes(FX2_FX3_SWAP_BYTES))).toEqual(FX2_FX3_SWAP_ORDER);
+  });
+
+  it("decodes an AMP/OD-DS swap", () => {
+    expect(decodeChain(hexFromBytes(AMP_OD_DS_SWAP_BYTES))).toEqual(AMP_OD_DS_SWAP_ORDER);
+  });
+
+  it("encodes the default order back to the real device bytes", () => {
+    expect(encodeChain(DEFAULT_ORDER, hexFromBytes(DEFAULT_BYTES))).toEqual(hexFromBytes(DEFAULT_BYTES));
+  });
+
+  it("encodes an FX2/FX3 swap to the real device bytes", () => {
+    expect(encodeChain(FX2_FX3_SWAP_ORDER, hexFromBytes(DEFAULT_BYTES))).toEqual(hexFromBytes(FX2_FX3_SWAP_BYTES));
+  });
+
+  it("encodes an AMP/OD-DS swap to the real device bytes", () => {
+    expect(encodeChain(AMP_OD_DS_SWAP_ORDER, hexFromBytes(DEFAULT_BYTES))).toEqual(hexFromBytes(AMP_OD_DS_SWAP_BYTES));
+  });
+
+  it("preserves unused trailing bytes from the original param set", () => {
+    const originalWithJunk = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 99, 42];
+    const result = bytesFromHex(encodeChain(DEFAULT_ORDER, hexFromBytes(originalWithJunk)));
+    expect(result.slice(11)).toEqual([99, 42]);
+  });
 });

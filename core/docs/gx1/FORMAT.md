@@ -29,7 +29,7 @@ Each patch:
 | Key                | Len | Description                        |
 |--------------------|-----|------------------------------------|
 | `MEMORY%COM`       |  16 | Patch name (ASCII, space-padded)   |
-| `MEMORY%CHAIN`     |  13 | Signal chain order (node IDs)      |
+| `MEMORY%CHAIN`     |  13 | Signal chain, linked list (11 bytes used) |
 | `MEMORY%FX1_COM`   |   3 | FX1 on/off + type header           |
 | `MEMORY%FX1`       | 251 | FX1 parameter block                |
 | `MEMORY%FX2_COM`   |   3 | FX2 on/off + type header           |
@@ -52,25 +52,46 @@ Each patch:
 
 ASCII bytes, right-padded with spaces (0x20).
 
-## MEMORY%CHAIN — Signal Chain (13 bytes)
+## MEMORY%CHAIN — Signal Chain (13 bytes, 11 used)
 
-Each byte is a node ID. The 13 positions represent the full signal path.
+Not a positional array — a linked list. Byte 0 holds the firmware value of whichever
+block comes first (`item_top`). Each of bytes 1–10 holds the firmware value of whatever
+comes immediately *after* one specific fixed block, indexed by that block's own slot
+below — not by chain position. A firmware value of 0 means "connects to OUTPUT", a fixed
+endpoint that is never itself reordered and has no slot of its own. Bytes 11–12 are
+unused by this scheme (always 11, 12 on a real device; preserved on encode, not written).
 
-| ID | Node   |
-|----|--------|
-|  0 | INPUT  |
-|  1 | PFX    |
-|  2 | FX1    |
-|  3 | OD/DS  |
-|  4 | AMP    |
-|  5 | DLY    |
-|  6 | FV     |
-|  7 | NS     |
-|  8 | FX3    |
-|  9 | FX2    |
-| 10 | REV    |
-| 11 | LOOP   |
-| 12 | OUTPUT |
+| Firmware value | Block  |
+|-----|--------|
+|   0 | OUTPUT (terminator only, never a `next`-slot source) |
+|   1 | PFX    |
+|   2 | FX1    |
+|   3 | OD/DS  |
+|   4 | AMP    |
+|   5 | FX2    |
+|   6 | FX3    |
+|   7 | NS     |
+|   8 | FV     |
+|   9 | DLY    |
+|  10 | REV    |
+
+| Byte | Holds the firmware value of what follows... |
+|------|----------------------------------------------|
+|    0 | *(nothing — this is `item_top`, the first block)* |
+|    1 | PFX    |
+|    2 | FX1    |
+|    3 | OD/DS  |
+|    4 | AMP    |
+|    5 | FX2    |
+|    6 | FX3    |
+|    7 | NS     |
+|    8 | FV     |
+|    9 | DLY    |
+|   10 | REV    |
+
+Example (untouched default order `PFX→FX1→OD/DS→AMP→NS→FV→FX2→FX3→DLY→REV`):
+`[1,2,3,4,7,6,9,8,5,10,0,11,12]` — byte 0 (`item_top`) is 1 (PFX); byte 1 (PFX's next) is
+2 (FX1); byte 4 (AMP's next) is 7 (NS); byte 10 (REV's next) is 0 (OUTPUT, end of chain).
 
 ## MEMORY%FX1_COM / FX2_COM / FX3_COM (3 bytes)
 

@@ -115,10 +115,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "OD/DS": [
     u8("drive", 0), signed("tone", 1), u8("level", 2), u8("direct", 3),
   ],
-  // midFreq/highCut are frequency-index numbers (indices into the same series as HIGH_CUT_MAP).
+  // midFreq/lowCut/highCut are frequency-index numbers (indices into the same series as HIGH_CUT_MAP).
   "PARA. EQ": [
     signed("level", 0, 20), signed("lowGain", 1, 20), signed("highGain", 2, 20),
-    u8("midFreq", 3), signed("midGain", 4, 20), u8("highCut", 6),
+    u8("midFreq", 3), signed("midGain", 4, 20), u8("lowCut", 5), u8("highCut", 6),
   ],
   // GEQ band gains use signed(centre=20) — each band covers ±20 dB.
   "GEQ": [

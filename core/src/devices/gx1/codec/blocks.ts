@@ -5,7 +5,7 @@ import {
   ODDS_TYPES, ODDS_IDX,
   DLY_TYPES, DLY_TYPE_IDX,
   REV_TYPES, REV_TYPE_IDX,
-  CHAIN_NAMES, CHAIN_IDS,
+  CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
   FX_SUBTYPE_LISTS,
 } from "../common";
@@ -28,12 +28,39 @@ const encodeName = (name: string, length = 16): string[] => {
 
 
 // ── Chain block ───────────────────────────────────────────────────────────────
+//
+// A linked list, not a positional array: byte 0 holds the firmware value of whichever
+// block comes first; byte CHAIN_NEXT_SLOT[name] holds the firmware value of whatever
+// comes immediately after that block. CHAIN_TERMINATOR means "connects to OUTPUT."
 
-const decodeChain = (hexList: string[]): string[] =>
-  bytesFromHex(hexList).map(chainId => CHAIN_NAMES[chainId] ?? `?${chainId}`);
+const CHAIN_NEXT_SLOT: Record<string, number> = Object.fromEntries(
+  CHAIN_BLOCK_ORDER.map((name, index) => [name, index + 1])
+);
 
-const encodeChain = (names: string[]): string[] =>
-  hexFromBytes(names.map(name => CHAIN_IDS[name] ?? 0));
+const decodeChain = (hexList: string[]): string[] => {
+  const bytes = bytesFromHex(hexList);
+  const order: string[] = [];
+  let value = bytes[0]!;
+  while (value !== CHAIN_TERMINATOR && order.length < CHAIN_BLOCK_ORDER.length) {
+    const name = CHAIN_VALUE_TO_NAME[value];
+    if (name === undefined) break;
+    order.push(name);
+    value = bytes[CHAIN_NEXT_SLOT[name]!]!;
+  }
+  return order;
+};
+
+const encodeChain = (names: string[], originalHexList: string[]): string[] => {
+  const bytes = bytesFromHex(originalHexList);
+  const valueOf = (name: string | undefined): number =>
+    name === undefined ? CHAIN_TERMINATOR : lookupIndex(CHAIN_NAME_TO_VALUE, name, "chain block");
+
+  bytes[0] = valueOf(names[0]);
+  names.forEach((name, index) => {
+    bytes[CHAIN_NEXT_SLOT[name]!] = valueOf(names[index + 1]);
+  });
+  return hexFromBytes(bytes);
+};
 
 
 // ── AMP block (13 bytes) ──────────────────────────────────────────────────────
@@ -182,13 +209,14 @@ const encodeFxCom = (block: FxBlock): string[] => {
 // Bytes 0–1 of the full block are [on, type] — handled in decodeDelay/encodeDelay.
 // Field offsets below are relative to byte 2 (the first parameter byte within the block).
 //
-// STANDARD stores time as a u16be (ms). ANALOG and the modulated types (MODULATE, ANLG MOD,
-// PAN, REVERSE, SPACE ECHO, SHIMMER) store time as a nibbleTriplet (12-bit hex-digit encoding).
-// WARP, TWIST, GLITCH have structurally different layouts — see their field definitions below.
+// STANDARD and ANALOG and the modulated types (MODULATE, ANLG MOD, PAN, REVERSE, SPACE ECHO,
+// SHIMMER) all store time as a nibbleTriplet (12-bit hex-digit encoding), just at different
+// offsets. WARP, TWIST, GLITCH have structurally different layouts — see their field
+// definitions below.
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
-    u16be("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
+    nibbleTriplet("time", 1), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
   ],
   "ANALOG": [
     nibbleTriplet("time", 12), u8("feedback", 4), u8("level", 5), u8("highCut", 6),
@@ -272,7 +300,7 @@ const decodeReverb = (hexList: string[]): ReverbBlock => {
       tone:         toSigned(bytes[3]!),
       density:      bytes[4]! + 1,
       level:        bytes[5]!,
-      preDelay: bytes[7]!,
+      preDelay: bytes[16]!,
       direct:       bytes[8]!,
     });
   } else if (reverbType === "SHIMMER") {
@@ -316,7 +344,7 @@ const encodeReverb = (block: ReverbBlock): string[] => {
     bytes[3] = toUnsigned(getParam("tone"));
     bytes[4] = getParam("density") - 1;
     bytes[5] = getParam("level");
-    bytes[7] = getParam("preDelay");
+    bytes[16] = getParam("preDelay");
     bytes[8] = getParam("direct");
   } else if (block.type === "SHIMMER") {
     bytes[2] = Math.round(getParam("time") / 0.1);

@@ -69,7 +69,7 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
   const paramSet: RawParamSet = { ...patch[RAW] };
 
   paramSet["MEMORY%COM"]   = encodeName(patch.name);
-  paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain);
+  paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain, patch[RAW]["MEMORY%CHAIN"]!);
   paramSet["MEMORY%AMP"]   = encodeAmp(patch.amp);
   paramSet["MEMORY%ODDS"]  = encodeOdDs(patch.odds);
   paramSet["MEMORY%NS"]    = encodeNs(patch.ns);

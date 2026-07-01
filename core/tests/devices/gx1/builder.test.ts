@@ -16,6 +16,8 @@ import {
   saveTsl,
   HIGH_CUT_MAP,
 } from "../../../src/devices/gx1/builder";
+import { encodePatch } from "../../../src/devices/gx1/codec";
+import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
 
 describe("basePatch", () => {
   it("defaults to DEFAULT_CHAIN", () => {
@@ -44,6 +46,26 @@ describe("moveBefore", () => {
 
   it("throws when beforeNode isn't found in the chain", () => {
     expect(() => moveBefore(DEFAULT_CHAIN, "FX2", "NOT-A-NODE")).toThrow(/not found in chain/);
+  });
+
+  // Real device values (a GX-1 was used to perform each reorder, then exported and
+  // byte-diffed) — a wrong MEMORY%CHAIN encoding fails this, not just self-consistency.
+  it("encodes an FX2-after-AMP reorder to the real device bytes", () => {
+    const chain = moveBefore(DEFAULT_CHAIN, "FX2", "NS");
+    const patch = basePatch("Test", chain);
+    const encoded = encodePatch(patch);
+    expect(bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]!)).toEqual(
+      [1, 2, 3, 4, 5, 7, 9, 8, 6, 10, 0, 11, 12]
+    );
+  });
+
+  it("encodes an OD/DS-before-FX1 reorder to the real device bytes", () => {
+    const chain = moveBefore(DEFAULT_CHAIN, "OD/DS", "FX1");
+    const patch = basePatch("Test", chain);
+    const encoded = encodePatch(patch);
+    expect(bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]!)).toEqual(
+      [1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]
+    );
   });
 });
 

@@ -11,7 +11,10 @@ import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types";
 const zeros251 = (): string[] => hexFromBytes(new Array(251).fill(0));
 
 const blankParamSet = (): RawParamSet => {
-  const defaultChain = [1, 2, 3, 7, 8, 6, 9, 4, 5, 10, 0, 11, 12];
+  // PFX->FX1->OD/DS->AMP->NS->FV->FX2->FX3->DLY->REV->OUTPUT as a MEMORY%CHAIN linked
+  // list (see CHAIN_BLOCK_ORDER in common/constants.ts): byte 0 is PFX (first block);
+  // each subsequent byte is the firmware value of what follows that fixed block.
+  const defaultChain = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
   const ps: RawParamSet = {
     "MEMORY%COM":     hexFromBytes(new Array(16).fill(0x20)),
     "MEMORY%CHAIN":   hexFromBytes(defaultChain),

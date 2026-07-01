@@ -12,9 +12,10 @@ const HIGH_CUT_MAP: Record<string, number> = {
   "5kHz": 24,  "6.3kHz": 25, "8kHz": 26, "10kHz": 27, "12.5kHz": 28, "FLAT": 29,
 };
 
-// Node names match CHAIN_NAMES in constants.ts.
+// The 10 reorderable blocks — OUTPUT is a fixed endpoint, not part of the chain array
+// (see CHAIN_BLOCK_ORDER in common/constants.ts for the underlying byte encoding).
 const DEFAULT_CHAIN: string[] =
-  ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV", "INPUT", "LOOP", "OUTPUT"];
+  ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"];
 
 /** Returns a new chain array with `node` relocated to sit immediately before `beforeNode`. */
 const moveBefore = (chain: string[], node: string, beforeNode: string): string[] => {
