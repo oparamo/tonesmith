@@ -12,6 +12,7 @@ import {
   fx,
   ns,
   fv,
+  pfx,
   delay,
   reverb,
   saveTsl,
@@ -92,6 +93,20 @@ describe("amp", () => {
     expect(patch.amp.mic).toBe("DYN57");
     expect(patch.amp.level).toBe(100);
   });
+
+  it("defaults solo to off and soloLevel to 50", () => {
+    const patch = basePatch("Test");
+    amp(patch, "TWIN", 50, 50, 50, 50);
+    expect(patch.amp.solo).toBe(false);
+    expect(patch.amp.soloLevel).toBe(50);
+  });
+
+  it("sets solo and soloLevel", () => {
+    const patch = basePatch("Test");
+    amp(patch, "TWIN", 50, 50, 50, 50, "ORIGINAL", "DYN57", 100, true, 80);
+    expect(patch.amp.solo).toBe(true);
+    expect(patch.amp.soloLevel).toBe(80);
+  });
 });
 
 describe("odds", () => {
@@ -110,6 +125,20 @@ describe("odds", () => {
     const patch = basePatch("Test");
     odds(patch, "OVERDRIVE", 50, 50, 50);
     expect(patch.odds.direct).toBe(0);
+  });
+
+  it("defaults solo to off and soloLevel to 50", () => {
+    const patch = basePatch("Test");
+    odds(patch, "OVERDRIVE", 50, 50, 50);
+    expect(patch.odds.solo).toBe(false);
+    expect(patch.odds.soloLevel).toBe(50);
+  });
+
+  it("sets solo and soloLevel", () => {
+    const patch = basePatch("Test");
+    odds(patch, "OVERDRIVE", 50, 50, 50, 10, true, 75);
+    expect(patch.odds.solo).toBe(true);
+    expect(patch.odds.soloLevel).toBe(75);
   });
 });
 
@@ -192,6 +221,37 @@ describe("fv", () => {
     const patch = basePatch("Test");
     fv(patch, 100, 0, 100);
     expect(patch.fv.curve).toBe("NORMAL");
+  });
+});
+
+describe("pfx", () => {
+  it("sets WAH fields and enables it by default", () => {
+    const patch = basePatch("Test");
+    pfx(patch, "WAH", { wahType: "VO WAH", level: 80, direct: 20, position: 90, min: 10, max: 100 });
+    expect(patch.pfx.on).toBe(true);
+    expect(patch.pfx.type).toBe("WAH");
+    expect((patch.pfx as Record<string, unknown>).wahType).toBe("VO WAH");
+    expect((patch.pfx as Record<string, unknown>).level).toBe(80);
+  });
+
+  it("sets PEDAL BEND fields", () => {
+    const patch = basePatch("Test");
+    pfx(patch, "PEDAL BEND", { pitchMin: -12, pitchMax: 12, position: 100, level: 90, direct: 0 });
+    expect(patch.pfx.type).toBe("PEDAL BEND");
+    expect((patch.pfx as Record<string, unknown>).pitchMin).toBe(-12);
+    expect((patch.pfx as Record<string, unknown>).pitchMax).toBe(12);
+  });
+
+  it("throws when a param isn't valid for the pfx type", () => {
+    const patch = basePatch("Test");
+    expect(() => pfx(patch, "WAH", { pitchMin: -12 }))
+      .toThrow(/pfx extra param "pitchMin" is not valid for type "WAH"/);
+  });
+
+  it("can disable pfx", () => {
+    const patch = basePatch("Test");
+    pfx(patch, "WAH", {}, false);
+    expect(patch.pfx.on).toBe(false);
   });
 });
 

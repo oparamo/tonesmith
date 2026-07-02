@@ -99,8 +99,8 @@ Example (untouched default order `PFX→FX1→OD/DS→AMP→NS→FV→FX2→FX3�
 | Byte | Field   | Notes                                      |
 |------|---------|--------------------------------------------|
 |    0 | on      | 0=OFF, 1=ON                                |
-|    1 | fx_type | Index into FX_TYPES list (see below)       |
-|    2 | fx_type_bass | Bass-mode mirror of byte 1 — not used in guitar mode, always preserved |
+|    1 | type    | Index into FX_TYPES list (see below)       |
+|    2 | type_bass | Bass-mode mirror of byte 1 — not used in guitar mode, always preserved |
 
 Byte 2 is never a subtype for any effect type. COMPRESSOR, LIMITER, AC RESO, CHORUS,
 CLASSIC-VIBE, HUMANIZER, and OD/DS each store their own sub-model selector as the
@@ -167,10 +167,10 @@ what's noted.
 `p[0]`=type (0=BOSS,1=RACK 160D,2=VTG RACK U) `p[1]`=threshold `p[2]`=ratio `p[3]`=level `p[4]`=attack `p[5]`=release
 
 **SLOW GEAR** — starts at byte 16; p[0..2]
-`p[0]`=sens `p[1]`=rise_time `p[2]`=level
+`p[0]`=sens `p[1]`=riseTime `p[2]`=level
 
 **ENHANCER** — starts at byte 19; p[0..5]
-`p[0]`=sens `p[1]`=low `p[2]`=high `p[3]`=low_freq `p[4]`=high_freq `p[5]`=level
+`p[0]`=sens `p[1]`=low `p[2]`=high `p[3]`=lowFreq `p[4]`=highFreq `p[5]`=level
 
 **SLICER** — starts at byte 25; p[0..5]
 `p[0]`=pattern (0–19 = PATTERN 1–20) `p[1]`=rate `p[2]`=level `p[3]`=attack `p[4]`=duty (signed, centre=-1: display=raw+1) `p[5]`=direct
@@ -197,7 +197,7 @@ what's noted.
 `p[0]`=sens `p[1]`=attack `p[2]`=depth `p[3]`=reso `p[4]`=tone (signed50) `p[5]`=level `p[6]`=direct
 
 **FIXED WAH** — starts at byte 85; p[0], p[2..4]  *(p[1] is the bass-mode wah type — not used in guitar mode)*
-`p[0]`=wah_type (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) `p[2]`=level `p[3]`=direct `p[4]`=manual
+`p[0]`=wahType (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) `p[2]`=level `p[3]`=direct `p[4]`=manual
 
 **AC. GTR SIM** — starts at byte 93; p[0..3]
 `p[0]`=high (signed50) `p[1]`=body `p[2]`=low (signed50) `p[3]`=level
@@ -206,7 +206,7 @@ what's noted.
 `p[0]`=type (0=NATURAL,1=WIDE,2=BRIGHT) `p[1]`=reso `p[2]`=tone (signed50) `p[3]`=level
 
 **FEEDBACKER** — starts at byte 101; p[0..6]
-`p[0]`=mode (0=PITCH,1=BRUSH,2=SCREEM) `p[1]`=trigger `p[2]`=depth `p[3]`=rise_time `p[4]`=oct_rise_tm `p[5]`=feedback `p[6]`=oct_feedback
+`p[0]`=mode (0=PITCH,1=BRUSH,2=SCREEM) `p[1]`=trigger `p[2]`=depth `p[3]`=riseTime `p[4]`=octRiseTm `p[5]`=feedback `p[6]`=octFeedback
 
 **SITAR SIM** — starts at byte 108; p[0..6]
 `p[0]`=sens `p[1]`=depth `p[2]`=tone (signed50) `p[3]`=level `p[4]`=reso `p[5]`=buzz `p[6]`=direct
@@ -215,13 +215,13 @@ what's noted.
 `p[0]`=type (see pedal-model table above) `p[1]`=drive `p[2]`=tone (signed50) `p[3]`=level `p[4]`=direct
 
 **CHORUS** — starts at byte 122; p[0..5]
-`p[0]`=type (0=MONO,1=DIR/EFX,2=STEREO) `p[1]`=rate `p[2]`=depth `p[3]`=level `p[4]`=pre_delay (raw × 0.5ms) `p[5]`=direct
+`p[0]`=type (0=MONO,1=DIR/EFX,2=STEREO) `p[1]`=rate `p[2]`=depth `p[3]`=level `p[4]`=preDelay (raw × 0.5ms) `p[5]`=direct
 
 **FLANGER** — starts at byte 128; p[0..5]
 `p[0]`=rate `p[1]`=depth `p[2]`=reso `p[3]`=manual `p[4]`=level `p[5]`=direct
 
 **PHASER** — starts at byte 134; p[0..6]
-`p[0]`=stage_raw (display=raw*2+2, so 0=4stage,1=8stage,2=12stage) `p[1]`=rate `p[2]`=depth `p[3]`=reso `p[4]`=manual `p[5]`=level `p[6]`=direct
+`p[0]`=stage (raw*2+2, so raw 0=4stage,1=8stage,2=12stage) `p[1]`=rate `p[2]`=depth `p[3]`=reso `p[4]`=manual `p[5]`=level `p[6]`=direct
 
 **SCRIPT PH** — starts at byte 141; p[0..2]
 `p[0]`=rate `p[1]`=depth `p[2]`=level
@@ -230,10 +230,10 @@ what's noted.
 `p[0]`=mode (0=CHORUS,1=VIBRATO) `p[1]`=rate `p[2]`=depth `p[3]`=level
 
 **ROTARY** — starts at byte 148; p[0..6]
-`p[0]`=speed (0=SLOW,1=FAST) `p[1]`=slow_rate `p[2]`=fast_rate `p[3]`=level `p[4]`=balance `p[5]`=drive `p[6]`=direct
+`p[0]`=speed (0=SLOW,1=FAST) `p[1]`=slowRate `p[2]`=fastRate `p[3]`=level `p[4]`=balance `p[5]`=drive `p[6]`=direct
 
 **VIBRATO** — starts at byte 155; p[0..4]
-`p[0]`=rate `p[1]`=depth `p[2]`=rise_time `p[3]`=trigger `p[4]`=level
+`p[0]`=rate `p[1]`=depth `p[2]`=riseTime `p[3]`=trigger `p[4]`=level
 
 **TREMOLO** — starts at byte 160; p[0..2]
 `p[0]`=rate `p[1]`=depth `p[2]`=level
@@ -242,37 +242,37 @@ what's noted.
 `p[0]`=rate `p[1]`=depth `p[2]`=level
 
 **RING MOD** — starts at byte 166; p[0..5]
-`p[0]`=intelligent (0=OFF,1=ON) `p[1]`=freq `p[2]`=mod_rate `p[3]`=mod_depth `p[4]`=level `p[5]`=direct
+`p[0]`=intelligent (0=OFF,1=ON) `p[1]`=freq `p[2]`=modRate `p[3]`=modDepth `p[4]`=level `p[5]`=direct
 
 **HUMANIZER** — starts at byte 172; p[0..6]
 `p[0]`=mode (0=PICKING,1=AUTO) `p[1]`=vowel1 `p[2]`=vowel2 (0–9 = a,e,i,o,u,A,E,I,O,U) `p[3]`=sens `p[4]`=rate `p[5]`=manual `p[6]`=level
 
-**PITCH SHIFT** — starts at byte 179; p[0..8]  *(pre_delay is 16-bit, not a plain byte)*
-`p[0]`=mode (0=FAST,1=MEDIUM,2=SLOW,3=MONO) `p[1]`=pitch — index into a 51-entry table: 0="+7&-5", 1–49 → semitones -24..+24 (index-25), 50="+12&-5" `p[2..5]`=pre_delay (16-bit) `p[6]`=level `p[7]`=feedback `p[8]`=direct
+**PITCH SHIFT** — starts at byte 179; p[0..8]  *(preDelay is 16-bit, not a plain byte)*
+`p[0]`=mode (0=FAST,1=MEDIUM,2=SLOW,3=MONO) `p[1]`=pitch — index into a 51-entry table: 0="+7&-5", 1–49 → semitones -24..+24 (index-25), 50="+12&-5" `p[2..5]`=preDelay (16-bit) `p[6]`=level `p[7]`=feedback `p[8]`=direct
 
-**HARMONIST** — starts at byte 188; p[0..7]  *(pre_delay is 16-bit; there is no separate "key" byte)*
-`p[0]`=harmony — raw index (0–32) into the 33-entry `HARMONIST_HR` table (`common/constants.ts`): 0="+1oct&-1oct", 1="-4th&-6th", 2="-2oct", 3–8="-14th".."-9th", 9="-1oct", 10–15="-7th".."-2nd", 16="UNISON", 17–22="+2nd".."+7th", 23="+1oct", 24–29="+9th".."+14th", 30="+2oct", 31="+3rd&+5th", 32="+3rd&-4th" `p[1..4]`=pre_delay (16-bit) `p[5]`=level `p[6]`=feedback `p[7]`=direct
+**HARMONIST** — starts at byte 188; p[0..7]  *(preDelay is 16-bit; there is no separate "key" byte)*
+`p[0]`=harmony — raw index (0–32) into the 33-entry `HARMONIST_HR` table (`common/constants.ts`): 0="+1oct&-1oct", 1="-4th&-6th", 2="-2oct", 3–8="-14th".."-9th", 9="-1oct", 10–15="-7th".."-2nd", 16="UNISON", 17–22="+2nd".."+7th", 23="+1oct", 24–29="+9th".."+14th", 30="+2oct", 31="+3rd&+5th", 32="+3rd&-4th" `p[1..4]`=preDelay (16-bit) `p[5]`=level `p[6]`=feedback `p[7]`=direct
 
 **OCTAVE** — starts at byte 196; p[0..2]
-`p[0]`=minus1_oct `p[1]`=minus2_oct `p[2]`=direct
+`p[0]`=minus1Oct `p[1]`=minus2Oct `p[2]`=direct
 
 **HEAVY OCT** — starts at byte 199; p[0..2]  *(same layout as OCTAVE)*
-`p[0]`=minus1_oct `p[1]`=minus2_oct `p[2]`=direct
+`p[0]`=minus1Oct `p[1]`=minus2Oct `p[2]`=direct
 
 **S-BEND** — starts at byte 202; p[0..3]
-`p[0]`=trigger `p[1]`=pitch (0–6 = -3oct..-1oct,+1oct..+4oct) `p[2]`=rise_time `p[3]`=fall_time
+`p[0]`=trigger `p[1]`=pitch (0–6 = -3oct..-1oct,+1oct..+4oct) `p[2]`=riseTime `p[3]`=fallTime
 
 **PEDAL BEND** — starts at byte 206; p[0..4]
-`p[0]`=pitch_min (signed24) `p[1]`=pitch_max (signed24) `p[2]`=pdl_pos `p[3]`=level `p[4]`=direct
+`p[0]`=pitchMin (signed24) `p[1]`=pitchMax (signed24) `p[2]`=pdlPos `p[3]`=level `p[4]`=direct
 
 **TUNE DOWN** — starts at byte 211; p[0]
 `p[0]`=pitch (signed12: raw-12, range -12..0 semitones)
 
 **DELAY** *(when FX slot type=DELAY)* — starts at byte 212; p[0..9]  *(only STANDARD/MODULATE/PAN/REVERSE/ANALOG are reachable — WARP/TWIST/GLITCH are dedicated-DLY-block-only)*
-`p[0]`=dly_type (0..4) `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=high_cut `p[8]`=mod_rate `p[9]`=mod_depth, plus `p[11]`=trigger (0=OFF,1=ON, used by REVERSE)
+`p[0]`=type (0..4) `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut `p[8]`=modRate `p[9]`=modDepth, plus `p[11]`=trigger (0=OFF,1=ON, used by REVERSE)
 
 **REVERB** *(when FX slot type=REVERB)* — starts at byte 231; p[0..5]  *(only HALL S/HALL M/PLATE/ROOM S/ROOM L are reachable)*
-`p[0]`=rev_type index (0..4) `p[1]`=time_s (raw × 0.1) `p[2..3]`=pre_delay_ms (8-bit) `p[4]`=level `p[5]`=direct
+`p[0]`=type index (0..4) `p[1]`=time (raw × 0.1) `p[2..3]`=preDelay (8-bit) `p[4]`=level `p[5]`=direct
 
 **OVERTONE** *(FX3 only — stored in MEMORY%FX3A, not MEMORY%FX3)* — p[0..4]
 `p[0]`=lower `p[1]`=upper `p[2]`=unison `p[3]`=direct `p[4]`=detune
@@ -292,8 +292,21 @@ what's noted.
 | 8    | speaker | SP_TYPES index (0=OFF,1=ORIGINAL,2–8=cabinet sizes,9–16=USER1–8) |
 | 9    | sp_type_bass | bass-mode speaker type — not used in guitar mode, preserved |
 | 10   | mic     | MIC_TYPES index (0=DYN57…8=BLEND C) |
-| 11   | solo_sw | not modeled, preserved |
-| 12   | solo_level | not modeled, preserved |
+| 11   | solo    | 0=OFF, 1=ON — temporary level boost for solos |
+| 12   | soloLevel | 0–100 |
+
+## MEMORY%ODDS — Overdrive/Distortion (8 bytes)
+
+| Byte | Field     | Notes |
+|------|-----------|-------|
+| 0    | on        | 0=OFF, 1=ON |
+| 1    | type      | ODDS_TYPES index (0–34) |
+| 2    | drive     | 0–100 |
+| 3    | tone      | signed, centre=50 |
+| 4    | level     | 0–100 |
+| 5    | direct    | 0–100 |
+| 6    | solo      | 0=OFF, 1=ON — temporary level boost for solos |
+| 7    | soloLevel | 0–100 |
 
 ## MEMORY%NS — Noise Suppressor (4 bytes)
 
@@ -325,7 +338,7 @@ DLY_TYPES: 0=STANDARD, 1=MODULATE, 2=PAN, 3=REVERSE, 4=ANALOG, 5=ANLG MOD, 6=SPA
 
 Byte offsets are absolute (not relative to a per-type sub-block). Several fields are
 shared across types at the same address rather than each type getting its own
-compact layout — e.g. `feedback`/`level`/`high_cut` at 6/7/8 are used by every
+compact layout — e.g. `feedback`/`level`/`highCut` at 6/7/8 are used by every
 "clean" delay type, and `trigger`/`level` at 21/25 are shared by WARP, TWIST, and
 GLITCH.
 
@@ -334,10 +347,10 @@ GLITCH.
 | 2–5 | time (16-bit, 4 hex-digit nibbles, MSB first) | STANDARD, MODULATE, PAN, REVERSE, ANLG MOD, SPACE ECHO, SHIMMER, WARP |
 | 6 | feedback | STANDARD, MODULATE, PAN, REVERSE, ANALOG, ANLG MOD, SPACE ECHO, SHIMMER |
 | 7 | level | same set as feedback |
-| 8 | high_cut | same set as feedback |
-| 9 | mod_rate | MODULATE, ANLG MOD |
-| 10 | mod_depth | MODULATE, ANLG MOD |
-| 11 | tap_time | PAN |
+| 8 | highCut | same set as feedback |
+| 9 | modRate | MODULATE, ANLG MOD |
+| 10 | modDepth | MODULATE, ANLG MOD |
+| 11 | tapTime | PAN |
 | 12 | trigger (auto-trigger) | REVERSE |
 | 13–16 | time (16-bit, own field) | ANALOG |
 | 17 | head | SPACE ECHO |
@@ -345,9 +358,9 @@ GLITCH.
 | 19 | balance | SHIMMER |
 | 20 | mode (0=TAPE,1=TAPE-ECH,2=REVERSE) | TWIST |
 | 21 | trigger | WARP, TWIST, GLITCH |
-| 22 | rise_time | TWIST |
-| 23 | fall_time | TWIST |
-| 24 | fade_time | TWIST |
+| 22 | riseTime | TWIST |
+| 23 | fallTime | TWIST |
+| 24 | fadeTime | TWIST |
 | 25 | level | WARP, TWIST |
 | 26 | time (1 byte, own field) | GLITCH |
 | 27 | glitch | GLITCH |
@@ -364,7 +377,7 @@ GLITCH.
 REV_TYPES: 0=HALL S, 1=HALL M, 2=PLATE, 3=ROOM S, 4=ROOM L, 5=AMBIENCE, 6=SPRING, 7=SHIMMER, 8=SUB DELAY, 9=TERA ECHO
 
 As with MEMORY%DLY, several fields are shared across types at the same address
-(`tone` at 3, `level` at 5, `direct` at 8, `pre_delay` at 6, `feedback` at 16).
+(`tone` at 3, `level` at 5, `direct` at 8, `preDelay` at 6, `feedback` at 16).
 
 | Byte(s) | Field | Used by |
 |---------|-------|---------|
@@ -372,23 +385,65 @@ As with MEMORY%DLY, several fields are shared across types at the same address
 | 3 | tone (signed50) | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, SHIMMER, TERA ECHO |
 | 4 | density (raw+1) | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING |
 | 5 | level | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, TERA ECHO |
-| 6–7 | pre_delay_ms (8-bit, 2 hex-digit nibbles) | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, SHIMMER |
+| 6–7 | preDelay (8-bit, 2 hex-digit nibbles, ms) | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, SHIMMER |
 | 8 | direct | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, TERA ECHO |
 | 9 | pitch (signed24) | SHIMMER |
 | 10 | level (own field) | SHIMMER |
-| 11–14 | time_ms (16-bit, own field) | SUB DELAY |
+| 11–14 | time (16-bit, own field, ms) | SUB DELAY |
 | 15 | level (own field) | SUB DELAY |
 | 16 | feedback | SUB DELAY, TERA ECHO |
-| 17 | high_cut | SUB DELAY |
-| 18 | spread_time ("S-TIME") | TERA ECHO |
+| 17 | highCut | SUB DELAY |
+| 18 | spreadTime ("S-TIME") | TERA ECHO |
 | 19 | trigger | TERA ECHO |
 
-## MEMORY%OTHER (7 bytes)
+## MEMORY%PFX — Expression Pedal Effect (14 bytes)
 
-Master block. Byte layout not fully decoded; known fields are inferred from context (BPM, key, carryover). Preserved verbatim on write.
+The effect assigned to the expression pedal input: WAH or PEDAL BEND. Both effects'
+fields always occupy their fixed byte ranges regardless of which is selected (the
+same "shadow bytes" union layout as MEMORY%DLY/MEMORY%REV).
 
-## Unknown / Unimplemented Blocks
+| Byte | Field | Notes |
+|------|-------|-------|
+| 0 | on | 0=OFF, 1=ON |
+| 1 | type | 0=WAH, 1=PEDAL BEND |
+| 2 | wahType | WAH_TYPES index (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) |
+| 3 | wahType_bass | Bass-mode mirror of byte 2 — not used in guitar mode, always preserved |
+| 4 | level | WAH — 0–100 |
+| 5 | direct | WAH — 0–100 |
+| 6 | position | WAH — 0–100 |
+| 7 | min | WAH — 0–100 |
+| 8 | max | WAH — 0–100 |
+| 9 | pitchMin | PEDAL BEND — signed24, −24..+24 semitones |
+| 10 | pitchMax | PEDAL BEND — signed24, −24..+24 semitones |
+| 11 | position | PEDAL BEND — 0–100 |
+| 12 | level | PEDAL BEND — 0–100 |
+| 13 | direct | PEDAL BEND — 0–100 |
 
-`MEMORY%PFX`, `MEMORY%CTL`, `MEMORY%ASGN1`–`8` are read and preserved verbatim. Their internal structure is out of scope and undecoded.
+## Blocks documented but out of scope
+
+These blocks' byte layouts are fully known (cross-checked against a real factory-default
+patch export) but aren't decoded into `Patch` — they're device/footswitch routing
+metadata rather than tone-shaping parameters, so the codec preserves them verbatim.
+
+### MEMORY%OTHER — Patch Metadata (7 bytes)
+
+| Byte(s) | Field | Notes |
+|---------|-------|-------|
+| 0–1 | memoryLevel | 8-bit, 2 hex-digit nibbles — overall patch output trim, 0–200 |
+| 2–3 | bpm | 8-bit, 2 hex-digit nibbles — reference tempo, 40–250; not consumed by any tone parameter (delay/reverb times are stored directly in ms, not derived from this) |
+| 4 | key | 0–11, display key for the tuner/reference |
+| 5 | carryover | 0=OFF, 1=ON — whether the current tone keeps sounding through a patch change |
+| 6 | tempoHold | 0=OFF, 1=ON — whether tempo persists across a patch change |
+
+### MEMORY%CTL — CTL Footswitch Assignments (32 bytes)
+
+Per-patch overrides for what each footswitch (DOWN, UP, CTL1–3, and others) does —
+function index + latch/momentary mode, repeated per switch. Same field shape as the
+device-global `SYSTEM_CTL` block. Footswitch routing, not a tone parameter.
+
+### MEMORY%ASGN1–8 — Expression/Assign Slots (15 bytes each)
+
+Expression pedal and assignable-controller mappings (source, destination parameter,
+range). Controller routing, not a tone parameter.
 
 

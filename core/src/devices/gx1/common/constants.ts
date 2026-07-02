@@ -43,6 +43,9 @@ const REV_TYPES = [
   "SPRING", "SHIMMER", "SUB DELAY", "TERA ECHO",
 ] as const;
 
+// The pedal-controlled effect assigned to the expression pedal input (MEMORY%PFX).
+const PFX_TYPES = ["WAH", "PEDAL BEND"] as const;
+
 // MEMORY%CHAIN is a linked list, not a positional array: byte 0 holds the firmware
 // value of whichever block comes first, and byte (1 + CHAIN_BLOCK_ORDER.indexOf(name))
 // holds the firmware value of whatever comes immediately after that block. A firmware
@@ -66,6 +69,7 @@ const SP_TYPE_IDX  = indexMap(SP_TYPES);
 const MIC_TYPE_IDX = indexMap(MIC_TYPES);
 const DLY_TYPE_IDX = indexMap(DLY_TYPES);
 const REV_TYPE_IDX = indexMap(REV_TYPES);
+const PFX_TYPE_IDX = indexMap(PFX_TYPES);
 const CHAIN_NAME_TO_VALUE: Record<string, number> = Object.fromEntries(
   Object.entries(CHAIN_VALUE_TO_NAME).map(([value, name]) => [name, Number(value)])
 );
@@ -112,9 +116,9 @@ const PARAM_SUBTYPE_EFFECTS = new Set([
 ]);
 
 export {
-  FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES,
+  FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
-  FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX,
+  FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, RING_INTL, SBEND_PITCH, FB_MODE,
   SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,

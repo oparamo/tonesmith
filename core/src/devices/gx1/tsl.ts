@@ -26,11 +26,12 @@ const blankParamSet = (): RawParamSet => {
     "MEMORY%FX3":     zeros251(),
     "MEMORY%FX3A":    hexFromBytes(new Array(5).fill(0)),
     "MEMORY%ODDS":    hexFromBytes(new Array(8).fill(0)),
-    // on=1, type=TRNSPRNT(0), unused=0, gain=50, level=100, bass=50, mid=50, treble=50,
-    // speaker=ORIGINAL(1), unused=0, mic=DYN57(0), unused=0, unused=0
+    // on=1, type=TRNSPRNT(0), type_bass=0, gain=50, level=100, bass=50, mid=50, treble=50,
+    // speaker=ORIGINAL(1), sp_type_bass=0, mic=DYN57(0), solo=0, soloLevel=0
     "MEMORY%AMP":     hexFromBytes([1, 0, 0, 50, 100, 50, 50, 50, 1, 0, 0, 0, 0]),
     "MEMORY%DLY":     hexFromBytes(new Array(29).fill(0)),
     "MEMORY%REV":     hexFromBytes(new Array(20).fill(0)),
+    // off, type=WAH(0)
     "MEMORY%PFX":     hexFromBytes(new Array(14).fill(0)),
     // position=100, min=0, max=100, curve=NORMAL(2)
     "MEMORY%FV":      hexFromBytes([100, 0, 100, 2]),

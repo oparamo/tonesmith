@@ -5,10 +5,12 @@ import { readFile } from "../../../src/devices/gx1/tsl";
 import { encodePatch } from "../../../src/devices/gx1/codec";
 import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import {
-  decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain,
+  decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePfx,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
-import { FX_TYPES, DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, RAW } from "../../../src/devices/gx1/common";
+import {
+  FX_TYPES, DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW,
+} from "../../../src/devices/gx1/common";
 import { HIGH_CUT_MAP, LOW_CUT_MAP } from "../../../src/devices/gx1/builder";
 
 const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
@@ -178,6 +180,7 @@ describe("Real device values (default-init.tsl)", () => {
   const dlyBytes = bytesFromHex(patch[RAW]["MEMORY%DLY"]!);
   const revBytes = bytesFromHex(patch[RAW]["MEMORY%REV"]!);
   const fx3aBytes = bytesFromHex(patch[RAW]["MEMORY%FX3A"]!);
+  const pfxBytes = bytesFromHex(patch[RAW]["MEMORY%PFX"]!);
 
   it("decodes the active chain order", () => {
     expect(patch.chain).toEqual(["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);
@@ -189,13 +192,21 @@ describe("Real device values (default-init.tsl)", () => {
   });
 
   it("decodes ODDS", () => {
-    expect(patch.odds).toMatchObject({ type: "OVERDRIVE", drive: 50, tone: 0, level: 50, direct: 0 });
+    expect(patch.odds).toMatchObject({
+      type: "OVERDRIVE", drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50,
+    });
   });
 
   it("decodes AMP", () => {
     expect(patch.amp).toMatchObject({
       type: "NATURAL", speaker: "ORIGINAL", gain: 50, level: 50,
-      bass: 50, middle: 50, treble: 50, mic: "DYN421",
+      bass: 50, middle: 50, treble: 50, mic: "DYN421", solo: false, soloLevel: 50,
+    });
+  });
+
+  it("decodes PFX (active type: WAH)", () => {
+    expect(patch.pfx).toMatchObject({
+      on: false, type: "WAH", wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100,
     });
   });
 
@@ -394,5 +405,10 @@ describe("Real device values (default-init.tsl)", () => {
   it("decodes REV shadow bytes for TERA ECHO (spreadTime at 18, not a shared time field)", () => {
     expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX["TERA ECHO"]!, ...revBytes.slice(2)])))
       .toMatchObject({ on: false, type: "TERA ECHO", tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: 0 });
+  });
+
+  it("decodes PFX shadow bytes for PEDAL BEND (its own pitchMin/pitchMax at offset 9/10)", () => {
+    expect(decodePfx(hexFromBytes([...pfxBytes.slice(0, 1), PFX_TYPE_IDX["PEDAL BEND"]!, ...pfxBytes.slice(2)])))
+      .toMatchObject({ on: false, type: "PEDAL BEND", pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 });
   });
 });

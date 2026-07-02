@@ -1,7 +1,7 @@
 import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
 import { PARAM_SUBTYPE_EFFECTS, NS_DETECT } from "./common";
-import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, type FieldCodec } from "./codec";
+import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, type FieldCodec } from "./codec";
 
 // 1/3-octave series from 20Hz to 12.5kHz (indices 0–28), then FLAT (29).
 const HIGH_CUT_MAP: Record<string, number> = {
@@ -53,6 +53,8 @@ const amp = (
   speaker = "ORIGINAL",
   mic = "DYN57",
   level = 100,
+  solo = false,
+  soloLevel = 50,
 ): void => {
   patch.amp.on = true;
   patch.amp.type = type;
@@ -63,6 +65,8 @@ const amp = (
   patch.amp.speaker = speaker;
   patch.amp.mic = mic;
   patch.amp.level = level;
+  patch.amp.solo = solo;
+  patch.amp.soloLevel = soloLevel;
 };
 
 const odds = (
@@ -72,6 +76,8 @@ const odds = (
   tone: number,
   level: number,
   direct = 0,
+  solo = false,
+  soloLevel = 50,
 ): void => {
   patch.odds.on = true;
   patch.odds.type = type;
@@ -79,6 +85,8 @@ const odds = (
   patch.odds.tone = tone;
   patch.odds.level = level;
   patch.odds.direct = direct;
+  patch.odds.solo = solo;
+  patch.odds.soloLevel = soloLevel;
 };
 
 const clearOdds = (patch: Patch): void => {
@@ -122,8 +130,8 @@ const fv = (patch: Patch, position: number, min: number, max: number, curve = "N
 /**
  * Merges `extra` into `target`, rejecting any key that isn't one of `fields`'
  * names — a typo'd or type-mismatched extra param would otherwise write a byte
- * offset that's meaningless for the current delay/reverb type and silently
- * corrupt an unrelated field on encode.
+ * offset that's meaningless for the current type and silently corrupt an
+ * unrelated field on encode. Shared by pfx/delay/reverb, whose field sets vary by type.
  */
 const assignExtra = (
   target: Record<string, unknown>,
@@ -139,6 +147,13 @@ const assignExtra = (
     }
   }
   Object.assign(target, extra);
+};
+
+/** Sets the expression pedal effect: "WAH" (wahType/level/direct/position/min/max) or "PEDAL BEND" (pitchMin/pitchMax/position/level/direct). */
+const pfx = (patch: Patch, type: string, params: Record<string, unknown> = {}, on = true): void => {
+  patch.pfx.on = on;
+  patch.pfx.type = type;
+  assignExtra(patch.pfx, params, PFX_TYPE_MAPS[type], "pfx", type);
 };
 
 const delay = (
@@ -194,4 +209,4 @@ const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
   console.info(`Saved ${outPath} (${patches.length} patches)`);
 };
 
-export { HIGH_CUT_MAP, LOW_CUT_MAP, DEFAULT_CHAIN, moveBefore, basePatch, amp, odds, clearOdds, fx, ns, fv, delay, reverb, saveTsl };
+export { HIGH_CUT_MAP, LOW_CUT_MAP, DEFAULT_CHAIN, moveBefore, basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, saveTsl };

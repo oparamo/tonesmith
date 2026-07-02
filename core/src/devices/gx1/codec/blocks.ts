@@ -5,10 +5,11 @@ import {
   ODDS_TYPES, ODDS_IDX,
   DLY_TYPES, DLY_TYPE_IDX,
   REV_TYPES, REV_TYPE_IDX,
+  PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
 } from "../common";
-import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "../types";
+import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
 import { RAW } from "../common";
 import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
 import { u8, signed, lookup, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
@@ -64,22 +65,26 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
 
 // ── AMP block (13 bytes) ──────────────────────────────────────────────────────
 //
-// Layout: [on, type, -, gain, level, bass, middle, treble, speaker, -, mic, -, -]
-// Bytes 2, 9, 11, 12 are unused — they pass through via the RAW bytes.
+// Layout: [on, type, type_bass, gain, level, bass, middle, treble, speaker,
+//          sp_type_bass, mic, solo, soloLevel]
+// Bytes 2 and 9 are the bass-mode mirrors of type/speaker — guitar-mode
+// out-of-scope, same pattern as FX_COM's byte 2 (see decodeFxCom below).
 
 const decodeAmp = (hexList: string[]): AmpBlock => {
   const bytes = bytesFromHex(hexList);
   return {
-    on:      Boolean(bytes[0]),
-    type:    lookupName(AMP_TYPES, bytes[1]!),
-    gain:    bytes[3]!,
-    level:   bytes[4]!,
-    bass:    bytes[5]!,
-    middle:  bytes[6]!,
-    treble:  bytes[7]!,
-    speaker: lookupName(SP_TYPES,  bytes[8]!),
-    mic:     lookupName(MIC_TYPES, bytes[10]!),
-    [RAW]:   bytes,
+    on:        Boolean(bytes[0]),
+    type:      lookupName(AMP_TYPES, bytes[1]!),
+    gain:      bytes[3]!,
+    level:     bytes[4]!,
+    bass:      bytes[5]!,
+    middle:    bytes[6]!,
+    treble:    bytes[7]!,
+    speaker:   lookupName(SP_TYPES,  bytes[8]!),
+    mic:       lookupName(MIC_TYPES, bytes[10]!),
+    solo:      Boolean(bytes[11]),
+    soloLevel: bytes[12]!,
+    [RAW]:     bytes,
   };
 };
 
@@ -94,25 +99,28 @@ const encodeAmp = (block: AmpBlock): string[] => {
   bytes[7]  = block.treble;
   bytes[8]  = lookupIndex(SP_TYPE_IDX,  block.speaker, "SP type");
   bytes[10] = lookupIndex(MIC_TYPE_IDX, block.mic,     "MIC type");
+  bytes[11] = Number(block.solo);
+  bytes[12] = block.soloLevel;
   return hexFromBytes(bytes);
 };
 
 
 // ── OD/DS block (8 bytes) ─────────────────────────────────────────────────────
 //
-// Layout: [on, type, drive, tone(signed), level, direct, -, ?]
-// Bytes 6–7 are unknown — they pass through via the RAW bytes.
+// Layout: [on, type, drive, tone(signed), level, direct, solo, soloLevel]
 
 const decodeOdDs = (hexList: string[]): OdDsBlock => {
   const bytes = bytesFromHex(hexList);
   return {
-    on:     Boolean(bytes[0]!),
-    type:   lookupName(ODDS_TYPES, bytes[1]!),
-    drive:  bytes[2]!,
-    tone:   toSigned(bytes[3]!),
-    level:  bytes[4]!,
-    direct: bytes[5]!,
-    [RAW]:  bytes,
+    on:        Boolean(bytes[0]!),
+    type:      lookupName(ODDS_TYPES, bytes[1]!),
+    drive:     bytes[2]!,
+    tone:      toSigned(bytes[3]!),
+    level:     bytes[4]!,
+    direct:    bytes[5]!,
+    solo:      Boolean(bytes[6]),
+    soloLevel: bytes[7]!,
+    [RAW]:     bytes,
   };
 };
 
@@ -124,6 +132,8 @@ const encodeOdDs = (block: OdDsBlock): string[] => {
   bytes[3] = toUnsigned(block.tone);
   bytes[4] = block.level;
   bytes[5] = block.direct;
+  bytes[6] = Number(block.solo);
+  bytes[7] = block.soloLevel;
   return hexFromBytes(bytes);
 };
 
@@ -334,6 +344,49 @@ const encodeReverb = (block: ReverbBlock): string[] => {
   return hexFromBytes(bytes);
 };
 
+// ── PFX (expression pedal effect: WAH / PEDAL BEND) block (14 bytes) ──────────
+//
+// Byte 3 (wah_type_bass) is the bass-mode mirror of byte 2's wah type — guitar-mode
+// out-of-scope, same pattern as AMP/FX_COM's other bass-mode mirror bytes. Both
+// WAH's and PEDAL BEND's fields always occupy their fixed byte ranges regardless of
+// which is currently selected (the same "shadow bytes" union layout as delay/reverb).
+
+const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
+  "WAH": [
+    lookup("wahType", 2, WAH_TYPES), u8("level", 4), u8("direct", 5),
+    u8("position", 6), u8("min", 7), u8("max", 8),
+  ],
+  "PEDAL BEND": [
+    signed("pitchMin", 9, 24), signed("pitchMax", 10, 24),
+    u8("position", 11), u8("level", 12), u8("direct", 13),
+  ],
+};
+
+const decodePfx = (hexList: string[]): PfxBlock => {
+  const bytes = bytesFromHex(hexList);
+  const pfxType = lookupName(PFX_TYPES, bytes[1]!);
+  const block: PfxBlock = { on: Boolean(bytes[0]), type: pfxType, [RAW]: bytes };
+
+  const fields = PFX_TYPE_MAPS[pfxType];
+  if (fields) Object.assign(block, decodeFields(fields, bytes));
+  return block;
+};
+
+const encodePfx = (block: PfxBlock): string[] => {
+  const bytes = [...block[RAW]];
+  bytes[0] = Number(block.on);
+  bytes[1] = lookupIndex(PFX_TYPE_IDX, block.type, "PFX type");
+
+  const fields = PFX_TYPE_MAPS[block.type];
+  if (fields) {
+    // Double-assertion needed: PfxBlock extends Record<string, unknown> which isn't
+    // directly assignable to FxParams (Record<string, string|number|number[]>) due to
+    // the 'on: boolean' field; at runtime we only read the named param fields.
+    encodeFields(fields, block as unknown as FxParams, bytes);
+  }
+  return hexFromBytes(bytes);
+};
+
 export {
   decodeName, encodeName,
   decodeChain, encodeChain,
@@ -344,5 +397,6 @@ export {
   decodeFxCom, encodeFxCom,
   decodeDelay, encodeDelay,
   decodeReverb, encodeReverb,
-  DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES,
+  decodePfx, encodePfx,
+  DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS,
 };

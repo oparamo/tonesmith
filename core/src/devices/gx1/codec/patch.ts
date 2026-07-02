@@ -12,6 +12,7 @@ import {
   decodeFxCom, encodeFxCom,
   decodeDelay, encodeDelay,
   decodeReverb, encodeReverb,
+  decodePfx, encodePfx,
 } from "./blocks";
 
 // ── Patch decode / encode ─────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     odds:   decodeOdDs(paramSet["MEMORY%ODDS"]!),
     ns:     decodeNs(paramSet["MEMORY%NS"]!),
     fv:     decodeFv(paramSet["MEMORY%FV"]!),
+    pfx:    decodePfx(paramSet["MEMORY%PFX"]!),
     delay:  decodeDelay(paramSet["MEMORY%DLY"]!),
     reverb: decodeReverb(paramSet["MEMORY%REV"]!),
     fx1: { ...decodeFxCom(paramSet["MEMORY%FX1_COM"]!), params: {} },
@@ -73,6 +75,7 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
   paramSet["MEMORY%ODDS"]  = encodeOdDs(patch.odds);
   paramSet["MEMORY%NS"]    = encodeNs(patch.ns);
   paramSet["MEMORY%FV"]    = encodeFv(patch.fv);
+  paramSet["MEMORY%PFX"]   = encodePfx(patch.pfx);
   paramSet["MEMORY%DLY"]   = encodeDelay(patch.delay);
   paramSet["MEMORY%REV"]   = encodeReverb(patch.reverb);
 
