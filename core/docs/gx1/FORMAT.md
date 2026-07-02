@@ -389,6 +389,6 @@ Master block. Byte layout not fully decoded; known fields are inferred from cont
 
 ## Unknown / Unimplemented Blocks
 
-`MEMORY%PFX`, `MEMORY%CTL`, `MEMORY%ASGN1`–`8` are read and preserved verbatim. Their internal structure has not been reverse-engineered.
+`MEMORY%PFX`, `MEMORY%CTL`, `MEMORY%ASGN1`–`8` are read and preserved verbatim. Their internal structure is out of scope and undecoded.
 
 
