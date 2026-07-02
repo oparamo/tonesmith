@@ -102,6 +102,12 @@ const HARMONIST_HR = [
   "+2oct", "+3rd&+5th", "+3rd&-4th",
 ] as const;
 
+// The patch's song key (MEMORY%OTHER byte 4) — HARMONIST_HR's scale-degree entries
+// (+2nd, +3rd, +6th, etc.) are diatonic, so the actual semitone shift HARMONIST applies
+// depends on this key.
+const KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
+const KEY_IDX = indexMap(KEY_NAMES);
+
 // FX_COM byte[2] is always the bass-mode mirror of the type selector (byte[1] for guitar
 // mode) — never a subtype, for any effect. COMPRESSOR, LIMITER, AC RESO, CHORUS,
 // CLASSIC-VIBE, HUMANIZER, and OD/DS instead store their own sub-model selector in
@@ -122,5 +128,5 @@ export {
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, RING_INTL, SBEND_PITCH, FB_MODE,
   SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
-  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS,
+  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, KEY_NAMES, KEY_IDX,
 };

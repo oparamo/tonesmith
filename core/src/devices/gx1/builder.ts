@@ -37,9 +37,10 @@ const moveBefore = (chain: string[], node: string, beforeNode: string): string[]
   return [...without.slice(0, index), node, ...without.slice(index)];
 };
 
-const basePatch = (name: string, chain: string[] = DEFAULT_CHAIN): Patch => {
+const basePatch = (name: string, chain: string[] = DEFAULT_CHAIN, key = "C"): Patch => {
   const patch = blankPatch(name);
   patch.chain = chain;
+  patch.key = key;
   return patch;
 };
 

@@ -36,6 +36,14 @@ describe("basePatch", () => {
   it("sets the patch name", () => {
     expect(basePatch("My Patch").name).toBe("My Patch");
   });
+
+  it("defaults key to C", () => {
+    expect(basePatch("Test").key).toBe("C");
+  });
+
+  it("accepts a custom key", () => {
+    expect(basePatch("Test", DEFAULT_CHAIN, "G").key).toBe("G");
+  });
 });
 
 describe("moveBefore", () => {

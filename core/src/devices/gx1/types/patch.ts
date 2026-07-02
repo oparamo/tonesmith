@@ -6,6 +6,7 @@ import type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, Reverb
 interface Patch extends BasePatch {
   memo: string;
   chain: string[];
+  key: string;
   fx1: FxBlock;
   fx2: FxBlock;
   fx3: FxBlock;

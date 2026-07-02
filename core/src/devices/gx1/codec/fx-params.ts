@@ -172,10 +172,13 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("reso", 4), u8("buzz", 5), u8("direct", 6),
   ],
   // OD/DS: p[0]=type (stored in param block, like COMPRESSOR/LIMITER/etc.), then params
-  // shifted by one.
+  // shifted by one. solo/soloLevel are this FX-slot instance's own solo boost — distinct
+  // from the dedicated MEMORY%ODDS block's solo (the device exposes "FX1 SOLO"/"FX2
+  // SOLO"/"FX3 SOLO" as separate footswitch functions from "OD/DS SOLO").
   "OD/DS": [
     lookup("type", 0, ODDS_TYPES),
     u8("drive", 1), signed("tone", 2), u8("level", 3), u8("direct", 4),
+    u8("solo", 5), u8("soloLevel", 6),
   ],
   // OVERTONE: FX3-only, stored in the separate 5-byte MEMORY%FX3A block rather than
   // the 251-byte FX3 block — see the FX3A handling in patch.ts. Offset 0 here refers

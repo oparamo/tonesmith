@@ -6,6 +6,7 @@ import { encodePatch } from "../../../src/devices/gx1/codec";
 import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import {
   decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePfx,
+  decodeKey, encodeKey,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import {
@@ -163,6 +164,28 @@ describe("Chain block (real device values)", () => {
 });
 
 
+// ── Key (MEMORY%OTHER byte 4) ─────────────────────────────────────────────────
+
+describe("Key", () => {
+  it("decodes the default key", () => {
+    expect(decodeKey(hexFromBytes(new Array(7).fill(0)))).toBe("C");
+  });
+
+  it("decodes a non-default key", () => {
+    const bytes = new Array(7).fill(0);
+    bytes[4] = 7; // G
+    expect(decodeKey(hexFromBytes(bytes))).toBe("G");
+  });
+
+  it("encodes a key while preserving the rest of MEMORY%OTHER untouched", () => {
+    const original = [6, 4, 7, 8, 0, 1, 0];
+    const result = bytesFromHex(encodeKey("G", hexFromBytes(original)));
+    expect(result[4]).toBe(7);
+    expect(result).toEqual([6, 4, 7, 8, 7, 1, 0]);
+  });
+});
+
+
 // ── Real device values (factory default init patch) ──────────────────────────
 //
 // default-init.tsl is a real GX-1 factory-default patch export. Every block below
@@ -296,8 +319,12 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX1 shadow bytes for OD/DS (byte offset 115 — type read from the param block, not FX_COM byte 2)", () => {
     expect(decodeFxParams("OD/DS", fx1Bytes)).toEqual({
-      type: "CLEAN BST", drive: 50, tone: 0, level: 50, direct: 0,
+      type: "CLEAN BST", drive: 50, tone: 0, level: 50, direct: 0, solo: 0, soloLevel: 50,
     });
+  });
+
+  it("decodes the patch's key (byte 4 of MEMORY%OTHER)", () => {
+    expect(patch.key).toBe("C");
   });
 
   it("decodes FX1 shadow bytes for FLANGER (byte offset 128, reordered + direct)", () => {

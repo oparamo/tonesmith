@@ -211,8 +211,11 @@ what's noted.
 **SITAR SIM** — starts at byte 108; p[0..6]
 `p[0]`=sens `p[1]`=depth `p[2]`=tone (signed50) `p[3]`=level `p[4]`=reso `p[5]`=buzz `p[6]`=direct
 
-**OD/DS** — starts at byte 115; p[0..4]  *(p[0]=type, stored here like COMPRESSOR/LIMITER/etc. — not in FX_COM byte 2)*
+**OD/DS** — starts at byte 115; p[0..6]  *(p[0]=type, stored here like COMPRESSOR/LIMITER/etc. — not in FX_COM byte 2)*
 `p[0]`=type (see pedal-model table above) `p[1]`=drive `p[2]`=tone (signed50) `p[3]`=level `p[4]`=direct
+`p[5]`=solo `p[6]`=soloLevel — this FX-slot instance's own solo boost, distinct from the
+dedicated `MEMORY%ODDS` block's solo (the device exposes "FX1 SOLO"/"FX2 SOLO"/"FX3 SOLO" as
+separate footswitch functions from "OD/DS SOLO")
 
 **CHORUS** — starts at byte 122; p[0..5]
 `p[0]`=type (0=MONO,1=DIR/EFX,2=STEREO) `p[1]`=rate `p[2]`=depth `p[3]`=level `p[4]`=preDelay (raw × 0.5ms) `p[5]`=direct
@@ -419,21 +422,23 @@ same "shadow bytes" union layout as MEMORY%DLY/MEMORY%REV).
 | 12 | level | PEDAL BEND — 0–100 |
 | 13 | direct | PEDAL BEND — 0–100 |
 
+## MEMORY%OTHER — Patch Metadata (7 bytes)
+
+Only `key` is decoded (`patch.key`); the rest is preserved verbatim (see rationale below).
+
+| Byte(s) | Field | Notes |
+|---------|-------|-------|
+| 0–1 | memoryLevel | 8-bit, 2 hex-digit nibbles — overall patch output trim, 0–200. Not decoded. |
+| 2–3 | bpm | 8-bit, 2 hex-digit nibbles — reference tempo, 40–250; not consumed by any tone parameter (delay/reverb times are stored directly in ms, not derived from this). Not decoded. |
+| 4 | key | 0–11, one of `KEY_NAMES` (C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B). This is the song key used to resolve `HARMONIST`'s diatonic `harmony` intervals (+2nd, +3rd, +6th, etc.) to actual semitones — decoded as `patch.key`. |
+| 5 | carryover | 0=OFF, 1=ON — whether the current tone keeps sounding through a patch change. Not decoded. |
+| 6 | tempoHold | 0=OFF, 1=ON — whether tempo persists across a patch change. Not decoded. |
+
 ## Blocks documented but out of scope
 
 These blocks' byte layouts are fully known (cross-checked against a real factory-default
 patch export) but aren't decoded into `Patch` — they're device/footswitch routing
 metadata rather than tone-shaping parameters, so the codec preserves them verbatim.
-
-### MEMORY%OTHER — Patch Metadata (7 bytes)
-
-| Byte(s) | Field | Notes |
-|---------|-------|-------|
-| 0–1 | memoryLevel | 8-bit, 2 hex-digit nibbles — overall patch output trim, 0–200 |
-| 2–3 | bpm | 8-bit, 2 hex-digit nibbles — reference tempo, 40–250; not consumed by any tone parameter (delay/reverb times are stored directly in ms, not derived from this) |
-| 4 | key | 0–11, display key for the tuner/reference |
-| 5 | carryover | 0=OFF, 1=ON — whether the current tone keeps sounding through a patch change |
-| 6 | tempoHold | 0=OFF, 1=ON — whether tempo persists across a patch change |
 
 ### MEMORY%CTL — CTL Footswitch Assignments (32 bytes)
 

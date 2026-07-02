@@ -4,6 +4,7 @@ import { bytesFromHex } from "./primitives";
 import { decodeFxParams, encodeFxParams } from "./fx-params";
 import {
   decodeName, encodeName,
+  decodeKey, encodeKey,
   decodeChain, encodeChain,
   decodeAmp, encodeAmp,
   decodeOdDs, encodeOdDs,
@@ -29,6 +30,7 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     name:   decodeName(paramSet["MEMORY%COM"]!),
     memo:   raw.memo ?? "",
     chain:  decodeChain(paramSet["MEMORY%CHAIN"]!),
+    key:    decodeKey(paramSet["MEMORY%OTHER"]!),
     amp:    decodeAmp(paramSet["MEMORY%AMP"]!),
     odds:   decodeOdDs(paramSet["MEMORY%ODDS"]!),
     ns:     decodeNs(paramSet["MEMORY%NS"]!),
@@ -71,6 +73,7 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
 
   paramSet["MEMORY%COM"]   = encodeName(patch.name);
   paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain, patch[RAW]["MEMORY%CHAIN"]!);
+  paramSet["MEMORY%OTHER"] = encodeKey(patch.key, patch[RAW]["MEMORY%OTHER"]!);
   paramSet["MEMORY%AMP"]   = encodeAmp(patch.amp);
   paramSet["MEMORY%ODDS"]  = encodeOdDs(patch.odds);
   paramSet["MEMORY%NS"]    = encodeNs(patch.ns);

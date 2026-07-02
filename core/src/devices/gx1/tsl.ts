@@ -37,6 +37,7 @@ const blankParamSet = (): RawParamSet => {
     "MEMORY%FV":      hexFromBytes([100, 0, 100, 2]),
     // off, threshold=20, release=20, detect=INPUT(0)
     "MEMORY%NS":      hexFromBytes([0, 20, 20, 0]),
+    // key=C(0); memoryLevel/bpm/carryover/tempoHold out of scope
     "MEMORY%OTHER":   hexFromBytes(new Array(7).fill(0)),
     "MEMORY%CTL":     hexFromBytes(new Array(32).fill(0)),
   };

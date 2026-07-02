@@ -7,7 +7,7 @@ import {
   REV_TYPES, REV_TYPE_IDX,
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
-  NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
+  NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
 import { RAW } from "../common";
@@ -24,6 +24,22 @@ const encodeName = (name: string, length = 16): string[] => {
   const buffer = Buffer.alloc(length, 0x20);
   buffer.write(name.slice(0, length), "ascii");
   return hexFromBytes(Array.from(buffer));
+};
+
+
+// ── Key (MEMORY%OTHER byte 4 only — the rest of that block is out of scope) ───────
+//
+// memoryLevel/bpm/carryover/tempoHold aren't tied to any modeled effect's output, but
+// key is: HARMONIST_HR's scale-degree entries are diatonic, so this is what the device
+// uses to resolve them to actual semitones.
+
+const decodeKey = (hexList: string[]): string =>
+  lookupName(KEY_NAMES, bytesFromHex(hexList)[4]!);
+
+const encodeKey = (key: string, originalHex: string[]): string[] => {
+  const bytes = bytesFromHex(originalHex);
+  bytes[4] = lookupIndex(KEY_IDX, key, "key");
+  return hexFromBytes(bytes);
 };
 
 
@@ -389,6 +405,7 @@ const encodePfx = (block: PfxBlock): string[] => {
 
 export {
   decodeName, encodeName,
+  decodeKey, encodeKey,
   decodeChain, encodeChain,
   decodeAmp, encodeAmp,
   decodeOdDs, encodeOdDs,
