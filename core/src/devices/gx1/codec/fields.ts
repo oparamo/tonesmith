@@ -101,6 +101,38 @@ const nibbleTriplet = (name: string, offset: number): FieldCodec => ({
   },
 });
 
+/**
+ * An 8-bit value split across two consecutive bytes, one hex digit (nibble)
+ * per byte, most-significant first. Used for reverb pre-delay (max 200ms).
+ */
+const nibblePair = (name: string, offset: number): FieldCodec => ({
+  name,
+  decode: bytes => bytes[offset]! * 16 + bytes[offset + 1]!,
+  encode: (value, bytes) => {
+    const n = value as number;
+    bytes[offset]     = (n >> 4) & 0xF;
+    bytes[offset + 1] = n & 0xF;
+  },
+});
+
+/**
+ * A 16-bit value split across four consecutive bytes, one hex digit (nibble)
+ * per byte, most-significant first. Used for delay/pre-delay times whose
+ * range exceeds the 12-bit nibbleTriplet span (e.g. up to ~2000ms).
+ */
+const nibbleQuad = (name: string, offset: number): FieldCodec => ({
+  name,
+  decode: bytes =>
+    bytes[offset]! * 4096 + bytes[offset + 1]! * 256 + bytes[offset + 2]! * 16 + bytes[offset + 3]!,
+  encode: (value, bytes) => {
+    const n = value as number;
+    bytes[offset]     = (n >> 12) & 0xF;
+    bytes[offset + 1] = (n >> 8) & 0xF;
+    bytes[offset + 2] = (n >> 4) & 0xF;
+    bytes[offset + 3] = n & 0xF;
+  },
+});
+
 
 // ── Generic walkers ───────────────────────────────────────────────────────────
 
@@ -124,4 +156,4 @@ const encodeFields = (fields: FieldCodec[], params: FxParams, bytes: number[]): 
 };
 
 export type { FieldCodec };
-export { u8, signed, lookup, scaled, u16be, nibbleTriplet, decodeFields, encodeFields };
+export { u8, signed, lookup, scaled, u16be, nibbleTriplet, nibblePair, nibbleQuad, decodeFields, encodeFields };

@@ -12,6 +12,17 @@ const HIGH_CUT_MAP: Record<string, number> = {
   "5kHz": 24,  "6.3kHz": 25, "8kHz": 26, "10kHz": 27, "12.5kHz": 28, "FLAT": 29,
 };
 
+// Same 1/3-octave series as HIGH_CUT_MAP, but FLAT (0) comes first and the
+// frequencies ascend from there — used by PARA. EQ's lowCut field.
+const LOW_CUT_MAP: Record<string, number> = {
+  "FLAT": 0,   "20Hz": 1,   "25Hz": 2,   "31.5Hz": 3, "40Hz": 4,  "50Hz": 5,
+  "63Hz": 6,   "80Hz": 7,   "100Hz": 8,  "125Hz": 9,  "160Hz": 10, "200Hz": 11,
+  "250Hz": 12, "315Hz": 13, "400Hz": 14, "500Hz": 15, "630Hz": 16, "800Hz": 17,
+  "1kHz": 18,  "1.25kHz": 19, "1.6kHz": 20, "2kHz": 21, "2.5kHz": 22,
+  "3.15kHz": 23, "4kHz": 24, "5kHz": 25, "6.3kHz": 26, "8kHz": 27,
+  "10kHz": 28, "12.5kHz": 29,
+};
+
 // The 10 reorderable blocks — OUTPUT is a fixed endpoint, not part of the chain array
 // (see CHAIN_BLOCK_ORDER in common/constants.ts for the underlying byte encoding).
 const DEFAULT_CHAIN: string[] =
@@ -149,4 +160,4 @@ const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
   console.info(`Saved ${outPath} (${patches.length} patches)`);
 };
 
-export { HIGH_CUT_MAP, DEFAULT_CHAIN, moveBefore, basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl };
+export { HIGH_CUT_MAP, LOW_CUT_MAP, DEFAULT_CHAIN, moveBefore, basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl };

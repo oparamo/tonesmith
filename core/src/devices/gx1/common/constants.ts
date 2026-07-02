@@ -90,30 +90,25 @@ const ON_OFF       = ["OFF", "ON"] as const;
 // Playback head combinations.
 const SPACE_ECHO_HEAD = ["1", "1+2", "1+3", "2+3", "1+2+3"] as const;
 
-const HARMONIST_KEY = [
-  "Am", "Bbm", "Bm", "Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m",
-  "Gm", "Abm", "A", "Bb", "B", "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab",
+// The 33 reachable HARMONIST harmony values (raw byte 0-32), in raw order.
+const HARMONIST_HR = [
+  "+1oct&-1oct", "-4th&-6th", "-2oct", "-14th", "-13th", "-12th", "-11th", "-10th", "-9th",
+  "-1oct", "-7th", "-6th", "-5th", "-4th", "-3rd", "-2nd", "UNISON", "+2nd", "+3rd", "+4th",
+  "+5th", "+6th", "+7th", "+1oct", "+9th", "+10th", "+11th", "+12th", "+13th", "+14th",
+  "+2oct", "+3rd&+5th", "+3rd&-4th",
 ] as const;
 
-const HARMONIST_HR = (
-  [-2, -1, 0, 1, 2].flatMap(octave =>
-    ["m2", "M2", "m3", "M3", "P4", "P5", "m6", "M6", "m7", "M7"].map(interval => `${octave}:${interval}`)
-  )
-);
-
-// Only OD/DS stores its subtype in FX_COM byte[2].
-// COMPRESSOR, LIMITER, CHORUS, AC RESO, CLASSIC-VIBE, HUMANIZER store their
-// type/mode in param-block byte p[0] — handled in codec/fx-params.ts.
-const FX_SUBTYPE_LISTS: Record<string, readonly string[]> = {
-  "OD/DS": ODDS_TYPES,
-};
+// FX_COM byte[2] is always the bass-mode mirror of the type selector (byte[1] for guitar
+// mode) — never a subtype, for any effect. COMPRESSOR, LIMITER, AC RESO, CHORUS,
+// CLASSIC-VIBE, HUMANIZER, and OD/DS instead store their own sub-model selector in
+// param-block byte p[0] — handled in codec/fx-params.ts.
 
 // Effects whose sub-model selector lives in param-block byte p[0] (read/written via
-// FX_PARAM_MAPS' lookup("type", 0, ...) field) rather than in FX_COM byte[2]. Used by
-// both the decoder (to promote params.type back to block.subType for display) and the
-// fx() builder (to thread a subType argument into params.type so it actually encodes).
+// FX_PARAM_MAPS' lookup("type", 0, ...) field). Used by both the decoder (to promote
+// params.type back to block.subType for display) and the fx() builder (to thread a
+// subType argument into params.type so it actually encodes).
 const PARAM_SUBTYPE_EFFECTS = new Set([
-  "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER",
+  "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER", "OD/DS",
 ]);
 
 export {
@@ -123,5 +118,5 @@ export {
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, RING_INTL, SBEND_PITCH, FB_MODE,
   SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
-  HARMONIST_KEY, HARMONIST_HR, FX_SUBTYPE_LISTS, PARAM_SUBTYPE_EFFECTS,
+  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS,
 };
