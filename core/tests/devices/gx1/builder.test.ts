@@ -11,6 +11,7 @@ import {
   clearOdds,
   fx,
   ns,
+  fv,
   delay,
   reverb,
   saveTsl,
@@ -163,6 +164,35 @@ describe("ns", () => {
     ns(patch, 40, 30, false);
     expect(patch.ns.on).toBe(false);
   });
+
+  it("defaults detect to INPUT", () => {
+    const patch = basePatch("Test");
+    ns(patch, 40, 30);
+    expect(patch.ns.detect).toBe("INPUT");
+  });
+
+  it("accepts an explicit detect mode", () => {
+    const patch = basePatch("Test");
+    ns(patch, 40, 30, true, "NS INPUT");
+    expect(patch.ns.detect).toBe("NS INPUT");
+  });
+});
+
+describe("fv", () => {
+  it("sets all fv fields", () => {
+    const patch = basePatch("Test");
+    fv(patch, 80, 10, 90, "FAST");
+    expect(patch.fv.position).toBe(80);
+    expect(patch.fv.min).toBe(10);
+    expect(patch.fv.max).toBe(90);
+    expect(patch.fv.curve).toBe("FAST");
+  });
+
+  it("defaults curve to NORMAL", () => {
+    const patch = basePatch("Test");
+    fv(patch, 100, 0, 100);
+    expect(patch.fv.curve).toBe("NORMAL");
+  });
 });
 
 describe("delay", () => {
@@ -193,6 +223,12 @@ describe("delay", () => {
     const patch = basePatch("Test");
     delay(patch, "MODULATE", 1, 50, 50, "FLAT", true, { modRate: 5 });
     expect((patch.delay as Record<string, unknown>).modRate).toBe(5);
+  });
+
+  it("throws when an extra param isn't valid for the delay type", () => {
+    const patch = basePatch("Test");
+    expect(() => delay(patch, "STANDARD", 7, 50, 60, "FLAT", true, { modRate: 5 }))
+      .toThrow(/extra param "modRate" is not valid for type "STANDARD"/);
   });
 
   it("can disable delay", () => {
@@ -227,8 +263,14 @@ describe("reverb", () => {
 
   it("merges extra params", () => {
     const patch = basePatch("Test");
-    reverb(patch, "SHIMMER", 3.0, 60, 0, 0, 5, 100, true, { shimmer: 50 });
-    expect((patch.reverb as Record<string, unknown>).shimmer).toBe(50);
+    reverb(patch, "SHIMMER", 3.0, 60, 0, 0, 5, 100, true, { pitch: 12 });
+    expect((patch.reverb as Record<string, unknown>).pitch).toBe(12);
+  });
+
+  it("throws when an extra param isn't valid for the reverb type", () => {
+    const patch = basePatch("Test");
+    expect(() => reverb(patch, "PLATE", 1.5, 50, 0, 0, 5, 100, true, { pitch: 12 }))
+      .toThrow(/extra param "pitch" is not valid for type "PLATE"/);
   });
 
   it("can disable reverb", () => {

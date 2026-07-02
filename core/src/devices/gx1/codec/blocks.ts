@@ -344,4 +344,5 @@ export {
   decodeFxCom, encodeFxCom,
   decodeDelay, encodeDelay,
   decodeReverb, encodeReverb,
+  DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES,
 };

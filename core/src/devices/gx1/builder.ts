@@ -1,6 +1,7 @@
 import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
-import { PARAM_SUBTYPE_EFFECTS } from "./common";
+import { PARAM_SUBTYPE_EFFECTS, NS_DETECT } from "./common";
+import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, type FieldCodec } from "./codec";
 
 // 1/3-octave series from 20Hz to 12.5kHz (indices 0–28), then FLAT (29).
 const HIGH_CUT_MAP: Record<string, number> = {
@@ -104,10 +105,40 @@ const fx = (
       : params;
 };
 
-const ns = (patch: Patch, threshold: number, release: number, on = true): void => {
+const ns = (patch: Patch, threshold: number, release: number, on = true, detect: string = NS_DETECT[0]): void => {
   patch.ns.on = on;
   patch.ns.threshold = threshold;
   patch.ns.release = release;
+  patch.ns.detect = detect;
+};
+
+const fv = (patch: Patch, position: number, min: number, max: number, curve = "NORMAL"): void => {
+  patch.fv.position = position;
+  patch.fv.min = min;
+  patch.fv.max = max;
+  patch.fv.curve = curve;
+};
+
+/**
+ * Merges `extra` into `target`, rejecting any key that isn't one of `fields`'
+ * names — a typo'd or type-mismatched extra param would otherwise write a byte
+ * offset that's meaningless for the current delay/reverb type and silently
+ * corrupt an unrelated field on encode.
+ */
+const assignExtra = (
+  target: Record<string, unknown>,
+  extra: Record<string, unknown>,
+  fields: FieldCodec[] | undefined,
+  blockLabel: string,
+  type: string,
+): void => {
+  const validNames = new Set((fields ?? []).map(f => f.name));
+  for (const key of Object.keys(extra)) {
+    if (!validNames.has(key)) {
+      throw new Error(`${blockLabel} extra param "${key}" is not valid for type "${type}"`);
+    }
+  }
+  Object.assign(target, extra);
 };
 
 const delay = (
@@ -127,7 +158,7 @@ const delay = (
   patch.delay.feedback = feedback;
   patch.delay.level = level;
   patch.delay.highCut = highCut;
-  Object.assign(patch.delay, extra);
+  assignExtra(patch.delay, extra, DELAY_TYPE_MAPS[type], "delay", type);
 };
 
 const reverb = (
@@ -150,7 +181,10 @@ const reverb = (
   patch.reverb.tone = tone;
   patch.reverb.density = density;
   patch.reverb.direct = direct;
-  Object.assign(patch.reverb, extra);
+  const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
+    ? REV_TYPE_MAPS["STANDARD"]
+    : REV_TYPE_MAPS[type];
+  assignExtra(patch.reverb, extra, fields, "reverb", type);
 };
 
 const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
@@ -160,4 +194,4 @@ const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
   console.info(`Saved ${outPath} (${patches.length} patches)`);
 };
 
-export { HIGH_CUT_MAP, LOW_CUT_MAP, DEFAULT_CHAIN, moveBefore, basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl };
+export { HIGH_CUT_MAP, LOW_CUT_MAP, DEFAULT_CHAIN, moveBefore, basePatch, amp, odds, clearOdds, fx, ns, fv, delay, reverb, saveTsl };

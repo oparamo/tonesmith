@@ -17,7 +17,7 @@ fx(ol1, "fx1", "CHORUS", "STEREO", { rate: 20, depth: 35, level: 60, preDelay: 5
 clearOdds(ol1);
 ns(ol1, 18, 40);
 delay(ol1, "ANALOG", 400, 30, 48, "FLAT");
-reverb(ol1, "SHIMMER", 4.0, 55, 25, -3, 5, 100, true, { pitch: 12, pitchLvl: 28 });
+reverb(ol1, "SHIMMER", 4.0, 55, 25, -3, 5, 100, true, { pitch: 12 });
 patches.push(ol1);
 
 // DTMF-1  Warm — FX1 (Compressor) → AMP → NS → DELAY → REVERB

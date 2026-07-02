@@ -233,7 +233,7 @@ fx(mar1, "fx2", "TREMOLO", null, { rate: 22, depth: 30, level: 65 });
 clearOdds(mar1);
 ns(mar1, 22, 65);
 delay(mar1, "MODULATE", 580, 38, 50, "2.5kHz", true, { modRate: 12, modDepth: 18 });
-reverb(mar1, "SHIMMER", 4.0, 48, 30, -5, 5, 100, true, { pitch: 12, pitchLvl: 25 });
+reverb(mar1, "SHIMMER", 4.0, 48, 30, -5, 5, 100, true, { pitch: 12 });
 patches.push(mar1);
 
 // MAR-2  Marooned Main Slide Lead
@@ -244,7 +244,7 @@ odds(mar2, "MUFF FUZZ", 45, 3, 65);
 fx(mar2, "fx2", "CHORUS", "STEREO", { rate: 16, depth: 30, level: 55, preDelay: 3 });
 ns(mar2, 28, 60);
 delay(mar2, "MODULATE", 520, 40, 55, "3.15kHz", true, { modRate: 10, modDepth: 15 });
-reverb(mar2, "SHIMMER", 4.5, 45, 20, -3, 5, 100, true, { pitch: 12, pitchLvl: 30 });
+reverb(mar2, "SHIMMER", 4.5, 45, 20, -3, 5, 100, true, { pitch: 12 });
 patches.push(mar2);
 
 saveTsl(patches, "Gilmour", "examples/gx1/gilmour.tsl");
