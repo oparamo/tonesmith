@@ -1,7 +1,7 @@
 const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
-const err = (e: unknown) => {
-  const msg = e instanceof Error ? e.message : String(e);
+const err = (error: unknown) => {
+  const msg = error instanceof Error ? error.message : String(error);
   return { content: [{ type: "text" as const, text: `Error: ${msg}` }], isError: true as const };
 };
 

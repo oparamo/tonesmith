@@ -10,10 +10,10 @@ const GREEN  = "\x1b[32m";
 /** Print a summary table of all groups (id, name, item count). */
 const printGroups = (caps: DeviceCapabilities): void => {
   console.info(`\n${BOLD}Capability groups${RESET}\n`);
-  for (const g of caps.groups) {
-    const count = g.items.length > 0 ? `${g.items.length} types` : "—";
-    console.info(`  ${CYAN}${g.id.padEnd(10)}${RESET}  ${BOLD}${g.name}${RESET}  ${DIM}(${count})${RESET}`);
-    console.info(`  ${"".padEnd(10)}  ${g.description}`);
+  for (const group of caps.groups) {
+    const count = group.items.length > 0 ? `${group.items.length} types` : "—";
+    console.info(`  ${CYAN}${group.id.padEnd(10)}${RESET}  ${BOLD}${group.name}${RESET}  ${DIM}(${count})${RESET}`);
+    console.info(`  ${"".padEnd(10)}  ${group.description}`);
     console.info();
   }
 };
@@ -25,8 +25,8 @@ const printGroup = (group: CapabilityGroup): void => {
 
   if (group.params && group.params.length > 0) {
     console.info(`${YELLOW}Block controls:${RESET}`);
-    for (const p of group.params) {
-      console.info(`  ${p.name.padEnd(14)} ${DIM}${p.range}${RESET}`);
+    for (const param of group.params) {
+      console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}`);
     }
     console.info();
   }
@@ -41,14 +41,14 @@ const printGroup = (group: CapabilityGroup): void => {
     const modelTag = item.models ? `  ${DIM}[models: ${item.models}]${RESET}` : "";
     console.info(`  ${CYAN}${item.id}${RESET}${modelTag}`);
     console.info(`    ${item.description}`);
-    if (item.subtypes && item.subtypes.length > 0) {
-      console.info(`    ${DIM}Subtypes: ${item.subtypes.map(s => s.id).join(", ")}${RESET}`);
+    if (item.subTypes && item.subTypes.length > 0) {
+      console.info(`    ${DIM}Subtypes: ${item.subTypes.map(subType => subType.id).join(", ")}${RESET}`);
     }
     console.info();
   }
 };
 
-/** Print full detail for a single item — description, models, subtypes, params. */
+/** Print full detail for a single item — description, models, subTypes, params. */
 const printItem = (group: CapabilityGroup, item: CapabilityItem): void => {
   console.info(`\n${BOLD}${item.name}${RESET}  ${DIM}[${group.id} / ${item.id}]${RESET}\n`);
   console.info(item.description);
@@ -57,21 +57,21 @@ const printItem = (group: CapabilityGroup, item: CapabilityItem): void => {
     console.info(`\n${GREEN}Models:${RESET} ${item.models}`);
   }
 
-  if (item.subtypes && item.subtypes.length > 0) {
+  if (item.subTypes && item.subTypes.length > 0) {
     console.info(`\n${YELLOW}Subtypes:${RESET}`);
-    for (const sub of item.subtypes) {
-      const modelTag = sub.models ? `  ${DIM}[models: ${sub.models}]${RESET}` : "";
-      console.info(`  ${CYAN}${sub.id}${RESET}${modelTag}`);
-      console.info(`    ${sub.description}`);
+    for (const subType of item.subTypes) {
+      const modelTag = subType.models ? `  ${DIM}[models: ${subType.models}]${RESET}` : "";
+      console.info(`  ${CYAN}${subType.id}${RESET}${modelTag}`);
+      console.info(`    ${subType.description}`);
     }
   }
 
   const params = [...(group.params ?? []), ...(item.params ?? [])];
   if (params.length > 0) {
     console.info(`\n${YELLOW}Parameters:${RESET}`);
-    for (const p of params) {
-      console.info(`  ${p.name.padEnd(14)} ${DIM}${p.range}${RESET}`);
-      console.info(`  ${"".padEnd(14)} ${p.description}`);
+    for (const param of params) {
+      console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}`);
+      console.info(`  ${"".padEnd(14)} ${param.description}`);
     }
   }
   console.info();

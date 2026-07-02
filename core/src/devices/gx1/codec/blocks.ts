@@ -5,14 +5,14 @@ import {
   ODDS_TYPES, ODDS_IDX,
   DLY_TYPES, DLY_TYPE_IDX,
   REV_TYPES, REV_TYPE_IDX,
-  CHAIN_NAMES, CHAIN_IDS,
-  NS_DETECT, FV_CURVE, TWIST_MODES,
-  FX_SUBTYPE_LISTS,
+  PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
+  CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
+  NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
 } from "../common";
-import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "../types";
+import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
 import { RAW } from "../common";
 import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
-import { u8, signed, lookup, u16be, decodeFields, encodeFields, type FieldCodec } from "./fields";
+import { u8, signed, lookup, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";
 
 // ── Name block ────────────────────────────────────────────────────────────────
@@ -28,32 +28,63 @@ const encodeName = (name: string, length = 16): string[] => {
 
 
 // ── Chain block ───────────────────────────────────────────────────────────────
+//
+// A linked list, not a positional array: byte 0 holds the firmware value of whichever
+// block comes first; byte CHAIN_NEXT_SLOT[name] holds the firmware value of whatever
+// comes immediately after that block. CHAIN_TERMINATOR means "connects to OUTPUT."
 
-const decodeChain = (hexList: string[]): string[] =>
-  bytesFromHex(hexList).map(v => CHAIN_NAMES[v] ?? `?${v}`);
+const CHAIN_NEXT_SLOT: Record<string, number> = Object.fromEntries(
+  CHAIN_BLOCK_ORDER.map((name, index) => [name, index + 1])
+);
 
-const encodeChain = (names: string[]): string[] =>
-  hexFromBytes(names.map(name => CHAIN_IDS[name] ?? 0));
+const decodeChain = (hexList: string[]): string[] => {
+  const bytes = bytesFromHex(hexList);
+  const order: string[] = [];
+  let value = bytes[0]!;
+  while (value !== CHAIN_TERMINATOR && order.length < CHAIN_BLOCK_ORDER.length) {
+    const name = CHAIN_VALUE_TO_NAME[value];
+    if (name === undefined) break;
+    order.push(name);
+    value = bytes[CHAIN_NEXT_SLOT[name]!]!;
+  }
+  return order;
+};
+
+const encodeChain = (names: string[], originalHexList: string[]): string[] => {
+  const bytes = bytesFromHex(originalHexList);
+  const valueOf = (name: string | undefined): number =>
+    name === undefined ? CHAIN_TERMINATOR : lookupIndex(CHAIN_NAME_TO_VALUE, name, "chain block");
+
+  bytes[0] = valueOf(names[0]);
+  names.forEach((name, index) => {
+    bytes[CHAIN_NEXT_SLOT[name]!] = valueOf(names[index + 1]);
+  });
+  return hexFromBytes(bytes);
+};
 
 
 // ── AMP block (13 bytes) ──────────────────────────────────────────────────────
 //
-// Layout: [on, type, -, gain, level, bass, middle, treble, speaker, -, mic, -, -]
-// Bytes 2, 9, 11, 12 are unused — they pass through via the RAW bytes.
+// Layout: [on, type, type_bass, gain, level, bass, middle, treble, speaker,
+//          sp_type_bass, mic, solo, soloLevel]
+// Bytes 2 and 9 are the bass-mode mirrors of type/speaker — guitar-mode
+// out-of-scope, same pattern as FX_COM's byte 2 (see decodeFxCom below).
 
 const decodeAmp = (hexList: string[]): AmpBlock => {
   const bytes = bytesFromHex(hexList);
   return {
-    on:      Boolean(bytes[0]),
-    type:    lookupName(AMP_TYPES, bytes[1]!),
-    gain:    bytes[3]!,
-    level:   bytes[4]!,
-    bass:    bytes[5]!,
-    middle:  bytes[6]!,
-    treble:  bytes[7]!,
-    speaker: lookupName(SP_TYPES,  bytes[8]!),
-    mic:     lookupName(MIC_TYPES, bytes[10]!),
-    [RAW]:   bytes,
+    on:        Boolean(bytes[0]),
+    type:      lookupName(AMP_TYPES, bytes[1]!),
+    gain:      bytes[3]!,
+    level:     bytes[4]!,
+    bass:      bytes[5]!,
+    middle:    bytes[6]!,
+    treble:    bytes[7]!,
+    speaker:   lookupName(SP_TYPES,  bytes[8]!),
+    mic:       lookupName(MIC_TYPES, bytes[10]!),
+    solo:      Boolean(bytes[11]),
+    soloLevel: bytes[12]!,
+    [RAW]:     bytes,
   };
 };
 
@@ -68,25 +99,28 @@ const encodeAmp = (block: AmpBlock): string[] => {
   bytes[7]  = block.treble;
   bytes[8]  = lookupIndex(SP_TYPE_IDX,  block.speaker, "SP type");
   bytes[10] = lookupIndex(MIC_TYPE_IDX, block.mic,     "MIC type");
+  bytes[11] = Number(block.solo);
+  bytes[12] = block.soloLevel;
   return hexFromBytes(bytes);
 };
 
 
 // ── OD/DS block (8 bytes) ─────────────────────────────────────────────────────
 //
-// Layout: [on, type, drive, tone(signed), level, -, -, direct]
-// Bytes 5–6 are unused — they pass through via the RAW bytes.
+// Layout: [on, type, drive, tone(signed), level, direct, solo, soloLevel]
 
 const decodeOdDs = (hexList: string[]): OdDsBlock => {
   const bytes = bytesFromHex(hexList);
   return {
-    on:     Boolean(bytes[0]!),
-    type:   lookupName(ODDS_TYPES, bytes[1]!),
-    drive:  bytes[2]!,
-    tone:   toSigned(bytes[3]!),
-    level:  bytes[4]!,
-    direct: bytes[7]!,
-    [RAW]:  bytes,
+    on:        Boolean(bytes[0]!),
+    type:      lookupName(ODDS_TYPES, bytes[1]!),
+    drive:     bytes[2]!,
+    tone:      toSigned(bytes[3]!),
+    level:     bytes[4]!,
+    direct:    bytes[5]!,
+    solo:      Boolean(bytes[6]),
+    soloLevel: bytes[7]!,
+    [RAW]:     bytes,
   };
 };
 
@@ -97,7 +131,9 @@ const encodeOdDs = (block: OdDsBlock): string[] => {
   bytes[2] = block.drive;
   bytes[3] = toUnsigned(block.tone);
   bytes[4] = block.level;
-  bytes[7] = block.direct;
+  bytes[5] = block.direct;
+  bytes[6] = Number(block.solo);
+  bytes[7] = block.soloLevel;
   return hexFromBytes(bytes);
 };
 
@@ -152,27 +188,24 @@ const encodeFv = (block: FvBlock): string[] => {
 };
 
 
-// ── FX_COM block (on/type/subtype header, 3 bytes) ────────────────────────────
+// ── FX_COM block (on/type header + bass-mode type mirror, 3 bytes) ────────────
+//
+// Byte 2 is the bass-mode mirror of byte 1's type selector (used when the device is
+// in bass mode) — it never carries a subtype for any effect. Effects that have their
+// own sub-model (COMPRESSOR, LIMITER, AC RESO, CHORUS, CLASSIC-VIBE, HUMANIZER, OD/DS)
+// store it in the FX param block itself (see PARAM_SUBTYPE_EFFECTS in common/constants.ts),
+// not here. Byte 2 is guitar-mode-out-of-scope and always passed through untouched.
 
 const decodeFxCom = (hexList: string[]): Omit<FxBlock, "params"> => {
   const bytes = bytesFromHex(hexList);
-  const [fxType, subtype] = decodeFxType(bytes[1]!, bytes[2]!);
-  return { on: Boolean(bytes[0]), type: fxType, subtype, [RAW]: bytes };
+  const fxType = decodeFxType(bytes[1]!);
+  return { on: Boolean(bytes[0]), type: fxType, subType: null, [RAW]: bytes };
 };
 
 const encodeFxCom = (block: FxBlock): string[] => {
   const bytes = [...block[RAW]];
   bytes[0] = Number(block.on);
-  const [typeByte, subtypeByte] = encodeFxType(block.type, block.subtype);
-  bytes[1] = typeByte;
-  // TODO: review whether byte 2 should always be zeroed or preserved when the fx
-  // type has no subtype, or when the subtype was decoded as unknown. Currently we
-  // preserve it in both cases to avoid corrupting data we don't fully understand.
-  const subtypeIsKnown =
-    FX_SUBTYPE_LISTS[block.type] !== undefined &&
-    block.subtype !== null &&
-    !String(block.subtype).startsWith("UNKNOWN_");
-  if (subtypeIsKnown) bytes[2] = subtypeByte;
+  bytes[1] = encodeFxType(block.type);
   return hexFromBytes(bytes);
 };
 
@@ -180,48 +213,52 @@ const encodeFxCom = (block: FxBlock): string[] => {
 // ── Delay block field maps (keyed by delay type) ──────────────────────────────
 //
 // Bytes 0–1 of the full block are [on, type] — handled in decodeDelay/encodeDelay.
-// Field offsets below are relative to byte 2 (the first parameter byte within the block).
+// All other offsets below are absolute byte positions within the full block.
+//
+// Many fields are shared across types at the same address (e.g. feedback/level/highCut
+// at 6/7/8 for every "clean" delay type, or trigger/level at 21/25 shared by WARP,
+// TWIST, and GLITCH) rather than each type getting its own compact, contiguous layout.
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-  ],
-  "ANALOG": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
+    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
   ],
   "MODULATE": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("mod_rate", 5), u8("mod_depth", 6),
-  ],
-  "ANLG MOD": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("mod_rate", 5), u8("mod_depth", 6),
+    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
+    u8("modRate", 9), u8("modDepth", 10),
   ],
   "PAN": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("tap_time", 5),
+    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
+    u8("tapTime", 11),
   ],
   "REVERSE": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("trigger", 5),
+    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
+    lookup("trigger", 12, ON_OFF),
+  ],
+  "ANALOG": [
+    nibbleQuad("time", 13), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
+  ],
+  "ANLG MOD": [
+    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
+    u8("modRate", 9), u8("modDepth", 10),
   ],
   "SPACE ECHO": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    u8("head", 5),
+    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
+    lookup("head", 17, SPACE_ECHO_HEAD),
   ],
   "SHIMMER": [
-    u16be("time_ms", 0), u8("feedback", 2), u8("level", 3), u8("high_cut", 4),
-    signed("pitch", 5, 24), u8("balance", 6),
+    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), u8("highCut", 8),
+    signed("pitch", 18, 24), u8("balance", 19),
   ],
   "WARP": [
-    u16be("time_ms", 0), u8("trigger", 2), u8("level", 3),
+    nibbleQuad("time", 2), u8("trigger", 21), u8("level", 25),
   ],
   "TWIST": [
-    lookup("mode", 0, TWIST_MODES),
-    u8("trigger", 1), u8("level", 2), u8("rise_time", 3), u8("fall_time", 4), u8("fade_time", 5),
+    lookup("mode", 20, TWIST_MODES), u8("trigger", 21),
+    u8("riseTime", 22), u8("fallTime", 23), u8("fadeTime", 24), u8("level", 25),
   ],
   "GLITCH": [
-    u8("trigger", 0), u8("time", 1), u8("glitch", 2), u8("balance", 3),
+    u8("trigger", 21), u8("time", 26), u8("glitch", 27), u8("balance", 28),
   ],
 };
 
@@ -231,7 +268,7 @@ const decodeDelay = (hexList: string[]): DelayBlock => {
   const block: DelayBlock = { on: Boolean(bytes[0]), type: delayType, [RAW]: bytes };
 
   const fields = DELAY_TYPE_MAPS[delayType];
-  if (fields) Object.assign(block, decodeFields(fields, bytes.slice(2)));
+  if (fields) Object.assign(block, decodeFields(fields, bytes));
   return block;
 };
 
@@ -242,61 +279,51 @@ const encodeDelay = (block: DelayBlock): string[] => {
 
   const fields = DELAY_TYPE_MAPS[block.type];
   if (fields) {
-    const paramBytes = bytes.slice(2);
     // Double-assertion needed: DelayBlock extends Record<string, unknown> which isn't
     // directly assignable to FxParams (Record<string, string|number|number[]>) due to
     // the 'on: boolean' field; at runtime we only read the named param fields.
-    encodeFields(fields, block as unknown as FxParams, paramBytes);
-    bytes.splice(2, paramBytes.length, ...paramBytes);
+    encodeFields(fields, block as unknown as FxParams, bytes);
   }
   return hexFromBytes(bytes);
 };
 
 
 // ── Reverb block (keyed by reverb type) ──────────────────────────────────────
+//
+// All offsets below are absolute byte positions within the full block. As with the
+// delay block, several fields are shared across types at the same address (tone at
+// 3, level at 5, direct at 8, preDelay at 6, feedback at 16) rather than each type
+// getting its own compact layout.
 
 const STANDARD_REVERB_TYPES = ["HALL S", "HALL M", "PLATE", "ROOM S", "ROOM L", "AMBIENCE", "SPRING"] as const;
+
+const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
+  "STANDARD": [
+    scaled("time", 2, 0.1), signed("tone", 3, 50), signed("density", 4, -1),
+    u8("level", 5), nibblePair("preDelay", 6), u8("direct", 8),
+  ],
+  "SHIMMER": [
+    scaled("time", 2, 0.1), signed("tone", 3, 50), nibblePair("preDelay", 6),
+    signed("pitch", 9, 24), u8("level", 10),
+  ],
+  "SUB DELAY": [
+    nibbleQuad("time", 11), u8("level", 15), u8("feedback", 16), u8("highCut", 17),
+  ],
+  "TERA ECHO": [
+    signed("tone", 3, 50), u8("level", 5), u8("direct", 8),
+    u8("feedback", 16), u8("spreadTime", 18), u8("trigger", 19),
+  ],
+};
 
 const decodeReverb = (hexList: string[]): ReverbBlock => {
   const bytes = bytesFromHex(hexList);
   const reverbType = lookupName(REV_TYPES, bytes[1]!);
   const block: ReverbBlock = { on: Boolean(bytes[0]), type: reverbType, [RAW]: bytes };
 
-  if ((STANDARD_REVERB_TYPES as readonly string[]).includes(reverbType)) {
-    Object.assign(block, {
-      time_s:       Math.round(bytes[2]! * 0.1 * 10) / 10,
-      tone:         toSigned(bytes[3]!),
-      density:      bytes[4]! + 1,
-      level:        bytes[5]!,
-      pre_delay_ms: bytes[7]!,
-      direct:       bytes[8]!,
-    });
-  } else if (reverbType === "SHIMMER") {
-    Object.assign(block, {
-      time_s:       Math.round(bytes[2]! * 0.1 * 10) / 10,
-      tone:         toSigned(bytes[3]!),
-      level:        bytes[4]!,
-      pre_delay_ms: bytes[5]!,
-      pitch:        bytes[6]! - 24,
-      pitch_lvl:    bytes[7]!,
-    });
-  } else if (reverbType === "SUB DELAY") {
-    Object.assign(block, {
-      time_ms:  (bytes[2]! << 8) | bytes[3]!,
-      feedback: bytes[4]!,
-      level:    bytes[5]!,
-      high_cut: bytes[6]!,
-    });
-  } else if (reverbType === "TERA ECHO") {
-    Object.assign(block, {
-      s_time:   bytes[2]!,
-      tone:     toSigned(bytes[3]!),
-      level:    bytes[4]!,
-      feedback: bytes[5]!,
-      direct:   bytes[6]!,
-      trigger:  bytes[7]!,
-    });
-  }
+  const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(reverbType)
+    ? REV_TYPE_MAPS["STANDARD"]
+    : REV_TYPE_MAPS[reverbType];
+  if (fields) Object.assign(block, decodeFields(fields, bytes));
   return block;
 };
 
@@ -305,36 +332,57 @@ const encodeReverb = (block: ReverbBlock): string[] => {
   bytes[0] = Number(block.on);
   bytes[1] = lookupIndex(REV_TYPE_IDX, block.type, "REV type");
 
-  const get = (key: string, fallback = 0): number => (block[key] as number) ?? fallback;
+  const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(block.type)
+    ? REV_TYPE_MAPS["STANDARD"]
+    : REV_TYPE_MAPS[block.type];
+  if (fields) {
+    // Double-assertion needed: ReverbBlock extends Record<string, unknown> which isn't
+    // directly assignable to FxParams (Record<string, string|number|number[]>) due to
+    // the 'on: boolean' field; at runtime we only read the named param fields.
+    encodeFields(fields, block as unknown as FxParams, bytes);
+  }
+  return hexFromBytes(bytes);
+};
 
-  if ((STANDARD_REVERB_TYPES as readonly string[]).includes(block.type)) {
-    bytes[2] = Math.round(get("time_s") / 0.1);
-    bytes[3] = toUnsigned(get("tone"));
-    bytes[4] = get("density") - 1;
-    bytes[5] = get("level");
-    bytes[7] = get("pre_delay_ms");
-    bytes[8] = get("direct");
-  } else if (block.type === "SHIMMER") {
-    bytes[2] = Math.round(get("time_s") / 0.1);
-    bytes[3] = toUnsigned(get("tone"));
-    bytes[4] = get("level");
-    bytes[5] = get("pre_delay_ms");
-    bytes[6] = get("pitch") + 24;
-    bytes[7] = get("pitch_lvl");
-  } else if (block.type === "SUB DELAY") {
-    const ms = get("time_ms");
-    bytes[2] = ms >> 8;
-    bytes[3] = ms & 0xFF;
-    bytes[4] = get("feedback");
-    bytes[5] = get("level");
-    bytes[6] = get("high_cut");
-  } else if (block.type === "TERA ECHO") {
-    bytes[2] = get("s_time");
-    bytes[3] = toUnsigned(get("tone"));
-    bytes[4] = get("level");
-    bytes[5] = get("feedback");
-    bytes[6] = get("direct");
-    bytes[7] = get("trigger");
+// ── PFX (expression pedal effect: WAH / PEDAL BEND) block (14 bytes) ──────────
+//
+// Byte 3 (wah_type_bass) is the bass-mode mirror of byte 2's wah type — guitar-mode
+// out-of-scope, same pattern as AMP/FX_COM's other bass-mode mirror bytes. Both
+// WAH's and PEDAL BEND's fields always occupy their fixed byte ranges regardless of
+// which is currently selected (the same "shadow bytes" union layout as delay/reverb).
+
+const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
+  "WAH": [
+    lookup("wahType", 2, WAH_TYPES), u8("level", 4), u8("direct", 5),
+    u8("position", 6), u8("min", 7), u8("max", 8),
+  ],
+  "PEDAL BEND": [
+    signed("pitchMin", 9, 24), signed("pitchMax", 10, 24),
+    u8("position", 11), u8("level", 12), u8("direct", 13),
+  ],
+};
+
+const decodePfx = (hexList: string[]): PfxBlock => {
+  const bytes = bytesFromHex(hexList);
+  const pfxType = lookupName(PFX_TYPES, bytes[1]!);
+  const block: PfxBlock = { on: Boolean(bytes[0]), type: pfxType, [RAW]: bytes };
+
+  const fields = PFX_TYPE_MAPS[pfxType];
+  if (fields) Object.assign(block, decodeFields(fields, bytes));
+  return block;
+};
+
+const encodePfx = (block: PfxBlock): string[] => {
+  const bytes = [...block[RAW]];
+  bytes[0] = Number(block.on);
+  bytes[1] = lookupIndex(PFX_TYPE_IDX, block.type, "PFX type");
+
+  const fields = PFX_TYPE_MAPS[block.type];
+  if (fields) {
+    // Double-assertion needed: PfxBlock extends Record<string, unknown> which isn't
+    // directly assignable to FxParams (Record<string, string|number|number[]>) due to
+    // the 'on: boolean' field; at runtime we only read the named param fields.
+    encodeFields(fields, block as unknown as FxParams, bytes);
   }
   return hexFromBytes(bytes);
 };
@@ -349,4 +397,6 @@ export {
   decodeFxCom, encodeFxCom,
   decodeDelay, encodeDelay,
   decodeReverb, encodeReverb,
+  decodePfx, encodePfx,
+  DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS,
 };

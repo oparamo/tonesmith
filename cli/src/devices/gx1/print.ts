@@ -1,50 +1,54 @@
 import type { gx1 } from "@tonesmith/core";
 
-const fmt = (d: Record<string, unknown>): string =>
-  Object.entries(d).map(([k, v]) => `${k}=${String(v)}`).join("  ");
+const formatParams = (params: Record<string, unknown>): string =>
+  Object.entries(params).map(([key, value]) => `${key}=${String(value)}`).join("  ");
 
 const printParams = (block: Record<string, unknown>): void => {
-  const params = Object.fromEntries(Object.entries(block).filter(([k]) => k !== "on" && k !== "type"));
-  if (Object.keys(params).length > 0) console.info(`    ${fmt(params)}`);
+  const params = Object.fromEntries(Object.entries(block).filter(([key]) => key !== "on" && key !== "type"));
+  if (Object.keys(params).length > 0) console.info(`    ${formatParams(params)}`);
 };
 
-const printPatch = (p: gx1.Patch, index?: number): void => {
+const printPatch = (patch: gx1.Patch, index?: number): void => {
   const label = index !== undefined ? `[${index}] ` : "";
   console.info(`\n${"━".repeat(52)}`);
-  console.info(`  ${label}${p.name}`);
+  console.info(`  ${label}${patch.name}`);
   console.info("━".repeat(52));
-  console.info(`  Chain: ${p.chain.join(" → ")}`);
+  console.info(`  Chain: ${patch.chain.join(" → ")}`);
 
-  const a = p.amp;
-  console.info(`\n  AMP/CAB [${a.on ? "ON" : "OFF"}]  ${a.type}`);
-  console.info(`    Gain=${a.gain}  Level=${a.level}  Bass=${a.bass}  Mid=${a.middle}  Treble=${a.treble}`);
-  console.info(`    Speaker=${a.speaker}  Mic=${a.mic}`);
+  const amp = patch.amp;
+  console.info(`\n  AMP/CAB [${amp.on ? "ON" : "OFF"}]  ${amp.type}`);
+  console.info(`    Gain=${amp.gain}  Level=${amp.level}  Bass=${amp.bass}  Mid=${amp.middle}  Treble=${amp.treble}`);
+  console.info(`    Speaker=${amp.speaker}  Mic=${amp.mic}  Solo=${amp.solo ? `ON(${amp.soloLevel})` : "OFF"}`);
 
-  const od = p.odds;
-  if (od.on) {
-    console.info(`\n  OD/DS [ON]  ${od.type}  Drive=${od.drive}  Tone=${od.tone}  Level=${od.level}  Direct=${od.direct}`);
+  const odds = patch.odds;
+  if (odds.on) {
+    console.info(`\n  OD/DS [ON]  ${odds.type}  Drive=${odds.drive}  Tone=${odds.tone}  Level=${odds.level}  Direct=${odds.direct}  Solo=${odds.solo ? `ON(${odds.soloLevel})` : "OFF"}`);
   }
 
-  console.info(`\n  NS [${p.ns.on ? "ON" : "OFF"}]  Threshold=${p.ns.threshold}  Release=${p.ns.release}  Detect=${p.ns.detect}`);
+  const pfx = patch.pfx;
+  console.info(`\n  PFX [${pfx.on ? "ON" : "OFF"}]  ${pfx.type}`);
+  printParams(pfx);
+
+  console.info(`\n  NS [${patch.ns.on ? "ON" : "OFF"}]  Threshold=${patch.ns.threshold}  Release=${patch.ns.release}  Detect=${patch.ns.detect}`);
 
   for (const slot of ["fx1", "fx2", "fx3"] as const) {
-    const block = p[slot];
-    const lbl = block.type + (block.subtype ? ` (${block.subtype})` : "");
-    console.info(`\n  ${slot.toUpperCase()} [${block.on ? "ON" : "OFF"}]  ${lbl}`);
+    const block = patch[slot];
+    const label = block.type + (block.subType ? ` (${block.subType})` : "");
+    console.info(`\n  ${slot.toUpperCase()} [${block.on ? "ON" : "OFF"}]  ${label}`);
     if (Object.keys(block.params).length > 0) {
-      console.info(`    ${fmt(block.params)}`);
+      console.info(`    ${formatParams(block.params)}`);
     }
   }
 
-  const dly = p.delay;
-  console.info(`\n  DELAY [${dly.on ? "ON" : "OFF"}]  ${dly.type}`);
-  printParams(dly);
+  const delay = patch.delay;
+  console.info(`\n  DELAY [${delay.on ? "ON" : "OFF"}]  ${delay.type}`);
+  printParams(delay);
 
-  const rev = p.reverb;
-  console.info(`\n  REVERB [${rev.on ? "ON" : "OFF"}]  ${rev.type}`);
-  printParams(rev);
+  const reverb = patch.reverb;
+  console.info(`\n  REVERB [${reverb.on ? "ON" : "OFF"}]  ${reverb.type}`);
+  printParams(reverb);
 
-  console.info(`\n  FV  Position=${p.fv.position}  Min=${p.fv.min}  Max=${p.fv.max}  Curve=${p.fv.curve}`);
+  console.info(`\n  FV  Position=${patch.fv.position}  Min=${patch.fv.min}  Max=${patch.fv.max}  Curve=${patch.fv.curve}`);
 };
 
 export { printPatch };

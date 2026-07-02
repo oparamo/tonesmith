@@ -22,8 +22,8 @@ const driver: PatchDriver<Patch> = {
   writeFile: (file, path): void =>
     tslWriteFile(file as PatchFile, path),
 
-  newFile: (setName: string, nPatches?: number): PatchFile =>
-    tslNewFile(setName, nPatches),
+  newFile: (setName: string, patchCount?: number): PatchFile =>
+    tslNewFile(setName, patchCount),
 
   blankPatch: (name?: string): Patch =>
     tslBlankPatch(name),

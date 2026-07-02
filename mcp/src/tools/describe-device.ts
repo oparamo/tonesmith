@@ -25,19 +25,19 @@ const registerDescribeDevice = (server: McpServer): void => {
         const { capabilities } = requireDriver(device);
 
         if (!group) {
-          const summary = capabilities.groups.map(g => ({
-            id: g.id,
-            name: g.name,
-            description: g.description,
-            itemCount: g.items.length,
+          const summary = capabilities.groups.map(capGroup => ({
+            id: capGroup.id,
+            name: capGroup.name,
+            description: capGroup.description,
+            itemCount: capGroup.items.length,
           }));
           return ok(JSON.stringify(summary, null, 2));
         }
 
         const groupLower = group.toLowerCase();
-        const matched = capabilities.groups.find(g => g.id.toLowerCase() === groupLower);
+        const matched = capabilities.groups.find(capGroup => capGroup.id.toLowerCase() === groupLower);
         if (!matched) {
-          const ids = capabilities.groups.map(g => g.id).join(", ");
+          const ids = capabilities.groups.map(capGroup => capGroup.id).join(", ");
           return err(new Error(`Unknown group '${group}'. Available groups: ${ids}`));
         }
 
@@ -46,15 +46,15 @@ const registerDescribeDevice = (server: McpServer): void => {
         }
 
         const itemLower = item.toLowerCase();
-        const matchedItem = matched.items.find(i => i.id.toLowerCase() === itemLower);
+        const matchedItem = matched.items.find(capItem => capItem.id.toLowerCase() === itemLower);
         if (!matchedItem) {
-          const ids = matched.items.map(i => i.id).join(", ");
+          const ids = matched.items.map(capItem => capItem.id).join(", ");
           return err(new Error(`Unknown item '${item}' in group '${group}'. Available items: ${ids}`));
         }
 
         return ok(JSON.stringify(matchedItem, null, 2));
-      } catch (e) {
-        return err(e);
+      } catch (error) {
+        return err(error);
       }
     }
   );

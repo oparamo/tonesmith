@@ -43,13 +43,24 @@ const REV_TYPES = [
   "SPRING", "SHIMMER", "SUB DELAY", "TERA ECHO",
 ] as const;
 
-const CHAIN_NAMES: Record<number, string> = {
-  0: "INPUT", 1: "PFX", 2: "FX1", 3: "OD/DS", 4: "FX3", 5: "DLY",
-  6: "FV", 7: "NS", 8: "AMP", 9: "FX2", 10: "REV", 11: "LOOP", 12: "OUTPUT",
+// The pedal-controlled effect assigned to the expression pedal input (MEMORY%PFX).
+const PFX_TYPES = ["WAH", "PEDAL BEND"] as const;
+
+// MEMORY%CHAIN is a linked list, not a positional array: byte 0 holds the firmware
+// value of whichever block comes first, and byte (1 + CHAIN_BLOCK_ORDER.indexOf(name))
+// holds the firmware value of whatever comes immediately after that block. A firmware
+// value of 0 (CHAIN_TERMINATOR) means "connects to OUTPUT" — OUTPUT is a fixed endpoint,
+// not itself a reorderable block, so it has no entry in CHAIN_BLOCK_ORDER.
+const CHAIN_BLOCK_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"] as const;
+
+const CHAIN_VALUE_TO_NAME: Record<number, string> = {
+  1: "PFX", 2: "FX1", 3: "OD/DS", 4: "AMP", 5: "FX2", 6: "FX3", 7: "NS", 8: "FV", 9: "DLY", 10: "REV",
 };
 
+const CHAIN_TERMINATOR = 0;
+
 const indexMap = (list: readonly string[]): Record<string, number> =>
-  Object.fromEntries(list.map((v, i) => [v, i]));
+  Object.fromEntries(list.map((value, index) => [value, index]));
 
 const FX_TYPE_IDX  = indexMap(FX_TYPES);
 const ODDS_IDX     = indexMap(ODDS_TYPES);
@@ -58,8 +69,9 @@ const SP_TYPE_IDX  = indexMap(SP_TYPES);
 const MIC_TYPE_IDX = indexMap(MIC_TYPES);
 const DLY_TYPE_IDX = indexMap(DLY_TYPES);
 const REV_TYPE_IDX = indexMap(REV_TYPES);
-const CHAIN_IDS: Record<string, number> = Object.fromEntries(
-  Object.entries(CHAIN_NAMES).map(([k, v]) => [v, Number(k)])
+const PFX_TYPE_IDX = indexMap(PFX_TYPES);
+const CHAIN_NAME_TO_VALUE: Record<string, number> = Object.fromEntries(
+  Object.entries(CHAIN_VALUE_TO_NAME).map(([value, name]) => [name, Number(value)])
 );
 
 const COMP_TYPES   = ["BOSS COMP", "D-COMP", "ORANGE", "X-COMP", "STEREO"] as const;
@@ -78,35 +90,37 @@ const SLICER_PAT   = Array.from({ length: 20 }, (_, i) => `PATTERN ${i + 1}`);
 const NS_DETECT    = ["INPUT", "NS INPUT"] as const;
 const FV_CURVE     = ["SLOW1", "SLOW2", "NORMAL", "FAST"] as const;
 const TWIST_MODES  = ["TAPE", "TAPE-ECH", "REVERSE"] as const;
+const ON_OFF       = ["OFF", "ON"] as const;
+// Playback head combinations.
+const SPACE_ECHO_HEAD = ["1", "1+2", "1+3", "2+3", "1+2+3"] as const;
 
-const HARMONIST_KEY = [
-  "Am", "Bbm", "Bm", "Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m",
-  "Gm", "Abm", "A", "Bb", "B", "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab",
+// The 33 reachable HARMONIST harmony values (raw byte 0-32), in raw order.
+const HARMONIST_HR = [
+  "+1oct&-1oct", "-4th&-6th", "-2oct", "-14th", "-13th", "-12th", "-11th", "-10th", "-9th",
+  "-1oct", "-7th", "-6th", "-5th", "-4th", "-3rd", "-2nd", "UNISON", "+2nd", "+3rd", "+4th",
+  "+5th", "+6th", "+7th", "+1oct", "+9th", "+10th", "+11th", "+12th", "+13th", "+14th",
+  "+2oct", "+3rd&+5th", "+3rd&-4th",
 ] as const;
 
-const HARMONIST_HR = (
-  [-2, -1, 0, 1, 2].flatMap(n =>
-    ["m2", "M2", "m3", "M3", "P4", "P5", "m6", "M6", "m7", "M7"].map(d => `${n}:${d}`)
-  )
-);
+// FX_COM byte[2] is always the bass-mode mirror of the type selector (byte[1] for guitar
+// mode) — never a subtype, for any effect. COMPRESSOR, LIMITER, AC RESO, CHORUS,
+// CLASSIC-VIBE, HUMANIZER, and OD/DS instead store their own sub-model selector in
+// param-block byte p[0] — handled in codec/fx-params.ts.
 
-const FX_SUBTYPE_LISTS: Record<string, readonly string[]> = {
-  "OD/DS":        ODDS_TYPES,
-  "COMPRESSOR":   COMP_TYPES,
-  "LIMITER":      LIM_TYPES,
-  "CHORUS":       CHORUS_TYPES,
-  "AC RESO":      ACRESO_TYPES,
-  "CLASSIC-VIBE": VIBE_MODES,
-  "HUMANIZER":    HUM_MODES,
-};
+// Effects whose sub-model selector lives in param-block byte p[0] (read/written via
+// FX_PARAM_MAPS' lookup("type", 0, ...) field). Used by both the decoder (to promote
+// params.type back to block.subType for display) and the fx() builder (to thread a
+// subType argument into params.type so it actually encodes).
+const PARAM_SUBTYPE_EFFECTS = new Set([
+  "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER", "OD/DS",
+]);
 
 export {
-  FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES,
-  CHAIN_NAMES,
-  FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX,
-  CHAIN_IDS,
+  FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
+  CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
+  FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, RING_INTL, SBEND_PITCH, FB_MODE,
-  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES,
-  HARMONIST_KEY, HARMONIST_HR, FX_SUBTYPE_LISTS,
+  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
+  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS,
 };

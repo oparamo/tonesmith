@@ -4,6 +4,10 @@ import { gx1 } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl } = gx1;
 import { FxBlockSchema, ok, err } from "../common";
 
+/** Parses a ">"-delimited chain key (e.g. "FX1>OD>AMP>NS>DLY>REV") into node names. */
+const parseChain = (chain: string | undefined): string[] | undefined =>
+  chain?.split(">").map(node => (node.trim() === "OD" ? "OD/DS" : node.trim()));
+
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
     "generate_patch",
@@ -64,7 +68,7 @@ Reverb types: HALL S HALL M PLATE ROOM S ROOM L AMBIENCE SPRING SHIMMER SUB DELA
           highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
           on: z.boolean().optional().describe("Enable delay (default true)"),
           extra: z.record(z.string(), z.number()).optional().describe(
-            "Extra type-specific params (e.g. { mod_rate: 12, mod_depth: 18 } for MODULATE)"
+            "Extra type-specific params (e.g. { modRate: 12, modDepth: 18 } for MODULATE)"
           ),
         }).optional().describe("Delay block. Omit to disable."),
 
@@ -78,53 +82,53 @@ Reverb types: HALL S HALL M PLATE ROOM S ROOM L AMBIENCE SPRING SHIMMER SUB DELA
           direct: z.number().int().optional().describe("Direct level 0–100 (default 100)"),
           on: z.boolean().optional().describe("Enable reverb (default true)"),
           extra: z.record(z.string(), z.number()).optional().describe(
-            "Extra type-specific params (e.g. { pitch: 12, pitch_lvl: 28 } for SHIMMER)"
+            "Extra type-specific params (e.g. { pitch: 12, pitchLvl: 28 } for SHIMMER)"
           ),
         }).optional().describe("Reverb block. Omit to disable."),
       },
     },
     async (params) => {
       try {
-        const p = basePatch(params.name, params.chain);
+        const patch = basePatch(params.name, parseChain(params.chain));
 
-        const a = params.amp;
-        amp(p, a.type, a.gain, a.bass, a.mid, a.treble, a.speaker, a.mic, a.level);
+        const ampParams = params.amp;
+        amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.mid, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level);
 
         if (params.odds) {
-          const o = params.odds;
-          odds(p, o.type, o.drive, o.tone, o.level, o.direct);
+          const oddsParams = params.odds;
+          odds(patch, oddsParams.type, oddsParams.drive, oddsParams.tone, oddsParams.level, oddsParams.direct);
         } else {
-          clearOdds(p);
+          clearOdds(patch);
         }
 
         for (const slot of ["fx1", "fx2", "fx3"] as const) {
           const block = params[slot];
           if (block?.type && block.type !== "NONE") {
-            fx(p, slot, block.type, block.subtype ?? null, block.params ?? {});
-            if (block.on === false) p[slot].on = false;
+            fx(patch, slot, block.type, block.subType ?? null, block.params ?? {});
+            if (block.on === false) patch[slot].on = false;
           }
         }
 
         if (params.ns) {
-          ns(p, params.ns.threshold, params.ns.release, params.ns.on ?? true);
+          ns(patch, params.ns.threshold, params.ns.release, params.ns.on ?? true);
         }
 
         if (params.delay) {
-          const d = params.delay;
-          delay(p, d.type, d.timeMs, d.feedback, d.level, d.highCut, d.on ?? true, d.extra ?? {});
+          const delayParams = params.delay;
+          delay(patch, delayParams.type, delayParams.timeMs, delayParams.feedback, delayParams.level, delayParams.highCut, delayParams.on ?? true, delayParams.extra ?? {});
         } else {
-          p.delay.on = false;
+          patch.delay.on = false;
         }
 
         if (params.reverb) {
-          const r = params.reverb;
-          reverb(p, r.type, r.timeS, r.level, r.preDelay, r.tone, r.density, r.direct, r.on ?? true, r.extra ?? {});
+          const reverbParams = params.reverb;
+          reverb(patch, reverbParams.type, reverbParams.timeS, reverbParams.level, reverbParams.preDelay, reverbParams.tone, reverbParams.density, reverbParams.direct, reverbParams.on ?? true, reverbParams.extra ?? {});
         }
 
-        saveTsl([p], params.name, params.outPath);
+        saveTsl([patch], params.name, params.outPath);
         return ok(`Saved patch "${params.name}" → ${params.outPath}`);
-      } catch (e) {
-        return err(e);
+      } catch (error) {
+        return err(error);
       }
     }
   );
