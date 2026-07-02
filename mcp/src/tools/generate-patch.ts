@@ -4,6 +4,10 @@ import { gx1 } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, delay, reverb, saveTsl } = gx1;
 import { FxBlockSchema, ok, err } from "../common";
 
+/** Parses a ">"-delimited chain key (e.g. "FX1>OD>AMP>NS>DLY>REV") into node names. */
+const parseChain = (chain: string | undefined): string[] | undefined =>
+  chain?.split(">").map(node => (node.trim() === "OD" ? "OD/DS" : node.trim()));
+
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
     "generate_patch",
@@ -85,7 +89,7 @@ Reverb types: HALL S HALL M PLATE ROOM S ROOM L AMBIENCE SPRING SHIMMER SUB DELA
     },
     async (params) => {
       try {
-        const patch = basePatch(params.name, params.chain);
+        const patch = basePatch(params.name, parseChain(params.chain));
 
         const ampParams = params.amp;
         amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.mid, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level);
