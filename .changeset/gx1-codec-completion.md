@@ -14,3 +14,8 @@ all previously undecoded. Rounds out the builder API with an `fv()` setter, an `
 a `pfx()` setter, a `key` param on `basePatch()`, and validation on `delay()`/`reverb()`/`pfx()`
 extra params. Also fixes a `generate_patch` MCP tool bug where the chain string wasn't parsed into a
 node array.
+
+`core/docs/gx1/FORMAT.md` (not published in the package, but the canonical reference for this
+codec) was audited end-to-end against the device's own address table and the official manual,
+reordered to match the actual block layout, and rewritten so every section reads top-to-bottom
+without needing to jump around — this is now the structural template for future devices' format docs.
