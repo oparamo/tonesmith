@@ -55,40 +55,27 @@ ASCII bytes, right-padded with spaces (0x20).
 
 ## MEMORY%CHAIN — Signal Chain (13 bytes, 11 used)
 
-Not a positional array — a linked list. Byte 0 holds the firmware value of whichever
-block comes first (`item_top`). Each of bytes 1–10 holds the firmware value of whatever
-comes immediately *after* one specific fixed block, indexed by that block's own slot
-below — not by chain position. A firmware value of 0 means "connects to OUTPUT", a fixed
-endpoint that is never itself reordered and has no slot of its own. Bytes 11–12 are
-unused by this scheme (always 11, 12 on a real device; preserved on encode, not written).
+Not a positional array — a linked list. Each block below has a fixed **slot** (1–10):
+byte `slot` holds the firmware value of whatever comes immediately *after* that block
+— not by chain position. Byte 0 is the one exception: it holds `item_top`, the firmware
+value of whichever block comes first. A firmware value of 0 always means "connects to
+OUTPUT", a fixed endpoint that has no slot of its own and never appears as a byte's
+*index* — only ever as a byte's *value*. Bytes 11–12 are unused by this scheme (always
+11, 12 on a real device; preserved on encode, not written).
 
-| Firmware value | Block                                                |
-|----------------|------------------------------------------------------|
-| 0              | OUTPUT (terminator only, never a `next`-slot source) |
-| 1              | PFX                                                  |
-| 2              | FX1                                                  |
-| 3              | OD/DS                                                |
-| 4              | AMP                                                  |
-| 5              | FX2                                                  |
-| 6              | FX3                                                  |
-| 7              | NS                                                   |
-| 8              | FV                                                   |
-| 9              | DLY                                                  |
-| 10             | REV                                                  |
-
-| Byte | Holds the firmware value of what follows...       |
-|------|---------------------------------------------------|
-| 0    | *(nothing — this is `item_top`, the first block)* |
-| 1    | PFX                                               |
-| 2    | FX1                                               |
-| 3    | OD/DS                                             |
-| 4    | AMP                                               |
-| 5    | FX2                                               |
-| 6    | FX3                                               |
-| 7    | NS                                                |
-| 8    | FV                                                |
-| 9    | DLY                                               |
-| 10   | REV                                               |
+| Slot / value | Block                                                |
+|-------------:|------------------------------------------------------|
+|            0 | OUTPUT (terminator only, never a `next`-slot source) |
+|            1 | PFX                                                  |
+|            2 | FX1                                                  |
+|            3 | OD/DS                                                |
+|            4 | AMP                                                  |
+|            5 | FX2                                                  |
+|            6 | FX3                                                  |
+|            7 | NS                                                   |
+|            8 | FV                                                   |
+|            9 | DLY                                                  |
+|           10 | REV                                                  |
 
 Example (untouched default order `PFX→FX1→OD/DS→AMP→NS→FV→FX2→FX3→DLY→REV`):
 `[1,2,3,4,7,6,9,8,5,10,0,11,12]` — byte 0 (`item_top`) is 1 (PFX); byte 1 (PFX's next) is
