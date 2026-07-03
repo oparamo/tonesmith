@@ -82,12 +82,12 @@ node mcp/dist/index.js   # runs the server over stdio
 
 MCP tools:
 
-| Tool | Description |
-|---|---|
-| `list_devices` | List supported devices |
-| `read_patch` | Read one or all patches from a `.tsl` file |
+| Tool             | Description                                                   |
+|------------------|---------------------------------------------------------------|
+| `list_devices`   | List supported devices                                        |
+| `read_patch`     | Read one or all patches from a `.tsl` file                    |
 | `generate_patch` | Build a new GX-1 patch from structured parameters and save it |
-| `write_field` | Edit a single field in an existing patch |
+| `write_field`    | Edit a single field in an existing patch                      |
 
 ## Generating preset packs
 
@@ -116,7 +116,7 @@ pnpm html-to-md tools/html-to-md/gx1.json inspect <url>
 
 ## Repository layout
 
-```
+```tree
 core/      @tonesmith/core — codec, types, driver registry, GX-1 driver + builder
 cli/       @tonesmith/cli  — CLI (tonesmith gx1 read/write/copy/new)
 mcp/       @tonesmith/mcp   — MCP server (list_devices, read_patch, generate_patch, write_field)

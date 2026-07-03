@@ -4,7 +4,7 @@ import type { FxParams } from "./tsl";
 interface FxBlock {
   on: boolean;
   type: string;
-  subtype: string | null;
+  subType: string | null;
   params: FxParams;
   [RAW]: number[];
 }
@@ -16,6 +16,8 @@ interface OdDsBlock {
   tone: number;
   level: number;
   direct: number;
+  solo: boolean;
+  soloLevel: number;
   [RAW]: number[];
 }
 
@@ -29,6 +31,8 @@ interface AmpBlock {
   treble: number;
   speaker: string;
   mic: string;
+  solo: boolean;
+  soloLevel: number;
   [RAW]: number[];
 }
 
@@ -48,9 +52,9 @@ interface FvBlock {
   [RAW]: number[];
 }
 
-// DelayBlock and ReverbBlock carry type-specific extra fields at the same level,
-// so they extend Record<string, unknown> to permit them while remaining typed for
-// the known base fields.
+// DelayBlock, ReverbBlock, and PfxBlock carry type-specific extra fields at the same
+// level, so they extend Record<string, unknown> to permit them while remaining typed
+// for the known base fields.
 interface DelayBlock extends Record<string, unknown> {
   on: boolean;
   type: string;
@@ -63,4 +67,11 @@ interface ReverbBlock extends Record<string, unknown> {
   [RAW]: number[];
 }
 
-export type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock };
+// The pedal-controlled effect assigned to the expression pedal input: WAH or PEDAL BEND.
+interface PfxBlock extends Record<string, unknown> {
+  on: boolean;
+  type: string;
+  [RAW]: number[];
+}
+
+export type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock };

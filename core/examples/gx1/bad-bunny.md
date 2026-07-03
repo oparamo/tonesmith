@@ -43,7 +43,7 @@ Note: OD/DS and FX2 are both OFF. The entire character comes from the Chorus and
 | OD/DS | OFF | — |
 | FX2 | OFF | — |
 | NS | THRESHOLD: 18, RELEASE: 40 | Very light — just housekeeping. |
-| DELAY | ANALOG, TIME: 400ms, FEEDBACK: 30, LEVEL: 48, HIGH CUT: 3.0kHz | Warm, recessed repeats that sit under the shimmer. |
+| DELAY | ANALOG, TIME: 400ms, FEEDBACK: 30, LEVEL: 48, HIGH CUT: FLAT | Warm, recessed repeats that sit under the shimmer. |
 | REVERB | SHIMMER, TIME: 4.0s, TONE: -3, PRE-DELAY: 25ms, LEVEL: 55, PITCH: +12, PITCH LVL: 28 | SHIMMER with +12 pitch shift is the signature of this patch — the ascending pitch tail gives the psychedelic, airy quality. |
 
 # DtMF (Debí Tomar Más Fotos)
@@ -63,7 +63,7 @@ Note: OD/DS and FX2 are OFF. Simplest chain in the library — just compressor, 
 | OD/DS | OFF | — |
 | FX2 | OFF | — |
 | NS | THRESHOLD: 20, RELEASE: 40 | — |
-| DELAY | ANALOG, TIME: 360ms, FEEDBACK: 22, LEVEL: 38, HIGH CUT: 2.2kHz | Very dark, very subtle delay — almost subliminal. Just adds a sense of depth to the strumming. |
+| DELAY | ANALOG, TIME: 360ms, FEEDBACK: 22, LEVEL: 38, HIGH CUT: 2kHz | Very dark, very subtle delay — almost subliminal. Just adds a sense of depth to the strumming. |
 | REVERB | HALL M, TIME: 3.0s, TONE: -12, PRE-DELAY: 30ms, LEVEL: 42, DENSITY: 4, DIRECT: 100 | Darkest TONE setting in the library (-12). Should feel like a warm room, not a concert hall. Low density keeps it from sounding artificial. |
 
 # DtMF (Debí Tomar Más Fotos)
@@ -83,7 +83,7 @@ Note: Note: True lo-fi tape saturation is a studio-level production treatment ba
 | OD/DS | OFF | — |
 | FX2 High GEQ | 250Hz: +4, 500Hz: +2, 1kHz: +3, 2kHz: -3, 4kHz: -6 | Boosts warmth in the low-mids, then rolls off the highs — gives the guitar that slightly muffled, tape-worn quality. 4kHz cut is the key. |
 | NS | THRESHOLD: 20, RELEASE: 40 | — |
-| DELAY | ANALOG, TIME: 360ms, FEEDBACK: 22, LEVEL: 38, HIGH CUT: 2.2kHz | Same as DTMF-1 — keep delay consistent between patches so you can compare them directly. |
+| DELAY | ANALOG, TIME: 360ms, FEEDBACK: 22, LEVEL: 38, HIGH CUT: 2kHz | Same as DTMF-1 — keep delay consistent between patches so you can compare them directly. |
 | REVERB | HALL M, TIME: 3.0s, TONE: -12, PRE-DELAY: 30ms, LEVEL: 42, DENSITY: 4, DIRECT: 100 | Same as DTMF-1 — the reverb character is identical, isolating the ENHANCER + GEQ as the only variables. |
 
 # Neverita
@@ -103,7 +103,7 @@ Note: OD/DS is OFF. The compressor before the amp evens out chord voicings that 
 | OD/DS | OFF | — |
 | FX2 Chorus | STEREO, RATE: 10, DEPTH: 20, LEVEL: 45, PRE-DELAY: 4ms | Extremely slow, subtle chorus — just enough to add warm, slightly liquid quality to the jazz chords. Not obvious. |
 | NS | THRESHOLD: 22, RELEASE: 38 | — |
-| DELAY | STANDARD, TIME: 320ms, FEEDBACK: 18, LEVEL: 35, HIGH CUT: 4.0kHz | STANDARD (not ANALOG) — brighter, crisper repeats suit the glassy jazz tone better than dark analog repeats. |
+| DELAY | STANDARD, TIME: 320ms, FEEDBACK: 18, LEVEL: 35, HIGH CUT: 4kHz | STANDARD (not ANALOG) — brighter, crisper repeats suit the glassy jazz tone better than dark analog repeats. |
 | REVERB | HALL S, TIME: 2.2s, TONE: -3, PRE-DELAY: 15ms, LEVEL: 38, DENSITY: 5, DIRECT: 100 | HALL S for clarity — the extended chord voicings need definition, not wash. |
 
 # Moscow Mule
@@ -123,7 +123,7 @@ Note: Blues OD in OD/DS is at very low drive — acting as a light colouring age
 | OD/DS | BLUES OD, DRIVE: 18, TONE: +8, LEVEL: 65 | BD-2 model at very low drive. Just a hint of edge and warmth — not actual overdrive. Keeps it musical without going rock. |
 | FX2 | OFF | — |
 | NS | THRESHOLD: 40, RELEASE: 25 | Tighter gate than any other Bad Bunny patch — keeps the staccato riff articulation clean. |
-| DELAY | STANDARD, TIME: 280ms, FEEDBACK: 20, LEVEL: 38, HIGH CUT: 4.5kHz | Short, bright delay — punchy and rhythmic. Brightest HIGH CUT in the library. |
+| DELAY | STANDARD, TIME: 280ms, FEEDBACK: 20, LEVEL: 38, HIGH CUT: FLAT | Short, bright delay — punchy and rhythmic. Brightest HIGH CUT in the library. |
 | REVERB | ROOM S, TIME: 1.4s, TONE: +3, PRE-DELAY: 8ms, LEVEL: 28, DENSITY: 6, DIRECT: 100 | ROOM S — tight and forward. This riff needs presence, not space. Brightest reverb TONE in the library (+3). |
 
 # Pitorro de Coco

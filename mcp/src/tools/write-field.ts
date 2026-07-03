@@ -28,8 +28,8 @@ const registerWriteField = (server: McpServer): void => {
         patchUtils.setByPath(patch, field, coerced);
         driver.writeFile(patchFile, file);
         return ok(`Updated ${file} patch ${idx}: ${field} = ${JSON.stringify(coerced)}`);
-      } catch (e) {
-        return err(e);
+      } catch (error) {
+        return err(error);
       }
     }
   );

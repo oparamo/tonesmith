@@ -64,7 +64,7 @@ Note: FX2 is OFF. Keep default order — compressor before fuzz is correct here;
 | FX1 Compressor | D-COMP, SUSTAIN: 65, ATTACK: 48, LEVEL: 60 | Dyna Comp sustain but not as stretched as Solo 2 — more dynamic range comes through. |
 | OD/DS | MUFF FUZZ, DRIVE: 52, TONE: +10, LEVEL: 65 | Slightly less drive than Solo 2 — more picking dynamics come through. |
 | FX2 | OFF | — |
-| DELAY | ANALOG, TIME: 375ms, FEEDBACK: 28, LEVEL: 48, HIGH CUT: 3.0kHz | Tighter and less prominent than Solo 2 — the first solo doesn't float as much. |
+| DELAY | ANALOG, TIME: 375ms, FEEDBACK: 28, LEVEL: 48, HIGH CUT: 3.15kHz | Tighter and less prominent than Solo 2 — the first solo doesn't float as much. |
 | REVERB | HALL S, TIME: 2.2s, TONE: -3, PRE-DELAY: 15ms, LEVEL: 36, DENSITY: 5 | HALL S for more definition. Shorter time than Solo 2 — this solo is more grounded. |
 | NS | THRESHOLD: 38, RELEASE: 48 | — |
 
@@ -82,7 +82,7 @@ Note: Subtle chorus in FX2 sits after the amp so it adds shimmer without muddyin
 | FX1 Compressor | D-COMP, SUSTAIN: 75, ATTACK: 42, LEVEL: 63 | Maximum sustain of any lead patch in the library. Notes should feel like they never decay. |
 | OD/DS | MUFF FUZZ, DRIVE: 58, TONE: +15, LEVEL: 68 | More drive and tone than Solo 1 — this solo is brighter and more sustained. |
 | FX2 Chorus | STEREO, RATE: 18, DEPTH: 22, LEVEL: 55, PRE-DELAY: 2ms | Very subtle chorus under the lead — adds slight shimmer and width without washing out the sustain. |
-| DELAY | ANALOG, TIME: 390ms, FEEDBACK: 35, LEVEL: 55, HIGH CUT: 3.2kHz | More feedback and level than Solo 1 — the echoes are a key emotional component of this solo. |
+| DELAY | ANALOG, TIME: 390ms, FEEDBACK: 35, LEVEL: 55, HIGH CUT: 3.15kHz | More feedback and level than Solo 1 — the echoes are a key emotional component of this solo. |
 | REVERB | HALL M, TIME: 3.2s, TONE: -5, PRE-DELAY: 20ms, LEVEL: 42, DENSITY: 6 | HALL M for vast, enveloping space. This solo needs to feel infinite. |
 | NS | THRESHOLD: 40, RELEASE: 55 | — |
 
@@ -104,7 +104,7 @@ Note: Phaser placed in FX2 after the amp so it shapes the sustained bloom withou
 | FX1 Compressor | D-COMP, SUSTAIN: 85, ATTACK: 30, LEVEL: 65 | Highest sustain setting in the entire library. Attack at 30 so notes bloom in rather than pop. |
 | OD/DS | MUFF FUZZ, DRIVE: 50, TONE: 0, LEVEL: 65 | Neutral tone — no brightness or darkness bias. Pure sustained Muff. |
 | FX2 Phaser | SCRIPT PH, RATE: 12, DEPTH: 60, LEVEL: 65 | Slowest phaser rate in the library. The sweep is so slow it feels like the note itself is breathing. |
-| DELAY | ANALOG, TIME: 550ms, FEEDBACK: 40, LEVEL: 58, HIGH CUT: 2.2kHz | Long delay with darkest HIGH CUT of any patch — echoes are almost indistinguishable from reverb. |
+| DELAY | ANALOG, TIME: 550ms, FEEDBACK: 40, LEVEL: 58, HIGH CUT: 2kHz | Long delay with darkest HIGH CUT of any patch — echoes are almost indistinguishable from reverb. |
 | REVERB | HALL M, TIME: 4.0s, TONE: -12, PRE-DELAY: 35ms, LEVEL: 45, DENSITY: 4 | Darkest, longest reverb in the library. Low density makes it feel organic, not artificial. |
 | NS | THRESHOLD: 20, RELEASE: 60 | Very low threshold — let everything breathe. Long release so the gate never chops notes. |
 
@@ -122,7 +122,7 @@ Note: OD/DS is OFF. Move Phaser to FX1 so it runs before the amp — this gives 
 | FX1 Phaser | SCRIPT PH, RATE: 25, DEPTH: 55, LEVEL: 68 | Slightly faster and deeper than the WYWH phaser — the rhythm is more active here. |
 | FX2 Chorus | STEREO, RATE: 14, DEPTH: 22, LEVEL: 48, PRE-DELAY: 3ms | Subtle supporting chorus under the phaser. |
 | OD/DS | OFF | — |
-| DELAY | ANALOG, TIME: 460ms, FEEDBACK: 28, LEVEL: 42, HIGH CUT: 2.8kHz | — |
+| DELAY | ANALOG, TIME: 460ms, FEEDBACK: 28, LEVEL: 42, HIGH CUT: 2.5kHz | — |
 | REVERB | HALL M, TIME: 2.8s, TONE: -5, PRE-DELAY: 22ms, LEVEL: 38, DENSITY: 5 | — |
 | NS | THRESHOLD: 28, RELEASE: 38 | — |
 
@@ -140,7 +140,7 @@ Note: Unusually, the Phaser stays on during the lead. Keep it in FX2 after the a
 | FX1 Compressor | D-COMP, SUSTAIN: 70, ATTACK: 45, LEVEL: 62 | — |
 | OD/DS | MUFF FUZZ, DRIVE: 55, TONE: +8, LEVEL: 66 | — |
 | FX2 Phaser | SCRIPT PH, RATE: 20, DEPTH: 45, LEVEL: 58 | Phase 90 stays on under the lead — part of the sonic identity of this album. |
-| DELAY | ANALOG, TIME: 500ms, FEEDBACK: 35, LEVEL: 52, HIGH CUT: 3.0kHz | Longer delay time than Comfortably Numb — SOYCD phrasing is slower and more spacious. |
+| DELAY | ANALOG, TIME: 500ms, FEEDBACK: 35, LEVEL: 52, HIGH CUT: 3.15kHz | Longer delay time than Comfortably Numb — SOYCD phrasing is slower and more spacious. |
 | REVERB | HALL M, TIME: 3.5s, TONE: -5, PRE-DELAY: 22ms, LEVEL: 40, DENSITY: 6 | — |
 | NS | THRESHOLD: 35, RELEASE: 52 | — |
 
@@ -180,7 +180,7 @@ Note: OD/DS is OFF. Same order as WYWH-1. Both WYWH rhythm patches use identical
 | FX1 Compressor | ORANGE, SUSTAIN: 45, ATTACK: 50, LEVEL: 58 | Slightly more sustain and faster attack to even out chord strums. |
 | OD/DS | OFF | — |
 | FX2 Phaser | SCRIPT PH, RATE: 20, DEPTH: 52, LEVEL: 65 | Marginally faster and deeper than the fingerpicked patch — strumming needs the phaser to breathe a little more. |
-| DELAY | ANALOG, TIME: 450ms, FEEDBACK: 30, LEVEL: 45, HIGH CUT: 2.8kHz | Slightly higher level than the fingerpicked patch. |
+| DELAY | ANALOG, TIME: 450ms, FEEDBACK: 30, LEVEL: 45, HIGH CUT: 2.5kHz | Slightly higher level than the fingerpicked patch. |
 | REVERB | HALL M, TIME: 2.8s, TONE: -5, PRE-DELAY: 22ms, LEVEL: 38, DENSITY: 5 | Marginally brighter and denser than the intro — strummed chords need more reverb presence to bloom. |
 | NS | THRESHOLD: 28, RELEASE: 40 | — |
 
@@ -198,7 +198,7 @@ Note: Phaser stays on during the lead in FX2 after the amp — critical for this
 | FX1 Compressor | D-COMP, SUSTAIN: 65, ATTACK: 45, LEVEL: 60 | Switched to D-COMP for the lead — more aggressive sustain to hold notes through the long phrasing. |
 | OD/DS | MUFF FUZZ, DRIVE: 48, TONE: +5, LEVEL: 62 | Lower drive than other lead patches — this solo is gentle and melodic. Just enough Muff for warmth. |
 | FX2 Phaser | SCRIPT PH, RATE: 18, DEPTH: 45, LEVEL: 60 | Phase 90 stays on for the lead — it's part of what makes this solo feel like it belongs with the song. |
-| DELAY | ANALOG, TIME: 460ms, FEEDBACK: 33, LEVEL: 52, HIGH CUT: 3.0kHz | Slightly more feedback than the rhythm patches — long delay tails give the solo its floating, weightless quality. |
+| DELAY | ANALOG, TIME: 460ms, FEEDBACK: 33, LEVEL: 52, HIGH CUT: 3.15kHz | Slightly more feedback than the rhythm patches — long delay tails give the solo its floating, weightless quality. |
 | REVERB | HALL M, TIME: 3.0s, TONE: -5, PRE-DELAY: 18ms, LEVEL: 40, DENSITY: 6 | Back to the longer reverb time — the solo should feel like it's in the same enormous space as the rest of the song. |
 | NS | THRESHOLD: 35, RELEASE: 50 | — |
 
@@ -221,7 +221,7 @@ Note: FX2 is OFF. T-Scream in OD/DS acts as a mid-boost going into the amp — O
 | OD/DS | T-SCREAM, DRIVE: 28, TONE: +12, LEVEL: 72 | TS-808 as a mid-boost into the amp. Pushes the mids further and tightens the low end. Higher TONE adds brightness. |
 | FX1 Compressor | BOSS COMP, SUSTAIN: 50, ATTACK: 35, LEVEL: 60 | CS-3 model for a punchier, snappier feel — suits the rhythmic, aggressive playing style. |
 | FX2 | OFF | No chorus — this tone needs to be direct and uncoloured. |
-| DELAY | ANALOG, TIME: 340ms, FEEDBACK: 22, LEVEL: 35, HIGH CUT: 3.5kHz | Short, tight delay — just enough to add dimension without smearing the riff. |
+| DELAY | ANALOG, TIME: 340ms, FEEDBACK: 22, LEVEL: 35, HIGH CUT: 3.15kHz | Short, tight delay — just enough to add dimension without smearing the riff. |
 | REVERB | PLATE, TIME: 1.6s, TONE: +5, PRE-DELAY: 10ms, LEVEL: 28, DENSITY: 6 | Plate reverb is brighter and more forward — matches the aggressive character. Short time keeps it tight. |
 
 ## [HAC-2]  Lead
@@ -238,7 +238,7 @@ Note: REORDER REQUIRED: Move OD/DS before FX1. Fuzz Face ran before the compress
 | FX1 Compressor | D-COMP, SUSTAIN: 60, ATTACK: 38, LEVEL: 62 | Dyna Comp for lead sustain, but faster attack than WYWH lead — this solo needs more snap and definition. |
 | OD/DS | 60S FUZZ, DRIVE: 60, TONE: +18, LEVEL: 65 | Fuzz Face model. Higher TONE than any other fuzz patch — this solo needs to be bright and cutting. |
 | FX2 | OFF | No modulation — the tone is intentionally direct and unadorned. |
-| DELAY | ANALOG, TIME: 360ms, FEEDBACK: 28, LEVEL: 48, HIGH CUT: 3.5kHz | Shorter time, higher HIGH CUT — delay repeats are brighter to match the overall tone. |
+| DELAY | ANALOG, TIME: 360ms, FEEDBACK: 28, LEVEL: 48, HIGH CUT: 3.15kHz | Shorter time, higher HIGH CUT — delay repeats are brighter to match the overall tone. |
 | REVERB | PLATE, TIME: 1.8s, TONE: +5, PRE-DELAY: 12ms, LEVEL: 35, DENSITY: 7 | Plate reverb kept from the rhythm patch for sonic consistency within the song. |
 | NS | THRESHOLD: 42, RELEASE: 45 | — |
 
@@ -278,7 +278,7 @@ Note: FX2 is OFF — no modulation anywhere. Compressor before Muff, Muff into a
 | FX1 Compressor | D-COMP, SUSTAIN: 72, ATTACK: 45, LEVEL: 62 | MXR Dyna Comp — works with the Muff to create notes that feel like they never end. |
 | OD/DS | MUFF FUZZ, DRIVE: 58, TONE: +8, LEVEL: 68 | Slightly higher drive than Comfortably Numb — the Hey You solo has a bit more desperation and push. |
 | FX2 | OFF | No modulation — the sustain and space carry the emotion entirely. |
-| DELAY | ANALOG, TIME: 480ms, FEEDBACK: 38, LEVEL: 55, HIGH CUT: 3.0kHz | Higher feedback (38) than most patches — the trailing echoes are a key emotional part of this solo. |
+| DELAY | ANALOG, TIME: 480ms, FEEDBACK: 38, LEVEL: 55, HIGH CUT: 3.15kHz | Higher feedback (38) than most patches — the trailing echoes are a key emotional part of this solo. |
 | REVERB | HALL S, TIME: 3.2s, TONE: -5, PRE-DELAY: 20ms, LEVEL: 42, DENSITY: 6 | HALL S for clarity so the solo cuts through. Longest reverb time of all lead patches — feels like echoing into a void. |
 | NS | THRESHOLD: 40, RELEASE: 55 | Slightly tighter than the rhythm patch — adds a subtle released quality between phrases. |
 
@@ -322,7 +322,7 @@ Note: REORDER REQUIRED: Move OD/DS before FX1. Fuzz Face before compressor resto
 | FX1 Compressor | D-COMP, SUSTAIN: 60, ATTACK: 45, LEVEL: 60 | Less sustain than Comfortably Numb — this tone is more dynamic and attacking. |
 | OD/DS | 60S FUZZ, DRIVE: 65, TONE: +5, LEVEL: 60 | Fuzz Face model. More aggressive and spitty than the Big Muff — correct for this era. |
 | FX2 Vibrato | RATE: 40, DEPTH: 35 | Used selectively for Dogs-style sections. Vibrato gives a more pitch-based, psychedelic effect than tremolo. |
-| DELAY | ANALOG, TIME: 440ms, FEEDBACK: 32, LEVEL: 50, HIGH CUT: 3.0kHz | Slightly longer time for the slower, more spacious feel of Animals-era songs. |
+| DELAY | ANALOG, TIME: 440ms, FEEDBACK: 32, LEVEL: 50, HIGH CUT: 3.15kHz | Slightly longer time for the slower, more spacious feel of Animals-era songs. |
 | REVERB | HALL S, TIME: 2.0s, PRE-DELAY: 15ms, LEVEL: 38 | HALL S for clarity — suits the more biting fuzz tone. |
 | NS | THRESHOLD: 35, RELEASE: 45 | — |
 
@@ -344,7 +344,7 @@ Note: OD/DS is OFF. Chorus in FX1 before the amp gives a slightly more saturated
 | FX1 Chorus | STEREO, RATE: 22, DEPTH: 45, LEVEL: 65, PRE-DELAY: 3ms | Prominent chorus — the Echoes clean tone is noticeably modulated. |
 | FX2 Phaser | SCRIPT PH, RATE: 16, DEPTH: 38, LEVEL: 52 | Subtle supporting phase sweep. |
 | OD/DS | OFF | — |
-| DELAY | ANALOG, TIME: 430ms, FEEDBACK: 30, LEVEL: 45, HIGH CUT: 2.8kHz | — |
+| DELAY | ANALOG, TIME: 430ms, FEEDBACK: 30, LEVEL: 45, HIGH CUT: 2.5kHz | — |
 | REVERB | HALL S, TIME: 2.5s, TONE: -5, PRE-DELAY: 18ms, LEVEL: 36, DENSITY: 5 | HALL S for more definition — Meddle recordings are rawer and less enveloped than later albums. |
 | NS | THRESHOLD: 30, RELEASE: 38 | — |
 
@@ -362,7 +362,7 @@ Note: NS is intentionally OFF — the only patch in the library where this is th
 | FX1 Flanger | RATE: 8, DEPTH: 80, MANUAL: 55, RESO: 70, LEVEL: 75 | High resonance creates that swooping, jet-like character. Low rate so it moves slowly and dramatically. |
 | FX2 Phaser | 12 STAGE, RATE: 10, DEPTH: 80, RESO: 65, LEVEL: 70 | 12-stage phaser at very slow rate adds a second layer of swirling movement beneath the flanger. |
 | OD/DS | LEAD DS, DRIVE: 80, TONE: +5, LEVEL: 65 | High gain distortion for feedback sustain — LEAD DS has a smooth top end that doesn't become piercing. |
-| DELAY | ANALOG, TIME: 680ms, FEEDBACK: 55, LEVEL: 65, HIGH CUT: 4.0kHz | Long delay with high feedback — approaching self-oscillation. Intentional for the chaos section. |
+| DELAY | ANALOG, TIME: 680ms, FEEDBACK: 55, LEVEL: 65, HIGH CUT: 4kHz | Long delay with high feedback — approaching self-oscillation. Intentional for the chaos section. |
 | REVERB | HALL S, TIME: 4.5s, TONE: +5, PRE-DELAY: 10ms, LEVEL: 55, DENSITY: 8 | Bright, dense, cavernous — should feel like filling an enormous space. |
 | NS | OFF | Intentionally off — you want the noise and feedback for this section. |
 
@@ -380,7 +380,7 @@ Note: REORDER REQUIRED: Move OD/DS before FX1. Same principle as HAC-2 and TD-1 
 | FX1 Compressor | D-COMP, SUSTAIN: 65, ATTACK: 45, LEVEL: 60 | — |
 | OD/DS | 60S FUZZ, DRIVE: 62, TONE: +10, LEVEL: 65 | Fuzz Face rather than Big Muff — correct for this earlier era. More dynamic and touch-sensitive. |
 | FX2 Chorus | STEREO, RATE: 18, DEPTH: 28, LEVEL: 52, PRE-DELAY: 2ms | Subtle chorus under the lead — consistent with the clean tone's modulation character. |
-| DELAY | ANALOG, TIME: 450ms, FEEDBACK: 32, LEVEL: 50, HIGH CUT: 3.0kHz | — |
+| DELAY | ANALOG, TIME: 450ms, FEEDBACK: 32, LEVEL: 50, HIGH CUT: 3.15kHz | — |
 | REVERB | HALL S, TIME: 2.8s, TONE: -3, PRE-DELAY: 16ms, LEVEL: 38, DENSITY: 5 | — |
 | NS | THRESHOLD: 36, RELEASE: 48 | — |
 
@@ -402,7 +402,7 @@ Note: OD/DS is OFF. Tremolo in FX1 before the amp gives a more natural, amp-like
 | FX1 Tremolo | RATE: 35, DEPTH: 45, LEVEL: 70 | The tremolo on Breathe is subtle but present — gives chords that lapping, undulating feel. |
 | FX2 Chorus | STEREO, RATE: 16, DEPTH: 48, LEVEL: 65, PRE-DELAY: 5ms | Deep, slow chorus. Combined with the tremolo this creates the liquid, steel-guitar quality. |
 | OD/DS | OFF | — |
-| DELAY | ANALOG, TIME: 500ms, FEEDBACK: 30, LEVEL: 40, HIGH CUT: 2.2kHz | Very dark delay — almost subliminal. Just adds depth. |
+| DELAY | ANALOG, TIME: 500ms, FEEDBACK: 30, LEVEL: 40, HIGH CUT: 2kHz | Very dark delay — almost subliminal. Just adds depth. |
 | REVERB | HALL M, TIME: 3.2s, TONE: -10, PRE-DELAY: 28ms, LEVEL: 40, DENSITY: 4 | Dark and spacious — consistent with the cosmic, floating feel of DSOTM. |
 | NS | THRESHOLD: 28, RELEASE: 42 | — |
 
@@ -420,7 +420,7 @@ Note: REORDER REQUIRED: Move OD/DS before FX1 for correct Fuzz Face dynamics. Su
 | FX1 Compressor | D-COMP, SUSTAIN: 68, ATTACK: 45, LEVEL: 60 | — |
 | OD/DS | 60S FUZZ, DRIVE: 55, TONE: +5, LEVEL: 63 | Fuzz Face for this DSOTM era lead — more organic and dynamic than the Big Muff. |
 | FX2 Chorus | STEREO, RATE: 16, DEPTH: 25, LEVEL: 50, PRE-DELAY: 2ms | Carries the modulation character over from the rhythm tone. |
-| DELAY | ANALOG, TIME: 460ms, FEEDBACK: 30, LEVEL: 48, HIGH CUT: 3.0kHz | — |
+| DELAY | ANALOG, TIME: 460ms, FEEDBACK: 30, LEVEL: 48, HIGH CUT: 3.15kHz | — |
 | REVERB | HALL M, TIME: 3.0s, TONE: -5, PRE-DELAY: 18ms, LEVEL: 38, DENSITY: 5 | — |
 | NS | THRESHOLD: 35, RELEASE: 48 | — |
 
@@ -460,7 +460,7 @@ Note: Compressor before Muff is correct here — the Muff drive is very low (45)
 | FX1 Compressor | D-COMP, SUSTAIN: 80, ATTACK: 35, LEVEL: 65 | Second highest sustain in the library — slide notes need even more sustain than fretted notes to sing properly. |
 | OD/DS | MUFF FUZZ, DRIVE: 45, TONE: +3, LEVEL: 65 | Lowest Muff drive in the library — by this era Gilmour used the Big Muff as a subtle, transparent sustain tool. |
 | FX2 Chorus | STEREO, RATE: 16, DEPTH: 30, LEVEL: 55, PRE-DELAY: 3ms | Carries the shimmer quality from the rhythm patch into the lead. |
-| DELAY | MODULATE, TIME: 520ms, FEEDBACK: 40, LEVEL: 55, HIGH CUT: 3.2kHz, MOD RATE: 10, MOD DEPTH: 15 | MODULATE delay again — wavering repeats suit slide guitar beautifully, making notes feel like they're drifting. |
+| DELAY | MODULATE, TIME: 520ms, FEEDBACK: 40, LEVEL: 55, HIGH CUT: 3.15kHz, MOD RATE: 10, MOD DEPTH: 15 | MODULATE delay again — wavering repeats suit slide guitar beautifully, making notes feel like they're drifting. |
 | REVERB | SHIMMER, TIME: 4.5s, TONE: -3, PRE-DELAY: 20ms, LEVEL: 45, PITCH: +12, PITCH LVL: 30 | Shimmer reverb with slightly more PITCH LVL than the rhythm patch — lead notes should feel like they're ascending. |
 | NS | THRESHOLD: 28, RELEASE: 60 | Long release — slide notes decay slowly and the gate must never cut them short. |
 

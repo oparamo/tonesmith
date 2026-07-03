@@ -6,7 +6,7 @@ const FxBlockSchema = z.object({
     "ENHANCER, HIGH GEQ, LOW GEQ, WAH, AUTO WAH, SLICER, PITCH SHIFT, HARMONIST, " +
     "DELAY, REVERB, CHORUS/DLY, etc.)"
   ),
-  subtype: z.string().optional().describe(
+  subType: z.string().optional().describe(
     "Effect subtype where applicable (e.g. STEREO/MONO for CHORUS; " +
     "ORANGE/BOSS COMP/HI-BAND for COMPRESSOR; 4-STAGE/8-STAGE/12-STAGE for PHASER)"
   ),

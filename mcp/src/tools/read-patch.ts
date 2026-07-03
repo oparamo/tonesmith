@@ -26,10 +26,10 @@ const registerReadPatch = (server: McpServer): void => {
         }
         return ok(JSON.stringify({
           setName: patchFile.name,
-          patches: patchFile.patches.map((p, i) => ({ index: i, ...p })),
+          patches: patchFile.patches.map((patch, index) => ({ index, ...patch })),
         }, null, 2));
-      } catch (e) {
-        return err(e);
+      } catch (error) {
+        return err(error);
       }
     }
   );

@@ -1,11 +1,12 @@
 import type { Patch as BasePatch, PatchFile as BasePatchFile } from "../../../types";
 import type { RAW } from "../common";
 import type { RawParamSet, TslEnvelope } from "./tsl";
-import type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock } from "./blocks";
+import type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "./blocks";
 
 interface Patch extends BasePatch {
   memo: string;
   chain: string[];
+  key: string;
   fx1: FxBlock;
   fx2: FxBlock;
   fx3: FxBlock;
@@ -13,6 +14,7 @@ interface Patch extends BasePatch {
   amp: AmpBlock;
   ns: NsBlock;
   fv: FvBlock;
+  pfx: PfxBlock;
   delay: DelayBlock;
   reverb: ReverbBlock;
   [RAW]: RawParamSet;

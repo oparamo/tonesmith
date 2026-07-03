@@ -9,8 +9,8 @@ const resolvePatchIndex = <T extends Patch>(patches: T[], ref: string): number =
   if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) return asNumber;
 
   const needle = ref.toLowerCase();
-  const matches = patches.flatMap((p, i) =>
-    p.name.trim().toLowerCase() === needle ? [i] : []
+  const matches = patches.flatMap((patch, index) =>
+    patch.name.trim().toLowerCase() === needle ? [index] : []
   );
 
   if (matches.length === 0) throw new Error(`No patch named ${JSON.stringify(ref)}`);

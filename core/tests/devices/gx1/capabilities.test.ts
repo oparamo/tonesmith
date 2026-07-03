@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES,
   ODDS_TYPES, DLY_TYPES, REV_TYPES,
-  FX_SUBTYPE_LISTS,
+  COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES,
 } from "../../../src/devices/gx1/common";
 import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
 import type { CapabilityItem } from "../../../src/types";
@@ -15,10 +15,10 @@ import type { CapabilityItem } from "../../../src/types";
 const groupItems = (groupId: string): CapabilityItem[] =>
   gx1Capabilities.groups.find(g => g.id === groupId)?.items ?? [];
 
-const allSubtypeIds = (items: CapabilityItem[]): Set<string> => {
+const allSubTypeIds = (items: CapabilityItem[]): Set<string> => {
   const ids = new Set<string>();
   for (const item of items) {
-    for (const sub of item.subtypes ?? []) {
+    for (const sub of item.subTypes ?? []) {
       ids.add(sub.id);
     }
   }
@@ -75,26 +75,37 @@ describe("GX-1 capabilities drift guard", () => {
     }
   });
 
-  it("covers every FX_SUBTYPE_LISTS entry as subtypes of the corresponding FX item", () => {
+  it("covers every PARAM_SUBTYPE_EFFECTS entry as subTypes of the corresponding FX item", () => {
+    // These FX types store their own sub-model selector in the param block itself
+    // (see PARAM_SUBTYPE_EFFECTS in common/constants.ts) rather than in FX_COM byte 2.
+    const paramSubtypeTables: Record<string, readonly string[]> = {
+      "COMPRESSOR":   COMP_TYPES,
+      "LIMITER":      LIM_TYPES,
+      "AC RESO":      ACRESO_TYPES,
+      "CHORUS":       CHORUS_TYPES,
+      "CLASSIC-VIBE": VIBE_MODES,
+      "HUMANIZER":    HUM_MODES,
+      "OD/DS":        ODDS_TYPES,
+    };
     const fxItems = groupItems("fx");
-    const subtypeMap = allSubtypeIds(fxItems);
+    const subTypeMap = allSubTypeIds(fxItems);
 
-    for (const [fxType, subtypes] of Object.entries(FX_SUBTYPE_LISTS)) {
+    for (const [fxType, subTypes] of Object.entries(paramSubtypeTables)) {
       const fxItem = fxItems.find(i => i.id === fxType);
       expect(
         fxItem,
-        `FX item "${fxType}" from FX_SUBTYPE_LISTS is missing from capabilities.groups.fx`
+        `FX item "${fxType}" from PARAM_SUBTYPE_EFFECTS is missing from capabilities.groups.fx`
       ).toBeDefined();
 
-      const itemSubtypeIds = new Set((fxItem?.subtypes ?? []).map(s => s.id));
-      for (const subId of subtypes) {
+      const itemSubTypeIds = new Set((fxItem?.subTypes ?? []).map(s => s.id));
+      for (const subId of subTypes) {
         expect(
-          itemSubtypeIds,
+          itemSubTypeIds,
           `Subtype "${subId}" of FX type "${fxType}" is missing from capabilities`
         ).toContain(subId);
       }
-      // suppress "used before assigned" lint note for subtypeMap
-      void subtypeMap;
+      // suppress "used before assigned" lint note for subTypeMap
+      void subTypeMap;
     }
   });
 });
