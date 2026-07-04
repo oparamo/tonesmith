@@ -22,10 +22,7 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
     .action((file: string, ref?: string) => run(() => {
       const patchFile = driver.readFile(file);
       console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
-      const indices = ref !== undefined
-        ? [patchUtils.resolvePatchIndex(patchFile.patches, ref)]
-        : Array.from({ length: patchFile.patches.length }, (_, index) => index);
-      for (const patchIndex of indices) {
+      for (const patchIndex of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
         printPatch(patchFile.patches[patchIndex]! as gx1.Patch, patchIndex);
       }
       console.info();
@@ -38,10 +35,11 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       const patchFile = driver.readFile(file);
       const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
       const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
-      for (const fieldAssignment of fields) {
+      const edits = fields.map((fieldAssignment): [string, string] => {
         const separatorIndex = fieldAssignment.indexOf("=");
-        patchUtils.setByPath(patch, fieldAssignment.slice(0, separatorIndex), patchUtils.coerceValue(fieldAssignment.slice(separatorIndex + 1)));
-      }
+        return [fieldAssignment.slice(0, separatorIndex), fieldAssignment.slice(separatorIndex + 1)];
+      });
+      patchUtils.applyFieldEdits(patch, edits);
       driver.writeFile(patchFile, file);
       console.info(`Wrote ${file} — patch ${idx} updated: ${fields.join(", ")}`);
     }));

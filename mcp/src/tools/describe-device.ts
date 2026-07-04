@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
-import { capabilityUtils } from "@tonesmith/core";
-import { ok, err, requireDriver } from "../common";
+import { capabilityUtils, registry } from "@tonesmith/core";
+import { ok, err } from "../common";
 
 const registerDescribeDevice = (server: McpServer): void => {
   server.registerTool(
@@ -23,7 +23,7 @@ const registerDescribeDevice = (server: McpServer): void => {
     },
     async ({ device, group, item }) => {
       try {
-        const { capabilities } = requireDriver(device);
+        const { capabilities } = registry.requireDriver(device);
 
         if (!group) {
           const summary = capabilities.groups.map(capGroup => ({

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
-import { patchUtils } from "@tonesmith/core";
-import { ok, err, requireDriver } from "../common";
+import { patchUtils, registry } from "@tonesmith/core";
+import { ok, err } from "../common";
 
 const registerReadPatch = (server: McpServer): void => {
   server.registerTool(
@@ -18,15 +18,16 @@ const registerReadPatch = (server: McpServer): void => {
     },
     async ({ file, device, ref }) => {
       try {
-        const driver = requireDriver(device);
+        const driver = registry.requireDriver(device);
         const patchFile = driver.readFile(file);
+        const indices = patchUtils.resolvePatchIndices(patchFile.patches, ref);
         if (ref !== undefined) {
-          const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
+          const idx = indices[0]!;
           return ok(JSON.stringify({ index: idx, ...patchFile.patches[idx] }, null, 2));
         }
         return ok(JSON.stringify({
           setName: patchFile.name,
-          patches: patchFile.patches.map((patch, index) => ({ index, ...patch })),
+          patches: indices.map(index => ({ index, ...patchFile.patches[index] })),
         }, null, 2));
       } catch (error) {
         return err(error);

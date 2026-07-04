@@ -49,4 +49,28 @@ const setByPath = (
   current[parts[parts.length - 1]!] = value;
 };
 
-export { resolvePatchIndex, coerceValue, setByPath };
+/**
+ * Resolve a patch reference to the indices it selects: a single index when ref is given,
+ * or every index in file order when ref is omitted. Shared by "read one or all patches"
+ * commands/tools.
+ */
+const resolvePatchIndices = <T extends Patch>(patches: T[], ref?: string): number[] =>
+  ref !== undefined
+    ? [resolvePatchIndex(patches, ref)]
+    : patches.map((_, index) => index);
+
+/**
+ * Apply a batch of dot-path field edits to a patch, coercing each raw string value.
+ * Mutates the patch in place. Shared by the CLI `write` command and the MCP `write_field`
+ * tool so both funnel through one mutation pipeline instead of duplicating it.
+ */
+const applyFieldEdits = (
+  patch: Record<string, unknown>,
+  edits: ReadonlyArray<readonly [path: string, rawValue: string]>,
+): void => {
+  for (const [path, rawValue] of edits) {
+    setByPath(patch, path, coerceValue(rawValue));
+  }
+};
+
+export { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits };
