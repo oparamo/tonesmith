@@ -44,11 +44,15 @@ describe("coerceValue", () => {
     expect(coerceValue("")).toBe(0);
   });
 
-  it("returns non-numeric strings unchanged", () => {
+  it("returns non-numeric, non-boolean strings unchanged", () => {
     expect(coerceValue("hello")).toBe("hello");
     expect(coerceValue("NaN")).toBe("NaN");
-    expect(coerceValue("true")).toBe("true");
     expect(coerceValue("FLAT")).toBe("FLAT");
+  });
+
+  it("converts \"true\"/\"false\" strings to booleans", () => {
+    expect(coerceValue("true")).toBe(true);
+    expect(coerceValue("false")).toBe(false);
   });
 });
 
