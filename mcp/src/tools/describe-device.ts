@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
+import { capabilityUtils } from "@tonesmith/core";
 import { ok, err, requireDriver } from "../common";
 
 const registerDescribeDevice = (server: McpServer): void => {
@@ -34,25 +35,13 @@ const registerDescribeDevice = (server: McpServer): void => {
           return ok(JSON.stringify(summary, null, 2));
         }
 
-        const groupLower = group.toLowerCase();
-        const matched = capabilities.groups.find(capGroup => capGroup.id.toLowerCase() === groupLower);
-        if (!matched) {
-          const ids = capabilities.groups.map(capGroup => capGroup.id).join(", ");
-          return err(new Error(`Unknown group '${group}'. Available groups: ${ids}`));
-        }
+        const matched = capabilityUtils.findGroup(capabilities, group);
 
         if (!item) {
           return ok(JSON.stringify(matched, null, 2));
         }
 
-        const itemLower = item.toLowerCase();
-        const matchedItem = matched.items.find(capItem => capItem.id.toLowerCase() === itemLower);
-        if (!matchedItem) {
-          const ids = matched.items.map(capItem => capItem.id).join(", ");
-          return err(new Error(`Unknown item '${item}' in group '${group}'. Available items: ${ids}`));
-        }
-
-        return ok(JSON.stringify(matchedItem, null, 2));
+        return ok(JSON.stringify(capabilityUtils.findItem(matched, item), null, 2));
       } catch (error) {
         return err(error);
       }

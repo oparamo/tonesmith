@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { PatchDriver, gx1 } from "@tonesmith/core";
-import { patchUtils } from "@tonesmith/core";
+import { patchUtils, capabilityUtils } from "@tonesmith/core";
 import { basename, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { printPatch } from "./print";
@@ -85,30 +85,14 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
         return;
       }
 
-      const group = caps.groups.find(capGroup => capGroup.id === groupId.toLowerCase());
-      if (!group) {
-        throw new Error(
-          `Unknown group "${groupId}". Available: ${caps.groups.map(capGroup => capGroup.id).join(", ")}`
-        );
-      }
+      const group = capabilityUtils.findGroup(caps, groupId);
 
       if (!item) {
         printGroup(group);
         return;
       }
 
-      // Match by id (exact, case-insensitive) or by name prefix
-      const itemUpper = item.toUpperCase();
-      const found =
-        group.items.find(capItem => capItem.id.toUpperCase() === itemUpper) ??
-        group.items.find(capItem => capItem.name.toUpperCase().startsWith(itemUpper));
-      if (!found) {
-        throw new Error(
-          `Unknown item "${item}" in group "${groupId}". Available: ${group.items.map(capItem => capItem.id).join(", ")}`
-        );
-      }
-
-      printItem(group, found);
+      printItem(group, capabilityUtils.findItem(group, item));
     }));
 };
 
