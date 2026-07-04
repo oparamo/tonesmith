@@ -21,10 +21,12 @@ const resolvePatchIndex = <T extends Patch>(patches: T[], ref: string): number =
 };
 
 /**
- * Coerce a string to a number if it parses as one, otherwise return it as-is.
- * Used to interpret CLI/MCP field values like "72" as the number 72.
+ * Coerce a string to a number or boolean if it parses as one, otherwise return it as-is.
+ * Used to interpret CLI/MCP field values like "72" as the number 72, or "true"/"false" as booleans.
  */
-const coerceValue = (value: string): string | number => {
+const coerceValue = (value: string): string | number | boolean => {
+  if (value === "true") return true;
+  if (value === "false") return false;
   const asNumber = Number(value);
   return Number.isNaN(asNumber) ? value : asNumber;
 };

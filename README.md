@@ -47,13 +47,16 @@ tonesmith gx1 copy <src.tsl> <src_idx|name> <dst.tsl> <dst_idx|name>
 tonesmith gx1 write my.tsl 0 amp.gain=72
 
 # Multiple fields at once
-tonesmith gx1 write my.tsl 0 reverb.level=30 reverb.time_s=3.0
+tonesmith gx1 write my.tsl 0 reverb.level=30 reverb.time=3.0
 
 # FX1 off
 tonesmith gx1 write my.tsl 0 fx1.on=false
 
 # Effect parameter
 tonesmith gx1 write my.tsl 0 fx1.params.rate=50
+
+# Top-level patch field
+tonesmith gx1 write my.tsl 0 key=G
 ```
 
 Field paths: `amp.<field>`, `fx1.params.<field>`, `ns.<field>`, `delay.<field>`, `reverb.<field>`, `fv.<field>`.

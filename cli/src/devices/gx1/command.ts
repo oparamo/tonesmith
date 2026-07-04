@@ -32,18 +32,18 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
     }));
 
   gx1
-    .command("write <file> <ref> <block> [fields...]")
-    .description("update patch fields by dot-path (e.g. amp.gain=72)")
-    .action((file: string, ref: string, block: string, fields: string[]) => run(() => {
+    .command("write <file> <ref> <fields...>")
+    .description("update patch fields by dot-path (e.g. amp.gain=72, key=G)")
+    .action((file: string, ref: string, fields: string[]) => run(() => {
       const patchFile = driver.readFile(file);
       const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
       const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
       for (const fieldAssignment of fields) {
         const separatorIndex = fieldAssignment.indexOf("=");
-        patchUtils.setByPath(patch, `${block}.${fieldAssignment.slice(0, separatorIndex)}`, patchUtils.coerceValue(fieldAssignment.slice(separatorIndex + 1)));
+        patchUtils.setByPath(patch, fieldAssignment.slice(0, separatorIndex), patchUtils.coerceValue(fieldAssignment.slice(separatorIndex + 1)));
       }
       driver.writeFile(patchFile, file);
-      console.info(`Wrote ${file} — patch ${idx} ${block} updated`);
+      console.info(`Wrote ${file} — patch ${idx} updated: ${fields.join(", ")}`);
     }));
 
   gx1
