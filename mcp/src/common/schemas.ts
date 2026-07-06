@@ -1,19 +1,21 @@
 import { z } from "zod";
+import { gx1, capabilityUtils } from "@tonesmith/core";
+
+/** Every selectable FX1/FX2/FX3 effect type, sourced from gx1 capabilities so this can't drift from constants.ts. */
+const fxTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "fx").items.map(item => item.id).join(", ");
 
 const FxBlockSchema = z.object({
-  type: z.string().describe(
-    "Effect type (e.g. CHORUS, COMPRESSOR, PHASER, FLANGER, TREMOLO, VIBRATO, ROTARY, " +
-    "ENHANCER, HIGH GEQ, LOW GEQ, WAH, AUTO WAH, SLICER, PITCH SHIFT, HARMONIST, " +
-    "DELAY, REVERB, CHORUS/DLY, etc.)"
-  ),
+  type: z.string().describe(`Effect type. One of: ${fxTypeIds}. (OVERTONE is FX3-only.)`),
   subType: z.string().optional().describe(
-    "Effect subtype where applicable (e.g. STEREO/MONO for CHORUS; " +
-    "ORANGE/BOSS COMP/HI-BAND for COMPRESSOR; 4-STAGE/8-STAGE/12-STAGE for PHASER)"
+    "Model variant, only for effects that actually have one — not every effect does, and some effects " +
+    "select their model via a numeric params entry instead (e.g. PHASER's TYPE, DELAY's TYPE, REVERB's " +
+    "TYPE). Use describe_device with group=fx and the item's id to see whether it has a subType and, " +
+    "if not, which params field selects its model."
   ),
   on: z.boolean().optional().describe("Whether the slot is active (default true)"),
   params: z.record(z.string(), z.number()).optional().describe(
-    "Effect parameter values as name→number pairs. Parameter names and ranges are " +
-    "device-specific — consult the GX-1 parameter guide."
+    "Effect parameter values as name→number pairs. Parameter names and ranges are device-specific — " +
+    "use describe_device with group=fx and the item's id for the authoritative list."
   ),
 }).optional();
 

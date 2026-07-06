@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
-import { patchUtils } from "@tonesmith/core";
-import { ok, err, requireDriver } from "../common";
+import { patchUtils, registry } from "@tonesmith/core";
+import { ok, err } from "../common";
 
 const registerWriteField = (server: McpServer): void => {
   server.registerTool(
@@ -20,14 +20,13 @@ const registerWriteField = (server: McpServer): void => {
     },
     async ({ file, device, ref, field, value }) => {
       try {
-        const driver = requireDriver(device);
+        const driver = registry.requireDriver(device);
         const patchFile = driver.readFile(file);
         const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
         const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
-        const coerced = patchUtils.coerceValue(value);
-        patchUtils.setByPath(patch, field, coerced);
+        patchUtils.applyFieldEdits(patch, [[field, value]]);
         driver.writeFile(patchFile, file);
-        return ok(`Updated ${file} patch ${idx}: ${field} = ${JSON.stringify(coerced)}`);
+        return ok(`Updated ${file} patch ${idx}: ${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`);
       } catch (error) {
         return err(error);
       }

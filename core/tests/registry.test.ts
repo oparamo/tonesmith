@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PatchDriver } from "../src/types";
-import { registerDriver, getDriver, listDrivers } from "../src/registry";
+import { registerDriver, getDriver, listDrivers, requireDriver } from "../src/registry";
 
 const makeDriver = (id: string): PatchDriver =>
   ({ id, name: `Driver ${id}` }) as unknown as PatchDriver;
@@ -36,5 +36,17 @@ describe("registerDriver / getDriver / listDrivers", () => {
 
   it("listDrivers returns an array", () => {
     expect(Array.isArray(listDrivers())).toBe(true);
+  });
+});
+
+describe("requireDriver", () => {
+  it("returns the registered driver by id", () => {
+    const d = makeDriver("test-require-a");
+    registerDriver(d);
+    expect(requireDriver("test-require-a")).toBe(d);
+  });
+
+  it("throws a descriptive error for an unregistered id", () => {
+    expect(() => requireDriver("__no_such_device__")).toThrow('Unknown device "__no_such_device__"');
   });
 });

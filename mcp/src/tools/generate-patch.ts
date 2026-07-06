@@ -1,12 +1,35 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import { z } from "zod";
-import { gx1 } from "@tonesmith/core";
+import { gx1, capabilityUtils } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, saveTsl } = gx1;
 import { FxBlockSchema, ok, err } from "../common";
 
 /** Parses a ">"-delimited chain key (e.g. "FX1>OD>AMP>NS>DLY>REV") into node names. */
 const parseChain = (chain: string | undefined): string[] | undefined =>
   chain?.split(">").map(node => (node.trim() === "OD" ? "OD/DS" : node.trim()));
+
+/** Builds the type-catalog block of the tool description straight from gx1 capabilities, so it can't drift from constants.ts. */
+const buildCatalog = (): string => {
+  const caps = gx1.driver.capabilities;
+  const itemIds = (groupId: string): string =>
+    capabilityUtils.findGroup(caps, groupId).items.map(item => item.id).join(" ");
+  const paramRange = (groupId: string, paramName: string): string =>
+    capabilityUtils.findGroup(caps, groupId).params?.find(param => param.name === paramName)?.range ?? "";
+
+  const pfxItems = capabilityUtils.findGroup(caps, "pfx").items;
+  const wahSubTypes = capabilityUtils.findItem(capabilityUtils.findGroup(caps, "pfx"), "WAH").subTypes
+    ?.map(subType => subType.id).join(" ") ?? "";
+
+  return `Amp types: ${itemIds("amp")}
+Speaker: ${itemIds("cab")}
+Mic: ${itemIds("mic")}
+Delay types: ${itemIds("delay")}
+Reverb types: ${itemIds("reverb")}
+Pedal FX types: ${pfxItems.map(item => item.id).join(", ")}
+Wah types: ${wahSubTypes}
+NS detect points: ${paramRange("ns", "DETECT")}
+FV curves: ${paramRange("fv", "CURVE")}`;
+};
 
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
@@ -21,15 +44,7 @@ Signal chains:
   "FX1>OD>AMP>NS>DLY>REV"    — OD/DS in chain
   "FX1>OD>AMP>FX2>NS>DLY>REV"
 
-Amp types: TRNSPRNT NATURAL BOUTIQUE SUPREME MAXIMUM JUGGERNAUT X-CRUNCH X-HI GAIN X-MODDED X-ULTRA X-OPTIMA X-TITAN JC-120 TWIN DELUXE TWEED DIAMOND BRIT STACK RECTI STACK MATCH BG COMBO ORNG STACK BGNR UB
-Speaker: OFF ORIGINAL 1x8" 1x10" 1x12" 2x12" 4x10" 4x12" 8x12"
-Mic: DYN57 DYN421 CND451 CND87 FLAT RIBON121 BLEND A BLEND B BLEND C
-Delay types: STANDARD MODULATE PAN REVERSE ANALOG ANLG MOD SPACE ECHO SHIMMER WARP TWIST GLITCH
-Reverb types: HALL S HALL M PLATE ROOM S ROOM L AMBIENCE SPRING SHIMMER SUB DELAY TERA ECHO
-Pedal FX types: WAH (wahType, level, direct, position, min, max), PEDAL BEND (pitchMin, pitchMax, position, level, direct)
-Wah types: CRY WAH VO WAH FAT WAH LIGHT WAH 7STR WAH RESO WAH
-NS detect points: INPUT, NS INPUT
-FV curves: SLOW1 SLOW2 NORMAL FAST`,
+${buildCatalog()}`,
       inputSchema: {
         name: z.string().max(13).describe("Patch name (max 13 characters)"),
         outPath: z.string().describe("Output file path (e.g. my-tone.tsl)"),

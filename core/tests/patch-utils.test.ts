@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Patch } from "../src/types";
-import { resolvePatchIndex, coerceValue, setByPath } from "../src/patch-utils";
+import { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits } from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
   ({ name }) as unknown as Patch;
@@ -53,6 +53,45 @@ describe("coerceValue", () => {
   it("converts \"true\"/\"false\" strings to booleans", () => {
     expect(coerceValue("true")).toBe(true);
     expect(coerceValue("false")).toBe(false);
+  });
+});
+
+describe("resolvePatchIndices", () => {
+  const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Metal")];
+
+  it("returns every index in file order when ref is omitted", () => {
+    expect(resolvePatchIndices(patches)).toEqual([0, 1, 2]);
+  });
+
+  it("returns a single resolved index when ref is given", () => {
+    expect(resolvePatchIndices(patches, "1")).toEqual([1]);
+    expect(resolvePatchIndices(patches, "metal")).toEqual([2]);
+  });
+
+  it("propagates resolvePatchIndex's not-found error", () => {
+    expect(() => resolvePatchIndices(patches, "Bogus")).toThrow('No patch named "Bogus"');
+  });
+});
+
+describe("applyFieldEdits", () => {
+  it("applies a single edit with coercion", () => {
+    const patch: Record<string, unknown> = { amp: { gain: 0 } };
+    applyFieldEdits(patch, [["amp.gain", "72"]]);
+    expect((patch.amp as Record<string, unknown>).gain).toBe(72);
+  });
+
+  it("applies multiple edits in order, including booleans", () => {
+    const patch: Record<string, unknown> = { key: "C", amp: { solo: false, gain: 0 } };
+    applyFieldEdits(patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
+    expect(patch.key).toBe("G");
+    expect((patch.amp as Record<string, unknown>).solo).toBe(true);
+    expect((patch.amp as Record<string, unknown>).gain).toBe(50);
+  });
+
+  it("does nothing given an empty edit list", () => {
+    const patch: Record<string, unknown> = { key: "C" };
+    applyFieldEdits(patch, []);
+    expect(patch.key).toBe("C");
   });
 });
 
