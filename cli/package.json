@@ -6,7 +6,10 @@
     "tonesmith": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc --noEmit && tsup"
+    "build": "tsc --noEmit && tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@tonesmith/core": "workspace:*",
@@ -25,6 +28,8 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "tsup": "8.5.1"
+    "tsup": "8.5.1",
+    "@vitest/coverage-v8": "4.1.9",
+    "vitest": "4.1.9"
   }
 }

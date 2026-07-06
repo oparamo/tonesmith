@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
 import { ok, err } from "../common";
@@ -8,13 +8,13 @@ const registerReadPatch = (server: McpServer): void => {
     "read_patch",
     {
       description: "Read one or all decoded patches from a .tsl file. Returns full patch parameter data as JSON.",
-      inputSchema: {
+      inputSchema: z.object({
         file: z.string().describe("Path to the .tsl patch file"),
         device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
         ref: z.string().optional().describe(
           "Patch index (0-based integer) or exact patch name. Omit to return all patches."
         ),
-      },
+      }),
     },
     async ({ file, device, ref }) => {
       try {

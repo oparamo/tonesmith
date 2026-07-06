@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { registry } from "@tonesmith/core";
 import { ok } from "../common";
 
