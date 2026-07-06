@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
 import { ok, err } from "../common";
@@ -10,13 +10,13 @@ const registerWriteField = (server: McpServer): void => {
       description:
         "Edit a specific field in a patch within a .tsl file using dot-notation. " +
         "Examples: 'amp.gain', 'fx1.params.rate', 'ns.threshold', 'delay.timeMs'.",
-      inputSchema: {
+      inputSchema: z.object({
         file: z.string().describe("Path to the .tsl file"),
         device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
         ref: z.string().describe("Patch index (0-based integer) or exact patch name"),
         field: z.string().describe("Dot-notation field path (e.g. 'amp.gain', 'fx1.params.rate')"),
         value: z.string().describe("New value — numbers are coerced from string automatically"),
-      },
+      }),
     },
     async ({ file, device, ref, field, value }) => {
       try {

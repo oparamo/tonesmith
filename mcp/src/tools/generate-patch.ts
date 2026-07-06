@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { gx1, capabilityUtils } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, saveTsl } = gx1;
@@ -45,7 +45,7 @@ Signal chains:
   "FX1>OD>AMP>FX2>NS>DLY>REV"
 
 ${buildCatalog()}`,
-      inputSchema: {
+      inputSchema: z.object({
         name: z.string().max(13).describe("Patch name (max 13 characters)"),
         outPath: z.string().describe("Output file path (e.g. my-tone.tsl)"),
         chain: z.string().optional().describe('Signal chain key (default "FX1>AMP>NS>DLY>REV")'),
@@ -128,7 +128,7 @@ ${buildCatalog()}`,
             "Extra type-specific params (e.g. { pitch: 12 } for SHIMMER)"
           ),
         }).optional().describe("Reverb block. Omit to disable."),
-      },
+      }),
     },
     async (params) => {
       try {

@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { capabilityUtils, registry } from "@tonesmith/core";
 import { ok, err } from "../common";
@@ -10,7 +10,7 @@ const registerDescribeDevice = (server: McpServer): void => {
       description:
         "Return capability metadata for a device — effect types, amp models, cabs, mics, etc. " +
         "Optionally filter to a single group (e.g. 'amp', 'fx', 'delay') or a single item within a group.",
-      inputSchema: {
+      inputSchema: z.object({
         device: z.string().describe("Device ID (e.g. 'gx1'). Use list_devices to enumerate IDs."),
         group: z.string().optional().describe(
           "Group ID to filter to (e.g. 'amp', 'fx', 'odds', 'delay', 'reverb', 'cab', 'mic', 'ns', 'fv'). " +
@@ -19,7 +19,7 @@ const registerDescribeDevice = (server: McpServer): void => {
         item: z.string().optional().describe(
           "Item ID within the selected group to return in full detail. Requires 'group'."
         ),
-      },
+      }),
     },
     async ({ device, group, item }) => {
       try {
