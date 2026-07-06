@@ -13,9 +13,10 @@ const FxBlockSchema = z.object({
     "if not, which params field selects its model."
   ),
   on: z.boolean().optional().describe("Whether the slot is active (default true)"),
-  params: z.record(z.string(), z.number()).optional().describe(
-    "Effect parameter values as name→number pairs. Parameter names and ranges are device-specific — " +
-    "use describe_device with group=fx and the item's id for the authoritative list."
+  params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+    "Effect parameter values as name→value pairs. Most are numbers, but some select a model or " +
+    "mode by name instead (e.g. SLICER's pattern, HARMONIST's harmony) — use describe_device with " +
+    "group=fx and the item's id for the authoritative list of names, ranges, and string values."
   ),
 }).optional();
 

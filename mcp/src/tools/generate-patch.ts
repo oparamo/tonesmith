@@ -78,8 +78,8 @@ ${buildCatalog()}`,
 
         pfx: z.object({
           type: z.string().describe("Pedal FX type: WAH or PEDAL BEND"),
-          params: z.record(z.string(), z.number()).optional().describe(
-            "Type-specific params (e.g. { wahType: 0, level: 100, direct: 0, position: 100, min: 0, max: 100 } for WAH; " +
+          params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+            "Type-specific params (e.g. { wahType: \"CRY WAH\", level: 100, direct: 0, position: 100, min: 0, max: 100 } for WAH; " +
             "{ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 } for PEDAL BEND)"
           ),
           on: z.boolean().optional().describe("Enable the pedal effect (default true)"),
@@ -110,8 +110,9 @@ ${buildCatalog()}`,
           level: z.number().int().min(0).max(100).describe("Effect level 0–100"),
           highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
           on: z.boolean().optional().describe("Enable delay (default true)"),
-          extra: z.record(z.string(), z.number()).optional().describe(
-            "Extra type-specific params (e.g. { modRate: 12, modDepth: 18 } for MODULATE)"
+          extra: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+            "Extra type-specific params (e.g. { modRate: 12, modDepth: 18 } for MODULATE; " +
+            "{ mode: \"TAPE\" } for TWIST; { head: \"1+2\" } for SPACE ECHO)"
           ),
         }).optional().describe("Delay block. Omit to disable."),
 

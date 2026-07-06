@@ -127,6 +127,126 @@ describe("generate_patch", () => {
     expect(isError).toBe(true);
   });
 
+  it("builds a pedal WAH whose model is selected by a string params.wahType", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "pedal-wah.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const { isError, text } = await client.callTool("generate_patch", {
+      name: "Pedal Wah",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      pfx: { type: "WAH", params: { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 } },
+    });
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    expect(patch.pfx.type).toBe("WAH");
+    expect(patch.pfx["wahType"]).toBe("CRY WAH");
+  });
+
+  it("builds an fx-slot FIXED WAH whose model is selected by a string params.wahType", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "fixed-wah.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const { isError, text } = await client.callTool("generate_patch", {
+      name: "Fixed Wah",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      fx1: { type: "FIXED WAH", params: { wahType: "CRY WAH", level: 100, direct: 0, manual: 50 } },
+    });
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    expect(patch.fx1.type).toBe("FIXED WAH");
+    expect(patch.fx1.params["wahType"]).toBe("CRY WAH");
+  });
+
+  it("builds an fx-slot SLICER whose pattern is selected by a string params.pattern", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "slicer.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const { isError, text } = await client.callTool("generate_patch", {
+      name: "Slicer",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      fx1: { type: "SLICER", params: { pattern: "PATTERN 3", rate: 50, level: 70, attack: 30, duty: 0, direct: 0 } },
+    });
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    expect(patch.fx1.type).toBe("SLICER");
+    expect(patch.fx1.params["pattern"]).toBe("PATTERN 3");
+  });
+
+  it("builds an fx-slot HARMONIST whose interval is selected by a string params.harmony", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "harmonist.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const { isError, text } = await client.callTool("generate_patch", {
+      name: "Harmonist",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      fx1: { type: "HARMONIST", params: { harmony: "+3rd", preDelay: 0, level: 70, feedback: 0, direct: 100 } },
+    });
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    expect(patch.fx1.type).toBe("HARMONIST");
+    expect(patch.fx1.params["harmony"]).toBe("+3rd");
+  });
+
+  it("builds a TWIST delay whose mode is selected by a string extra.mode", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "twist.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const { isError, text } = await client.callTool("generate_patch", {
+      name: "Twist Delay",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      delay: {
+        type: "TWIST", timeMs: 500, feedback: 20, level: 25,
+        extra: { mode: "TAPE-ECH", riseTime: 10, fallTime: 10, fadeTime: 10 },
+      },
+    });
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    expect(patch.delay.type).toBe("TWIST");
+    expect(patch.delay["mode"]).toBe("TAPE-ECH");
+  });
+
+  it("builds a SPACE ECHO delay whose head is selected by a string extra.head", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "space-echo.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const { isError, text } = await client.callTool("generate_patch", {
+      name: "Space Echo",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      delay: {
+        type: "SPACE ECHO", timeMs: 500, feedback: 20, level: 25,
+        extra: { head: "1+2" },
+      },
+    });
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    expect(patch.delay.type).toBe("SPACE ECHO");
+    expect(patch.delay["head"]).toBe("1+2");
+  });
+
   it("errors for an out-of-range zod input", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "bad-range.tsl");
