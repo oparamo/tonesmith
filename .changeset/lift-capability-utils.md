@@ -18,3 +18,12 @@ Also lift three more pieces of logic duplicated across the CLI and MCP server in
 - `registry.requireDriver(id)` — `getDriver` or throw a descriptive error. Used by the CLI's device
   dispatch and the MCP server's per-call device validation; `mcp/src/common/driver.ts`'s duplicate
   `requireDriver` is removed.
+
+Fix `mcp/src/common/schemas.ts`'s `FxBlockSchema`, whose hardcoded example text was actively wrong, not
+just incomplete: `CHORUS/DLY` isn't a real effect id, and `subType` examples like `4-STAGE/8-STAGE/12-
+STAGE for PHASER` and `HI-BAND for COMPRESSOR` pointed at the wrong mechanism (PHASER's stage count is a
+`params.TYPE` value, not a `subType` — passing `subType` for effects outside the codec's
+`PARAM_SUBTYPE_EFFECTS` set is silently dropped, never reaching the encoded bytes). `type`'s description
+is now generated from GX-1 capabilities (same fix as `generate_patch`'s catalog); `subType`/`params`
+now point agents at `describe_device` for the authoritative per-effect fields instead of asserting
+specific (and sometimes wrong) examples.
