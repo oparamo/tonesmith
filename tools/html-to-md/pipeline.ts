@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { ManualConfig } from "./config.js";
-import type { TocSelectors } from "./toc.js";
+import type { TocEntry, TocSelectors } from "./toc.js";
 import { extractToc } from "./toc.js";
 import { htmlToMarkdown } from "./converter.js";
 
@@ -17,6 +17,48 @@ const fetchPage = async (url: string): Promise<string> => {
 };
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Fetches and converts one TOC entry to a Markdown section. Returns null (after logging why) on failure. */
+const convertPage = async (entry: TocEntry, index: number, total: number): Promise<string | null> => {
+  const { level, url, text } = entry;
+  const prefix = "  ".repeat(level);
+  process.stdout.write(`  [${String(index + 1).padStart(3)}/${total}] ${prefix}${text}  `);
+
+  let html: string;
+  try {
+    html = await fetchPage(url);
+  } catch (error) {
+    console.info(`FETCH ERROR: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+
+  if (!html.trim()) { console.info("EMPTY"); return null; }
+
+  const md = htmlToMarkdown(html);
+  if (!md.trim()) { console.info("NO TEXT"); return null; }
+
+  console.info(`✓ (${md.length} chars)`);
+  // level 0 → ##, 1 → ###, 2 → ####  (# is reserved for the document title)
+  const hashes = "#".repeat(level + 2);
+  return `${hashes} ${text}\n\n${md}`;
+};
+
+const printSummary = (
+  outPath: string,
+  combined: string,
+  sectionCount: number,
+  toc: TocEntry[],
+  failed: { url: string; text: string }[],
+): void => {
+  console.info(`\nWrote: ${outPath}`);
+  console.info(`  Sections: ${sectionCount}/${toc.length}`);
+  console.info(`  Size:     ${combined.length.toLocaleString()} chars`);
+  if (failed.length === 0) return;
+  console.info(`  Failed (${failed.length}):`);
+  for (const { url, text } of failed) {
+    console.info(`    ${text} — ${url}`);
+  }
+};
 
 export const convertManual = async (cfg: ManualConfig, selectors: TocSelectors): Promise<void> => {
   const tocPath = resolve(cfg.toc);
@@ -40,37 +82,13 @@ export const convertManual = async (cfg: ManualConfig, selectors: TocSelectors):
   const failed: { url: string; text: string }[] = [];
 
   for (let i = 0; i < toc.length; i++) {
-    const { level, url, text } = toc[i];
-    const prefix = "  ".repeat(level);
-    process.stdout.write(`  [${String(i + 1).padStart(3)}/${toc.length}] ${prefix}${text}  `);
-
-    let html: string;
-    try {
-      html = await fetchPage(url);
-    } catch (error) {
-      console.info(`FETCH ERROR: ${error instanceof Error ? error.message : String(error)}`);
-      failed.push({ url, text });
-      continue;
+    const entry = toc[i];
+    const section = await convertPage(entry, i, toc.length);
+    if (section === null) {
+      failed.push({ url: entry.url, text: entry.text });
+    } else {
+      sections.push(section);
     }
-
-    if (!html.trim()) {
-      console.info("EMPTY");
-      failed.push({ url, text });
-      continue;
-    }
-
-    const md = htmlToMarkdown(html);
-    if (!md.trim()) {
-      console.info("NO TEXT");
-      failed.push({ url, text });
-      continue;
-    }
-
-    // level 0 → ##, 1 → ###, 2 → ####  (# is reserved for the document title)
-    const hashes = "#".repeat(level + 2);
-    sections.push(`${hashes} ${text}\n\n${md}`);
-    console.info(`✓ (${md.length} chars)`);
-
     if (i < toc.length - 1) await sleep(400);
   }
 
@@ -78,15 +96,7 @@ export const convertManual = async (cfg: ManualConfig, selectors: TocSelectors):
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, combined, "utf-8");
 
-  console.info(`\nWrote: ${outPath}`);
-  console.info(`  Sections: ${sections.length}/${toc.length}`);
-  console.info(`  Size:     ${combined.length.toLocaleString()} chars`);
-  if (failed.length > 0) {
-    console.info(`  Failed (${failed.length}):`);
-    for (const { url, text } of failed) {
-      console.info(`    ${text} — ${url}`);
-    }
-  }
+  printSummary(outPath, combined, sections.length, toc, failed);
 };
 
 export const inspectPage = async (url: string): Promise<void> => {
