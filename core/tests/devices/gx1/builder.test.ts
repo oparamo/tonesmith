@@ -196,6 +196,17 @@ describe("fx", () => {
     expect(decoded.fx1.subType).toBe("VO WAH");
     expect(decoded.fx1.params).toMatchObject({ level: 80, direct: 20, manual: 60 });
   });
+
+  // OVERTONE (FX3-only) stores its params in the separate MEMORY%FX3A block instead
+  // of the shared 251-byte FX param block — proves both halves of that special-casing
+  // in codec/patch.ts round-trip correctly.
+  it("round-trips OVERTONE on fx3 through its dedicated MEMORY%FX3A block", () => {
+    const patch = basePatch("Test");
+    fx(patch, "fx3", "OVERTONE", null, { lower: 60, upper: 40, unison: 50, direct: 100, detune: 20 });
+    const decoded = decodePatch(encodePatch(patch));
+    expect(decoded.fx3.type).toBe("OVERTONE");
+    expect(decoded.fx3.params).toMatchObject({ lower: 60, upper: 40, unison: 50, direct: 100, detune: 20 });
+  });
 });
 
 describe("ns", () => {
@@ -273,6 +284,12 @@ describe("pfx", () => {
     const patch = basePatch("Test");
     pfx(patch, "WAH", {}, false);
     expect(patch.pfx.on).toBe(false);
+  });
+
+  it("accepts an unrecognized type with no params, without throwing", () => {
+    const patch = basePatch("Test");
+    expect(() => { pfx(patch, "BOGUS TYPE", {}); }).not.toThrow();
+    expect(patch.pfx.type).toBe("BOGUS TYPE");
   });
 });
 

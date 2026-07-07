@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildServer } from "../src/server";
 
-const FIXTURE = join(import.meta.dirname, "../../core/tests/fixtures/gx1/rock-tones.tsl");
+const FIXTURE = join(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
 
 /** A scratch dir with the rock-tones fixture copied in, for tools that write files. */
 const withTempDir = (): { dir: string; fixture: string; cleanup: () => void } => {

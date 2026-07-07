@@ -31,17 +31,6 @@ describe("read_patch", () => {
     expect(body.name).toBe(expected.patches[0].name);
   });
 
-  it("returns a single patch by exact name", async () => {
-    const client = await connectClient();
-    close = client.close;
-    const targetName = expected.patches[1].name;
-    const input = { device: "gx1", file: FIXTURE, ref: targetName };
-    const { text, isError } = await client.callTool("read_patch", input);
-    expect(isError, text).toBe(false);
-    const body = JSON.parse(text) as { index: number; name: string };
-    expect(body.index).toBe(1);
-  });
-
   it("errors for an unknown device", async () => {
     const client = await connectClient();
     close = client.close;

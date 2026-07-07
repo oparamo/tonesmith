@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
 
-const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
+const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tones.tsl");
 
 describe("blankPatch", () => {
   it("uses 'NEW PATCH' as the default name", () => {

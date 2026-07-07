@@ -132,8 +132,8 @@ tools/html-to-md/
   index.ts      generic HTML-manual → Markdown converter (configurable selectors)
   gx1.json      Roland GX-1 specific config
 
-core/tests/fixtures/gx1/
-  rock-tones.tsl  real-world fixture for codec round-trip tests
+fixtures/gx1/
+  rock-tones.tsl  real-world fixture for codec round-trip tests (shared by core/cli/mcp tests)
 
 core/docs/gx1/
   FORMAT.md              reverse-engineered TSL binary format
