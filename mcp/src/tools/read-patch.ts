@@ -16,13 +16,13 @@ const registerReadPatch = (server: McpServer): void => {
         ),
       }),
     },
-    async ({ file, device, ref }) => {
+    ({ file, device, ref }) => {
       try {
-        const driver = registry.requireDriver(device);
+        const driver = registry.getDriver(device);
         const patchFile = driver.readFile(file);
         const indices = patchUtils.resolvePatchIndices(patchFile.patches, ref);
         if (ref !== undefined) {
-          const idx = indices[0]!;
+          const idx = indices[0];
           return ok(JSON.stringify({ index: idx, ...patchFile.patches[idx] }, null, 2));
         }
         return ok(JSON.stringify({

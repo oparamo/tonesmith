@@ -19,19 +19,19 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
   gx1
     .command("read <file> [ref]")
     .description("display one or all patches from a .tsl file")
-    .action((file: string, ref?: string) => run(() => {
+    .action((file: string, ref?: string) => { run(() => {
       const patchFile = driver.readFile(file);
       console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
-      for (const patchIndex of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
-        printPatch(patchFile.patches[patchIndex]! as gx1.Patch, patchIndex);
+      for (const i of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
+        printPatch(patchFile.patches[i] as gx1.Patch, i);
       }
       console.info();
-    }));
+    }); });
 
   gx1
     .command("write <file> <ref> <fields...>")
     .description("update patch fields by dot-path (e.g. amp.gain=72, key=G)")
-    .action((file: string, ref: string, fields: string[]) => run(() => {
+    .action((file: string, ref: string, fields: string[]) => { run(() => {
       const patchFile = driver.readFile(file);
       const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
       const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
@@ -42,25 +42,25 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       patchUtils.applyFieldEdits(patch, edits);
       driver.writeFile(patchFile, file);
       console.info(`Wrote ${file} — patch ${idx} updated: ${fields.join(", ")}`);
-    }));
+    }); });
 
   gx1
     .command("copy <src> <srcRef> <dst> <dstRef>")
     .description("copy a patch from one .tsl file to another")
-    .action((src: string, srcRef: string, dst: string, dstRef: string) => run(() => {
+    .action((src: string, srcRef: string, dst: string, dstRef: string) => { run(() => {
       const srcFile = driver.readFile(src);
       const dstFile = driver.readFile(dst);
       const srcIdx = patchUtils.resolvePatchIndex(srcFile.patches, srcRef);
       const dstIdx = patchUtils.resolvePatchIndex(dstFile.patches, dstRef);
-      dstFile.patches[dstIdx] = srcFile.patches[srcIdx]!;
+      dstFile.patches[dstIdx] = srcFile.patches[srcIdx];
       driver.writeFile(dstFile, dst);
-      console.info(`Copied '${srcFile.patches[srcIdx]!.name}' → ${dst} patch ${dstIdx}`);
-    }));
+      console.info(`Copied '${srcFile.patches[srcIdx].name}' → ${dst} patch ${dstIdx}`);
+    }); });
 
   gx1
     .command("new <file> [setName] [nPatches]")
     .description("create a blank .tsl file")
-    .action((file: string, setName?: string, patchCountStr?: string) => run(() => {
+    .action((file: string, setName?: string, patchCountStr?: string) => { run(() => {
       if (existsSync(file)) {
         console.error(`${file} already exists — refusing to overwrite`);
         process.exit(1);
@@ -70,12 +70,12 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       const patchFile = driver.newFile(name, patchCount);
       driver.writeFile(patchFile, file);
       console.info(`Created ${file} — ${patchCount} blank patch(es), set name '${name}'`);
-    }));
+    }); });
 
   gx1
     .command("capabilities [group] [item]")
     .description("browse supported effects, amp models, and other device capabilities")
-    .action((groupId?: string, item?: string) => run(() => {
+    .action((groupId?: string, item?: string) => { run(() => {
       const caps = driver.capabilities;
 
       if (!groupId) {
@@ -91,7 +91,7 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       }
 
       printItem(group, capabilityUtils.findItem(group, item));
-    }));
+    }); });
 };
 
 export { configureGx1Commands };

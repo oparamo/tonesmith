@@ -9,7 +9,7 @@ const buildProgram = (): Command => {
     .description("multi-device guitar processor patch toolkit");
 
   for (const device of devices) {
-    const driver = registry.requireDriver(device.id);
+    const driver = registry.getDriver(device.id);
     const cmd = program.command(device.id).description(device.description);
     device.configure(cmd, driver);
   }

@@ -23,7 +23,7 @@ const getLinkText = (link: HTMLElement, invisibleClass?: string): string => {
     ) {
       continue;
     }
-    parts.push(child.rawText ?? "");
+    parts.push(child.rawText);
   }
   return parts.join("").replace(/\s+/g, " ").trim();
 };
@@ -32,12 +32,12 @@ const countDepth = (link: HTMLElement, menuClass: string, submenuClass: string):
   let depth = 0;
   let parent = link.parentNode as HTMLElement | null;
   while (parent) {
-    const tag = parent.tagName?.toLowerCase();
+    const tag = parent.tagName.toLowerCase();
     if (tag === "ul") {
       if (parent.classList.contains(menuClass)) break;
       if (parent.classList.contains(submenuClass)) depth++;
     }
-    parent = parent.parentNode as HTMLElement | null;
+    parent = parent.parentNode;
   }
   return depth;
 };

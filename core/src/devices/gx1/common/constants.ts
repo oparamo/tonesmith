@@ -53,14 +53,14 @@ const PFX_TYPES = ["WAH", "PEDAL BEND"] as const;
 // not itself a reorderable block, so it has no entry in CHAIN_BLOCK_ORDER.
 const CHAIN_BLOCK_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"] as const;
 
-const CHAIN_VALUE_TO_NAME: Record<number, string> = {
+const CHAIN_VALUE_TO_NAME: Record<number, string | undefined> = {
   1: "PFX", 2: "FX1", 3: "OD/DS", 4: "AMP", 5: "FX2", 6: "FX3", 7: "NS", 8: "FV", 9: "DLY", 10: "REV",
 };
 
 const CHAIN_TERMINATOR = 0;
 
 const indexMap = (list: readonly string[]): Record<string, number> =>
-  Object.fromEntries(list.map((value, index) => [value, index]));
+  Object.fromEntries(list.map((v, i) => [v, i]));
 
 const FX_TYPE_IDX  = indexMap(FX_TYPES);
 const ODDS_IDX     = indexMap(ODDS_TYPES);
@@ -71,7 +71,9 @@ const DLY_TYPE_IDX = indexMap(DLY_TYPES);
 const REV_TYPE_IDX = indexMap(REV_TYPES);
 const PFX_TYPE_IDX = indexMap(PFX_TYPES);
 const CHAIN_NAME_TO_VALUE: Record<string, number> = Object.fromEntries(
-  Object.entries(CHAIN_VALUE_TO_NAME).map(([value, name]) => [name, Number(value)])
+  Object.entries(CHAIN_VALUE_TO_NAME)
+    .filter((entry): entry is [string, string] => entry[1] !== undefined)
+    .map(([value, name]) => [name, Number(value)])
 );
 
 const COMP_TYPES   = ["BOSS COMP", "D-COMP", "ORANGE", "X-COMP", "STEREO"] as const;

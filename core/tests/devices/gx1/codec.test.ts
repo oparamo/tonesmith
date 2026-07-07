@@ -24,12 +24,12 @@ describe("GX-1 round-trip", () => {
   it("decodes and re-encodes every patch byte-for-byte", () => {
     const file = readFile(FIXTURE);
     const raw = JSON.parse(readFileSync(FIXTURE, "utf8")) as {
-      data: [Array<{ paramSet: Record<string, string[]> }>, unknown[]];
+      data: [{ paramSet: Record<string, string[]> }[], unknown[]];
     };
 
     for (let i = 0; i < file.patches.length; i++) {
-      const patch = file.patches[i]!;
-      const original = raw.data[0][i]!;
+      const patch = file.patches[i];
+      const original = raw.data[0][i];
       const reencoded = encodePatch(patch);
 
       for (const key of Object.keys(original.paramSet)) {
@@ -58,7 +58,7 @@ describe("GX-1 round-trip", () => {
 // encode are true inverses) for all ~40 types, not just those in the fixture.
 
 describe("FX param map symmetry (all types)", () => {
-  const zeroBytes = new Array(251).fill(0) as number[];
+  const zeroBytes = new Array<number>(251).fill(0);
 
   for (const fxType of FX_TYPES) {
     it(`${fxType}: encode(decode(zeros)) equals decode(zeros)`, () => {
@@ -81,9 +81,9 @@ describe("FX param map symmetry (all types)", () => {
 describe("Delay block symmetry (all types)", () => {
   for (const dlyType of DLY_TYPES) {
     it(`${dlyType}: encode(decode(zeros)) equals decode(zeros)`, () => {
-      const bytes = new Array(29).fill(0) as number[];
+      const bytes = new Array<number>(29).fill(0);
       bytes[0] = 1;
-      bytes[1] = DLY_TYPE_IDX[dlyType]!;
+      bytes[1] = DLY_TYPE_IDX[dlyType];
 
       const hexList = hexFromBytes(bytes);
       const decoded = decodeDelay(hexList);
@@ -101,9 +101,9 @@ describe("Delay block symmetry (all types)", () => {
 describe("Reverb block symmetry (all types)", () => {
   for (const revType of REV_TYPES) {
     it(`${revType}: encode(decode(zeros)) equals decode(zeros)`, () => {
-      const bytes = new Array(20).fill(0) as number[];
+      const bytes = new Array<number>(20).fill(0);
       bytes[0] = 1;
-      bytes[1] = REV_TYPE_IDX[revType]!;
+      bytes[1] = REV_TYPE_IDX[revType];
 
       const hexList = hexFromBytes(bytes);
       const decoded = decodeReverb(hexList);
@@ -168,11 +168,11 @@ describe("Chain block (real device values)", () => {
 
 describe("Key", () => {
   it("decodes the default key", () => {
-    expect(decodeKey(hexFromBytes(new Array(7).fill(0)))).toBe("C");
+    expect(decodeKey(hexFromBytes(new Array<number>(7).fill(0)))).toBe("C");
   });
 
   it("decodes a non-default key", () => {
-    const bytes = new Array(7).fill(0);
+    const bytes = new Array<number>(7).fill(0);
     bytes[4] = 7; // G
     expect(decodeKey(hexFromBytes(bytes))).toBe("G");
   });
@@ -197,13 +197,13 @@ describe("Key", () => {
 
 describe("Real device values (default-init.tsl)", () => {
   const file = readFile(DEFAULT_INIT_FIXTURE);
-  const patch = file.patches[0]!;
-  const fx1Bytes = bytesFromHex(patch[RAW]["MEMORY%FX1"]!);
-  const fx2Bytes = bytesFromHex(patch[RAW]["MEMORY%FX2"]!);
-  const dlyBytes = bytesFromHex(patch[RAW]["MEMORY%DLY"]!);
-  const revBytes = bytesFromHex(patch[RAW]["MEMORY%REV"]!);
-  const fx3aBytes = bytesFromHex(patch[RAW]["MEMORY%FX3A"]!);
-  const pfxBytes = bytesFromHex(patch[RAW]["MEMORY%PFX"]!);
+  const patch = file.patches[0];
+  const fx1Bytes = bytesFromHex(patch[RAW]["MEMORY%FX1"]);
+  const fx2Bytes = bytesFromHex(patch[RAW]["MEMORY%FX2"]);
+  const dlyBytes = bytesFromHex(patch[RAW]["MEMORY%DLY"]);
+  const revBytes = bytesFromHex(patch[RAW]["MEMORY%REV"]);
+  const fx3aBytes = bytesFromHex(patch[RAW]["MEMORY%FX3A"]);
+  const pfxBytes = bytesFromHex(patch[RAW]["MEMORY%PFX"]);
 
   it("decodes the active chain order", () => {
     expect(patch.chain).toEqual(["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);
@@ -245,7 +245,7 @@ describe("Real device values (default-init.tsl)", () => {
     expect(patch.fx2.type).toBe("PARA. EQ");
     expect(patch.fx2.params).toEqual({
       lowGain: 0, highGain: 0, level: 0, midFreq: 23,
-      midGain: 0, lowCut: LOW_CUT_MAP["FLAT"], highCut: HIGH_CUT_MAP["FLAT"],
+      midGain: 0, lowCut: LOW_CUT_MAP.FLAT, highCut: HIGH_CUT_MAP.FLAT,
     });
   });
 
@@ -398,44 +398,44 @@ describe("Real device values (default-init.tsl)", () => {
   });
 
   it("decodes DLY shadow bytes for MODULATE (shares time/feedback/level/highCut with STANDARD)", () => {
-    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX["MODULATE"]!, ...dlyBytes.slice(2)])))
+    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX.MODULATE, ...dlyBytes.slice(2)])))
       .toMatchObject({ time: 400, feedback: 30, level: 50, highCut: 25, modRate: 50, modDepth: 30 });
   });
 
   it("decodes DLY shadow bytes for ANALOG (its own 4-byte time at offset 13)", () => {
     // highCut is the same shared byte STANDARD (the patch's active type) left at 25;
     // ANALOG's own device-default of 29 only applies when ANALOG itself is selected.
-    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX["ANALOG"]!, ...dlyBytes.slice(2)])))
+    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX.ANALOG, ...dlyBytes.slice(2)])))
       .toMatchObject({ time: 400, feedback: 30, level: 50, highCut: 25 });
   });
 
   it("decodes DLY shadow bytes for WARP (time shared at offset 2, trigger/level at 21/25)", () => {
-    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX["WARP"]!, ...dlyBytes.slice(2)])))
+    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX.WARP, ...dlyBytes.slice(2)])))
       .toMatchObject({ on: false, type: "WARP", time: 400, trigger: 0, level: 50 });
   });
 
   it("decodes DLY shadow bytes for GLITCH (own 1-byte time at offset 26, not the shared 4-byte field)", () => {
-    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX["GLITCH"]!, ...dlyBytes.slice(2)])))
+    expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX.GLITCH, ...dlyBytes.slice(2)])))
       .toMatchObject({ on: false, type: "GLITCH", trigger: 0, time: 50, glitch: 50, balance: 100 });
   });
 
   it("decodes REV shadow bytes for SHIMMER (its own level at offset 10, not the shared EFFECT_LEVEL at 5)", () => {
-    expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX["SHIMMER"]!, ...revBytes.slice(2)])))
+    expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX.SHIMMER, ...revBytes.slice(2)])))
       .toMatchObject({ on: false, type: "SHIMMER", time: 2.6, tone: 0, preDelay: 30, pitch: 12, level: 100 });
   });
 
   it("decodes REV shadow bytes for SUB DELAY (its own 4-byte time at offset 11)", () => {
-    expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX["SUB DELAY"]!, ...revBytes.slice(2)])))
+    expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX["SUB DELAY"], ...revBytes.slice(2)])))
       .toMatchObject({ on: false, type: "SUB DELAY", time: 400, level: 50, feedback: 30, highCut: 25 });
   });
 
   it("decodes REV shadow bytes for TERA ECHO (spreadTime at 18, not a shared time field)", () => {
-    expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX["TERA ECHO"]!, ...revBytes.slice(2)])))
+    expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX["TERA ECHO"], ...revBytes.slice(2)])))
       .toMatchObject({ on: false, type: "TERA ECHO", tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: 0 });
   });
 
   it("decodes PFX shadow bytes for PEDAL BEND (its own pitchMin/pitchMax at offset 9/10)", () => {
-    expect(decodePfx(hexFromBytes([...pfxBytes.slice(0, 1), PFX_TYPE_IDX["PEDAL BEND"]!, ...pfxBytes.slice(2)])))
+    expect(decodePfx(hexFromBytes([...pfxBytes.slice(0, 1), PFX_TYPE_IDX["PEDAL BEND"], ...pfxBytes.slice(2)])))
       .toMatchObject({ on: false, type: "PEDAL BEND", pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 });
   });
 });

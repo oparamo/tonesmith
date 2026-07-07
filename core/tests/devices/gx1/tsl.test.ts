@@ -114,13 +114,13 @@ describe("writeFile + readFile round-trip", () => {
     writeFile(original, tmpPath);
 
     const origRaw = JSON.parse(readFileSync(FIXTURE, "utf8")) as {
-      data: [Array<{ paramSet: Record<string, string[]> }>, unknown[]];
+      data: [{ paramSet: Record<string, string[]> }[], unknown[]];
     };
     const writtenRaw = JSON.parse(readFileSync(tmpPath, "utf8")) as typeof origRaw;
 
     for (let i = 0; i < origRaw.data[0].length; i++) {
-      const origPs  = origRaw.data[0][i]!.paramSet;
-      const writPs  = writtenRaw.data[0][i]!.paramSet;
+      const origPs  = origRaw.data[0][i].paramSet;
+      const writPs  = writtenRaw.data[0][i].paramSet;
       for (const key of Object.keys(origPs)) {
         expect(writPs[key], `patch ${i} key ${key}`).toEqual(origPs[key]);
       }

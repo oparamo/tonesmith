@@ -2,8 +2,7 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": "src",
     "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src", "tests", "*.config.ts"]
 }

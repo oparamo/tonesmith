@@ -18,7 +18,7 @@ const wrapBlock = (inner: string): string => {
 const collapseBlankLines = (text: string): string => text.replace(/\n{3,}/g, "\n\n");
 
 const tableToMd = (table: HTMLElement): string => {
-  const rows: Array<{ cells: string[]; isHeader: boolean }> = [];
+  const rows: { cells: string[]; isHeader: boolean }[] = [];
 
   for (const row of table.querySelectorAll("tr")) {
     const isHeader =
@@ -39,15 +39,15 @@ const tableToMd = (table: HTMLElement): string => {
     return out;
   };
 
-  const hasHeader = rows.some(r => r.isHeader);
+  const headerRowFound = rows.find(r => r.isHeader);
   let headerRow: string[];
   let bodyRows: string[][];
 
-  if (hasHeader) {
-    headerRow = pad(rows.find(r => r.isHeader)!.cells);
+  if (headerRowFound) {
+    headerRow = pad(headerRowFound.cells);
     bodyRows = rows.filter(r => !r.isHeader).map(r => pad(r.cells));
   } else {
-    headerRow = pad(rows[0]!.cells);
+    headerRow = pad(rows[0].cells);
     bodyRows = rows.slice(1).map(r => pad(r.cells));
   }
 
@@ -71,7 +71,7 @@ const nodeToMd = (node: Node, listDepth: number): string => {
   if (node.nodeType !== NodeType.ELEMENT_NODE) return "";
 
   const el = node as HTMLElement;
-  const tag = el.tagName?.toLowerCase() ?? "";
+  const tag = el.tagName.toLowerCase();
   if (!tag || SKIP_TAGS.has(tag)) return "";
 
   const children = (depth = listDepth) =>
@@ -79,7 +79,7 @@ const nodeToMd = (node: Node, listDepth: number): string => {
 
   switch (tag) {
     case "h1": case "h2": case "h3": case "h4": case "h5": case "h6": {
-      const level = Math.min(parseInt(tag[1]!) + 2, 6);
+      const level = Math.min(parseInt(tag[1]) + 2, 6);
       const text = children().replace(/\s+/g, " ").trim();
       return text ? `\n${"#".repeat(level)} ${text}\n\n` : "";
     }
@@ -105,7 +105,7 @@ const nodeToMd = (node: Node, listDepth: number): string => {
     case "ul": case "ol":
       return "\n" + el.childNodes
         .filter(c => c.nodeType === NodeType.ELEMENT_NODE &&
-          (c as HTMLElement).tagName?.toLowerCase() === "li")
+          (c as HTMLElement).tagName.toLowerCase() === "li")
         .map(c => nodeToMd(c, listDepth + 1))
         .join("") + "\n";
 

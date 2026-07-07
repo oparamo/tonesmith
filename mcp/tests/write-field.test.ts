@@ -16,7 +16,7 @@ describe("write_field", () => {
       device: "gx1", file: temp.fixture, ref: "0", field: "amp.gain", value: "88",
     });
     expect(isError).toBe(false);
-    expect(gx1.driver.readFile(temp.fixture).patches[0]!.amp.gain).toBe(88);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].amp.gain).toBe(88);
   });
 
   it("coerces a boolean field", async () => {
@@ -27,7 +27,7 @@ describe("write_field", () => {
     await client.callTool("write_field", {
       device: "gx1", file: temp.fixture, ref: "0", field: "amp.solo", value: "true",
     });
-    expect(gx1.driver.readFile(temp.fixture).patches[0]!.amp.solo).toBe(true);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].amp.solo).toBe(true);
   });
 
   it("errors for an unknown device", async () => {

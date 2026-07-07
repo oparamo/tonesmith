@@ -131,7 +131,7 @@ ${buildCatalog()}`,
         }).optional().describe("Reverb block. Omit to disable."),
       }),
     },
-    async (params) => {
+    (params) => {
       try {
         const patch = basePatch(params.name, parseChain(params.chain), params.key);
 

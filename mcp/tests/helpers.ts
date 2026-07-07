@@ -21,10 +21,10 @@ const emptyTempDir = (): { dir: string; cleanup: () => void } => {
   return { dir, cleanup: () => { rmSync(dir, { recursive: true, force: true }); } };
 };
 
-type ToolResult = {
+interface ToolResult {
   text: string;
   isError: boolean;
-};
+}
 
 /** Connects a fresh in-process server + client pair and returns a callTool helper
  * that extracts the single text content block from the result. */
@@ -42,7 +42,7 @@ const connectClient = async (): Promise<{
   const callTool = async (name: string, args: Record<string, unknown>): Promise<ToolResult> => {
     const result = await client.callTool({ name, arguments: args });
     const [block] = result.content as { type: string; text: string }[];
-    return { text: block!.text, isError: result.isError === true };
+    return { text: block.text, isError: result.isError === true };
   };
 
   const close = async (): Promise<void> => {

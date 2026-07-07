@@ -560,7 +560,9 @@ const FX_ITEMS = [
 // OD/DS block — separate overdrive/distortion block (same types as above OD/DS subtype list)
 // ---------------------------------------------------------------------------
 
-const ODDS_ITEMS = FX_ITEMS.find(f => f.id === "OD/DS")!.subTypes as unknown as CapabilityItem[];
+const oddsFxItem = FX_ITEMS.find(f => f.id === "OD/DS");
+if (!oddsFxItem) throw new Error('"OD/DS" not found in FX_ITEMS');
+const ODDS_ITEMS = oddsFxItem.subTypes as unknown as CapabilityItem[];
 
 // ---------------------------------------------------------------------------
 // AMP models
@@ -677,7 +679,7 @@ const gx1Capabilities: DeviceCapabilities = {
       id: "fx",
       name: "FX1/FX2/FX3",
       description: "Three independent effects slots in the signal chain. FX1 and FX2 can use any of the 38 effects; FX3 additionally supports OVERTONE.",
-      items: FX_ITEMS as unknown as CapabilityItem[],
+      items: FX_ITEMS,
     },
     {
       id: "odds",

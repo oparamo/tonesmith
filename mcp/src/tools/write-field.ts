@@ -18,9 +18,9 @@ const registerWriteField = (server: McpServer): void => {
         value: z.string().describe("New value — numbers are coerced from string automatically"),
       }),
     },
-    async ({ file, device, ref, field, value }) => {
+    ({ file, device, ref, field, value }) => {
       try {
-        const driver = registry.requireDriver(device);
+        const driver = registry.getDriver(device);
         const patchFile = driver.readFile(file);
         const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
         const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;

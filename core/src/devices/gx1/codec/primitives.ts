@@ -17,7 +17,7 @@ const hexFromBytes = (byteList: number[]): string[] =>
  * preserving unknown bytes rather than throwing on malformed device data.
  */
 const lookupName = (table: readonly string[], index: number, label = ""): string =>
-  (index >= 0 && index < table.length) ? table[index]! : `UNKNOWN_${label}${index}`;
+  (index >= 0 && index < table.length) ? table[index] : `UNKNOWN_${label}${index}`;
 
 /**
  * Return the index of a name in a lookup table.
@@ -25,9 +25,8 @@ const lookupName = (table: readonly string[], index: number, label = ""): string
  * originally decoded from the same table.
  */
 const lookupIndex = (tableMap: Record<string, number>, name: string, label = ""): number => {
-  const index = tableMap[name];
-  if (index === undefined) throw new Error(`Unknown ${label}: ${JSON.stringify(name)}`);
-  return index;
+  if (!(name in tableMap)) throw new Error(`Unknown ${label}: "${name}"`);
+  return tableMap[name];
 };
 
 

@@ -8,7 +8,7 @@ import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types";
 // are free to mutate patch[RAW]["MEMORY%FXn"] in place (e.g. to probe undecoded byte
 // offsets). A single shared array here would let a mutation on one FX slot silently
 // corrupt the "blank" template for every other slot and every later blankPatch() call.
-const zeros251 = (): string[] => hexFromBytes(new Array(251).fill(0));
+const zeros251 = (): string[] => hexFromBytes(new Array<number>(251).fill(0));
 
 const blankParamSet = (): RawParamSet => {
   // PFX->FX1->OD/DS->AMP->NS->FV->FX2->FX3->DLY->REV->OUTPUT as a MEMORY%CHAIN linked
@@ -16,7 +16,7 @@ const blankParamSet = (): RawParamSet => {
   // each subsequent byte is the firmware value of what follows that fixed block.
   const defaultChain = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
   const ps: RawParamSet = {
-    "MEMORY%COM":     hexFromBytes(new Array(16).fill(0x20)),
+    "MEMORY%COM":     hexFromBytes(new Array<number>(16).fill(0x20)),
     "MEMORY%CHAIN":   hexFromBytes(defaultChain),
     "MEMORY%FX1_COM": hexFromBytes([0, 0, 0]),
     "MEMORY%FX1":     zeros251(),
@@ -24,25 +24,25 @@ const blankParamSet = (): RawParamSet => {
     "MEMORY%FX2":     zeros251(),
     "MEMORY%FX3_COM": hexFromBytes([0, 0, 0]),
     "MEMORY%FX3":     zeros251(),
-    "MEMORY%FX3A":    hexFromBytes(new Array(5).fill(0)),
-    "MEMORY%ODDS":    hexFromBytes(new Array(8).fill(0)),
+    "MEMORY%FX3A":    hexFromBytes(new Array<number>(5).fill(0)),
+    "MEMORY%ODDS":    hexFromBytes(new Array<number>(8).fill(0)),
     // on=1, type=TRNSPRNT(0), type_bass=0, gain=50, level=100, bass=50, mid=50, treble=50,
     // speaker=ORIGINAL(1), sp_type_bass=0, mic=DYN57(0), solo=0, soloLevel=0
     "MEMORY%AMP":     hexFromBytes([1, 0, 0, 50, 100, 50, 50, 50, 1, 0, 0, 0, 0]),
-    "MEMORY%DLY":     hexFromBytes(new Array(29).fill(0)),
-    "MEMORY%REV":     hexFromBytes(new Array(20).fill(0)),
+    "MEMORY%DLY":     hexFromBytes(new Array<number>(29).fill(0)),
+    "MEMORY%REV":     hexFromBytes(new Array<number>(20).fill(0)),
     // off, type=WAH(0)
-    "MEMORY%PFX":     hexFromBytes(new Array(14).fill(0)),
+    "MEMORY%PFX":     hexFromBytes(new Array<number>(14).fill(0)),
     // position=100, min=0, max=100, curve=NORMAL(2)
     "MEMORY%FV":      hexFromBytes([100, 0, 100, 2]),
     // off, threshold=20, release=20, detect=INPUT(0)
     "MEMORY%NS":      hexFromBytes([0, 20, 20, 0]),
     // key=C(0); memoryLevel/bpm/carryover/tempoHold out of scope
-    "MEMORY%OTHER":   hexFromBytes(new Array(7).fill(0)),
-    "MEMORY%CTL":     hexFromBytes(new Array(32).fill(0)),
+    "MEMORY%OTHER":   hexFromBytes(new Array<number>(7).fill(0)),
+    "MEMORY%CTL":     hexFromBytes(new Array<number>(32).fill(0)),
   };
   for (let i = 1; i <= 8; i++) {
-    ps[`MEMORY%ASGN${i}`] = hexFromBytes(new Array(15).fill(0));
+    ps[`MEMORY%ASGN${i}`] = hexFromBytes(new Array<number>(15).fill(0));
   }
   return ps;
 };

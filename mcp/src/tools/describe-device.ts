@@ -21,9 +21,9 @@ const registerDescribeDevice = (server: McpServer): void => {
         ),
       }),
     },
-    async ({ device, group, item }) => {
+    ({ device, group, item }) => {
       try {
-        const { capabilities } = registry.requireDriver(device);
+        const { capabilities } = registry.getDriver(device);
 
         if (!group) {
           const summary = capabilities.groups.map(capGroup => ({

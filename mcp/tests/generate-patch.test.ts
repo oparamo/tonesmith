@@ -21,7 +21,7 @@ describe("generate_patch", () => {
     });
     expect(isError).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.amp.type).toBe("JC-120");
     expect(patch.amp.gain).toBe(50);
   });
@@ -47,7 +47,7 @@ describe("generate_patch", () => {
     });
     expect(isError, text).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.key).toBe("G");
     expect(patch.odds.on).toBe(true);
     expect(patch.odds.type).toBe("BLUES OD");
@@ -76,7 +76,7 @@ describe("generate_patch", () => {
       odds: { type: "BLUES OD", drive: 40, tone: 60, level: 70 },
     });
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.chain).toContain("OD/DS");
   });
 
@@ -92,7 +92,7 @@ describe("generate_patch", () => {
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
     });
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.odds.on).toBe(false);
     expect(patch.pfx.on).toBe(false);
     expect(patch.delay.on).toBe(false);
@@ -141,9 +141,9 @@ describe("generate_patch", () => {
     });
     expect(isError, text).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.pfx.type).toBe("WAH");
-    expect(patch.pfx["wahType"]).toBe("CRY WAH");
+    expect(patch.pfx.wahType).toBe("CRY WAH");
   });
 
   it("builds an fx-slot FIXED WAH whose model is selected by a string params.wahType", async () => {
@@ -160,9 +160,9 @@ describe("generate_patch", () => {
     });
     expect(isError, text).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.fx1.type).toBe("FIXED WAH");
-    expect(patch.fx1.params["wahType"]).toBe("CRY WAH");
+    expect(patch.fx1.params.wahType).toBe("CRY WAH");
   });
 
   it("builds an fx-slot SLICER whose pattern is selected by a string params.pattern", async () => {
@@ -179,9 +179,9 @@ describe("generate_patch", () => {
     });
     expect(isError, text).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.fx1.type).toBe("SLICER");
-    expect(patch.fx1.params["pattern"]).toBe("PATTERN 3");
+    expect(patch.fx1.params.pattern).toBe("PATTERN 3");
   });
 
   it("builds an fx-slot HARMONIST whose interval is selected by a string params.harmony", async () => {
@@ -198,9 +198,9 @@ describe("generate_patch", () => {
     });
     expect(isError, text).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.fx1.type).toBe("HARMONIST");
-    expect(patch.fx1.params["harmony"]).toBe("+3rd");
+    expect(patch.fx1.params.harmony).toBe("+3rd");
   });
 
   it("builds a TWIST delay whose mode is selected by a string extra.mode", async () => {
@@ -220,9 +220,9 @@ describe("generate_patch", () => {
     });
     expect(isError, text).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.delay.type).toBe("TWIST");
-    expect(patch.delay["mode"]).toBe("TAPE-ECH");
+    expect(patch.delay.mode).toBe("TAPE-ECH");
   });
 
   it("builds a SPACE ECHO delay whose head is selected by a string extra.head", async () => {
@@ -242,9 +242,9 @@ describe("generate_patch", () => {
     });
     expect(isError, text).toBe(false);
 
-    const patch = gx1.driver.readFile(outPath).patches[0]!;
+    const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.delay.type).toBe("SPACE ECHO");
-    expect(patch.delay["head"]).toBe("1+2");
+    expect(patch.delay.head).toBe("1+2");
   });
 
   it("errors for an out-of-range zod input", async () => {

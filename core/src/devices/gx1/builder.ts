@@ -1,4 +1,4 @@
-import type { Patch, FxParams } from "./types";
+import type { Patch, FxParams, NsBlock, FvBlock } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
 import { PARAM_SUBTYPE_EFFECTS, NS_DETECT } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, type FieldCodec } from "./codec";
@@ -109,7 +109,7 @@ const fx = (
   // the encoder reads it from params.type, not block.subType — thread it through here
   // so callers can keep passing subType positionally without knowing that distinction.
   block.params =
-    subType != null && PARAM_SUBTYPE_EFFECTS.has(fxType) && params["type"] === undefined
+    subType != null && PARAM_SUBTYPE_EFFECTS.has(fxType) && !("type" in params)
       ? { ...params, type: subType }
       : params;
 };
@@ -118,14 +118,14 @@ const ns = (patch: Patch, threshold: number, release: number, on = true, detect:
   patch.ns.on = on;
   patch.ns.threshold = threshold;
   patch.ns.release = release;
-  patch.ns.detect = detect;
+  patch.ns.detect = detect as NsBlock["detect"];
 };
 
 const fv = (patch: Patch, position: number, min: number, max: number, curve = "NORMAL"): void => {
   patch.fv.position = position;
   patch.fv.min = min;
   patch.fv.max = max;
-  patch.fv.curve = curve;
+  patch.fv.curve = curve as FvBlock["curve"];
 };
 
 /**
@@ -198,7 +198,7 @@ const reverb = (
   patch.reverb.density = density;
   patch.reverb.direct = direct;
   const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
-    ? REV_TYPE_MAPS["STANDARD"]
+    ? REV_TYPE_MAPS.STANDARD
     : REV_TYPE_MAPS[type];
   assignExtra(patch.reverb, extra, fields, "reverb", type);
 };

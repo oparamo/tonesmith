@@ -34,7 +34,7 @@ const encodeName = (name: string, length = 16): string[] => {
 // uses to resolve them to actual semitones.
 
 const decodeKey = (hexList: string[]): string =>
-  lookupName(KEY_NAMES, bytesFromHex(hexList)[4]!);
+  lookupName(KEY_NAMES, bytesFromHex(hexList)[4]);
 
 const encodeKey = (key: string, originalHex: string[]): string[] => {
   const bytes = bytesFromHex(originalHex);
@@ -56,12 +56,12 @@ const CHAIN_NEXT_SLOT: Record<string, number> = Object.fromEntries(
 const decodeChain = (hexList: string[]): string[] => {
   const bytes = bytesFromHex(hexList);
   const order: string[] = [];
-  let value = bytes[0]!;
+  let value = bytes[0];
   while (value !== CHAIN_TERMINATOR && order.length < CHAIN_BLOCK_ORDER.length) {
     const name = CHAIN_VALUE_TO_NAME[value];
     if (name === undefined) break;
     order.push(name);
-    value = bytes[CHAIN_NEXT_SLOT[name]!]!;
+    value = bytes[CHAIN_NEXT_SLOT[name]];
   }
   return order;
 };
@@ -73,7 +73,7 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
 
   bytes[0] = valueOf(names[0]);
   names.forEach((name, index) => {
-    bytes[CHAIN_NEXT_SLOT[name]!] = valueOf(names[index + 1]);
+    bytes[CHAIN_NEXT_SLOT[name]] = valueOf(names[index + 1]);
   });
   return hexFromBytes(bytes);
 };
@@ -90,16 +90,16 @@ const decodeAmp = (hexList: string[]): AmpBlock => {
   const bytes = bytesFromHex(hexList);
   return {
     on:        Boolean(bytes[0]),
-    type:      lookupName(AMP_TYPES, bytes[1]!),
-    gain:      bytes[3]!,
-    level:     bytes[4]!,
-    bass:      bytes[5]!,
-    middle:    bytes[6]!,
-    treble:    bytes[7]!,
-    speaker:   lookupName(SP_TYPES,  bytes[8]!),
-    mic:       lookupName(MIC_TYPES, bytes[10]!),
+    type:      lookupName(AMP_TYPES, bytes[1]),
+    gain:      bytes[3],
+    level:     bytes[4],
+    bass:      bytes[5],
+    middle:    bytes[6],
+    treble:    bytes[7],
+    speaker:   lookupName(SP_TYPES,  bytes[8]),
+    mic:       lookupName(MIC_TYPES, bytes[10]),
     solo:      Boolean(bytes[11]),
-    soloLevel: bytes[12]!,
+    soloLevel: bytes[12],
     [RAW]:     bytes,
   };
 };
@@ -128,14 +128,14 @@ const encodeAmp = (block: AmpBlock): string[] => {
 const decodeOdDs = (hexList: string[]): OdDsBlock => {
   const bytes = bytesFromHex(hexList);
   return {
-    on:        Boolean(bytes[0]!),
-    type:      lookupName(ODDS_TYPES, bytes[1]!),
-    drive:     bytes[2]!,
-    tone:      toSigned(bytes[3]!),
-    level:     bytes[4]!,
-    direct:    bytes[5]!,
+    on:        Boolean(bytes[0]),
+    type:      lookupName(ODDS_TYPES, bytes[1]),
+    drive:     bytes[2],
+    tone:      toSigned(bytes[3]),
+    level:     bytes[4],
+    direct:    bytes[5],
     solo:      Boolean(bytes[6]),
-    soloLevel: bytes[7]!,
+    soloLevel: bytes[7],
     [RAW]:     bytes,
   };
 };
@@ -160,9 +160,9 @@ const decodeNs = (hexList: string[]): NsBlock => {
   const bytes = bytesFromHex(hexList);
   return {
     on:        Boolean(bytes[0]),
-    threshold: bytes[1]!,
-    release:   bytes[2]!,
-    detect:    lookupName(NS_DETECT, bytes[3]!),
+    threshold: bytes[1],
+    release:   bytes[2],
+    detect:    lookupName(NS_DETECT, bytes[3]) as typeof NS_DETECT[number],
     [RAW]:     bytes,
   };
 };
@@ -172,7 +172,7 @@ const encodeNs = (block: NsBlock): string[] => {
   bytes[0] = Number(block.on);
   bytes[1] = block.threshold;
   bytes[2] = block.release;
-  const detectIndex = NS_DETECT.indexOf(block.detect as typeof NS_DETECT[number]);
+  const detectIndex = NS_DETECT.indexOf(block.detect);
   if (detectIndex >= 0) bytes[3] = detectIndex;
   return hexFromBytes(bytes);
 };
@@ -183,10 +183,10 @@ const encodeNs = (block: NsBlock): string[] => {
 const decodeFv = (hexList: string[]): FvBlock => {
   const bytes = bytesFromHex(hexList);
   return {
-    position: bytes[0]!,
-    min:      bytes[1]!,
-    max:      bytes[2]!,
-    curve:    bytes.length > 3 ? lookupName(FV_CURVE, bytes[3]!) : "NORMAL",
+    position: bytes[0],
+    min:      bytes[1],
+    max:      bytes[2],
+    curve:    bytes.length > 3 ? lookupName(FV_CURVE, bytes[3]) as typeof FV_CURVE[number] : "NORMAL",
     [RAW]:    bytes,
   };
 };
@@ -197,7 +197,7 @@ const encodeFv = (block: FvBlock): string[] => {
   bytes[1] = block.min;
   bytes[2] = block.max;
   if (bytes.length > 3) {
-    const curveIndex = FV_CURVE.indexOf(block.curve as typeof FV_CURVE[number]);
+    const curveIndex = FV_CURVE.indexOf(block.curve);
     if (curveIndex >= 0) bytes[3] = curveIndex;
   }
   return hexFromBytes(bytes);
@@ -214,7 +214,7 @@ const encodeFv = (block: FvBlock): string[] => {
 
 const decodeFxCom = (hexList: string[]): Omit<FxBlock, "params"> => {
   const bytes = bytesFromHex(hexList);
-  const fxType = decodeFxType(bytes[1]!);
+  const fxType = decodeFxType(bytes[1]);
   return { on: Boolean(bytes[0]), type: fxType, subType: null, [RAW]: bytes };
 };
 
@@ -280,7 +280,7 @@ const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
 
 const decodeDelay = (hexList: string[]): DelayBlock => {
   const bytes = bytesFromHex(hexList);
-  const delayType = lookupName(DLY_TYPES, bytes[1]!);
+  const delayType = lookupName(DLY_TYPES, bytes[1]);
   const block: DelayBlock = { on: Boolean(bytes[0]), type: delayType, [RAW]: bytes };
 
   const fields = DELAY_TYPE_MAPS[delayType];
@@ -333,11 +333,11 @@ const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
 
 const decodeReverb = (hexList: string[]): ReverbBlock => {
   const bytes = bytesFromHex(hexList);
-  const reverbType = lookupName(REV_TYPES, bytes[1]!);
+  const reverbType = lookupName(REV_TYPES, bytes[1]);
   const block: ReverbBlock = { on: Boolean(bytes[0]), type: reverbType, [RAW]: bytes };
 
   const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(reverbType)
-    ? REV_TYPE_MAPS["STANDARD"]
+    ? REV_TYPE_MAPS.STANDARD
     : REV_TYPE_MAPS[reverbType];
   if (fields) Object.assign(block, decodeFields(fields, bytes));
   return block;
@@ -349,7 +349,7 @@ const encodeReverb = (block: ReverbBlock): string[] => {
   bytes[1] = lookupIndex(REV_TYPE_IDX, block.type, "REV type");
 
   const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(block.type)
-    ? REV_TYPE_MAPS["STANDARD"]
+    ? REV_TYPE_MAPS.STANDARD
     : REV_TYPE_MAPS[block.type];
   if (fields) {
     // Double-assertion needed: ReverbBlock extends Record<string, unknown> which isn't
@@ -380,7 +380,7 @@ const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
 
 const decodePfx = (hexList: string[]): PfxBlock => {
   const bytes = bytesFromHex(hexList);
-  const pfxType = lookupName(PFX_TYPES, bytes[1]!);
+  const pfxType = lookupName(PFX_TYPES, bytes[1]);
   const block: PfxBlock = { on: Boolean(bytes[0]), type: pfxType, [RAW]: bytes };
 
   const fields = PFX_TYPE_MAPS[pfxType];

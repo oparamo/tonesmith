@@ -67,7 +67,7 @@ if (keys.length === 0) {
 }
 
 for (const key of keys) {
-  await convertManual(config.manuals[key]!, selectors);
+  await convertManual(config.manuals[key], selectors);
 }
 
 console.info(`\nDone.`);

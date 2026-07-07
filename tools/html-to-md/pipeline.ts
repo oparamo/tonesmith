@@ -37,10 +37,10 @@ export const convertManual = async (cfg: ManualConfig, selectors: TocSelectors):
   console.info(`Pages found in TOC: ${toc.length}`);
 
   const sections: string[] = [];
-  const failed: Array<{ url: string; text: string }> = [];
+  const failed: { url: string; text: string }[] = [];
 
   for (let i = 0; i < toc.length; i++) {
-    const { level, url, text } = toc[i]!;
+    const { level, url, text } = toc[i];
     const prefix = "  ".repeat(level);
     process.stdout.write(`  [${String(i + 1).padStart(3)}/${toc.length}] ${prefix}${text}  `);
 
@@ -48,7 +48,7 @@ export const convertManual = async (cfg: ManualConfig, selectors: TocSelectors):
     try {
       html = await fetchPage(url);
     } catch (e) {
-      console.info(`FETCH ERROR: ${e instanceof Error ? e.message : e}`);
+      console.info(`FETCH ERROR: ${e instanceof Error ? e.message : String(e)}`);
       failed.push({ url, text });
       continue;
     }

@@ -64,7 +64,7 @@ describe("moveBefore", () => {
     const chain = moveBefore(DEFAULT_CHAIN, "FX2", "NS");
     const patch = basePatch("Test", chain);
     const encoded = encodePatch(patch);
-    expect(bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]!)).toEqual(
+    expect(bytesFromHex(encoded.paramSet["MEMORY%CHAIN"])).toEqual(
       [1, 2, 3, 4, 5, 7, 9, 8, 6, 10, 0, 11, 12]
     );
   });
@@ -73,7 +73,7 @@ describe("moveBefore", () => {
     const chain = moveBefore(DEFAULT_CHAIN, "OD/DS", "FX1");
     const patch = basePatch("Test", chain);
     const encoded = encodePatch(patch);
-    expect(bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]!)).toEqual(
+    expect(bytesFromHex(encoded.paramSet["MEMORY%CHAIN"])).toEqual(
       [1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]
     );
   });
@@ -252,7 +252,7 @@ describe("pfx", () => {
 
   it("throws when a param isn't valid for the pfx type", () => {
     const patch = basePatch("Test");
-    expect(() => pfx(patch, "WAH", { pitchMin: -12 }))
+    expect(() => { pfx(patch, "WAH", { pitchMin: -12 }); })
       .toThrow(/pfx extra param "pitchMin" is not valid for type "WAH"/);
   });
 
@@ -272,7 +272,7 @@ describe("delay", () => {
     expect(patch.delay.time).toBe(7);
     expect(patch.delay.feedback).toBe(50);
     expect(patch.delay.level).toBe(60);
-    expect(patch.delay.highCut).toBe(HIGH_CUT_MAP["FLAT"]);
+    expect(patch.delay.highCut).toBe(HIGH_CUT_MAP.FLAT);
   });
 
   it("resolves high cut string to its numeric value", () => {
@@ -295,7 +295,7 @@ describe("delay", () => {
 
   it("throws when an extra param isn't valid for the delay type", () => {
     const patch = basePatch("Test");
-    expect(() => delay(patch, "STANDARD", 7, 50, 60, "FLAT", true, { modRate: 5 }))
+    expect(() => { delay(patch, "STANDARD", 7, 50, 60, "FLAT", true, { modRate: 5 }); })
       .toThrow(/extra param "modRate" is not valid for type "STANDARD"/);
   });
 
@@ -337,7 +337,7 @@ describe("reverb", () => {
 
   it("throws when an extra param isn't valid for the reverb type", () => {
     const patch = basePatch("Test");
-    expect(() => reverb(patch, "PLATE", 1.5, 50, 0, 0, 5, 100, true, { pitch: 12 }))
+    expect(() => { reverb(patch, "PLATE", 1.5, 50, 0, 0, 5, 100, true, { pitch: 12 }); })
       .toThrow(/extra param "pitch" is not valid for type "PLATE"/);
   });
 
@@ -366,7 +366,7 @@ describe("saveTsl", () => {
 
     const loaded = readFile(tmpPath);
     expect(loaded.patches).toHaveLength(1);
-    expect(loaded.patches[0]!.name).toBe("Save Test");
+    expect(loaded.patches[0].name).toBe("Save Test");
   });
 
   it("logs the output path via console.info", () => {
