@@ -5,21 +5,21 @@ import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, t
 
 // 1/3-octave series from 20Hz to 12.5kHz (indices 0–28), then FLAT (29).
 const HIGH_CUT_MAP: Record<string, number> = {
-  "20Hz": 0,   "25Hz": 1,   "31.5Hz": 2, "40Hz": 3,  "50Hz": 4,
-  "63Hz": 5,   "80Hz": 6,   "100Hz": 7,  "125Hz": 8, "160Hz": 9,
+  "20Hz": 0, "25Hz": 1, "31.5Hz": 2, "40Hz": 3, "50Hz": 4,
+  "63Hz": 5, "80Hz": 6, "100Hz": 7, "125Hz": 8, "160Hz": 9,
   "200Hz": 10, "250Hz": 11, "315Hz": 12, "400Hz": 13, "500Hz": 14,
-  "630Hz": 15, "800Hz": 16, "1kHz": 17,  "1.25kHz": 18, "1.6kHz": 19,
-  "2kHz": 20,  "2.5kHz": 21, "3.15kHz": 22, "4kHz": 23,
-  "5kHz": 24,  "6.3kHz": 25, "8kHz": 26, "10kHz": 27, "12.5kHz": 28, "FLAT": 29,
+  "630Hz": 15, "800Hz": 16, "1kHz": 17, "1.25kHz": 18, "1.6kHz": 19,
+  "2kHz": 20, "2.5kHz": 21, "3.15kHz": 22, "4kHz": 23,
+  "5kHz": 24, "6.3kHz": 25, "8kHz": 26, "10kHz": 27, "12.5kHz": 28, "FLAT": 29,
 };
 
 // Same 1/3-octave series as HIGH_CUT_MAP, but FLAT (0) comes first and the
 // frequencies ascend from there — used by PARA. EQ's lowCut field.
 const LOW_CUT_MAP: Record<string, number> = {
-  "FLAT": 0,   "20Hz": 1,   "25Hz": 2,   "31.5Hz": 3, "40Hz": 4,  "50Hz": 5,
-  "63Hz": 6,   "80Hz": 7,   "100Hz": 8,  "125Hz": 9,  "160Hz": 10, "200Hz": 11,
+  "FLAT": 0, "20Hz": 1, "25Hz": 2, "31.5Hz": 3, "40Hz": 4, "50Hz": 5,
+  "63Hz": 6, "80Hz": 7, "100Hz": 8, "125Hz": 9, "160Hz": 10, "200Hz": 11,
   "250Hz": 12, "315Hz": 13, "400Hz": 14, "500Hz": 15, "630Hz": 16, "800Hz": 17,
-  "1kHz": 18,  "1.25kHz": 19, "1.6kHz": 20, "2kHz": 21, "2.5kHz": 22,
+  "1kHz": 18, "1.25kHz": 19, "1.6kHz": 20, "2kHz": 21, "2.5kHz": 22,
   "3.15kHz": 23, "4kHz": 24, "5kHz": 25, "6.3kHz": 26, "8kHz": 27,
   "10kHz": 28, "12.5kHz": 29,
 };
