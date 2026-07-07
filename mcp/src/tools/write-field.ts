@@ -18,15 +18,16 @@ const registerWriteField = (server: McpServer): void => {
         value: z.string().describe("New value — numbers are coerced from string automatically"),
       }),
     },
-    async ({ file, device, ref, field, value }) => {
+    ({ file, device, ref, field, value }) => {
       try {
-        const driver = registry.requireDriver(device);
+        const driver = registry.getDriver(device);
         const patchFile = driver.readFile(file);
         const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
         const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
         patchUtils.applyFieldEdits(patch, [[field, value]]);
         driver.writeFile(patchFile, file);
-        return ok(`Updated ${file} patch ${idx}: ${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`);
+        const coercedValue = patchUtils.coerceValue(value);
+        return ok(`Updated ${file} patch ${idx}: ${field} = ${JSON.stringify(coercedValue)}`);
       } catch (error) {
         return err(error);
       }

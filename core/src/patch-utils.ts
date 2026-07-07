@@ -4,7 +4,7 @@ import type { Patch } from "./types";
  * Resolve a patch reference (numeric index string or exact name) to an array index.
  * Throws with a descriptive message when the ref is ambiguous or not found.
  */
-const resolvePatchIndex = <T extends Patch>(patches: T[], ref: string): number => {
+const resolvePatchIndex = (patches: Patch[], ref: string): number => {
   const asNumber = Number(ref);
   if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) return asNumber;
 
@@ -13,11 +13,11 @@ const resolvePatchIndex = <T extends Patch>(patches: T[], ref: string): number =
     patch.name.trim().toLowerCase() === needle ? [index] : []
   );
 
-  if (matches.length === 0) throw new Error(`No patch named ${JSON.stringify(ref)}`);
+  if (matches.length === 0) throw new Error(`No patch named "${ref}"`);
   if (matches.length > 1) {
-    throw new Error(`Ambiguous name ${JSON.stringify(ref)} — matches indices ${matches.join(", ")}`);
+    throw new Error(`Ambiguous name "${ref}" — matches indices ${matches.join(", ")}`);
   }
-  return matches[0]!;
+  return matches[0];
 };
 
 /**
@@ -28,7 +28,8 @@ const coerceValue = (value: string): string | number | boolean => {
   if (value === "true") return true;
   if (value === "false") return false;
   const asNumber = Number(value);
-  return Number.isNaN(asNumber) ? value : asNumber;
+  const result = Number.isNaN(asNumber) ? value : asNumber;
+  return result;
 };
 
 /**
@@ -46,7 +47,7 @@ const setByPath = (
   for (const part of parts.slice(0, -1)) {
     current = current[part] as Record<string, unknown>;
   }
-  current[parts[parts.length - 1]!] = value;
+  current[parts[parts.length - 1]] = value;
 };
 
 /**
@@ -54,7 +55,7 @@ const setByPath = (
  * or every index in file order when ref is omitted. Shared by "read one or all patches"
  * commands/tools.
  */
-const resolvePatchIndices = <T extends Patch>(patches: T[], ref?: string): number[] =>
+const resolvePatchIndices = (patches: Patch[], ref?: string): number[] =>
   ref !== undefined
     ? [resolvePatchIndex(patches, ref)]
     : patches.map((_, index) => index);
@@ -66,7 +67,7 @@ const resolvePatchIndices = <T extends Patch>(patches: T[], ref?: string): numbe
  */
 const applyFieldEdits = (
   patch: Record<string, unknown>,
-  edits: ReadonlyArray<readonly [path: string, rawValue: string]>,
+  edits: readonly (readonly [path: string, rawValue: string])[],
 ): void => {
   for (const [path, rawValue] of edits) {
     setByPath(patch, path, coerceValue(rawValue));

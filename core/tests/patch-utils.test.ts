@@ -3,7 +3,7 @@ import type { Patch } from "../src/types";
 import { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits } from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
-  ({ name }) as unknown as Patch;
+  ({ name });
 
 describe("resolvePatchIndex", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Rock Lead")];

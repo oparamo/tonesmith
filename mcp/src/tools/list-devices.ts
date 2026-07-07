@@ -6,7 +6,10 @@ const registerListDevices = (server: McpServer): void => {
   server.registerTool(
     "list_devices",
     { description: "List all supported guitar processor devices and their IDs." },
-    async () => ok(JSON.stringify(registry.listDrivers().map(driver => ({ id: driver.id, name: driver.name })), null, 2))
+    () => {
+      const deviceSummaries = registry.listDrivers().map(driver => ({ id: driver.id, name: driver.name }));
+      return ok(JSON.stringify(deviceSummaries, null, 2));
+    }
   );
 };
 

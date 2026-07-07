@@ -26,7 +26,7 @@ interface FieldCodec {
 /** A raw unsigned byte: decoded value is identical to the stored byte. */
 const u8 = (name: string, offset: number): FieldCodec => ({
   name,
-  decode: bytes => bytes[offset]!,
+  decode: bytes => bytes[offset],
   encode: (value, bytes) => {
     const n = value as number;
     if (n < 0 || n > 255) throw new RangeError(`${name}: value ${n} out of u8 range (0–255)`);
@@ -41,7 +41,7 @@ const u8 = (name: string, offset: number): FieldCodec => ({
  */
 const signed = (name: string, offset: number, centre = 50): FieldCodec => ({
   name,
-  decode: bytes => toSigned(bytes[offset]!, centre),
+  decode: bytes => toSigned(bytes[offset], centre),
   encode: (value, bytes) => { bytes[offset] = toUnsigned(value as number, centre); },
 });
 
@@ -53,7 +53,7 @@ const signed = (name: string, offset: number, centre = 50): FieldCodec => ({
  */
 const lookup = (name: string, offset: number, table: readonly string[]): FieldCodec => ({
   name,
-  decode: bytes => lookupName(table, bytes[offset]!),
+  decode: bytes => lookupName(table, bytes[offset]),
   encode: (value, bytes) => {
     const index = table.indexOf(value as string);
     if (index < 0) throw new Error(`Unknown ${name} value: ${JSON.stringify(value)}`);
@@ -68,7 +68,7 @@ const lookup = (name: string, offset: number, table: readonly string[]): FieldCo
  */
 const scaled = (name: string, offset: number, factor: number): FieldCodec => ({
   name,
-  decode: bytes => Math.round(bytes[offset]! * factor * 10) / 10,
+  decode: bytes => Math.round(bytes[offset] * factor * 10) / 10,
   encode: (value, bytes) => { bytes[offset] = Math.round((value as number) / factor); },
 });
 
@@ -78,7 +78,7 @@ const scaled = (name: string, offset: number, factor: number): FieldCodec => ({
  */
 const u16be = (name: string, offset: number): FieldCodec => ({
   name,
-  decode: bytes => (bytes[offset]! << 8) | bytes[offset + 1]!,
+  decode: bytes => (bytes[offset] << 8) | bytes[offset + 1],
   encode: (value, bytes) => {
     const n = value as number;
     bytes[offset]     = n >> 8;
@@ -92,7 +92,7 @@ const u16be = (name: string, offset: number): FieldCodec => ({
  */
 const nibbleTriplet = (name: string, offset: number): FieldCodec => ({
   name,
-  decode: bytes => bytes[offset]! * 256 + bytes[offset + 1]! * 16 + bytes[offset + 2]!,
+  decode: bytes => bytes[offset] * 256 + bytes[offset + 1] * 16 + bytes[offset + 2],
   encode: (value, bytes) => {
     const n = value as number;
     bytes[offset]     = (n >> 8) & 0xF;
@@ -107,7 +107,7 @@ const nibbleTriplet = (name: string, offset: number): FieldCodec => ({
  */
 const nibblePair = (name: string, offset: number): FieldCodec => ({
   name,
-  decode: bytes => bytes[offset]! * 16 + bytes[offset + 1]!,
+  decode: bytes => bytes[offset] * 16 + bytes[offset + 1],
   encode: (value, bytes) => {
     const n = value as number;
     bytes[offset]     = (n >> 4) & 0xF;
@@ -123,7 +123,7 @@ const nibblePair = (name: string, offset: number): FieldCodec => ({
 const nibbleQuad = (name: string, offset: number): FieldCodec => ({
   name,
   decode: bytes =>
-    bytes[offset]! * 4096 + bytes[offset + 1]! * 256 + bytes[offset + 2]! * 16 + bytes[offset + 3]!,
+    bytes[offset] * 4096 + bytes[offset + 1] * 256 + bytes[offset + 2] * 16 + bytes[offset + 3],
   encode: (value, bytes) => {
     const n = value as number;
     bytes[offset]     = (n >> 12) & 0xF;
@@ -141,7 +141,7 @@ const nibbleQuad = (name: string, offset: number): FieldCodec => ({
  * Returns a plain object mapping field names to decoded values.
  */
 const decodeFields = (fields: FieldCodec[], bytes: number[]): FxParams =>
-  Object.fromEntries(fields.map(f => [f.name, f.decode(bytes)]));
+  Object.fromEntries(fields.map(field => [field.name, field.decode(bytes)]));
 
 /**
  * Encode a list of fields into a mutable byte array.
@@ -150,8 +150,7 @@ const decodeFields = (fields: FieldCodec[], bytes: number[]): FxParams =>
  */
 const encodeFields = (fields: FieldCodec[], params: FxParams, bytes: number[]): void => {
   for (const field of fields) {
-    const value = params[field.name];
-    if (value !== undefined) field.encode(value, bytes);
+    if (field.name in params) field.encode(params[field.name], bytes);
   }
 };
 

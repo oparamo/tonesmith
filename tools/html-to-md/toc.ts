@@ -23,7 +23,7 @@ const getLinkText = (link: HTMLElement, invisibleClass?: string): string => {
     ) {
       continue;
     }
-    parts.push(child.rawText ?? "");
+    parts.push(child.rawText);
   }
   return parts.join("").replace(/\s+/g, " ").trim();
 };
@@ -32,12 +32,12 @@ const countDepth = (link: HTMLElement, menuClass: string, submenuClass: string):
   let depth = 0;
   let parent = link.parentNode as HTMLElement | null;
   while (parent) {
-    const tag = parent.tagName?.toLowerCase();
+    const tag = parent.tagName.toLowerCase();
     if (tag === "ul") {
       if (parent.classList.contains(menuClass)) break;
       if (parent.classList.contains(submenuClass)) depth++;
     }
-    parent = parent.parentNode as HTMLElement | null;
+    parent = parent.parentNode;
   }
   return depth;
 };
@@ -56,9 +56,9 @@ export const extractToc = (html: string, selectors: TocSelectors): TocEntry[] =>
 
   // Deduplicate by URL (some TOCs list the same page in multiple spots)
   const seen = new Set<string>();
-  return entries.filter(e => {
-    if (seen.has(e.url)) return false;
-    seen.add(e.url);
+  return entries.filter(entry => {
+    if (seen.has(entry.url)) return false;
+    seen.add(entry.url);
     return true;
   });
 };

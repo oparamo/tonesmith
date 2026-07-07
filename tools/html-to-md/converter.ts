@@ -12,13 +12,14 @@ const BLOCK_TAGS = new Set([
 
 const wrapBlock = (inner: string): string => {
   const text = inner.trim();
-  return text ? `\n${text}\n\n` : "";
+  const wrapped = text ? `\n${text}\n\n` : "";
+  return wrapped;
 };
 
 const collapseBlankLines = (text: string): string => text.replace(/\n{3,}/g, "\n\n");
 
 const tableToMd = (table: HTMLElement): string => {
-  const rows: Array<{ cells: string[]; isHeader: boolean }> = [];
+  const rows: { cells: string[]; isHeader: boolean }[] = [];
 
   for (const row of table.querySelectorAll("tr")) {
     const isHeader =
@@ -26,29 +27,29 @@ const tableToMd = (table: HTMLElement): string => {
       row.querySelectorAll("th").length > 0;
     const cells = row
       .querySelectorAll("th,td")
-      .map(c => c.innerText.replace(/\s+/g, " ").trim().replace(/\|/g, "\\|"));
+      .map(cell => cell.innerText.replace(/\s+/g, " ").trim().replace(/\|/g, "\\|"));
     if (cells.length > 0) rows.push({ cells, isHeader });
   }
 
   if (rows.length === 0) return "";
 
-  const maxCols = Math.max(...rows.map(r => r.cells.length));
+  const maxCols = Math.max(...rows.map(row => row.cells.length));
   const pad = (cells: string[]): string[] => {
     const out = [...cells];
     while (out.length < maxCols) out.push("");
     return out;
   };
 
-  const hasHeader = rows.some(r => r.isHeader);
+  const headerRowFound = rows.find(row => row.isHeader);
   let headerRow: string[];
   let bodyRows: string[][];
 
-  if (hasHeader) {
-    headerRow = pad(rows.find(r => r.isHeader)!.cells);
-    bodyRows = rows.filter(r => !r.isHeader).map(r => pad(r.cells));
+  if (headerRowFound) {
+    headerRow = pad(headerRowFound.cells);
+    bodyRows = rows.filter(row => !row.isHeader).map(row => pad(row.cells));
   } else {
-    headerRow = pad(rows[0]!.cells);
-    bodyRows = rows.slice(1).map(r => pad(r.cells));
+    headerRow = pad(rows[0].cells);
+    bodyRows = rows.slice(1).map(row => pad(row.cells));
   }
 
   const fmt = (cells: string[]) => `| ${cells.join(" | ")} |`;
@@ -71,17 +72,18 @@ const nodeToMd = (node: Node, listDepth: number): string => {
   if (node.nodeType !== NodeType.ELEMENT_NODE) return "";
 
   const el = node as HTMLElement;
-  const tag = el.tagName?.toLowerCase() ?? "";
+  const tag = el.tagName.toLowerCase();
   if (!tag || SKIP_TAGS.has(tag)) return "";
 
   const children = (depth = listDepth) =>
-    el.childNodes.map(c => nodeToMd(c, depth)).join("");
+    el.childNodes.map(child => nodeToMd(child, depth)).join("");
 
   switch (tag) {
     case "h1": case "h2": case "h3": case "h4": case "h5": case "h6": {
-      const level = Math.min(parseInt(tag[1]!) + 2, 6);
+      const level = Math.min(parseInt(tag[1]) + 2, 6);
       const text = children().replace(/\s+/g, " ").trim();
-      return text ? `\n${"#".repeat(level)} ${text}\n\n` : "";
+      const heading = text ? `\n${"#".repeat(level)} ${text}\n\n` : "";
+      return heading;
     }
 
     case "p":
@@ -104,9 +106,9 @@ const nodeToMd = (node: Node, listDepth: number): string => {
 
     case "ul": case "ol":
       return "\n" + el.childNodes
-        .filter(c => c.nodeType === NodeType.ELEMENT_NODE &&
-          (c as HTMLElement).tagName?.toLowerCase() === "li")
-        .map(c => nodeToMd(c, listDepth + 1))
+        .filter(child => child.nodeType === NodeType.ELEMENT_NODE &&
+          (child as HTMLElement).tagName.toLowerCase() === "li")
+        .map(child => nodeToMd(child, listDepth + 1))
         .join("") + "\n";
 
     case "li": {

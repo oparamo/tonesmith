@@ -20,7 +20,7 @@ const driver: PatchDriver<Patch> = {
     tslReadFile(path),
 
   writeFile: (file, path): void =>
-    tslWriteFile(file as PatchFile, path),
+    { tslWriteFile(file as PatchFile, path); },
 
   newFile: (setName: string, patchCount?: number): PatchFile =>
     tslNewFile(setName, patchCount),
@@ -32,7 +32,7 @@ const driver: PatchDriver<Patch> = {
     codecDecodePatch(raw as { memo?: string; paramSet: RawParamSet }),
 
   encodePatch: (patch: Patch): RawPatch =>
-    codecEncodePatch(patch) as RawPatch,
+    codecEncodePatch(patch),
 };
 
 export { driver };

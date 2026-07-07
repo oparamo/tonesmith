@@ -25,12 +25,12 @@ describe("gx1 read", () => {
     const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, "0"]);
     expect(exitCode, error.join("\n")).toBeUndefined();
     const output = info.join("\n");
-    expect(output).toContain(expected.patches[0]!.name);
-    expect(output).not.toContain(expected.patches[1]!.name);
+    expect(output).toContain(expected.patches[0].name);
+    expect(output).not.toContain(expected.patches[1].name);
   });
 
   it("prints a single patch when given an exact patch name", async () => {
-    const targetName = expected.patches[1]!.name;
+    const targetName = expected.patches[1].name;
     const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, targetName]);
     expect(exitCode, error.join("\n")).toBeUndefined();
     expect(info.join("\n")).toContain(targetName);

@@ -6,12 +6,12 @@ import { buildProgram } from "../src/program";
 
 const FIXTURE = join(import.meta.dirname, "../../core/tests/fixtures/gx1/rock-tones.tsl");
 
-type CliResult = {
+interface CliResult {
   info: string[];
   error: string[];
   exitCode?: number;
   errorMessage?: string;
-};
+}
 
 /** Runs the CLI program in-process, capturing console output and normalizing both
  * commander's own exits (exitOverride) and our run() helper's process.exit(1) path
@@ -41,8 +41,9 @@ const runCli = async (argv: string[]): Promise<CliResult> => {
     if (exitMatch) {
       exitCode = Number(exitMatch[1]);
     } else if (err && typeof err === "object" && "exitCode" in err) {
-      exitCode = (err as { exitCode: number }).exitCode;
-      errorMessage = (err as Error).message;
+      const commanderError = err as { exitCode: number; message: string };
+      exitCode = commanderError.exitCode;
+      errorMessage = commanderError.message;
     } else {
       vi.restoreAllMocks();
       throw err;

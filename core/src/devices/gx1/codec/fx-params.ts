@@ -45,7 +45,7 @@ const PITCH_SHIFT_PITCH_TABLE: readonly (string | number)[] = [
 /** A field whose raw byte is an index into a fixed table of mixed string/number values. */
 const indexTable = (name: string, offset: number, table: readonly (string | number)[]): FieldCodec => ({
   name,
-  decode: bytes => table[bytes[offset]!]!,
+  decode: bytes => table[bytes[offset]],
   encode: (value, bytes) => {
     const index = table.indexOf(value as string | number);
     if (index < 0) throw new Error(`Unknown ${name} value: ${JSON.stringify(value)}`);
@@ -199,7 +199,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "PHASER": [
     {
       name: "stage",
-      decode: bytes => bytes[0]! * 2 + 2,
+      decode: bytes => bytes[0] * 2 + 2,
       encode: (value, bytes) => { bytes[0] = ((value as number) - 2) >> 1; },
     },
     u8("rate", 1), u8("depth", 2), u8("reso", 3), u8("manual", 4), u8("level", 5), u8("direct", 6),
@@ -295,7 +295,8 @@ const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
   if (!fields) return { unknownBytes: bytes.slice(0, 32) };
 
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
-  return decodeFields(fields, offset > 0 ? bytes.slice(offset) : bytes);
+  const paramBytes = offset > 0 ? bytes.slice(offset) : bytes;
+  return decodeFields(fields, paramBytes);
 };
 
 /**

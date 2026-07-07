@@ -12,11 +12,10 @@ describe("write_field", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError } = await client.callTool("write_field", {
-      device: "gx1", file: temp.fixture, ref: "0", field: "amp.gain", value: "88",
-    });
+    const input = { device: "gx1", file: temp.fixture, ref: "0", field: "amp.gain", value: "88" };
+    const { isError } = await client.callTool("write_field", input);
     expect(isError).toBe(false);
-    expect(gx1.driver.readFile(temp.fixture).patches[0]!.amp.gain).toBe(88);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].amp.gain).toBe(88);
   });
 
   it("coerces a boolean field", async () => {
@@ -24,10 +23,9 @@ describe("write_field", () => {
     const client = await connectClient();
     close = client.close;
 
-    await client.callTool("write_field", {
-      device: "gx1", file: temp.fixture, ref: "0", field: "amp.solo", value: "true",
-    });
-    expect(gx1.driver.readFile(temp.fixture).patches[0]!.amp.solo).toBe(true);
+    const input = { device: "gx1", file: temp.fixture, ref: "0", field: "amp.solo", value: "true" };
+    await client.callTool("write_field", input);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].amp.solo).toBe(true);
   });
 
   it("errors for an unknown device", async () => {
@@ -35,9 +33,8 @@ describe("write_field", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("write_field", {
-      device: "nonexistent", file: temp.fixture, ref: "0", field: "amp.gain", value: "1",
-    });
+    const input = { device: "nonexistent", file: temp.fixture, ref: "0", field: "amp.gain", value: "1" };
+    const { isError, text } = await client.callTool("write_field", input);
     expect(isError).toBe(true);
     expect(text).toContain('Unknown device "nonexistent"');
   });
@@ -47,9 +44,8 @@ describe("write_field", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("write_field", {
-      device: "gx1", file: temp.fixture, ref: "No Such Patch", field: "amp.gain", value: "1",
-    });
+    const input = { device: "gx1", file: temp.fixture, ref: "No Such Patch", field: "amp.gain", value: "1" };
+    const { isError, text } = await client.callTool("write_field", input);
     expect(isError).toBe(true);
     expect(text).toContain('No patch named "No Such Patch"');
   });

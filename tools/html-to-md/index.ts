@@ -52,9 +52,9 @@ if (rest[0] === "inspect") {
 
 const keys =
   rest.length > 0
-    ? rest.filter(k => {
-        if (!(k in config.manuals)) {
-          console.warn(`Unknown manual key "${k}" — available: ${Object.keys(config.manuals).join(", ")}`);
+    ? rest.filter(key => {
+        if (!(key in config.manuals)) {
+          console.warn(`Unknown manual key "${key}" — available: ${Object.keys(config.manuals).join(", ")}`);
           return false;
         }
         return true;
@@ -67,7 +67,7 @@ if (keys.length === 0) {
 }
 
 for (const key of keys) {
-  await convertManual(config.manuals[key]!, selectors);
+  await convertManual(config.manuals[key], selectors);
 }
 
 console.info(`\nDone.`);

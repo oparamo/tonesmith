@@ -10,14 +10,14 @@ describe("gx1 write", () => {
     temp = withTempDir();
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain=99"]);
     expect(exitCode, error.join("\n")).toBeUndefined();
-    expect(gx1.driver.readFile(temp.fixture).patches[0]!.amp.gain).toBe(99);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].amp.gain).toBe(99);
   });
 
   it("writes multiple fields in one call", async () => {
     temp = withTempDir();
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain=10", "amp.level=20"]);
     expect(exitCode, error.join("\n")).toBeUndefined();
-    const patch = gx1.driver.readFile(temp.fixture).patches[0]!;
+    const patch = gx1.driver.readFile(temp.fixture).patches[0];
     expect(patch.amp.gain).toBe(10);
     expect(patch.amp.level).toBe(20);
   });
@@ -26,7 +26,7 @@ describe("gx1 write", () => {
     temp = withTempDir();
     const written = await runCli(["gx1", "write", temp.fixture, "0", "amp.solo=true"]);
     expect(written.exitCode, written.error.join("\n")).toBeUndefined();
-    expect(gx1.driver.readFile(temp.fixture).patches[0]!.amp.solo).toBe(true);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].amp.solo).toBe(true);
 
     const { info } = await runCli(["gx1", "read", temp.fixture, "0"]);
     expect(info.join("\n")).toContain("Solo=ON(");
@@ -61,7 +61,7 @@ describe("gx1 write", () => {
     temp = withTempDir();
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "key=G"]);
     expect(exitCode, error.join("\n")).toBeUndefined();
-    expect(gx1.driver.readFile(temp.fixture).patches[0]!.key).toBe("G");
+    expect(gx1.driver.readFile(temp.fixture).patches[0].key).toBe("G");
   });
 
   it("exits with an error for an unresolvable ref", async () => {
