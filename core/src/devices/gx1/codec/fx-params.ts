@@ -153,7 +153,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   // FIXED WAH: byte +1 is the bass-mode wah type — not used in guitar mode.
   "FIXED WAH": [
-    lookup("wahType", 0, WAH_TYPES), u8("level", 2), u8("direct", 3), u8("manual", 4),
+    lookup("type", 0, WAH_TYPES), u8("level", 2), u8("direct", 3), u8("manual", 4),
   ],
   "AC. GTR SIM": [
     signed("high", 0), u8("body", 1), signed("low", 2), u8("level", 3),
@@ -326,4 +326,4 @@ const encodeFxParams = (
   return hexFromBytes(bytes);
 };
 
-export { decodeFxType, encodeFxType, decodeFxParams, encodeFxParams };
+export { decodeFxType, encodeFxType, decodeFxParams, encodeFxParams, FX_PARAM_MAPS };

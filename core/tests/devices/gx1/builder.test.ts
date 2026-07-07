@@ -18,7 +18,7 @@ import {
   saveTsl,
   HIGH_CUT_MAP,
 } from "../../../src/devices/gx1/builder";
-import { encodePatch } from "../../../src/devices/gx1/codec";
+import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
 
 describe("basePatch", () => {
@@ -184,6 +184,17 @@ describe("fx", () => {
     fx(patch, "fx1", "TREMOLO");
     expect(patch.fx1.subType).toBeNull();
     expect(patch.fx1.params).toEqual({});
+  });
+
+  // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS),
+  // not FX_COM byte[2] — this proves both halves of that threading: fx() writing
+  // subType into params.type on encode, and decodePatch promoting it back on decode.
+  it("round-trips FIXED WAH's subType through encode/decode", () => {
+    const patch = basePatch("Test");
+    fx(patch, "fx1", "FIXED WAH", "VO WAH", { level: 80, direct: 20, manual: 60 });
+    const decoded = decodePatch(encodePatch(patch));
+    expect(decoded.fx1.subType).toBe("VO WAH");
+    expect(decoded.fx1.params).toMatchObject({ level: 80, direct: 20, manual: 60 });
   });
 });
 

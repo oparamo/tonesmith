@@ -307,7 +307,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX1 shadow bytes for FIXED WAH (byte offset 85, no freq field, has manual)", () => {
     expect(decodeFxParams("FIXED WAH", fx1Bytes)).toEqual({
-      wahType: "CRY WAH", level: 100, direct: 0, manual: 50,
+      type: "CRY WAH", level: 100, direct: 0, manual: 50,
     });
   });
 
