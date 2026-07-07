@@ -6,7 +6,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test:watch",
-    "test:tools": "vitest run --config tools/html-to-md/vitest.config.ts",
+    "test:tools": "vitest run --config tools/vitest.config.ts",
     "coverage": "pnpm -r coverage",
     "clean": "find core cli mcp -name dist -type d | xargs rm -rf",
     "html-to-md": "tsx tools/html-to-md/index.ts",

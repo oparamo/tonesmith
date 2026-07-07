@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { fetchPage } from "../fetch";
+import { fetchPage } from "./fetch";
 
 describe("fetchPage", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
