@@ -1,10 +1,9 @@
 import type { Command } from "commander";
-import type { PatchDriver, gx1 } from "@tonesmith/core";
+import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, capabilityUtils } from "@tonesmith/core";
 import { basename, extname } from "node:path";
 import { existsSync } from "node:fs";
-import { printPatch } from "./print";
-import { printGroups, printGroup, printItem } from "../../common";
+import { printGroups, printGroup, printItem } from "./capabilities-print";
 
 const run = (action: () => void): void => {
   try {
@@ -16,8 +15,12 @@ const run = (action: () => void): void => {
   }
 };
 
-const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
-  gx1
+const configureDeviceCommands = <T extends Patch>(
+  cmd: Command,
+  driver: PatchDriver<T>,
+  printPatch: (patch: T, index: number) => void,
+): void => {
+  cmd
     .command("read <file> [ref]")
     .description("display one or all patches from a .tsl file")
     .action((file: string, ref?: string) => {
@@ -25,13 +28,13 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
         const patchFile = driver.readFile(file);
         console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
         for (const i of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
-          printPatch(patchFile.patches[i] as gx1.Patch, i);
+          printPatch(patchFile.patches[i], i);
         }
         console.info();
       });
     });
 
-  gx1
+  cmd
     .command("write <file> <ref> <fields...>")
     .description("update patch fields by dot-path (e.g. amp.gain=72, key=G)")
     .action((file: string, ref: string, fields: string[]) => {
@@ -49,7 +52,7 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       });
     });
 
-  gx1
+  cmd
     .command("copy <src> <srcRef> <dst> <dstRef>")
     .description("copy a patch from one .tsl file to another")
     .action((src: string, srcRef: string, dst: string, dstRef: string) => {
@@ -64,7 +67,7 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       });
     });
 
-  gx1
+  cmd
     .command("new <file> [setName] [nPatches]")
     .description("create a blank .tsl file")
     .action((file: string, setName?: string, patchCountStr?: string) => {
@@ -81,7 +84,7 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
       });
     });
 
-  gx1
+  cmd
     .command("capabilities [group] [item]")
     .description("browse supported effects, amp models, and other device capabilities")
     .action((groupId?: string, item?: string) => {
@@ -106,4 +109,4 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
     });
 };
 
-export { configureGx1Commands };
+export { configureDeviceCommands };

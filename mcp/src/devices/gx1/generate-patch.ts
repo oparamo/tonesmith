@@ -2,7 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { gx1, capabilityUtils } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, saveTsl } = gx1;
-import { FxBlockSchema, ok, err } from "../common";
+import { ok, err } from "../../common";
+import { FxBlockSchema } from "./schemas";
 
 /** Parses a ">"-delimited chain key (e.g. "FX1>OD>AMP>NS>DLY>REV") into node names. */
 const parseChain = (chain: string | undefined): string[] | undefined =>
@@ -157,7 +158,7 @@ const applyReverb = (patch: Patch, reverbParams: GeneratePatchInput["reverb"]): 
 
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
-    "generate_patch",
+    "generate_gx1_patch",
     {
       description: `Build a BOSS GX-1 patch from structured parameters and save it as a .tsl file.
 
