@@ -26,7 +26,8 @@ const registerWriteField = (server: McpServer): void => {
         const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
         patchUtils.applyFieldEdits(patch, [[field, value]]);
         driver.writeFile(patchFile, file);
-        return ok(`Updated ${file} patch ${idx}: ${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`);
+        const coercedValue = patchUtils.coerceValue(value);
+        return ok(`Updated ${file} patch ${idx}: ${field} = ${JSON.stringify(coercedValue)}`);
       } catch (error) {
         return err(error);
       }

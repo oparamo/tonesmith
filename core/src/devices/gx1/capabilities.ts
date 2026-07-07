@@ -560,7 +560,7 @@ const FX_ITEMS = [
 // OD/DS block — separate overdrive/distortion block (same types as above OD/DS subtype list)
 // ---------------------------------------------------------------------------
 
-const oddsFxItem = FX_ITEMS.find(f => f.id === "OD/DS");
+const oddsFxItem = FX_ITEMS.find(item => item.id === "OD/DS");
 if (!oddsFxItem) throw new Error('"OD/DS" not found in FX_ITEMS');
 const ODDS_ITEMS = oddsFxItem.subTypes as unknown as CapabilityItem[];
 

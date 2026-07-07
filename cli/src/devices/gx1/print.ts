@@ -30,7 +30,8 @@ const printPatch = (patch: gx1.Patch, index?: number): void => {
   console.info(`\n  PFX [${pfx.on ? "ON" : "OFF"}]  ${pfx.type}`);
   printParams(pfx);
 
-  console.info(`\n  NS [${patch.ns.on ? "ON" : "OFF"}]  Threshold=${patch.ns.threshold}  Release=${patch.ns.release}  Detect=${patch.ns.detect}`);
+  const ns = patch.ns;
+  console.info(`\n  NS [${ns.on ? "ON" : "OFF"}]  Threshold=${ns.threshold}  Release=${ns.release}  Detect=${ns.detect}`);
 
   for (const slot of ["fx1", "fx2", "fx3"] as const) {
     const block = patch[slot];
@@ -49,7 +50,8 @@ const printPatch = (patch: gx1.Patch, index?: number): void => {
   console.info(`\n  REVERB [${reverb.on ? "ON" : "OFF"}]  ${reverb.type}`);
   printParams(reverb);
 
-  console.info(`\n  FV  Position=${patch.fv.position}  Min=${patch.fv.min}  Max=${patch.fv.max}  Curve=${patch.fv.curve}`);
+  const fv = patch.fv;
+  console.info(`\n  FV  Position=${fv.position}  Min=${fv.min}  Max=${fv.max}  Curve=${fv.curve}`);
 };
 
 export { printPatch };

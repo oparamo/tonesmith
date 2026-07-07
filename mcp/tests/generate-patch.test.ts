@@ -14,11 +14,12 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Minimal",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
-    });
+    };
+    const { isError } = await client.callTool("generate_patch", patchSpec);
     expect(isError).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -32,7 +33,7 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Full Patch",
       outPath,
       key: "G",
@@ -44,7 +45,8 @@ describe("generate_patch", () => {
       fv: { position: 100, min: 0, max: 100 },
       delay: { type: "STANDARD", timeMs: 500, feedback: 20, level: 25 },
       reverb: { type: "HALL S", timeS: 2.4, level: 20 },
-    });
+    };
+    const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -68,13 +70,14 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Chain",
       outPath,
       chain: "FX1>OD>AMP>NS>DLY>REV",
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
       odds: { type: "BLUES OD", drive: 40, tone: 60, level: 70 },
-    });
+    };
+    await client.callTool("generate_patch", patchSpec);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.chain).toContain("OD/DS");
@@ -86,11 +89,12 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Omitted",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
-    });
+    };
+    await client.callTool("generate_patch", patchSpec);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.odds.on).toBe(false);
@@ -104,11 +108,12 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Bad Amp",
       outPath,
       amp: { type: "NOT-A-REAL-AMP", gain: 50, bass: 50, mid: 50, treble: 50 },
-    });
+    };
+    const { isError } = await client.callTool("generate_patch", patchSpec);
     expect(isError).toBe(true);
   });
 
@@ -118,12 +123,13 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Bad FX",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
       fx1: { type: "NOT-A-REAL-EFFECT" },
-    });
+    };
+    const { isError } = await client.callTool("generate_patch", patchSpec);
     expect(isError).toBe(true);
   });
 
@@ -133,12 +139,13 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Pedal Wah",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
       pfx: { type: "WAH", params: { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 } },
-    });
+    };
+    const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -152,12 +159,13 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Fixed Wah",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
       fx1: { type: "FIXED WAH", params: { wahType: "CRY WAH", level: 100, direct: 0, manual: 50 } },
-    });
+    };
+    const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -171,12 +179,13 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Slicer",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
       fx1: { type: "SLICER", params: { pattern: "PATTERN 3", rate: 50, level: 70, attack: 30, duty: 0, direct: 0 } },
-    });
+    };
+    const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -190,12 +199,13 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Harmonist",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
       fx1: { type: "HARMONIST", params: { harmony: "+3rd", preDelay: 0, level: 70, feedback: 0, direct: 100 } },
-    });
+    };
+    const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -209,7 +219,7 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Twist Delay",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
@@ -217,7 +227,8 @@ describe("generate_patch", () => {
         type: "TWIST", timeMs: 500, feedback: 20, level: 25,
         extra: { mode: "TAPE-ECH", riseTime: 10, fallTime: 10, fadeTime: 10 },
       },
-    });
+    };
+    const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -231,7 +242,7 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Space Echo",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
@@ -239,7 +250,8 @@ describe("generate_patch", () => {
         type: "SPACE ECHO", timeMs: 500, feedback: 20, level: 25,
         extra: { head: "1+2" },
       },
-    });
+    };
+    const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -253,11 +265,12 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError } = await client.callTool("generate_patch", {
+    const patchSpec = {
       name: "Bad Range",
       outPath,
       amp: { type: "JC-120", gain: 150, bass: 50, mid: 50, treble: 50 },
-    });
+    };
+    const { isError } = await client.callTool("generate_patch", patchSpec);
     expect(isError).toBe(true);
   });
 });

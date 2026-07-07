@@ -56,9 +56,9 @@ export const extractToc = (html: string, selectors: TocSelectors): TocEntry[] =>
 
   // Deduplicate by URL (some TOCs list the same page in multiple spots)
   const seen = new Set<string>();
-  return entries.filter(e => {
-    if (seen.has(e.url)) return false;
-    seen.add(e.url);
+  return entries.filter(entry => {
+    if (seen.has(entry.url)) return false;
+    seen.add(entry.url);
     return true;
   });
 };

@@ -16,9 +16,10 @@ const buildCatalog = (): string => {
   const paramRange = (groupId: string, paramName: string): string =>
     capabilityUtils.findGroup(caps, groupId).params?.find(param => param.name === paramName)?.range ?? "";
 
-  const pfxItems = capabilityUtils.findGroup(caps, "pfx").items;
-  const wahSubTypes = capabilityUtils.findItem(capabilityUtils.findGroup(caps, "pfx"), "WAH").subTypes
-    ?.map(subType => subType.id).join(" ") ?? "";
+  const pfxGroup = capabilityUtils.findGroup(caps, "pfx");
+  const pfxItems = pfxGroup.items;
+  const wahItem = capabilityUtils.findItem(pfxGroup, "WAH");
+  const wahSubTypes = wahItem.subTypes?.map(subType => subType.id).join(" ") ?? "";
 
   return `Amp types: ${itemIds("amp")}
 Speaker: ${itemIds("cab")}

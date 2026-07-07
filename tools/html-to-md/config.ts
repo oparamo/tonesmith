@@ -23,8 +23,8 @@ export const DEFAULT_SELECTORS: TocSelectors = {
 export const loadConfig = (configPath: string): Config => {
   try {
     return JSON.parse(readFileSync(resolve(configPath), "utf-8")) as Config;
-  } catch (e) {
-    console.error(`Failed to read config: ${e instanceof Error ? e.message : String(e)}`);
+  } catch (error) {
+    console.error(`Failed to read config: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 };

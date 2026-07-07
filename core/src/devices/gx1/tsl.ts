@@ -15,7 +15,7 @@ const blankParamSet = (): RawParamSet => {
   // list (see CHAIN_BLOCK_ORDER in common/constants.ts): byte 0 is PFX (first block);
   // each subsequent byte is the firmware value of what follows that fixed block.
   const defaultChain = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
-  const ps: RawParamSet = {
+  const paramSet: RawParamSet = {
     "MEMORY%COM":     hexFromBytes(new Array<number>(16).fill(0x20)),
     "MEMORY%CHAIN":   hexFromBytes(defaultChain),
     "MEMORY%FX1_COM": hexFromBytes([0, 0, 0]),
@@ -42,15 +42,15 @@ const blankParamSet = (): RawParamSet => {
     "MEMORY%CTL":     hexFromBytes(new Array<number>(32).fill(0)),
   };
   for (let i = 1; i <= 8; i++) {
-    ps[`MEMORY%ASGN${i}`] = hexFromBytes(new Array<number>(15).fill(0));
+    paramSet[`MEMORY%ASGN${i}`] = hexFromBytes(new Array<number>(15).fill(0));
   }
-  return ps;
+  return paramSet;
 };
 
 const blankPatch = (name = "NEW PATCH"): Patch => {
-  const ps = blankParamSet();
-  ps["MEMORY%COM"] = encodeName(name);
-  return decodePatch({ memo: "", paramSet: ps });
+  const paramSet = blankParamSet();
+  paramSet["MEMORY%COM"] = encodeName(name);
+  return decodePatch({ memo: "", paramSet });
 };
 
 const newFile = (setName: string, patchCount = 1): PatchFile => {
@@ -65,8 +65,8 @@ const readFile = (path: string): PatchFile => {
     name:      envelope.name,
     formatRev: envelope.formatRev,
     device:    envelope.device,
-    patches:   envelope.data[0].map(r =>
-      decodePatch(r as unknown as { memo?: string; paramSet: RawParamSet })
+    patches:   envelope.data[0].map(rawPatch =>
+      decodePatch(rawPatch as unknown as { memo?: string; paramSet: RawParamSet })
     ),
     [RAW]: envelope,
   };

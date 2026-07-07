@@ -52,8 +52,8 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     const block = patch[fxKey];
     // OVERTONE (FX3-only) stores its params in the separate 5-byte MEMORY%FX3A
     // block rather than the shared 251-byte FX param block.
-    const paramBid = slot === "FX3" && block.type === "OVERTONE" ? "MEMORY%FX3A" : `MEMORY%${slot}`;
-    const params = decodeFxParams(block.type, bytesFromHex(paramSet[paramBid]));
+    const paramBlockKey = slot === "FX3" && block.type === "OVERTONE" ? "MEMORY%FX3A" : `MEMORY%${slot}`;
+    const params = decodeFxParams(block.type, bytesFromHex(paramSet[paramBlockKey]));
     if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params.type === "string") {
       block.subType = params.type;
     }
@@ -88,9 +88,9 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
     paramSet[`MEMORY%${slot}_COM`] = encodeFxCom(block);
     // OVERTONE (FX3-only) stores its params in the separate 5-byte MEMORY%FX3A
     // block rather than the shared 251-byte FX param block.
-    const paramBid = slot === "FX3" && block.type === "OVERTONE" ? "MEMORY%FX3A" : `MEMORY%${slot}`;
-    const originalParamBytes = bytesFromHex(patch[RAW][paramBid]);
-    paramSet[paramBid] = encodeFxParams(block.type, block.params, originalParamBytes);
+    const paramBlockKey = slot === "FX3" && block.type === "OVERTONE" ? "MEMORY%FX3A" : `MEMORY%${slot}`;
+    const originalParamBytes = bytesFromHex(patch[RAW][paramBlockKey]);
+    paramSet[paramBlockKey] = encodeFxParams(block.type, block.params, originalParamBytes);
   }
 
   return { memo: patch.memo, paramSet };

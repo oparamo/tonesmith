@@ -141,7 +141,7 @@ const nibbleQuad = (name: string, offset: number): FieldCodec => ({
  * Returns a plain object mapping field names to decoded values.
  */
 const decodeFields = (fields: FieldCodec[], bytes: number[]): FxParams =>
-  Object.fromEntries(fields.map(f => [f.name, f.decode(bytes)]));
+  Object.fromEntries(fields.map(field => [field.name, field.decode(bytes)]));
 
 /**
  * Encode a list of fields into a mutable byte array.

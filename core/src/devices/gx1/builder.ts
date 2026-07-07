@@ -141,7 +141,7 @@ const assignExtra = (
   blockLabel: string,
   type: string,
 ): void => {
-  const validNames = new Set((fields ?? []).map(f => f.name));
+  const validNames = new Set((fields ?? []).map(field => field.name));
   for (const key of Object.keys(extra)) {
     if (!validNames.has(key)) {
       throw new Error(`${blockLabel} extra param "${key}" is not valid for type "${type}"`);

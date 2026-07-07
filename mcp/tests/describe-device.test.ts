@@ -17,7 +17,8 @@ describe("describe_device", () => {
   it("returns full detail for a single group", async () => {
     const client = await connectClient();
     close = client.close;
-    const { text, isError } = await client.callTool("describe_device", { device: "gx1", group: "amp" });
+    const input = { device: "gx1", group: "amp" };
+    const { text, isError } = await client.callTool("describe_device", input);
     expect(isError, text).toBe(false);
     const group = JSON.parse(text) as { id: string; items: { id: string }[] };
     expect(group.id).toBe("amp");
@@ -27,7 +28,8 @@ describe("describe_device", () => {
   it("returns full detail for a single item", async () => {
     const client = await connectClient();
     close = client.close;
-    const { text, isError } = await client.callTool("describe_device", { device: "gx1", group: "amp", item: "jc-120" });
+    const input = { device: "gx1", group: "amp", item: "jc-120" };
+    const { text, isError } = await client.callTool("describe_device", input);
     expect(isError, text).toBe(false);
     const item = JSON.parse(text) as { id: string };
     expect(item.id).toBe("JC-120");
@@ -44,7 +46,8 @@ describe("describe_device", () => {
   it("errors for an unknown group", async () => {
     const client = await connectClient();
     close = client.close;
-    const { isError, text } = await client.callTool("describe_device", { device: "gx1", group: "nonexistent" });
+    const input = { device: "gx1", group: "nonexistent" };
+    const { isError, text } = await client.callTool("describe_device", input);
     expect(isError).toBe(true);
     expect(text).toContain('Unknown group "nonexistent"');
   });
@@ -52,7 +55,8 @@ describe("describe_device", () => {
   it("errors for an unknown item", async () => {
     const client = await connectClient();
     close = client.close;
-    const { isError, text } = await client.callTool("describe_device", { device: "gx1", group: "amp", item: "nonexistent" });
+    const input = { device: "gx1", group: "amp", item: "nonexistent" };
+    const { isError, text } = await client.callTool("describe_device", input);
     expect(isError).toBe(true);
     expect(text).toContain('Unknown item "nonexistent"');
   });

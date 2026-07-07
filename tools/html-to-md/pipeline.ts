@@ -6,17 +6,17 @@ import { extractToc } from "./toc.js";
 import { htmlToMarkdown } from "./converter.js";
 
 const fetchPage = async (url: string): Promise<string> => {
-  const res = await fetch(url, {
+  const response = await fetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       "Accept": "text/html,application/xhtml+xml",
     },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-  return res.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  return response.text();
 };
 
-const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 export const convertManual = async (cfg: ManualConfig, selectors: TocSelectors): Promise<void> => {
   const tocPath = resolve(cfg.toc);
@@ -47,8 +47,8 @@ export const convertManual = async (cfg: ManualConfig, selectors: TocSelectors):
     let html: string;
     try {
       html = await fetchPage(url);
-    } catch (e) {
-      console.info(`FETCH ERROR: ${e instanceof Error ? e.message : String(e)}`);
+    } catch (error) {
+      console.info(`FETCH ERROR: ${error instanceof Error ? error.message : String(error)}`);
       failed.push({ url, text });
       continue;
     }

@@ -23,12 +23,14 @@ const registerReadPatch = (server: McpServer): void => {
         const indices = patchUtils.resolvePatchIndices(patchFile.patches, ref);
         if (ref !== undefined) {
           const idx = indices[0];
-          return ok(JSON.stringify({ index: idx, ...patchFile.patches[idx] }, null, 2));
+          const patchWithIndex = { index: idx, ...patchFile.patches[idx] };
+          return ok(JSON.stringify(patchWithIndex, null, 2));
         }
-        return ok(JSON.stringify({
+        const result = {
           setName: patchFile.name,
           patches: indices.map(index => ({ index, ...patchFile.patches[index] })),
-        }, null, 2));
+        };
+        return ok(JSON.stringify(result, null, 2));
       } catch (error) {
         return err(error);
       }

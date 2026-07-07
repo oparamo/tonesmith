@@ -41,7 +41,8 @@ const registerDescribeDevice = (server: McpServer): void => {
           return ok(JSON.stringify(matched, null, 2));
         }
 
-        return ok(JSON.stringify(capabilityUtils.findItem(matched, item), null, 2));
+        const foundItem = capabilityUtils.findItem(matched, item);
+        return ok(JSON.stringify(foundItem, null, 2));
       } catch (error) {
         return err(error);
       }

@@ -11,7 +11,8 @@ describe("read_patch", () => {
   it("returns every patch when ref is omitted", async () => {
     const client = await connectClient();
     close = client.close;
-    const { text, isError } = await client.callTool("read_patch", { device: "gx1", file: FIXTURE });
+    const input = { device: "gx1", file: FIXTURE };
+    const { text, isError } = await client.callTool("read_patch", input);
     expect(isError, text).toBe(false);
     const body = JSON.parse(text) as { setName: string; patches: { index: number; name: string }[] };
     expect(body.setName).toBe(expected.name);
@@ -22,7 +23,8 @@ describe("read_patch", () => {
   it("returns a single patch by numeric index", async () => {
     const client = await connectClient();
     close = client.close;
-    const { text, isError } = await client.callTool("read_patch", { device: "gx1", file: FIXTURE, ref: "0" });
+    const input = { device: "gx1", file: FIXTURE, ref: "0" };
+    const { text, isError } = await client.callTool("read_patch", input);
     expect(isError, text).toBe(false);
     const body = JSON.parse(text) as { index: number; name: string };
     expect(body.index).toBe(0);
@@ -33,7 +35,8 @@ describe("read_patch", () => {
     const client = await connectClient();
     close = client.close;
     const targetName = expected.patches[1].name;
-    const { text, isError } = await client.callTool("read_patch", { device: "gx1", file: FIXTURE, ref: targetName });
+    const input = { device: "gx1", file: FIXTURE, ref: targetName };
+    const { text, isError } = await client.callTool("read_patch", input);
     expect(isError, text).toBe(false);
     const body = JSON.parse(text) as { index: number; name: string };
     expect(body.index).toBe(1);
@@ -42,7 +45,8 @@ describe("read_patch", () => {
   it("errors for an unknown device", async () => {
     const client = await connectClient();
     close = client.close;
-    const { isError, text } = await client.callTool("read_patch", { device: "nonexistent", file: FIXTURE });
+    const input = { device: "nonexistent", file: FIXTURE };
+    const { isError, text } = await client.callTool("read_patch", input);
     expect(isError).toBe(true);
     expect(text).toContain('Unknown device "nonexistent"');
   });
@@ -50,14 +54,16 @@ describe("read_patch", () => {
   it("errors for a missing file", async () => {
     const client = await connectClient();
     close = client.close;
-    const { isError } = await client.callTool("read_patch", { device: "gx1", file: "/no/such/file.tsl" });
+    const input = { device: "gx1", file: "/no/such/file.tsl" };
+    const { isError } = await client.callTool("read_patch", input);
     expect(isError).toBe(true);
   });
 
   it("errors for a bad ref", async () => {
     const client = await connectClient();
     close = client.close;
-    const { isError, text } = await client.callTool("read_patch", { device: "gx1", file: FIXTURE, ref: "No Such Patch" });
+    const input = { device: "gx1", file: FIXTURE, ref: "No Such Patch" };
+    const { isError, text } = await client.callTool("read_patch", input);
     expect(isError).toBe(true);
     expect(text).toContain('No patch named "No Such Patch"');
   });
