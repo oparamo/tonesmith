@@ -20,9 +20,9 @@ importers:
       eslint-plugin-sonarjs:
         specifier: 4.1.0
         version: 4.1.0(eslint@10.5.0)
-      node-html-parser:
-        specifier: 8.0.3
-        version: 8.0.3
+      node-html-markdown:
+        specifier: 2.0.0
+        version: 2.0.0
       tsx:
         specifier: 4.22.4
         version: 4.22.4
@@ -32,6 +32,9 @@ importers:
       typescript-eslint:
         specifier: 8.62.0
         version: 8.62.0(eslint@10.5.0)(typescript@6.0.3)
+      vitest:
+        specifier: 4.1.9
+        version: 4.1.9(@types/node@24.0.0)(@vitest/coverage-v8@4.1.9)(vite@7.3.5(@types/node@24.0.0)(tsx@4.22.4)(yaml@2.9.0))
 
   cli:
     dependencies:
@@ -1002,10 +1005,6 @@ packages:
     resolution: {integrity: sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==}
     engines: {node: '>=0.12'}
 
-  entities@8.0.0:
-    resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
-    engines: {node: '>=20.19.0'}
-
   es-module-lexer@2.1.0:
     resolution: {integrity: sha512-n27zTYMjYu1aj4MjCWzSP7G9r75utsaoc8m61weK+W8JMBGGQybd43GstCXZ3WNmSFtGT9wi59qQTW6mhTR5LQ==}
 
@@ -1183,6 +1182,10 @@ packages:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
 
+  he@1.2.0:
+    resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
+    hasBin: true
+
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
 
@@ -1350,8 +1353,12 @@ packages:
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
-  node-html-parser@8.0.3:
-    resolution: {integrity: sha512-ilV20e83nDfiFoEyhlvgqks23Hmy6pySF6UNb8DpgmxnTbXDGgShYKzH2+7ctJK42LXyo+IFOgxCkXmmbacm8w==}
+  node-html-markdown@2.0.0:
+    resolution: {integrity: sha512-DqUC3GGP7pwSYxS93SwHoP+qCw78xcMP6C6H2DuC8rPD2AweJRjBzQb5SdXpKtDlqAQ7hVotJcfhgU7hU5Gthw==}
+    engines: {node: '>=20.0.0'}
+
+  node-html-parser@6.1.13:
+    resolution: {integrity: sha512-qIsTMOY4C/dAa5Q5vsobRpOOvPfC4pB61UVW2uSwZNUp0QU/jCekTal1vMmbO0DgdHeLUJpv/ARmDqErVxA3Sg==}
 
   nth-check@2.1.1:
     resolution: {integrity: sha512-lqjrjmaOoAnWfMmBPL+XNnynZh2+swxiX3WUE0s4yEHI6m+AwrK2UZOimIRl3X/4QctVqS8AiZjFqyOGrMXb/w==}
@@ -2591,8 +2598,6 @@ snapshots:
 
   entities@4.5.0: {}
 
-  entities@8.0.0: {}
-
   es-module-lexer@2.1.0: {}
 
   esbuild@0.27.7:
@@ -2845,6 +2850,8 @@ snapshots:
 
   has-flag@4.0.0: {}
 
+  he@1.2.0: {}
+
   html-escaper@2.0.2: {}
 
   human-id@4.2.0: {}
@@ -2988,10 +2995,14 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  node-html-parser@8.0.3:
+  node-html-markdown@2.0.0:
+    dependencies:
+      node-html-parser: 6.1.13
+
+  node-html-parser@6.1.13:
     dependencies:
       css-select: 5.2.2
-      entities: 8.0.0
+      he: 1.2.0
 
   nth-check@2.1.1:
     dependencies:

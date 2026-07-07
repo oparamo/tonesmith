@@ -101,20 +101,13 @@ pnpm gen:gilmour     # → core/examples/gx1/gilmour.tsl    (22 patches)
 
 Tone descriptions are in `core/examples/gx1/bad-bunny.md` and `core/examples/gx1/gilmour.md`.
 
-## Updating documentation from Roland's site
+## Converting a documentation page to Markdown
 
-The parameter guide and reference manual are generated from Roland's online HTML manuals.
-To regenerate (requires saving the manual TOC pages locally first):
+`tools/html-to-md` fetches a URL and converts its HTML to Markdown — one page per run.
 
 ```bash
-# Save the TOC HTML page for each manual to docs/ as shown in tools/html-to-md/gx1.json,
-# then run:
-pnpm html-to-md:gx1          # regenerate both docs
-pnpm html-to-md:gx1 param    # parameter guide only
-pnpm html-to-md:gx1 ref      # reference manual only
-
-# Debug a specific page:
-pnpm html-to-md tools/html-to-md/gx1.json inspect <url>
+pnpm html-to-md <url>              # prints Markdown to stdout
+pnpm html-to-md <url> -o out.md    # writes Markdown to a file
 ```
 
 ## Repository layout
@@ -129,8 +122,8 @@ core/examples/gx1/
   bad-bunny.md / gilmour.md  tone-library reference docs
 
 tools/html-to-md/
-  index.ts      generic HTML-manual → Markdown converter (configurable selectors)
-  gx1.json      Roland GX-1 specific config
+  index.ts      fetch a URL, convert to Markdown, print or write it
+  fetch.ts      fetchPage(url) — plain HTTP GET with a browser-like User-Agent
 
 fixtures/gx1/
   rock-tones.tsl  real-world fixture for codec round-trip tests (shared by core/cli/mcp tests)
