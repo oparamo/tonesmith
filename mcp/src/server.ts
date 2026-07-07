@@ -2,10 +2,10 @@ import { McpServer } from "@modelcontextprotocol/server";
 import {
   registerListDevices,
   registerReadPatch,
-  registerGeneratePatch,
   registerWriteField,
   registerDescribeDevice,
 } from "./tools";
+import { deviceTools } from "./devices";
 import packageJson from "../package.json" with { type: "json" };
 
 const buildServer = (): McpServer => {
@@ -13,9 +13,12 @@ const buildServer = (): McpServer => {
 
   registerListDevices(server);
   registerReadPatch(server);
-  registerGeneratePatch(server);
   registerWriteField(server);
   registerDescribeDevice(server);
+
+  for (const registerTools of deviceTools) {
+    registerTools(server);
+  }
 
   return server;
 };
