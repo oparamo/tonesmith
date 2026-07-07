@@ -12,7 +12,8 @@ const BLOCK_TAGS = new Set([
 
 const wrapBlock = (inner: string): string => {
   const text = inner.trim();
-  return text ? `\n${text}\n\n` : "";
+  const wrapped = text ? `\n${text}\n\n` : "";
+  return wrapped;
 };
 
 const collapseBlankLines = (text: string): string => text.replace(/\n{3,}/g, "\n\n");
@@ -81,7 +82,8 @@ const nodeToMd = (node: Node, listDepth: number): string => {
     case "h1": case "h2": case "h3": case "h4": case "h5": case "h6": {
       const level = Math.min(parseInt(tag[1]) + 2, 6);
       const text = children().replace(/\s+/g, " ").trim();
-      return text ? `\n${"#".repeat(level)} ${text}\n\n` : "";
+      const heading = text ? `\n${"#".repeat(level)} ${text}\n\n` : "";
+      return heading;
     }
 
     case "p":

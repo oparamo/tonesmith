@@ -1,5 +1,7 @@
 import type { gx1 } from "@tonesmith/core";
 
+const onOff = (on: boolean): string => (on ? "ON" : "OFF");
+
 const formatParams = (params: Record<string, unknown>): string =>
   Object.entries(params).map(([key, value]) => `${key}=${String(value)}`).join("  ");
 
@@ -18,19 +20,22 @@ const printHeader = (patch: gx1.Patch, index?: number): void => {
 };
 
 const printAmp = (amp: gx1.Patch["amp"]): void => {
-  console.info(`\n  AMP/CAB [${amp.on ? "ON" : "OFF"}]  ${amp.type}`);
+  console.info(`\n  AMP/CAB [${onOff(amp.on)}]  ${amp.type}`);
   console.info(`    Gain=${amp.gain}  Level=${amp.level}  Bass=${amp.bass}  Mid=${amp.middle}  Treble=${amp.treble}`);
-  console.info(`    Speaker=${amp.speaker}  Mic=${amp.mic}  Solo=${amp.solo ? `ON(${amp.soloLevel})` : "OFF"}`);
+  const soloLabel = amp.solo ? `ON(${amp.soloLevel})` : "OFF";
+  console.info(`    Speaker=${amp.speaker}  Mic=${amp.mic}  Solo=${soloLabel}`);
 };
 
 const printOdds = (odds: gx1.Patch["odds"]): void => {
   if (!odds.on) return;
-  console.info(`\n  OD/DS [ON]  ${odds.type}  Drive=${odds.drive}  Tone=${odds.tone}  Level=${odds.level}  Direct=${odds.direct}  Solo=${odds.solo ? `ON(${odds.soloLevel})` : "OFF"}`);
+  const soloLabel = odds.solo ? `ON(${odds.soloLevel})` : "OFF";
+  console.info(`\n  OD/DS [ON]  ${odds.type}  Drive=${odds.drive}  Tone=${odds.tone}  Level=${odds.level}  Direct=${odds.direct}  Solo=${soloLabel}`);
 };
 
 const printFxSlot = (slot: "fx1" | "fx2" | "fx3", block: gx1.Patch["fx1"]): void => {
-  const label = block.type + (block.subType ? ` (${block.subType})` : "");
-  console.info(`\n  ${slot.toUpperCase()} [${block.on ? "ON" : "OFF"}]  ${label}`);
+  const subTypeSuffix = block.subType ? ` (${block.subType})` : "";
+  const label = block.type + subTypeSuffix;
+  console.info(`\n  ${slot.toUpperCase()} [${onOff(block.on)}]  ${label}`);
   if (Object.keys(block.params).length > 0) {
     console.info(`    ${formatParams(block.params)}`);
   }
@@ -42,22 +47,22 @@ const printPatch = (patch: gx1.Patch, index?: number): void => {
   printOdds(patch.odds);
 
   const pfx = patch.pfx;
-  console.info(`\n  PFX [${pfx.on ? "ON" : "OFF"}]  ${pfx.type}`);
+  console.info(`\n  PFX [${onOff(pfx.on)}]  ${pfx.type}`);
   printParams(pfx);
 
   const ns = patch.ns;
-  console.info(`\n  NS [${ns.on ? "ON" : "OFF"}]  Threshold=${ns.threshold}  Release=${ns.release}  Detect=${ns.detect}`);
+  console.info(`\n  NS [${onOff(ns.on)}]  Threshold=${ns.threshold}  Release=${ns.release}  Detect=${ns.detect}`);
 
   for (const slot of ["fx1", "fx2", "fx3"] as const) {
     printFxSlot(slot, patch[slot]);
   }
 
   const delay = patch.delay;
-  console.info(`\n  DELAY [${delay.on ? "ON" : "OFF"}]  ${delay.type}`);
+  console.info(`\n  DELAY [${onOff(delay.on)}]  ${delay.type}`);
   printParams(delay);
 
   const reverb = patch.reverb;
-  console.info(`\n  REVERB [${reverb.on ? "ON" : "OFF"}]  ${reverb.type}`);
+  console.info(`\n  REVERB [${onOff(reverb.on)}]  ${reverb.type}`);
   printParams(reverb);
 
   const fv = patch.fv;

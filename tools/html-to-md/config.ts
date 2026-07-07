@@ -24,7 +24,8 @@ export const loadConfig = (configPath: string): Config => {
   try {
     return JSON.parse(readFileSync(resolve(configPath), "utf-8")) as Config;
   } catch (error) {
-    console.error(`Failed to read config: ${error instanceof Error ? error.message : String(error)}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to read config: ${message}`);
     process.exit(1);
   }
 };

@@ -182,11 +182,12 @@ const encodeNs = (block: NsBlock): string[] => {
 
 const decodeFv = (hexList: string[]): FvBlock => {
   const bytes = bytesFromHex(hexList);
+  const curve = bytes.length > 3 ? lookupName(FV_CURVE, bytes[3]) as typeof FV_CURVE[number] : "NORMAL";
   return {
     position: bytes[0],
     min:      bytes[1],
     max:      bytes[2],
-    curve:    bytes.length > 3 ? lookupName(FV_CURVE, bytes[3]) as typeof FV_CURVE[number] : "NORMAL",
+    curve,
     [RAW]:    bytes,
   };
 };

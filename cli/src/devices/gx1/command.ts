@@ -10,7 +10,8 @@ const run = (action: () => void): void => {
   try {
     action();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(message);
     process.exit(1);
   }
 };

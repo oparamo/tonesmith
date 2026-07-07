@@ -28,7 +28,8 @@ const convertPage = async (entry: TocEntry, index: number, total: number): Promi
   try {
     html = await fetchPage(url);
   } catch (error) {
-    console.info(`FETCH ERROR: ${error instanceof Error ? error.message : String(error)}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.info(`FETCH ERROR: ${message}`);
     return null;
   }
 
@@ -108,5 +109,6 @@ export const inspectPage = async (url: string): Promise<void> => {
   console.info(html.slice(0, 3000));
   console.info(`\n--- CONVERTED MARKDOWN ---\n`);
   const md = htmlToMarkdown(html);
-  console.info(md.length > 3000 ? md.slice(0, 3000) + "\n...(truncated)" : md);
+  const preview = md.length > 3000 ? md.slice(0, 3000) + "\n...(truncated)" : md;
+  console.info(preview);
 };

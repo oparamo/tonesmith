@@ -295,7 +295,8 @@ const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
   if (!fields) return { unknownBytes: bytes.slice(0, 32) };
 
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
-  return decodeFields(fields, offset > 0 ? bytes.slice(offset) : bytes);
+  const paramBytes = offset > 0 ? bytes.slice(offset) : bytes;
+  return decodeFields(fields, paramBytes);
 };
 
 /**

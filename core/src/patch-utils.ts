@@ -28,7 +28,8 @@ const coerceValue = (value: string): string | number | boolean => {
   if (value === "true") return true;
   if (value === "false") return false;
   const asNumber = Number(value);
-  return Number.isNaN(asNumber) ? value : asNumber;
+  const result = Number.isNaN(asNumber) ? value : asNumber;
+  return result;
 };
 
 /**
