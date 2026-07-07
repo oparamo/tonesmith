@@ -10,3 +10,11 @@ dist/
 core/examples/**/*.tsl
 .npmrc
 coverage/
+
+# Track project-level Claude Code files despite personal global gitignore rules
+# (CLAUDE.md and .claude are ignored globally so unrelated repos don't pick up local settings)
+!CLAUDE.md
+!.claude/
+!.claude/skills/
+!.claude/skills/**
+.claude/settings.local.json
