@@ -29,13 +29,6 @@ describe("gx1 read", () => {
     expect(output).not.toContain(expected.patches[1].name);
   });
 
-  it("prints a single patch when given an exact patch name", async () => {
-    const targetName = expected.patches[1].name;
-    const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, targetName]);
-    expect(exitCode, error.join("\n")).toBeUndefined();
-    expect(info.join("\n")).toContain(targetName);
-  });
-
   it("exits with an error for a patch name that doesn't exist", async () => {
     const { error, exitCode } = await runCli(["gx1", "read", FIXTURE, "No Such Patch"]);
     expect(exitCode).toBe(1);

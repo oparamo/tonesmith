@@ -102,6 +102,47 @@ describe("generate_gx1_patch", () => {
     expect(patch.delay.on).toBe(false);
   });
 
+  it("disables an explicitly-provided pfx or fx slot via on: false", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "explicit-off.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const patchSpec = {
+      name: "Explicit Off",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      pfx: { type: "WAH", on: false, params: { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 } },
+      fx1: { type: "COMPRESSOR", subType: "D-COMP", on: false, params: { sustain: 30, attack: 30, level: 70 } },
+    };
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.pfx.on).toBe(false);
+    expect(patch.fx1.on).toBe(false);
+  });
+
+  it("builds a pfx block with no params, using its type's defaults", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "pfx-no-params.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const patchSpec = {
+      name: "Pfx No Params",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      pfx: { type: "WAH" },
+    };
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.pfx.on).toBe(true);
+    expect(patch.pfx.type).toBe("WAH");
+  });
+
   it("errors for an invalid amp type", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "bad-amp.tsl");

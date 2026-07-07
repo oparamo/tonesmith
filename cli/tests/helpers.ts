@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildProgram } from "../src/program";
 
-const FIXTURE = join(import.meta.dirname, "../../core/tests/fixtures/gx1/rock-tones.tsl");
+const FIXTURE = join(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
 
 interface CliResult {
   info: string[];

@@ -38,6 +38,14 @@ describe("gx1 capabilities", () => {
     expect(output).toContain("Parameters:");
   });
 
+  it("omits the Parameters section for an item with no params of its own or from its group", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "cab", "original"]);
+    expect(exitCode, error.join("\n")).toBeUndefined();
+    const output = info.join("\n");
+    expect(output).toContain("[cab / ORIGINAL]");
+    expect(output).not.toContain("Parameters:");
+  });
+
   it("prints block controls and a 'no selectable types' message for a params-only group", async () => {
     const { info, error, exitCode } = await runCli(["gx1", "capabilities", "ns"]);
     expect(exitCode, error.join("\n")).toBeUndefined();
