@@ -181,7 +181,7 @@ where a given type's own parameters live.
 `p[0]`=sens `p[1]`=attack `p[2]`=depth `p[3]`=reso `p[4]`=tone (signed50) `p[5]`=level `p[6]`=direct
 
 **FIXED WAH** — starts at byte 85; p[0], p[2..4]  *(p[1] is the bass-mode wah type — not used in guitar mode)*
-`p[0]`=wahType (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) `p[2]`=level `p[3]`=direct `p[4]`=manual
+`p[0]`=type (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) `p[2]`=level `p[3]`=direct `p[4]`=manual
 
 **AC. GTR SIM** — starts at byte 93; p[0..3]
 `p[0]`=high (signed50) `p[1]`=body `p[2]`=low (signed50) `p[3]`=level

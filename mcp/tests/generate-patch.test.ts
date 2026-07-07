@@ -153,7 +153,7 @@ describe("generate_patch", () => {
     expect(patch.pfx.wahType).toBe("CRY WAH");
   });
 
-  it("builds an fx-slot FIXED WAH whose model is selected by a string params.wahType", async () => {
+  it("builds an fx-slot FIXED WAH whose model is selected by subType", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "fixed-wah.tsl");
     const client = await connectClient();
@@ -163,14 +163,14 @@ describe("generate_patch", () => {
       name: "Fixed Wah",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
-      fx1: { type: "FIXED WAH", params: { wahType: "CRY WAH", level: 100, direct: 0, manual: 50 } },
+      fx1: { type: "FIXED WAH", subType: "CRY WAH", params: { level: 100, direct: 0, manual: 50 } },
     };
     const { isError, text } = await client.callTool("generate_patch", patchSpec);
     expect(isError, text).toBe(false);
 
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.fx1.type).toBe("FIXED WAH");
-    expect(patch.fx1.params.wahType).toBe("CRY WAH");
+    expect(patch.fx1.subType).toBe("CRY WAH");
   });
 
   it("builds an fx-slot SLICER whose pattern is selected by a string params.pattern", async () => {

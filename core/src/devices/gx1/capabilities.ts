@@ -103,7 +103,7 @@ const FX_ITEMS = [
       { id: "RESO WAH",  name: "Reso Wah",     description: "Completely original wah enhancing the characteristic resonances of analog synth filters." },
     ],
     params: [
-      { name: "FREQ",   range: "0-100", description: "Center frequency of the wah effect." },
+      { name: "MANUAL", range: "0-100", description: "Center frequency of the wah effect." },
       { name: "LEVEL",  range: "0-100", description: "Volume of the effect sound." },
       { name: "DIRECT", range: "0-100", description: "Volume of the direct (dry) signal." },
     ],
@@ -794,7 +794,6 @@ const gx1Capabilities: DeviceCapabilities = {
         { name: "FEEDBACK", range: "0-100",                description: "Number of repeats." },
         { name: "LEVEL",    range: "1-120",                description: "Volume of the delay sound." },
         { name: "HIGH CUT", range: "20 Hz-12.5 kHz, FLAT", description: "High-cut filter on delay repeats." },
-        { name: "DIRECT",   range: "0-100",                description: "Volume of the direct signal." },
       ],
     },
     {

@@ -120,7 +120,7 @@ const KEY_IDX = indexMap(KEY_NAMES);
 // params.type back to block.subType for display) and the fx() builder (to thread a
 // subType argument into params.type so it actually encodes).
 const PARAM_SUBTYPE_EFFECTS = new Set([
-  "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER", "OD/DS",
+  "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER", "OD/DS", "FIXED WAH",
 ]);
 
 export {
