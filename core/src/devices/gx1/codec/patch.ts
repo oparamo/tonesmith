@@ -53,7 +53,8 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     // OVERTONE (FX3-only) stores its params in the separate 5-byte MEMORY%FX3A
     // block rather than the shared 251-byte FX param block.
     const paramBlockKey = slot === "FX3" && block.type === "OVERTONE" ? "MEMORY%FX3A" : `MEMORY%${slot}`;
-    const params = decodeFxParams(block.type, bytesFromHex(paramSet[paramBlockKey]));
+    const paramBlockBytes = bytesFromHex(paramSet[paramBlockKey]);
+    const params = decodeFxParams(block.type, paramBlockBytes);
     if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params.type === "string") {
       block.subType = params.type;
     }

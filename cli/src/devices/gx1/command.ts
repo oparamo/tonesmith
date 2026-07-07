@@ -90,7 +90,8 @@ const configureGx1Commands = (gx1: Command, driver: PatchDriver): void => {
         return;
       }
 
-      printItem(group, capabilityUtils.findItem(group, item));
+      const foundItem = capabilityUtils.findItem(group, item);
+      printItem(group, foundItem);
     }); });
 };
 

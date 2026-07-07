@@ -235,7 +235,8 @@ describe("fv", () => {
 describe("pfx", () => {
   it("sets WAH fields and enables it by default", () => {
     const patch = basePatch("Test");
-    pfx(patch, "WAH", { wahType: "VO WAH", level: 80, direct: 20, position: 90, min: 10, max: 100 });
+    const wahParams = { wahType: "VO WAH", level: 80, direct: 20, position: 90, min: 10, max: 100 };
+    pfx(patch, "WAH", wahParams);
     expect(patch.pfx.on).toBe(true);
     expect(patch.pfx.type).toBe("WAH");
     expect((patch.pfx as Record<string, unknown>).wahType).toBe("VO WAH");
@@ -244,7 +245,8 @@ describe("pfx", () => {
 
   it("sets PEDAL BEND fields", () => {
     const patch = basePatch("Test");
-    pfx(patch, "PEDAL BEND", { pitchMin: -12, pitchMax: 12, position: 100, level: 90, direct: 0 });
+    const pedalBendParams = { pitchMin: -12, pitchMax: 12, position: 100, level: 90, direct: 0 };
+    pfx(patch, "PEDAL BEND", pedalBendParams);
     expect(patch.pfx.type).toBe("PEDAL BEND");
     expect((patch.pfx as Record<string, unknown>).pitchMin).toBe(-12);
     expect((patch.pfx as Record<string, unknown>).pitchMax).toBe(12);
