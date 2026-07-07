@@ -1,6 +1,8 @@
 import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
 
+const ternarySelector = 'ConditionalExpression:not(VariableDeclarator > ConditionalExpression):not(AssignmentExpression > ConditionalExpression):not(ArrowFunctionExpression > ConditionalExpression)';
+
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/coverage/**'] },
   ...tseslint.configs.strictTypeChecked,
@@ -31,7 +33,7 @@ export default tseslint.config(
       // return value). Everything else (template literals, call arguments, return statements
       // in block-bodied functions, object/array literal values) must extract to a variable first.
       'no-restricted-syntax': ['error', {
-        selector: 'ConditionalExpression:not(VariableDeclarator > ConditionalExpression):not(AssignmentExpression > ConditionalExpression):not(ArrowFunctionExpression > ConditionalExpression)',
+        selector: ternarySelector,
         message: 'Assign this ternary to a variable before using it.',
       }],
     },
