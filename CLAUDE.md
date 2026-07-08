@@ -149,13 +149,13 @@ decoded-patch field lists) directly; don't duplicate any of it into this file.
 
 ## MCP server tools
 
-| Tool              | Inputs                                                                    | Notes                                                                                       |
-|-------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| `list_devices`    | —                                                                         | Returns `[{ id, name }]`                                                                    |
-| `read_patch`      | `file`, `ref?`                                                            | `ref` = index or name; omit for all patches                                                 |
-| `generate_<id>_patch` | device-specific (derived from the device's builder + capabilities)      | One tool per device (currently `generate_gx1_patch`): builds a patch via the device's builder and saves it in the device's native format |
-| `write_field`     | `file`, `ref`, `field`, `value`                                           | Dot-path mutation, same as CLI `write`                                                      |
-| `describe_device` | `device`, `group?`, `item?`                                               | Returns capability metadata; omit `group` for all groups, add `item` to drill into one type |
+| Tool                  | Inputs                                                             | Notes                                                                                                                                    |
+|-----------------------|--------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `list_devices`        | —                                                                  | Returns `[{ id, name }]`                                                                                                                 |
+| `read_patch`          | `file`, `ref?`                                                     | `ref` = index or name; omit for all patches                                                                                              |
+| `generate_<id>_patch` | device-specific (derived from the device's builder + capabilities) | One tool per device (currently `generate_gx1_patch`): builds a patch via the device's builder and saves it in the device's native format |
+| `write_field`         | `file`, `ref`, `field`, `value`                                    | Dot-path mutation, same as CLI `write`                                                                                                   |
+| `describe_device`     | `device`, `group?`, `item?`                                        | Returns capability metadata; omit `group` for all groups, add `item` to drill into one type                                              |
 
 ## CLI capabilities command
 

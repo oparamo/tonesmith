@@ -84,12 +84,12 @@ node mcp/dist/index.js   # runs the server over stdio
 
 MCP tools:
 
-| Tool                  | Description                                                          |
-|-----------------------|----------------------------------------------------------------------|
-| `list_devices`        | List supported devices                                               |
-| `read_patch`          | Read one or all patches from a patch file                            |
-| `write_field`         | Edit a single field in an existing patch                             |
-| `describe_device`     | Browse a device's capability metadata (groups, types, params)        |
+| Tool                  | Description                                                                                         |
+|-----------------------|-----------------------------------------------------------------------------------------------------|
+| `list_devices`        | List supported devices                                                                              |
+| `read_patch`          | Read one or all patches from a patch file                                                           |
+| `write_field`         | Edit a single field in an existing patch                                                            |
+| `describe_device`     | Browse a device's capability metadata (groups, types, params)                                       |
 | `generate_<id>_patch` | Build a new patch from structured parameters — one tool per device (currently `generate_gx1_patch`) |
 
 ## Generating preset packs
