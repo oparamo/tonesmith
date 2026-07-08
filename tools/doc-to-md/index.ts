@@ -13,17 +13,17 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fetchDocument } from "./fetch.js";
 import { detectFormat, toMarkdown } from "./convert.js";
 
-const [source, ...rest] = process.argv.slice(2);
+const [source, ...flagArgs] = process.argv.slice(2);
 
 if (!source) {
   console.error("Usage: tsx tools/doc-to-md/index.ts <url|file> [-o out.md] [--format html|pdf]");
   process.exit(1);
 }
 
-const outFlagIndex = rest.indexOf("-o");
-const outPath = outFlagIndex !== -1 ? rest[outFlagIndex + 1] : undefined;
-const formatFlagIndex = rest.indexOf("--format");
-const formatOverride = formatFlagIndex !== -1 ? rest[formatFlagIndex + 1] : undefined;
+const outFlagIndex = flagArgs.indexOf("-o");
+const outPath = outFlagIndex !== -1 ? flagArgs[outFlagIndex + 1] : undefined;
+const formatFlagIndex = flagArgs.indexOf("--format");
+const formatOverride = formatFlagIndex !== -1 ? flagArgs[formatFlagIndex + 1] : undefined;
 
 const isUrl = /^https?:\/\//.test(source);
 const bytes = isUrl ? await fetchDocument(source) : new Uint8Array(readFileSync(source));
