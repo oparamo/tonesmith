@@ -18,15 +18,24 @@ at every boundary (build **before** coverage — sibling packages resolve `@tone
 its built `dist/`). Coverage thresholds are ratcheted to the numbers the suite actually achieves,
 so new code lands fully tested or CI fails.
 
-## 1. Request patch exports, then gather documentation
+## 1. Gather patch exports and documentation
 
 Two inputs feed everything downstream: real patch-file exports (reverse-engineered in step 2)
-and the official documentation (the source for step 5's capabilities). The exports can only
-come from the user, so ask for them first, then capture documentation while you wait.
+and the official documentation (the source for step 5's capabilities). Both start with the
+user, so open with one combined request covering exports and documentation sources, then do
+the capture work while you wait.
 
-**Ask the user for patch-file exports up front — you cannot obtain these yourself.** Exports
-come from the device's own editor software, which is typically proprietary, tied to owning the
-hardware, or behind a vendor account. Make the request concrete:
+**Ask the user for links or file paths to the documentation.** Don't hunt for it yourself
+first: vendors scatter manuals across product pages, support portals, and downloads sections,
+and a web search can land on the wrong device, the wrong hardware revision, or a third-party
+summary — bad capability data poisons step 5 quietly. Treat user-supplied sources as the
+authoritative set; use web search only to fill gaps the user couldn't cover, and confirm
+anything found that way with the user (right device? right manual revision?) before relying
+on it.
+
+**Ask the user for patch-file exports — you cannot obtain these yourself.** Exports come from
+the device's own editor software, which is typically proprietary, tied to owning the hardware,
+or behind a vendor account. Make the request concrete:
 
 - a factory-default (untouched) export, as a clean baseline
 - a few exports of real, varied presets
