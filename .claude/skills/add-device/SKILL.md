@@ -18,21 +18,45 @@ at every boundary (build **before** coverage — sibling packages resolve `@tone
 its built `dist/`). Coverage thresholds are ratcheted to the numbers the suite actually achieves,
 so new code lands fully tested or CI fails.
 
-## 1. Gather documentation
+## 1. Request patch exports, then gather documentation
 
-Collect the device's official documentation — at minimum the **parameter reference** (every
-effect/model name and its value range; this later becomes the source of truth for the
-capabilities metadata in step 5) and the **operation manual**. Vendors publish these as web
-pages, downloadable PDFs, or both — either works.
+Two inputs feed everything downstream: real patch-file exports (reverse-engineered in step 2)
+and the official documentation (the source for step 5's capabilities). The exports can only
+come from the user, so ask for them first, then capture documentation while you wait.
 
-Convert each source to Markdown with the repo's `doc-to-md` tool and commit it under
-`core/docs/<id>/`, one source per run:
+**Ask the user for patch-file exports up front — you cannot obtain these yourself.** Exports
+come from the device's own editor software, which is typically proprietary, tied to owning the
+hardware, or behind a vendor account. Make the request concrete:
+
+- a factory-default (untouched) export, as a clean baseline
+- a few exports of real, varied presets
+- later, once the docs have taught you the parameter names: pairs of exports differing by
+  exactly one parameter — name the precise parameter and value for the user to set, since
+  these targeted pairs are what make step 2's byte-diffing tractable
+
+This is a pause point, not a dead end: continue with the documentation work below while the
+user gathers files, and don't start step 2 until at least a baseline export has arrived. If
+the exports arrive in a later conversation, resume this skill at step 2 — the checkpoints
+stay valid across the gap. Keep received exports somewhere private (not committed) until
+step 4, when one becomes the public round-trip fixture.
+
+**Documentation to collect** — at minimum the **parameter reference** (every effect/model name
+and its value range; this later becomes the source of truth for the capabilities metadata in
+step 5) and the **operation manual**. Vendors publish these as web pages, downloadable PDFs,
+or both — either works.
+
+Convert sources to Markdown with the repo's `doc-to-md` tool — it converts exactly one URL or
+file per run:
 
 ```bash
-pnpm doc-to-md <manual-page-url> -o core/docs/<id>/<page>.md      # HTML page
-pnpm doc-to-md <local-path>.pdf -o core/docs/<id>/<manual>.md     # downloaded PDF manual
-pnpm doc-to-md <pdf-url> -o core/docs/<id>/<manual>.md            # PDF straight from a URL
+pnpm doc-to-md <manual-page-url> -o <out>.md    # HTML page
+pnpm doc-to-md <local-path>.pdf -o <out>.md     # downloaded PDF manual
+pnpm doc-to-md <pdf-url> -o <out>.md            # PDF straight from a URL
 ```
+
+When a source maps 1:1 onto a subject, write straight to its committed path under
+`core/docs/<id>/` (see the organization rules below); when several pages make up one subject,
+convert them to scratch files first and merge them into the subject's single committed file.
 
 The tool accepts an http(s) URL or a local file path and detects HTML vs PDF from the content
 itself, so no format flag is normally needed (pass `--format html|pdf` only if detection ever
@@ -60,17 +84,20 @@ subject-sized files let a later reader (usually an AI) search just the relevant 
 scanning a monolith. Where sections reference each other, add relative Markdown links between
 the files.
 
-Also obtain a handful of real patch-file exports from the device's own editor software —
-ideally pairs that differ by exactly one parameter, which makes byte-diffing tractable in the
-next step. Save them somewhere private (not committed) until step 4, when one becomes the
-public round-trip fixture.
+All of a device's captured docs live under `core/docs/<id>/`. A manual that fits in one file is
+a single `core/docs/<id>/<manual>.md`; when one manual yields several subject files, group them
+in a subdirectory per manual (`core/docs/<id>/<manual>/<subject>.md`) so each document stays a
+unit and the device's doc root stays skimmable.
 
 ## 2. Reverse-engineer and document the binary format
 
-Diff the exports byte-by-byte to map out the file's structure: envelope framing, parameter
-block boundaries, and per-field encoding (fixed offsets, nibble-packed values, lookup tables,
-signed ranges, etc.). Change one parameter at a time in the editor, re-export, and diff against
-the previous export to isolate which bytes moved.
+Requires the exports from step 1. Diff them byte-by-byte to map out the file's structure:
+envelope framing, parameter block boundaries, and per-field encoding (fixed offsets,
+nibble-packed values, lookup tables, signed ranges, etc.). For targeted probes, work the loop
+with the user — you don't operate the editor, they do: ask them to change one named parameter
+to a specific value, re-export, and send the file; diff it against the previous export to
+isolate which bytes moved. Batch these requests where you can (several parameters across
+different blocks per round) so each round trip to the user resolves more of the format.
 
 Write up the findings as `core/docs/<id>/FORMAT.md`. Follow this structure top-to-bottom:
 envelope shape → a block inventory table (in the order the format actually stores blocks) → one
@@ -96,8 +123,9 @@ Create `core/src/devices/<id>/` with:
   device's own patch-file format, not a borrowed name
 - `builder.ts` — high-level, no-"set"-prefix construction helpers (an unknown field key should
   throw rather than write silently)
-- `driver.ts` — exports a `PatchDriver<T>` object wiring the codec and file-I/O functions
-  together (a driver never self-registers)
+- `driver.ts` — exports a `PatchDriver<T>` object (the contract lives in
+  `core/src/types/driver.ts`) wiring the codec and file-I/O functions together (a driver
+  never self-registers)
 - `index.ts` — the device's public barrel: the driver, patch types, and builder helpers
 
 **Round-trip byte preservation is non-negotiable**: the codec must start from the original raw
@@ -113,7 +141,10 @@ Then wire it up with exactly two lines outside the device directory:
 
 Commit one real device export, using its own native file extension, as the shared round-trip
 baseline for core/cli/mcp tests. Put it at the repo root under `fixtures/<id>/`, not inside
-`core/`.
+`core/`. Prefer the richest of the user's exports — one whose patches genuinely differ from
+each other and from factory state — over the factory-default file: varied bytes in ranges the
+codec doesn't decode yet are exactly what catches pass-through regressions, and a clean
+baseline can't provide them.
 
 Write byte-for-byte round-trip tests in `core/tests/devices/<id>/`, mirroring the source
 layout: decode the fixture, re-encode it, and assert the output bytes match the input exactly.
@@ -125,8 +156,9 @@ surfaces — the driver and exported helpers — never internals.
 ## 5. Author capabilities metadata
 
 Write `core/src/devices/<id>/capabilities.ts` — a `DeviceCapabilities` object built from the
-manual, covering every parameter group the device exposes (effect types, amp/cab models, etc.,
-whatever applies). Wire it into the driver object from step 3.
+parameter reference captured in step 1, covering every parameter group the device exposes
+(effect types, amp/cab models, etc., whatever applies). Wire it into the driver object from
+step 3.
 
 Add two drift guards as tests:
 - **Coverage guard**: every id in the device's constant lookup arrays has a matching
@@ -157,6 +189,19 @@ Adding a device changes every published package that gained it: add one changese
 (`pnpm changeset`) with a **minor** bump for `@tonesmith/core` (new public device namespace)
 and for `@tonesmith/cli` / `@tonesmith/mcp` (new device support in each surface). Also update
 the device lists in `README.md` and `CLAUDE.md`'s Project section.
+
+## Done when
+
+- `pnpm lint && pnpm build && pnpm coverage` is green from the repo root.
+- The committed fixture round-trips byte-for-byte through the driver's decode → encode.
+- Both drift guards pass — and fail when you deliberately break one capability entry
+  (spot-check once, then revert).
+- Against the built output, `node cli/dist/index.js <id> read fixtures/<id>/<fixture>` prints
+  the patches and `node cli/dist/index.js <id> capabilities` lists the device's groups.
+- CLI and MCP behavior tests cover the new device's happy paths and error paths, including
+  `generate_<id>_patch`.
+- Changesets exist (minor for `@tonesmith/core`, `@tonesmith/cli`, `@tonesmith/mcp`) and the
+  device lists in `README.md` and `CLAUDE.md` mention the new device.
 
 ## Reference implementation
 
