@@ -1,7 +1,17 @@
 # tonesmith
 
-TypeScript toolkit for reading, editing, and building presets for guitar multi-effects processors.
-Currently implements the **BOSS GX-1** (`.tsl` patch files). Designed to support additional devices.
+TypeScript toolkit for reading, editing, and building presets for guitar multi-effects
+processors. Every device plugs in as a self-contained driver behind the same core library,
+CLI, and MCP server — the surfaces below work identically for any supported device.
+
+## Supported devices
+
+| Device    | id    | Patch file format |
+|-----------|-------|-------------------|
+| BOSS GX-1 | `gx1` | `.tsl`            |
+
+New devices are onboarded with the `add-device` skill (`.claude/skills/add-device/SKILL.md`),
+which walks from format reverse-engineering to CLI/MCP wiring.
 
 ## Quick start
 
@@ -15,51 +25,40 @@ pnpm build
 After building, the CLI is available at `node cli/dist/index.js`. For a global alias:
 
 ```bash
-pnpm link --global --dir src/cli   # makes `tonesmith` available in your PATH
+pnpm link --global --dir cli   # makes `tonesmith` available in your PATH
 ```
 
 ## CLI
+
+Every command takes the device id as its first argument:
 
 ```bash
 # List available devices
 tonesmith
 
-# Create a new .tsl file with N blank patches
-tonesmith gx1 new <file.tsl> [set_name] [n_patches]
+# Create a new patch file with N blank patches
+tonesmith <device> new <file> [set_name] [n_patches]
 
-# Read all patches in a file
-tonesmith gx1 read <file.tsl>
+# Read all patches in a file, or a single patch by index or name
+tonesmith <device> read <file> [index|name]
 
-# Read a single patch by index or name
-tonesmith gx1 read <file.tsl> <index|name>
-
-# Edit a field in-place (dot notation for nested fields)
-tonesmith gx1 write <file.tsl> <index|name> <field>=<value> ...
+# Edit fields in-place (dot notation for nested fields)
+tonesmith <device> write <file> <index|name> <field>=<value> ...
 
 # Copy a patch between files
-tonesmith gx1 copy <src.tsl> <src_idx|name> <dst.tsl> <dst_idx|name>
+tonesmith <device> copy <src> <src_idx|name> <dst> <dst_idx|name>
+
+# Browse device capabilities (all groups / one group / one item)
+tonesmith <device> capabilities [group] [item]
 ```
 
-### Write examples
+Field paths are device-specific: `read` a patch to see its structure (the printed fields
+mirror the writable paths) and use `capabilities` for the valid types and value ranges.
+For example, editing a GX-1 patch:
 
 ```bash
-# Amp gain
-tonesmith gx1 write my.tsl 0 amp.gain=72
-
-# Multiple fields at once
-tonesmith gx1 write my.tsl 0 reverb.level=30 reverb.time=3.0
-
-# FX1 off
-tonesmith gx1 write my.tsl 0 fx1.on=false
-
-# Effect parameter
-tonesmith gx1 write my.tsl 0 fx1.params.rate=50
-
-# Top-level patch field
-tonesmith gx1 write my.tsl 0 key=G
+tonesmith gx1 write my.tsl 0 amp.gain=72 fx1.params.rate=50 fx1.on=true key=G
 ```
-
-Field paths: `amp.<field>`, `fx1.params.<field>`, `ns.<field>`, `delay.<field>`, `reverb.<field>`, `fv.<field>`.
 
 ## MCP server
 
@@ -85,64 +84,57 @@ node mcp/dist/index.js   # runs the server over stdio
 
 MCP tools:
 
-| Tool             | Description                                                   |
-|------------------|---------------------------------------------------------------|
-| `list_devices`   | List supported devices                                        |
-| `read_patch`     | Read one or all patches from a `.tsl` file                    |
-| `generate_patch` | Build a new GX-1 patch from structured parameters and save it |
-| `write_field`    | Edit a single field in an existing patch                      |
+| Tool                  | Description                                                                                         |
+|-----------------------|-----------------------------------------------------------------------------------------------------|
+| `list_devices`        | List supported devices                                                                              |
+| `read_patch`          | Read one or all patches from a patch file                                                           |
+| `write_field`         | Edit a single field in an existing patch                                                            |
+| `describe_device`     | Browse a device's capability metadata (groups, types, params)                                       |
+| `generate_<id>_patch` | Build a new patch from structured parameters — one tool per device (currently `generate_gx1_patch`) |
 
 ## Generating preset packs
 
 ```bash
-pnpm gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl  (8 patches)
-pnpm gen:gilmour     # → core/examples/gx1/gilmour.tsl    (22 patches)
+pnpm --filter @tonesmith/core gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl  (8 patches)
+pnpm --filter @tonesmith/core gen:gilmour     # → core/examples/gx1/gilmour.tsl    (22 patches)
 ```
 
 Tone descriptions are in `core/examples/gx1/bad-bunny.md` and `core/examples/gx1/gilmour.md`.
 
-## Converting a documentation page to Markdown
+## Converting documentation to Markdown
 
-`tools/html-to-md` fetches a URL and converts its HTML to Markdown — one page per run.
+`tools/doc-to-md` converts one documentation source per run — an HTML page or a PDF, from a URL
+or a local file — to Markdown. HTML vs PDF is detected from the content itself; pass
+`--format html|pdf` to override.
 
 ```bash
-pnpm html-to-md <url>              # prints Markdown to stdout
-pnpm html-to-md <url> -o out.md    # writes Markdown to a file
+pnpm doc-to-md <url>                   # HTML page → Markdown on stdout
+pnpm doc-to-md <url> -o out.md         # write to a file instead
+pnpm doc-to-md manual.pdf -o out.md    # local PDF manual → Markdown
 ```
 
 ## Repository layout
 
 ```tree
-core/      @tonesmith/core — codec, types, driver registry, GX-1 driver + builder
-cli/       @tonesmith/cli  — CLI (tonesmith gx1 read/write/copy/new)
-mcp/       @tonesmith/mcp   — MCP server (list_devices, read_patch, generate_patch, write_field)
-
-core/examples/gx1/
-  bad-bunny.ts / gilmour.ts  preset generators (run with pnpm gen:*)
-  bad-bunny.md / gilmour.md  tone-library reference docs
-
-tools/html-to-md/
-  index.ts      fetch a URL, convert to Markdown, print or write it
-  fetch.ts      fetchPage(url) — plain HTTP GET with a browser-like User-Agent
-
-fixtures/gx1/
-  rock-tones.tsl  real-world fixture for codec round-trip tests (shared by core/cli/mcp tests)
-
-core/docs/gx1/
-  FORMAT.md              reverse-engineered TSL binary format
-  gx1_parameter_guide.md effect types, parameters, value ranges
-  gx1_reference_manual.md hardware operation reference
+core/            @tonesmith/core — device-agnostic types, registry, and utils; one driver per device under src/devices/<id>/
+cli/             @tonesmith/cli  — shared device-agnostic commands; one thin printer/descriptor per device under src/devices/<id>/
+mcp/             @tonesmith/mcp  — generic MCP tools; one generate tool per device under src/devices/<id>/
+tools/           repo tooling (doc-to-md); not published
+fixtures/<id>/   one committed real patch-file export per device — the round-trip test baseline
+core/docs/<id>/  captured device documentation + FORMAT.md, the reverse-engineered format spec
 ```
 
 ## Development
 
 ```bash
-pnpm build        # compile all workspaces (tsc -b)
-pnpm test         # run Vitest codec round-trip tests
+pnpm build        # compile all workspaces (core via tsc -b; cli/mcp bundled with tsup)
+pnpm lint         # eslint over core, cli, mcp, tools
+pnpm test         # run Vitest suites in all workspaces (build first)
+pnpm coverage     # tests with coverage thresholds (what CI gates on)
 pnpm clean        # remove dist/ directories
 ```
 
 ## Roadmap
 
-- REST API (`src/api`) + web frontend — future workspaces over `@tonesmith/core`
-- Additional devices beyond GX-1
+- REST API + web frontend — future workspaces over `@tonesmith/core`
+- Additional devices

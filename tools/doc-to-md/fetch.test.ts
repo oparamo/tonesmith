@@ -1,23 +1,24 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { fetchPage } from "./fetch";
+import { fetchDocument } from "./fetch";
 
-describe("fetchPage", () => {
+describe("fetchDocument", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it("returns the response body text on success", async () => {
-    const response = { ok: true, text: () => Promise.resolve("<html>hi</html>") };
+  it("returns the response body bytes on success", async () => {
+    const body = new TextEncoder().encode("<html>hi</html>");
+    const response = { ok: true, arrayBuffer: () => Promise.resolve(body.buffer) };
     const fetchMock = vi.fn().mockResolvedValue(response);
     vi.stubGlobal("fetch", fetchMock);
 
-    const html = await fetchPage("https://example.com/page");
+    const bytes = await fetchDocument("https://example.com/page");
 
-    expect(html).toBe("<html>hi</html>");
+    expect(new TextDecoder().decode(bytes)).toBe("<html>hi</html>");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://example.com/page",
       expect.objectContaining({
         headers: expect.objectContaining({
           "User-Agent": expect.any(String) as string,
-          "Accept": "text/html,application/xhtml+xml",
+          "Accept": "text/html,application/xhtml+xml,application/pdf",
         }) as Record<string, string>,
       }),
     );
@@ -27,6 +28,6 @@ describe("fetchPage", () => {
     const response = { ok: false, status: 404, statusText: "Not Found" };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
 
-    await expect(fetchPage("https://example.com/missing")).rejects.toThrow("HTTP 404 Not Found");
+    await expect(fetchDocument("https://example.com/missing")).rejects.toThrow("HTTP 404 Not Found");
   });
 });

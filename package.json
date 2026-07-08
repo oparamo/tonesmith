@@ -9,7 +9,7 @@
     "test:tools": "vitest run --config tools/vitest.config.ts",
     "coverage": "pnpm -r coverage",
     "clean": "find core cli mcp -name dist -type d | xargs rm -rf",
-    "html-to-md": "tsx tools/html-to-md/index.ts",
+    "doc-to-md": "tsx tools/doc-to-md/index.ts",
     "lint": "eslint core cli mcp tools",
     "lint:fix": "eslint core cli mcp tools --fix",
     "changeset": "changeset",
@@ -17,13 +17,14 @@
   },
   "devDependencies": {
     "@changesets/cli": "2.31.0",
+    "@opendocsg/pdf2md": "0.2.7",
     "@types/node": "24.0.0",
-    "eslint-plugin-sonarjs": "4.1.0",
     "eslint": "10.5.0",
+    "eslint-plugin-sonarjs": "4.1.0",
     "node-html-markdown": "2.0.0",
     "tsx": "4.22.4",
-    "typescript-eslint": "8.62.0",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.62.0",
     "vitest": "4.1.9"
   }
 }
