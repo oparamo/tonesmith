@@ -15,7 +15,7 @@ pnpm build
 After building, the CLI is available at `node cli/dist/index.js`. For a global alias:
 
 ```bash
-pnpm link --global --dir src/cli   # makes `tonesmith` available in your PATH
+pnpm link --global --dir cli   # makes `tonesmith` available in your PATH
 ```
 
 ## CLI
@@ -38,6 +38,9 @@ tonesmith gx1 write <file.tsl> <index|name> <field>=<value> ...
 
 # Copy a patch between files
 tonesmith gx1 copy <src.tsl> <src_idx|name> <dst.tsl> <dst_idx|name>
+
+# Browse device capabilities (all groups / one group / one item)
+tonesmith gx1 capabilities [group] [item]
 ```
 
 ### Write examples
@@ -85,45 +88,50 @@ node mcp/dist/index.js   # runs the server over stdio
 
 MCP tools:
 
-| Tool             | Description                                                   |
-|------------------|---------------------------------------------------------------|
-| `list_devices`   | List supported devices                                        |
-| `read_patch`     | Read one or all patches from a `.tsl` file                    |
-| `generate_patch` | Build a new GX-1 patch from structured parameters and save it |
-| `write_field`    | Edit a single field in an existing patch                      |
+| Tool                 | Description                                                    |
+|----------------------|----------------------------------------------------------------|
+| `list_devices`       | List supported devices                                         |
+| `read_patch`         | Read one or all patches from a patch file                      |
+| `write_field`        | Edit a single field in an existing patch                       |
+| `describe_device`    | Browse a device's capability metadata (groups, types, params)  |
+| `generate_gx1_patch` | Build a new GX-1 patch from structured parameters and save it  |
 
 ## Generating preset packs
 
 ```bash
-pnpm gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl  (8 patches)
-pnpm gen:gilmour     # → core/examples/gx1/gilmour.tsl    (22 patches)
+pnpm --filter @tonesmith/core gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl  (8 patches)
+pnpm --filter @tonesmith/core gen:gilmour     # → core/examples/gx1/gilmour.tsl    (22 patches)
 ```
 
 Tone descriptions are in `core/examples/gx1/bad-bunny.md` and `core/examples/gx1/gilmour.md`.
 
-## Converting a documentation page to Markdown
+## Converting documentation to Markdown
 
-`tools/html-to-md` fetches a URL and converts its HTML to Markdown — one page per run.
+`tools/doc-to-md` converts one documentation source per run — an HTML page or a PDF, from a URL
+or a local file — to Markdown. HTML vs PDF is detected from the content itself; pass
+`--format html|pdf` to override.
 
 ```bash
-pnpm html-to-md <url>              # prints Markdown to stdout
-pnpm html-to-md <url> -o out.md    # writes Markdown to a file
+pnpm doc-to-md <url>                   # HTML page → Markdown on stdout
+pnpm doc-to-md <url> -o out.md         # write to a file instead
+pnpm doc-to-md manual.pdf -o out.md    # local PDF manual → Markdown
 ```
 
 ## Repository layout
 
 ```tree
 core/      @tonesmith/core — codec, types, driver registry, GX-1 driver + builder
-cli/       @tonesmith/cli  — CLI (tonesmith gx1 read/write/copy/new)
-mcp/       @tonesmith/mcp   — MCP server (list_devices, read_patch, generate_patch, write_field)
+cli/       @tonesmith/cli  — CLI (tonesmith gx1 read/write/copy/new/capabilities)
+mcp/       @tonesmith/mcp  — MCP server (list_devices, read_patch, write_field, describe_device, generate_gx1_patch)
 
 core/examples/gx1/
-  bad-bunny.ts / gilmour.ts  preset generators (run with pnpm gen:*)
+  bad-bunny.ts / gilmour.ts  preset generators (run with pnpm --filter @tonesmith/core gen:*)
   bad-bunny.md / gilmour.md  tone-library reference docs
 
-tools/html-to-md/
-  index.ts      fetch a URL, convert to Markdown, print or write it
-  fetch.ts      fetchPage(url) — plain HTTP GET with a browser-like User-Agent
+tools/doc-to-md/
+  index.ts      take a URL or file, convert HTML/PDF to Markdown, print or write it
+  convert.ts    format detection (PDF magic bytes) + HTML/PDF → Markdown conversion
+  fetch.ts      fetchDocument(url) — plain HTTP GET for bytes with a browser-like User-Agent
 
 fixtures/gx1/
   rock-tones.tsl  real-world fixture for codec round-trip tests (shared by core/cli/mcp tests)
@@ -137,8 +145,10 @@ core/docs/gx1/
 ## Development
 
 ```bash
-pnpm build        # compile all workspaces (tsc -b)
-pnpm test         # run Vitest codec round-trip tests
+pnpm build        # compile all workspaces (core via tsc -b; cli/mcp bundled with tsup)
+pnpm lint         # eslint over core, cli, mcp, tools
+pnpm test         # run Vitest suites in all workspaces (build first)
+pnpm coverage     # tests with coverage thresholds (what CI gates on)
 pnpm clean        # remove dist/ directories
 ```
 

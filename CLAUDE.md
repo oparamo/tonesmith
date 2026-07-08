@@ -12,23 +12,27 @@ containing binary-encoded parameter blocks). Designed to support additional devi
 
 ```bash
 pnpm install            # install all workspace deps
-pnpm build              # compile all workspaces (tsc -b with project references)
-pnpm test               # run Vitest (codec round-trip tests in core/)
+pnpm build              # compile all workspaces (core via tsc -b; cli/mcp bundled with tsup)
+pnpm lint               # eslint over core, cli, mcp, tools
+pnpm test               # run Vitest suites in all workspaces (build first — cli/mcp resolve @tonesmith/core through its built dist/)
 pnpm test:watch         # watch mode
-pnpm clean              # rm -rf core/dist cli/dist mcp/dist
+pnpm coverage           # tests with coverage thresholds — what CI gates on (build first, as above)
+pnpm test:tools         # tests for tools/ scripts (doc-to-md)
+pnpm clean              # remove all dist/ directories
 
 # Run the CLI (after pnpm build):
 node cli/dist/index.js gx1 read <file.tsl>
 
 # Run the MCP server (after pnpm build):
-pnpm --filter tonesmith-mcp start
+pnpm --filter @tonesmith/mcp start
 
 # Generate preset packs:
-pnpm --filter tonesmith gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl
-pnpm --filter tonesmith gen:gilmour     # → core/examples/gx1/gilmour.tsl
+pnpm --filter @tonesmith/core gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl
+pnpm --filter @tonesmith/core gen:gilmour     # → core/examples/gx1/gilmour.tsl
 
-# Convert a documentation page to Markdown (prints to stdout; add -o to write a file):
-pnpm html-to-md <url> [-o out.md]
+# Convert a documentation source (HTML page or PDF, URL or local file) to Markdown
+# (prints to stdout; add -o to write a file; format auto-detected, --format overrides):
+pnpm doc-to-md <url|file> [-o out.md] [--format html|pdf]
 ```
 
 The reverse-engineered binary format is in `core/docs/gx1/FORMAT.md` — read it before modifying any
@@ -41,66 +45,83 @@ encode/decode logic. The authoritative reference for parameter names and value r
 fixtures/gx1/
   rock-tones.tsl          real-world fixture (committed — round-trip baseline, shared by core/cli/mcp tests)
 
-core/                       tonesmith
+core/                       @tonesmith/core
   src/
     types/                  device-agnostic type definitions (barrel: types/index.ts)
       patch.ts              Patch, PatchFile, RawPatch
       driver.ts             PatchDriver<T> interface (includes capabilities field)
       capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec
-    registry.ts             registerDriver / getDriver / listDrivers
-    patch-utils.ts          resolvePatchIndex / coerceValue / setByPath
-    index.ts                public re-exports (all of the above + GX-1 symbols)
+    registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
+    patch-utils.ts          resolvePatchIndices / applyFieldEdits / coerceValue / setByPath
+    capability-utils.ts     findGroup / findItem
+    devices/index.ts        driver roster — one line per device
+    index.ts                registers the roster; public re-exports + device namespaces (gx1)
     devices/gx1/
       types/                GX-1 type definitions (barrel: types/index.ts)
         tsl.ts              RawParamSet, TslEnvelope, FxParams
-        blocks.ts           FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock
-        patch.ts            Gx1Patch, Gx1PatchFile
-      constants.ts          ordered lookup arrays + reverse-index maps
-      tsl.ts                readFile / writeFile / blankPatch / newFile
-      gx1.ts                PatchDriver<Gx1Patch> implementation (registered on import)
-      builder.ts            basePatch, amp, odds, fx, ns, delay, reverb, saveTsl
-      raw.ts                RAW unique symbol (attaches raw bytes to decoded objects)
-      capabilities.ts       full GX-1 DeviceCapabilities (fx, odds, amp, cab, mic, delay, reverb, ns, fv)
-      capabilities.test.ts  drift guard — asserts every constant id has a CapabilityItem
-      codec.test.ts         Vitest round-trip snapshot tests
+        blocks.ts           FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock
+        patch.ts            Patch, PatchFile (used namespaced: gx1.Patch)
+      common/               constants.ts (ordered lookup arrays + reverse-index maps) + raw.ts (RAW unique
+                            symbol — attaches raw bytes to decoded objects), barrel index.ts
       codec/                encode/decode pipeline (barrel: codec/index.ts)
         primitives.ts       bytesFromHex / hexFromBytes / lookupName / lookupIndex / toSigned / toUnsigned
-        fields.ts           FieldCodec interface + u8 / signed / lookup / scaled / u16be / decodeFields / encodeFields
-        blocks.ts           per-block encode/decode (amp, od/ds, ns, fv, chain, name, delay, reverb)
+        fields.ts           FieldCodec interface + u8 / signed / lookup / scaled / decodeFields / encodeFields
+        blocks.ts           per-block encode/decode (amp, od/ds, ns, fv, pfx, chain, name, delay, reverb)
         fx-params.ts        decodeFxType / encodeFxType / decodeFxParams / encodeFxParams
         patch.ts            decodePatch / encodePatch (top-level composition)
+      tsl.ts                file I/O — readFile / writeFile / blankPatch / newFile
+      builder.ts            basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, saveTsl
+      capabilities.ts       full GX-1 DeviceCapabilities (fx, pfx, odds, amp, cab, mic, delay, reverb, ns, fv)
+      driver.ts             PatchDriver<Patch> object wiring codec + file I/O together
+      index.ts              device barrel — driver, patch types, builder helpers
+  tests/                    mirrors src/ (patch-utils, registry, capability-utils, devices/gx1/* incl.
+                            codec round-trip suites and both capabilities drift guards)
+    fixtures/gx1/           default-init.tsl — factory-default export, clean-baseline complement to
+                            the shared root fixture
   examples/gx1/
     bad-bunny.ts / gilmour.ts  preset generators using builder.ts
     bad-bunny.md / gilmour.md  tone-library reference docs
-    *.tsl                      gitignored (regenerate via pnpm gen:*)
+    *.tsl                      gitignored (regenerate via pnpm --filter @tonesmith/core gen:*)
   docs/gx1/
     FORMAT.md               reverse-engineered TSL binary format
     gx1_parameter_guide.md  effect parameters and value ranges
     gx1_reference_manual.md hardware operation reference
 
-cli/                        tonesmith-cli  (bin: tonesmith)
+cli/                        @tonesmith/cli  (bin: tonesmith)
   src/
-    capabilities-print.ts   device-agnostic colour printer for DeviceCapabilities
-    index.ts                entry point — device dispatcher → gx1
-    devices/gx1/            GX-1 CLI commands (barrel: devices/gx1/index.ts)
-      command.ts            read / write / copy / new / capabilities commands
-      print.ts              printPatch — GX-1 patch pretty-printer
+    common/                 device-agnostic pieces (barrel: common/index.ts)
+      commands.ts           configureDeviceCommands — shared read / write / copy / new / capabilities
+      capabilities-print.ts color printer for DeviceCapabilities
+    devices/
+      index.ts              CLI device roster — one CliDescriptor per device
+      gx1/                  print.ts (GX-1 patch pretty-printer) + barrel index.ts (descriptor
+                            handing driver + printer to the shared commands)
+    types/                  CliDescriptor (barrel: types/index.ts)
+    program.ts              buildProgram() — assembles the commander program from the roster
+    index.ts                bin entry — shebang + buildProgram().parse()
+  tests/                    behavior tests (in-process commander, per-command suites)
 
-mcp/                        tonesmith-mcp  (bin: tonesmith-mcp)
+mcp/                        @tonesmith/mcp  (bin: tonesmith-mcp)
   src/
-    response.ts             ok / err MCP response helpers
-    schemas.ts              shared zod schemas (FxBlockSchema)
-    index.ts                McpServer over stdio — registers all tools
-    tools/                  MCP tool registrations (barrel: tools/index.ts)
+    common/                 response.ts — ok / err MCP response helpers (barrel: common/index.ts)
+    tools/                  generic tool registrations (barrel: tools/index.ts)
       list-devices.ts       list_devices tool
       read-patch.ts         read_patch tool
-      generate-patch.ts     generate_patch tool
       write-field.ts        write_field tool
       describe-device.ts    describe_device tool
+    devices/
+      index.ts              per-device tool roster
+      gx1/                  generate_gx1_patch tool + its zod schemas (FxBlockSchema)
+    server.ts               buildServer() — registers generic tools, then the device roster
+    index.ts                bin entry — shebang + buildServer() over stdio
+  tests/                    behavior tests (MCP InMemoryTransport, per-tool suites)
 
-tools/html-to-md/
-  index.ts                  CLI — fetch a URL, convert to Markdown, print or write it
-  fetch.ts                  fetchPage(url) — plain HTTP GET with a browser-like User-Agent
+tools/                      repo tooling — not published, not exposed through MCP; shared
+                            tsconfig.json + vitest.config.ts cover every script under tools/
+  doc-to-md/
+    index.ts                CLI — take a URL or file, convert HTML/PDF to Markdown, print or write it
+    convert.ts              detectFormat (PDF magic bytes) + toMarkdown (node-html-markdown / pdf2md)
+    fetch.ts                fetchDocument(url) — plain HTTP GET for bytes with a browser-like User-Agent
 ```
 
 ## Architecture
@@ -108,8 +129,8 @@ tools/html-to-md/
 ```text
 .tsl file (JSON)
   → readFile()       reads JSON envelope, calls decodePatch() on each patch
-  → decodePatch()    hex string → Gx1Patch (all blocks decoded)
-  → encodePatch()    Gx1Patch → raw bytes (start from original, overwrite known indices)
+  → decodePatch()    hex string → gx1.Patch (all blocks decoded)
+  → encodePatch()    gx1.Patch → raw bytes (start from original, overwrite known indices)
   → writeFile()      writes JSON envelope back to disk
 ```
 
@@ -120,7 +141,7 @@ tools/html-to-md/
   Unknown/unused bytes pass through untouched — this prevents file corruption from format fields
   not yet reverse-engineered.
 
-- **Lookup tables:** defined as ordered `const` arrays in `constants.ts`; reverse-index maps
+- **Lookup tables:** defined as ordered `const` arrays in the device's `common/constants.ts`; reverse-index maps
   (`AMP_TYPE_IDX`, etc.) are derived with `Object.fromEntries(list.map((v,i) => [v,i]))`.
 
 - **Builder functions:** no "set" prefix (`amp`, `odds`, `fx`, `ns`, `fv`, `delay`, `reverb`, ...);
@@ -133,7 +154,7 @@ tools/html-to-md/
 
 Device-specific byte layouts, field names, and value tables do **not** live here — they'd bloat
 this file and go stale as devices are added. For GX-1, read `core/docs/gx1/FORMAT.md` (byte-level
-format spec) and `core/src/devices/gx1/types/patch.ts` (current `Gx1Patch` field list) directly
+format spec) and `core/src/devices/gx1/types/patch.ts` (current `gx1.Patch` field list) directly
 when you need that detail; don't duplicate it into this file.
 
 ## MCP server tools
@@ -142,7 +163,7 @@ when you need that detail; don't duplicate it into this file.
 |-------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
 | `list_devices`    | —                                                                         | Returns `[{ id, name }]`                                                                    |
 | `read_patch`      | `file`, `ref?`                                                            | `ref` = index or name; omit for all patches                                                 |
-| `generate_patch`  | `name`, `outPath`, `amp`, `fx1/2/3?`, `odds?`, `ns?`, `delay?`, `reverb?` | Calls builder, saves `.tsl`                                                                 |
+| `generate_gx1_patch` | `name`, `outPath`, `amp`, `chain?`, `key?`, `odds?`, `pfx?`, `fx1/2/3?`, `ns?`, `fv?`, `delay?`, `reverb?` | Per-device tool: calls the GX-1 builder, saves `.tsl`                             |
 | `write_field`     | `file`, `ref`, `field`, `value`                                           | Dot-path mutation, same as CLI `write`                                                      |
 | `describe_device` | `device`, `group?`, `item?`                                               | Returns capability metadata; omit `group` for all groups, add `item` to drill into one type |
 
@@ -156,26 +177,8 @@ node cli/dist/index.js gx1 capabilities amp jc-120 # one amp model detail
 
 ## Adding a new device
 
-1. Create `core/src/devices/<id>/` following the `gx1` domain-grouped layout:
-   - `types/` — type definitions split by domain (`tsl.ts`, `blocks.ts`, `patch.ts`) + barrel `index.ts`
-   - `constants.ts` — ordered lookup arrays + reverse-index maps
-   - `codec/` — encode/decode pipeline following gx1's `primitives/fields/blocks/fx-params/patch` split + barrel `index.ts`
-   - `tsl.ts` — file I/O (readFile / writeFile / blankPatch / newFile)
-   - `builder.ts` — high-level patch-construction helpers
-   - `raw.ts` — unique symbol for attaching raw bytes to decoded objects
-   - `<id>.ts` — `PatchDriver<YourPatch>` implementation, calls `registerDriver` at import time
-2. Author `core/src/devices/<id>/capabilities.ts` — a `DeviceCapabilities` object covering every
-   group (effects, amp, cab, mic, etc.); add a `capabilities.test.ts` drift guard mirroring the
-   GX-1 one. Wire `capabilities` into the driver object in `<id>.ts`.
-3. Re-export the driver from `core/src/index.ts` (import for its side effect).
-4. Create `cli/src/devices/<id>/` with `command.ts` (CLI commands) + `print.ts` (patch printer) + barrel `index.ts`.
-   Register the barrel in `cli/src/index.ts`.
-5. Convert any online reference manuals to Markdown with `pnpm html-to-md <url> -o core/docs/<id>/<name>.md`
-   (one page per run), and add `examples/<id>/` for preset generators.
-6. Write `core/docs/<id>/FORMAT.md`, the reverse-engineered binary format spec — model it on
-   `core/docs/gx1/FORMAT.md`'s structure: envelope shape → a block inventory table (in the same
-   order the format actually stores them) → one section per block, each in that same order,
-   with a shared "encoding conventions" section defined once before the sections that use it →
-   an "out of scope" section at the end for undecoded blocks. Keep it readable top-to-bottom:
-   define a thing before you reference it, avoid "see above" pointers across more than a
-   section or two, and don't make the reader hold context from far earlier in the file.
+Use the **add-device skill** (`.claude/skills/add-device/SKILL.md`) — the single source of truth
+for the full onboarding workflow: documentation capture, binary-format reverse engineering and
+`FORMAT.md` write-up, core driver scaffolding, round-trip proof, capabilities + drift guards,
+CLI/MCP wiring, and changesets. Don't duplicate its steps here; if the workflow changes, update
+the skill.

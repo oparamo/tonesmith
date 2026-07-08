@@ -13,16 +13,52 @@ byte layout, and terminology are discovered fresh. Existing devices are useful o
 layout, field name, or block name from one device onto another.
 
 Work through these checkpoints in order. Each is a real commit boundary — get one solid before
-starting the next.
+starting the next, and leave `pnpm lint && pnpm build && pnpm coverage` green from the repo root
+at every boundary (build **before** coverage — sibling packages resolve `@tonesmith/core` through
+its built `dist/`). Coverage thresholds are ratcheted to the numbers the suite actually achieves,
+so new code lands fully tested or CI fails.
 
 ## 1. Gather documentation
 
-Collect the device's official manual and parameter reference online. Convert each relevant page
-to Markdown and save it under `core/docs/<id>/`:
+Collect the device's official documentation — at minimum the **parameter reference** (every
+effect/model name and its value range; this later becomes the source of truth for the
+capabilities metadata in step 5) and the **operation manual**. Vendors publish these as web
+pages, downloadable PDFs, or both — either works.
+
+Convert each source to Markdown with the repo's `doc-to-md` tool and commit it under
+`core/docs/<id>/`, one source per run:
 
 ```bash
-pnpm html-to-md <url> -o core/docs/<id>/<page>.md
+pnpm doc-to-md <manual-page-url> -o core/docs/<id>/<page>.md      # HTML page
+pnpm doc-to-md <local-path>.pdf -o core/docs/<id>/<manual>.md     # downloaded PDF manual
+pnpm doc-to-md <pdf-url> -o core/docs/<id>/<manual>.md            # PDF straight from a URL
 ```
+
+The tool accepts an http(s) URL or a local file path and detects HTML vs PDF from the content
+itself, so no format flag is normally needed (pass `--format html|pdf` only if detection ever
+guesses wrong). Omitting `-o` prints the Markdown to stdout — useful for a quick look before
+committing. After each conversion, skim the output: PDF extraction in particular can garble
+multi-column layouts and tables, and a parameter table that lost its alignment is worse than
+useless for step 5 — clean up anything mangled before relying on it.
+
+**Traversing the vendor's site is your job, not the tool's.** It converts exactly one URL per
+run and never follows links, and real manual sites are rarely one clean page per topic. Scout
+the structure first: convert the landing/contents page without `-o` and skim the output to find
+the section links worth converting. Expect any of these shapes — a manual split across many
+linked pages, everything collected on one long page, or a navigation shell whose actual content
+lives in iframes (feed the iframe's own URL to the tool, not the shell). A conversion that
+comes back nearly empty, or as pure link soup, usually means you converted a wrapper page —
+look inside it for the real content URL instead of accepting the result.
+
+**Organize the committed files by subject, not by source page.** Aim for one Markdown file per
+section/domain of the manual — whatever the manual's own top-level sections are (parameter
+reference, effect descriptions, hardware operation, ...). Source pagination is a publishing
+artifact: if one section spans several web pages or a PDF, convert the pieces and merge them
+into that section's single file; if one page covers several sections, split it. Don't commit
+one file per fetched page, and don't concatenate the whole manual into a single giant file —
+subject-sized files let a later reader (usually an AI) search just the relevant file instead of
+scanning a monolith. Where sections reference each other, add relative Markdown links between
+the files.
 
 Also obtain a handful of real patch-file exports from the device's own editor software —
 ideally pairs that differ by exactly one parameter, which makes byte-diffing tractable in the
@@ -41,28 +77,37 @@ envelope shape → a block inventory table (in the order the format actually sto
 section per block, in that same order, with a shared "encoding conventions" section defined
 once before any section that relies on it → an "out of scope" section at the end for anything
 observed but not yet decoded. Define a thing before referencing it; don't make the reader hold
-context from far earlier in the file.
+context from far earlier in the file. The finished spec should read top-to-bottom in a single
+pass, with little to no jumping around the page to follow it.
+
+In committed docs and commit messages, describe the vendor's editor software generically —
+never name its internal files, paths, or implementation details.
 
 ## 3. Scaffold the core driver
 
 Create `core/src/devices/<id>/` with:
 - `types/` — type definitions split by domain, plus a barrel `index.ts`
-- `constants.ts` — ordered lookup arrays, with reverse-index maps derived via
-  `Object.fromEntries(list.map((v, i) => [v, i]))`
+- `common/` — shared internals, plus a barrel `index.ts`: `constants.ts` (ordered lookup
+  arrays, with reverse-index maps derived via `Object.fromEntries(list.map((v, i) => [v, i]))`)
+  and `raw.ts` (a unique symbol for stashing a decoded patch's original raw bytes)
 - `codec/` — the encode/decode pipeline, split into primitives, field codecs, per-block
   codecs, and a top-level patch composer, plus a barrel `index.ts`
 - a file-I/O module (`readFile` / `writeFile` / `blankPatch` / `newFile`) — name it after the
   device's own patch-file format, not a borrowed name
 - `builder.ts` — high-level, no-"set"-prefix construction helpers (an unknown field key should
   throw rather than write silently)
-- `raw.ts` — a unique symbol for stashing a decoded patch's original raw bytes
-- `<id>.ts` — the `PatchDriver<T>` implementation; calls `registerDriver` at import time
+- `driver.ts` — exports a `PatchDriver<T>` object wiring the codec and file-I/O functions
+  together (a driver never self-registers)
+- `index.ts` — the device's public barrel: the driver, patch types, and builder helpers
 
 **Round-trip byte preservation is non-negotiable**: the codec must start from the original raw
 bytes and overwrite only the byte indices it has actually decoded. Anything not yet understood
 passes through untouched, so an incomplete format spec never corrupts a file.
 
-Register the new driver in `core/src/index.ts` (import for its side effect only).
+Then wire it up with exactly two lines outside the device directory:
+- one roster line in `core/src/devices/index.ts` (the registration loop in `core/src/index.ts`
+  picks it up from there)
+- one namespace re-export in `core/src/index.ts`: `export * as <id> from "./devices/<id>"`
 
 ## 4. Prove the codec round-trips
 
@@ -70,10 +115,12 @@ Commit one real device export, using its own native file extension, as the share
 baseline for core/cli/mcp tests. Put it at the repo root under `fixtures/<id>/`, not inside
 `core/`.
 
-Write byte-for-byte round-trip tests: decode the fixture, re-encode it, and assert the output
-bytes match the input exactly. Add targeted tests for individual field codecs and any
-lookup-table edge cases (unknown/out-of-range raw values should decode to a clearly-labeled
-sentinel rather than throwing).
+Write byte-for-byte round-trip tests in `core/tests/devices/<id>/`, mirroring the source
+layout: decode the fixture, re-encode it, and assert the output bytes match the input exactly.
+Add targeted tests for individual field codecs and any lookup-table edge cases
+(unknown/out-of-range raw values should decode to a clearly-labeled sentinel rather than
+throwing). Tests are BDD-style (`describe` behavior / `it` does-X) and assert through public
+surfaces — the driver and exported helpers — never internals.
 
 ## 5. Author capabilities metadata
 
@@ -90,17 +137,26 @@ Add two drift guards as tests:
 
 ## 6. Wire the presentation layers
 
-- **CLI**: `cli/src/devices/<id>/` with a `command.ts` (read / write / copy / new /
-  capabilities commands via the shared device-agnostic command wiring) and a `print.ts`
-  (patch pretty-printer). Add one roster line in `cli/src/devices/index.ts`.
-- **MCP**: `mcp/src/devices/<id>/` with a `generate_<id>_patch`-style tool plus any zod schemas
-  it needs. Add one roster line in `mcp/src/devices/index.ts`.
-- **Tests**: behavior tests for both layers — exercise every CLI command and MCP tool against
-  the fixture from step 4, including error paths (bad ref, bad field path, unknown device).
+- **CLI**: `cli/src/devices/<id>/` with a `print.ts` (patch pretty-printer) and a barrel
+  `index.ts` exporting a `CliDescriptor` whose `configure` hands the driver and printer to the
+  shared `configureDeviceCommands` from `cli/src/common` — read / write / copy / new /
+  capabilities all come from that shared wiring; write no per-device command code. Add one
+  roster line in `cli/src/devices/index.ts`.
+- **MCP**: the generic tools (`list_devices`, `read_patch`, `write_field`, `describe_device`)
+  pick the new device up automatically once its driver is in the core roster. Only patch
+  generation is per-device: `mcp/src/devices/<id>/` with a `generate_<id>_patch` tool plus the
+  zod schemas it needs (derive the tool description's type catalog from the driver's
+  capabilities so it can't drift), and one roster line in `mcp/src/devices/index.ts`.
+- **Tests**: behavior tests in `cli/tests/` and `mcp/tests/` — exercise every CLI command and
+  MCP tool against the fixture from step 4, including error paths (bad ref, bad field path,
+  unknown device).
 
-No changeset entry is needed purely for adding a new device (no existing published package's
-public API changes because of it, unless a shared type in `core/src/types/` had to grow — in
-which case changeset only that).
+## 7. Changesets and docs
+
+Adding a device changes every published package that gained it: add one changeset
+(`pnpm changeset`) with a **minor** bump for `@tonesmith/core` (new public device namespace)
+and for `@tonesmith/cli` / `@tonesmith/mcp` (new device support in each surface). Also update
+the device lists in `README.md` and `CLAUDE.md`'s Project section.
 
 ## Reference implementation
 
