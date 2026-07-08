@@ -1,20 +1,17 @@
 .DS_Store
-*.tsl.bak
 
 # Node
 node_modules/
 dist/
 *.tsbuildinfo
-
-# Generated preset outputs (regenerate via pnpm gen:*)
-core/examples/**/*.tsl
-.npmrc
 coverage/
+.npmrc
+
+# Generated preset outputs (regenerate via pnpm --filter @tonesmith/core gen:*)
+core/examples/**/*.tsl
 
 # Track project-level Claude Code files despite personal global gitignore rules
 # (CLAUDE.md and .claude are ignored globally so unrelated repos don't pick up local settings)
 !CLAUDE.md
 !.claude/
-!.claude/skills/
-!.claude/skills/**
 .claude/settings.local.json
