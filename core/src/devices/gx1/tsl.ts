@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { decodePatch, encodePatch, hexFromBytes } from "./codec";
 import { encodeName } from "./codec/blocks";
 import { RAW } from "./common";
@@ -82,6 +83,7 @@ const writeFile = (file: PatchFile, path: string): void => {
       file[RAW].data[1],
     ],
   };
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(envelope, null, 4));
 };
 

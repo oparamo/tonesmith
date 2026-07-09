@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, unlinkSync, readFileSync } from "node:fs";
+import { existsSync, unlinkSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -133,5 +133,17 @@ describe("writeFile + readFile round-trip", () => {
     const reloaded = readFile(tmpPath);
     expect(reloaded.patches).toHaveLength(2);
     expect(reloaded.name).toBe("Test Set");
+  });
+
+  it("creates missing parent directories", () => {
+    const nestedDir = join(tmpdir(), `tonesmith-tsl-test-nested-${process.pid}`);
+    const nestedPath = join(nestedDir, "sub", "patch.tsl");
+    try {
+      const f = newFile("Nested Set", 1);
+      writeFile(f, nestedPath);
+      expect(existsSync(nestedPath)).toBe(true);
+    } finally {
+      rmSync(nestedDir, { recursive: true, force: true });
+    }
   });
 });

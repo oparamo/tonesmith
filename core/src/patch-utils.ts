@@ -1,4 +1,4 @@
-import type { Patch } from "./types";
+import type { Patch, PatchFile, PatchDriver } from "./types";
 
 /**
  * Resolve a patch reference (numeric index string or exact name) to an array index.
@@ -74,4 +74,33 @@ const applyFieldEdits = (
   }
 };
 
-export { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits };
+/** Reads `path` via the driver, or starts a fresh empty file (named after the patch) if it doesn't exist yet. */
+const readExistingOrNew = <T extends Patch>(
+  driver: PatchDriver<T>,
+  path: string,
+  setName: string,
+): PatchFile<T> => {
+  try {
+    return driver.readFile(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return driver.newFile(setName, 0);
+    throw error;
+  }
+};
+
+/**
+ * Saves `patch` into the patch file at `path`, keyed by name: replaces the existing
+ * patch of the same name if one is found, otherwise appends. Creates the file (and,
+ * via the driver's writeFile, any missing parent directories) if `path` doesn't exist
+ * yet. Device-agnostic — works for any PatchDriver, not just gx1.
+ */
+const upsertPatch = <T extends Patch>(driver: PatchDriver<T>, path: string, patch: T): PatchFile<T> => {
+  const file = readExistingOrNew(driver, path, patch.name);
+  const index = file.patches.findIndex(existing => existing.name === patch.name);
+  if (index >= 0) file.patches[index] = patch;
+  else file.patches.push(patch);
+  driver.writeFile(file, path);
+  return file;
+};
+
+export { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch };
