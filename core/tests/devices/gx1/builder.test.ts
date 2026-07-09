@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
   DEFAULT_CHAIN,
   moveBefore,
+  normalizeChain,
+  defaultFxParams,
+  defaultForField,
   basePatch,
   amp,
   odds,
@@ -16,10 +19,10 @@ import {
   delay,
   reverb,
   saveTsl,
-  HIGH_CUT_MAP,
 } from "../../../src/devices/gx1/builder";
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
+import { readFile } from "../../../src/devices/gx1/tsl";
 
 describe("basePatch", () => {
   it("defaults to DEFAULT_CHAIN", () => {
@@ -76,6 +79,33 @@ describe("moveBefore", () => {
     expect(bytesFromHex(encoded.paramSet["MEMORY%CHAIN"])).toEqual(
       [1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]
     );
+  });
+});
+
+describe("normalizeChain", () => {
+  it("returns DEFAULT_CHAIN unchanged when given the full chain in order", () => {
+    expect(normalizeChain(DEFAULT_CHAIN)).toEqual(DEFAULT_CHAIN);
+  });
+
+  it("preserves the caller's relative order, inserting omitted blocks after their nearest present predecessor", () => {
+    const partial = ["FX1", "OD/DS", "AMP", "FX2", "NS", "DLY", "REV"];
+    expect(normalizeChain(partial)).toEqual(
+      ["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"]
+    );
+  });
+
+  it("accepts \"OD\" as an alias for \"OD/DS\"", () => {
+    expect(normalizeChain(["FX1", "OD", "AMP"])).toEqual(
+      ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]
+    );
+  });
+
+  it("throws on an unknown block name", () => {
+    expect(() => normalizeChain(["FX1", "BOGUS"])).toThrow(/unknown chain block "BOGUS"/);
+  });
+
+  it("throws on a duplicate block name", () => {
+    expect(() => normalizeChain(["FX1", "AMP", "FX1"])).toThrow(/duplicate chain block "FX1"/);
   });
 });
 
@@ -161,13 +191,13 @@ describe("clearOdds", () => {
 });
 
 describe("fx", () => {
-  it("sets fx1 block fields", () => {
+  it("sets fx1 block fields, filling in unset params with the type's defaults", () => {
     const patch = basePatch("Test");
     fx(patch, "fx1", "CHORUS", null, { rate: 50, depth: 60 });
     expect(patch.fx1.on).toBe(true);
     expect(patch.fx1.type).toBe("CHORUS");
     expect(patch.fx1.subType).toBeNull();
-    expect(patch.fx1.params).toEqual({ rate: 50, depth: 60 });
+    expect(patch.fx1.params).toEqual({ rate: 50, depth: 60, level: 100, preDelay: 4, direct: 100 });
   });
 
   it("sets fx2 and fx3 independently", () => {
@@ -179,11 +209,11 @@ describe("fx", () => {
     expect(patch.fx3.subType).toBe("STANDARD");
   });
 
-  it("defaults subType to null and params to {}", () => {
+  it("defaults subType to null and params to the type's defaults when omitted", () => {
     const patch = basePatch("Test");
     fx(patch, "fx1", "TREMOLO");
     expect(patch.fx1.subType).toBeNull();
-    expect(patch.fx1.params).toEqual({});
+    expect(patch.fx1.params).toEqual({ rate: 0, depth: 0, level: 50 });
   });
 
   // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS),
@@ -206,6 +236,27 @@ describe("fx", () => {
     const decoded = decodePatch(encodePatch(patch));
     expect(decoded.fx3.type).toBe("OVERTONE");
     expect(decoded.fx3.params).toMatchObject({ lower: 60, upper: 40, unison: 50, direct: 100, detune: 20 });
+  });
+
+  it("accepts an unrecognized FX type with no params, without throwing", () => {
+    const patch = basePatch("Test");
+    expect(() => { fx(patch, "fx1", "BOGUS TYPE"); }).not.toThrow();
+    expect(patch.fx1.type).toBe("BOGUS TYPE");
+    expect(patch.fx1.params).toEqual({});
+  });
+
+  it("throws when a param key isn't valid for the FX type (ROTARY's field is \"speed\", not \"speedSelect\")", () => {
+    const patch = basePatch("Test");
+    expect(() => { fx(patch, "fx1", "ROTARY", null, { speedSelect: "FAST" }); })
+      .toThrow(/fx1 param "speedSelect" is not valid for type "ROTARY"/);
+  });
+
+  it("defaults unset GEQ bands to 0 dB instead of the signed-centre raw byte", () => {
+    const patch = basePatch("Test");
+    fx(patch, "fx1", "HIGH GEQ", null, { level: 80, "4kHz": 5 });
+    expect(patch.fx1.params).toEqual({
+      "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 5, "8kHz": 0, level: 80,
+    });
   });
 });
 
@@ -291,6 +342,37 @@ describe("pfx", () => {
     expect(() => { pfx(patch, "BOGUS TYPE", {}); }).not.toThrow();
     expect(patch.pfx.type).toBe("BOGUS TYPE");
   });
+
+  it("fills every WAH field with sane defaults when called with no params", () => {
+    const patch = basePatch("Test");
+    pfx(patch, "WAH", {});
+    const block = patch.pfx as Record<string, unknown>;
+    expect(block.wahType).toBe("CRY WAH");
+    expect(block.level).toBe(50);
+    expect(block.direct).toBe(0);
+    expect(block.position).toBe(0);
+    expect(block.min).toBe(0);
+    expect(block.max).toBe(0);
+  });
+
+  it("fills PEDAL BEND fields (including signed pitchMin/pitchMax) with sane defaults when called with no params", () => {
+    const patch = basePatch("Test");
+    pfx(patch, "PEDAL BEND", {});
+    const block = patch.pfx as Record<string, unknown>;
+    expect(block.pitchMin).toBe(0);
+    expect(block.pitchMax).toBe(0);
+    expect(block.position).toBe(0);
+    expect(block.level).toBe(50);
+    expect(block.direct).toBe(0);
+  });
+
+  it("lets a partial params object override only some defaults", () => {
+    const patch = basePatch("Test");
+    pfx(patch, "WAH", { level: 90 });
+    const block = patch.pfx as Record<string, unknown>;
+    expect(block.level).toBe(90);
+    expect(block.wahType).toBe("CRY WAH");
+  });
 });
 
 describe("delay", () => {
@@ -302,19 +384,19 @@ describe("delay", () => {
     expect(patch.delay.time).toBe(7);
     expect(patch.delay.feedback).toBe(50);
     expect(patch.delay.level).toBe(60);
-    expect(patch.delay.highCut).toBe(HIGH_CUT_MAP.FLAT);
+    expect(patch.delay.highCut).toBe("FLAT");
   });
 
-  it("resolves high cut string to its numeric value", () => {
+  it("stores the high cut label string directly", () => {
     const patch = basePatch("Test");
     delay(patch, "ANALOG", 1, 40, 50, "2kHz");
-    expect(patch.delay.highCut).toBe(HIGH_CUT_MAP["2kHz"]);
+    expect(patch.delay.highCut).toBe("2kHz");
   });
 
-  it("falls back to FLAT (29) for an unrecognized high cut string", () => {
+  it("throws on encode for an unrecognized high cut label", () => {
     const patch = basePatch("Test");
     delay(patch, "PAN", 1, 30, 40, "UNKNOWN");
-    expect(patch.delay.highCut).toBe(29);
+    expect(() => { encodePatch(patch); }).toThrow(/Unknown highCut value: "UNKNOWN"/);
   });
 
   it("merges extra params", () => {
@@ -333,6 +415,22 @@ describe("delay", () => {
     const patch = basePatch("Test");
     delay(patch, "STANDARD", 7, 50, 60, "FLAT", false);
     expect(patch.delay.on).toBe(false);
+  });
+
+  it("fills SHIMMER's type-specific pitch/balance fields (not covered by any positional param) with sane defaults", () => {
+    const patch = basePatch("Test");
+    delay(patch, "SHIMMER", 1, 40, 50, "FLAT");
+    const block = patch.delay as Record<string, unknown>;
+    expect(block.pitch).toBe(0);
+    expect(block.balance).toBe(0);
+  });
+
+  it("fills WARP's trigger field (entirely uncovered by delay()'s positional params) with a sane default", () => {
+    const patch = basePatch("Test");
+    delay(patch, "WARP", 1, 40, 50);
+    const block = patch.delay as Record<string, unknown>;
+    expect(block.trigger).toBe(0);
+    expect(block.level).toBe(50);
   });
 });
 
@@ -375,6 +473,60 @@ describe("reverb", () => {
     const patch = basePatch("Test");
     reverb(patch, "PLATE", 1.5, 50, 0, 0, 5, 100, false);
     expect(patch.reverb.on).toBe(false);
+  });
+
+  it("fills SUB DELAY's feedback/highCut fields (not covered by any positional param) with sane defaults, preferring FLAT over the table's first entry", () => {
+    const patch = basePatch("Test");
+    reverb(patch, "SUB DELAY", 1, 60);
+    const block = patch.reverb as Record<string, unknown>;
+    expect(block.feedback).toBe(0);
+    expect(block.highCut).toBe("FLAT");
+  });
+
+  it("fills SHIMMER's pitch field with a sane default when the caller doesn't pass it via extra", () => {
+    const patch = basePatch("Test");
+    reverb(patch, "SHIMMER", 1, 60);
+    expect((patch.reverb as Record<string, unknown>).pitch).toBe(0);
+  });
+});
+
+// Anchors defaultFxParams to the one real captured factory-default source we have:
+// core/tests/fixtures/gx1/default-init.tsl. For each FX type actually present there,
+// defaultFxParams(type) must match what the real device shows for that type's params
+// — this is what would have caught the class of bug where an unset GEQ band decoded
+// to −20 dB instead of 0 dB, if defaultFxParams had existed and drifted from reality.
+describe("defaultFxParams (anchored to default-init.tsl)", () => {
+  const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
+  const file = readFile(FIXTURE);
+  const patch = file.patches[0];
+
+  it("matches the fixture's real COMPRESSOR params (fx1)", () => {
+    expect(patch.fx1.type).toBe("COMPRESSOR");
+    expect(defaultFxParams("COMPRESSOR")).toEqual({ sustain: 50, attack: 50, level: 60 });
+    expect(patch.fx1.params).toMatchObject(defaultFxParams("COMPRESSOR"));
+  });
+
+  it("matches the fixture's real PARA. EQ params (fx2)", () => {
+    expect(patch.fx2.type).toBe("PARA. EQ");
+    expect(defaultFxParams("PARA. EQ")).toEqual({
+      lowGain: 0, highGain: 0, level: 0, midFreq: "4kHz", midGain: 0, lowCut: "FLAT", highCut: "FLAT",
+    });
+    expect(patch.fx2.params).toEqual(defaultFxParams("PARA. EQ"));
+  });
+
+  it("matches the fixture's real CHORUS params (fx3)", () => {
+    expect(patch.fx3.type).toBe("CHORUS");
+    expect(defaultFxParams("CHORUS")).toEqual({
+      rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100,
+    });
+    expect(patch.fx3.params).toMatchObject(defaultFxParams("CHORUS"));
+  });
+});
+
+describe("defaultForField", () => {
+  it("throws for a malformed lookup/indexTable field with no table entries", () => {
+    const malformedField = { name: "bogus", kind: "lookup" as const, table: [], decode: () => "", encode: () => undefined };
+    expect(() => defaultForField(malformedField)).toThrow('Field "bogus" has kind "lookup" but no table entries');
   });
 });
 
