@@ -75,6 +75,7 @@ const FX_ITEMS = [
       { name: "RESO",     range: "0-100",          description: "Resonance intensity around the center frequency." },
       { name: "DECAY",    range: "0-100",          description: "Rate at which the filter returns." },
       { name: "LEVEL",    range: "0-100",          description: "Output volume." },
+      { name: "DIRECT",   range: "0-100",          description: "Volume of the direct (unaffected) signal." },
     ],
   },
   {
@@ -181,6 +182,7 @@ const FX_ITEMS = [
       { name: "TRIGGER",   range: "OFF, ON",     description: "Applies feedback when ON." },
       { name: "DEPTH",     range: "0-100",       description: "How readily feedback occurs when the effect is on (NORMAL mode)." },
       { name: "RISE TIME", range: "0-100",       description: "Time for the feedback volume to reach its maximum (OSC mode)." },
+      { name: "OCT RISE TM", range: "0-100",     description: "Time for the octave-up feedback volume to reach its maximum (OSC mode)." },
       { name: "FEEDBACK",  range: "0-100",       description: "Volume of the feedback sound (OSC mode)." },
       { name: "OCT F-BACK", range: "0-100",      description: "Volume of the octave-up feedback sound (OSC mode)." },
     ],
@@ -231,6 +233,8 @@ const FX_ITEMS = [
       { name: "TONE",   range: "-50-+50", description: "Tonal character." },
       { name: "LEVEL",  range: "0-100",   description: "Volume of the effect sound." },
       { name: "DIRECT", range: "0-100",   description: "Volume of the direct signal." },
+      { name: "SOLO",       range: "OFF, ON", description: "Temporary level boost for solo sections." },
+      { name: "SOLO LEVEL", range: "0-100",   description: "Output volume while SOLO is engaged." },
     ],
   },
   {
@@ -303,6 +307,7 @@ const FX_ITEMS = [
       { name: "DEPTH",     range: "0-100",          description: "Depth of the modulation. Set to 0 for a doubling effect." },
       { name: "PRE-DELAY", range: "0.0-40.0 ms",    description: "Pre-delay before the effect sound appears. Longer values create a doubling effect." },
       { name: "LEVEL",     range: "0-100",          description: "Volume of the chorus sound." },
+      { name: "DIRECT",    range: "0-100",          description: "Volume of the direct (unaffected) signal." },
     ],
   },
   {
@@ -315,6 +320,7 @@ const FX_ITEMS = [
       { name: "MANUAL", range: "0-100",      description: "Center frequency of the effect." },
       { name: "RESO",   range: "0-100",      description: "Resonance (feedback) — higher values create a more extreme effect." },
       { name: "LEVEL",  range: "0-100",      description: "Output volume." },
+      { name: "DIRECT", range: "0-100",      description: "Volume of the direct (unaffected) signal." },
     ],
   },
   {
@@ -328,6 +334,7 @@ const FX_ITEMS = [
       { name: "RESO",   range: "0-100",                      description: "Resonance (feedback)." },
       { name: "MANUAL", range: "0-100",                      description: "Center frequency of the phaser." },
       { name: "LEVEL",  range: "0-100",                      description: "Output volume." },
+      { name: "DIRECT", range: "0-100",                      description: "Volume of the direct (unaffected) signal." },
     ],
   },
   {
@@ -366,6 +373,7 @@ const FX_ITEMS = [
       { name: "DRIVE",        range: "0-100",      description: "Amount of preamp distortion." },
       { name: "BALANCE",      range: "0-100",      description: "Balance between treble and bass rotors." },
       { name: "LEVEL",        range: "0-100",      description: "Output volume." },
+      { name: "DIRECT",       range: "0-100",      description: "Volume of the direct (unaffected) signal." },
     ],
   },
   {
@@ -400,6 +408,7 @@ const FX_ITEMS = [
       { name: "ATTACK",  range: "0-100",      description: "Attack volume for the rhythm pattern." },
       { name: "DUTY",    range: "1-99",       description: "Duration of the sound within each slice." },
       { name: "LEVEL",   range: "0-100",      description: "Output volume." },
+      { name: "DIRECT",  range: "0-100",      description: "Volume of the direct (unaffected) signal." },
     ],
   },
   {
@@ -438,6 +447,7 @@ const FX_ITEMS = [
       { name: "VOWEL2", range: "a, e, i, o, u", description: "Second vowel sound." },
       { name: "SENS",   range: "0-100",         description: "Picking sensitivity (PICKING mode)." },
       { name: "RATE",   range: "0-100, BPM",    description: "Cycle speed for vowel alternation." },
+      { name: "MANUAL", range: "0-100",         description: "Manual vowel position (AUTO mode)." },
       { name: "LEVEL",  range: "0-100",         description: "Output volume." },
     ],
   },
@@ -523,11 +533,14 @@ const FX_ITEMS = [
     name: "Delay (FX slot)",
     description: "Delay effect in the FX slot. Adds delayed sound for echo, depth, or special effects. Includes standard, modulated, warp, twist, and glitch types.",
     params: [
-      { name: "TYPE",     range: "STANDARD, MODULATE, WARP, TWIST, GLITCH", description: "Delay algorithm type." },
-      { name: "TIME",     range: "1-2000 ms, BPM",                          description: "Delay time." },
-      { name: "FEEDBACK", range: "0-100",                                   description: "Number of delay repeats." },
-      { name: "LEVEL",    range: "1-120",                                   description: "Volume of the delay sound." },
-      { name: "HIGH CUT", range: "20 Hz-12.5 kHz, FLAT",                    description: "High-cut filter on delay repeats." },
+      { name: "TYPE",      range: "STANDARD, MODULATE, WARP, TWIST, GLITCH", description: "Delay algorithm type." },
+      { name: "TIME",      range: "1-2000 ms, BPM",                          description: "Delay time." },
+      { name: "FEEDBACK",  range: "0-100",                                   description: "Number of delay repeats." },
+      { name: "LEVEL",     range: "1-120",                                   description: "Volume of the delay sound." },
+      { name: "HIGH CUT",  range: "20 Hz-12.5 kHz, FLAT",                    description: "High-cut filter on delay repeats." },
+      { name: "MOD RATE",  range: "0-100, BPM",                              description: "Speed of the modulation on the repeats." },
+      { name: "MOD DEPTH", range: "0-100",                                   description: "Depth of the modulation on the repeats." },
+      { name: "TRIGGER",   range: "OFF, ON",                                 description: "Activates the reversed playback (REVERSE type)." },
     ],
   },
   {
