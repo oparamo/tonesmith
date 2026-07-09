@@ -4,8 +4,6 @@ import { readFile } from "../../../src/devices/gx1/tsl";
 import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
 import { FX_TYPES, RAW } from "../../../src/devices/gx1/common";
-import { HIGH_CUT_MAP, LOW_CUT_MAP } from "../../../src/devices/gx1/builder";
-
 const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
 
 // ── Per-effect-type symmetry tests ────────────────────────────────────────────
@@ -90,8 +88,8 @@ describe("Real device values (default-init.tsl)", () => {
   it("decodes FX2 (active type: PARA. EQ) in real UI display order", () => {
     expect(patch.fx2.type).toBe("PARA. EQ");
     expect(patch.fx2.params).toEqual({
-      lowGain: 0, highGain: 0, level: 0, midFreq: 23,
-      midGain: 0, lowCut: LOW_CUT_MAP.FLAT, highCut: HIGH_CUT_MAP.FLAT,
+      lowGain: 0, highGain: 0, level: 0, midFreq: "4kHz",
+      midGain: 0, lowCut: "FLAT", highCut: "FLAT",
     });
   });
 
@@ -113,7 +111,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX1 shadow bytes for ENHANCER (byte offset 19, reordered fields)", () => {
     expect(decodeFxParams("ENHANCER", fx1Bytes)).toEqual({
-      sens: 50, low: 50, high: 50, lowFreq: 3, highFreq: 4, level: 100,
+      sens: 50, low: 50, high: 50, lowFreq: "63Hz", highFreq: "2kHz", level: 100,
     });
   });
 
@@ -207,7 +205,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX1 shadow bytes for DELAY as an FX-slot type (byte offset 212)", () => {
     expect(decodeFxParams("DELAY", fx1Bytes)).toEqual({
-      type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: 25, modRate: 50, modDepth: 0, trigger: "OFF",
+      type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 0, trigger: "OFF",
     });
   });
 

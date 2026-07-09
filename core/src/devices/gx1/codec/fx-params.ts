@@ -4,6 +4,7 @@ import {
   SBEND_PITCH, SLICER_PAT, HARMONIST_HR,
   DLY_TYPES, REV_TYPES, ON_OFF,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES,
+  FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 } from "../common";
 import type { FxParams } from "../types";
 import { hexFromBytes, lookupName, lookupIndex } from "./primitives";
@@ -45,6 +46,8 @@ const PITCH_SHIFT_PITCH_TABLE: readonly (string | number)[] = [
 /** A field whose raw byte is an index into a fixed table of mixed string/number values. */
 const indexTable = (name: string, offset: number, table: readonly (string | number)[]): FieldCodec => ({
   name,
+  kind: "indexTable",
+  table,
   decode: bytes => table[bytes[offset]],
   encode: (value, bytes) => {
     const index = table.indexOf(value as string | number);
@@ -111,16 +114,16 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "ENHANCER": [
     u8("sens", 0), u8("low", 1), u8("high", 2),
-    u8("lowFreq", 3), u8("highFreq", 4), u8("level", 5),
+    lookup("lowFreq", 3, ENHANCER_LOW_FREQ), lookup("highFreq", 4, ENHANCER_HIGH_FREQ), u8("level", 5),
   ],
   "SLICER": [
     lookup("pattern", 0, SLICER_PAT),
     u8("rate", 1), u8("level", 2), u8("attack", 3), signed("duty", 4, -1), u8("direct", 5),
   ],
-  // midFreq/lowCut/highCut are frequency-index numbers (indices into the same series as HIGH_CUT_MAP).
   "PARA. EQ": [
     signed("lowGain", 0, 20), signed("highGain", 1, 20), signed("level", 2, 20),
-    u8("midFreq", 3), signed("midGain", 4, 20), u8("lowCut", 5), u8("highCut", 6),
+    lookup("midFreq", 3, FREQ_STEPS), signed("midGain", 4, 20),
+    lookup("lowCut", 5, FREQ_LOW_CUT), lookup("highCut", 6, FREQ_HIGH_CUT),
   ],
   // GEQ band gains use signed(centre=20) — each band covers ±20 dB.
   "GEQ": [
@@ -269,7 +272,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   // WARP/TWIST/GLITCH are dedicated-block-only.
   "DELAY": [
     lookup("type", 0, DLY_TYPES), nibbleQuad("time", 1),
-    u8("feedback", 5), u8("level", 6), u8("highCut", 7),
+    u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
     u8("modRate", 8), u8("modDepth", 9), lookup("trigger", 11, ON_OFF),
   ],
   // REVERB as an FX slot type (separate from the dedicated REV block). Only the first
