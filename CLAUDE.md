@@ -28,10 +28,6 @@ node cli/dist/index.js <device> read <file>       # e.g. gx1 read fixtures/gx1/r
 # Run the MCP server (after pnpm build):
 pnpm --filter @tonesmith/mcp start
 
-# Generate preset packs:
-pnpm --filter @tonesmith/core gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl
-pnpm --filter @tonesmith/core gen:gilmour     # → core/examples/gx1/gilmour.tsl
-
 # Convert a documentation source (HTML page or PDF, URL or local file) to Markdown
 # (prints to stdout; add -o to write a file; format auto-detected, --format overrides):
 pnpm doc-to-md <url|file> [-o out.md] [--format html|pdf]
@@ -80,7 +76,6 @@ core/                       @tonesmith/core
                             round-trip + both capabilities drift guards per device)
     fixtures/<id>/          supplementary per-device fixtures (gx1: default-init.tsl, a
                             factory-default clean baseline complementing the root fixture)
-  examples/gx1/             preset generators + tone docs (temporary — removed by the 1.0 docs pass)
   docs/<id>/                captured manuals as subject-sized Markdown + FORMAT.md (the
                             reverse-engineered binary format spec)
 
