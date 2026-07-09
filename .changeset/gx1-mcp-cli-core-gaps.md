@@ -40,3 +40,6 @@ Also: `generate_gx1_patch` and the CLI `new` command now create missing parent d
 file (new `patchUtils.upsertPatch`); `capabilities.ts` gained missing `DIRECT`/`MANUAL`/etc. params
 across several FX types plus new codec↔capabilities drift guards; MCP zod bounds for amp gain,
 delay level, reverb tone/preDelay/density, and odds drive/tone now match the device's real ranges.
+
+Also: the device-agnostic CLI (`read`/`copy`/`new`) and MCP (`read_patch`/`write_field`) command
+descriptions no longer say ".tsl file" — that's GX-1's format, not a property of the shared layer.

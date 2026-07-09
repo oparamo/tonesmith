@@ -22,7 +22,7 @@ const configureDeviceCommands = <T extends Patch>(
 ): void => {
   cmd
     .command("read <file> [ref]")
-    .description("display one or all patches from a .tsl file")
+    .description("display one or all patches from a patch file")
     .action((file: string, ref?: string) => {
       run(() => {
         const patchFile = driver.readFile(file);
@@ -54,7 +54,7 @@ const configureDeviceCommands = <T extends Patch>(
 
   cmd
     .command("copy <src> <srcRef> <dst> <dstRef>")
-    .description("copy a patch from one .tsl file to another")
+    .description("copy a patch from one patch file to another")
     .action((src: string, srcRef: string, dst: string, dstRef: string) => {
       run(() => {
         const srcFile = driver.readFile(src);
@@ -69,7 +69,7 @@ const configureDeviceCommands = <T extends Patch>(
 
   cmd
     .command("new <file> [setName] [nPatches]")
-    .description("create a blank .tsl file")
+    .description("create a blank patch file")
     .action((file: string, setName?: string, patchCountStr?: string) => {
       run(() => {
         if (existsSync(file)) {

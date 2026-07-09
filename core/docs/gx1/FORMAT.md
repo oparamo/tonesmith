@@ -333,7 +333,7 @@ GLITCH.
 | 2–5     | time (16-bit, 4 hex-digit nibbles, MSB first) | STANDARD, MODULATE, PAN, REVERSE, ANLG MOD, SPACE ECHO, SHIMMER, WARP   |
 | 6       | feedback                                      | STANDARD, MODULATE, PAN, REVERSE, ANALOG, ANLG MOD, SPACE ECHO, SHIMMER |
 | 7       | level                                         | same set as feedback                                                    |
-| 8       | highCut (index into `FREQ_HIGH_CUT`)         | same set as feedback                                                    |
+| 8       | highCut (index into `FREQ_HIGH_CUT`)          | same set as feedback                                                    |
 | 9       | modRate                                       | MODULATE, ANLG MOD                                                      |
 | 10      | modDepth                                      | MODULATE, ANLG MOD                                                      |
 | 11      | tapTime                                       | PAN                                                                     |
