@@ -15,7 +15,7 @@ const printHeader = (patch: gx1.Patch, index?: number): void => {
   console.info(`\n${"━".repeat(52)}`);
   console.info(`  ${label}${patch.name}`);
   console.info("━".repeat(52));
-  console.info(`  Chain: ${patch.chain.join(" → ")}`);
+  console.info(`  Chain: ${patch.chain.join(", ")}`);
   console.info(`  Key: ${patch.key}`);
 };
 

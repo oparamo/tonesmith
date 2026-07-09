@@ -76,4 +76,21 @@ describe("gx1 write", () => {
     const { exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "nonexistent.foo=1"]);
     expect(exitCode).toBe(1);
   });
+
+  it("writes a lookup field by label and shows the label on re-read", async () => {
+    temp = withTempDir();
+    const written = await runCli(["gx1", "write", temp.fixture, "0", "delay.highCut=2.5kHz"]);
+    expect(written.exitCode, written.error.join("\n")).toBeUndefined();
+    expect(gx1.driver.readFile(temp.fixture).patches[0].delay.highCut).toBe("2.5kHz");
+
+    const { info } = await runCli(["gx1", "read", temp.fixture, "0"]);
+    expect(info.join("\n")).toContain("highCut=2.5kHz");
+  });
+
+  it("exits with an error for a label not in the field's table", async () => {
+    temp = withTempDir();
+    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "delay.highCut=2.6kHz"]);
+    expect(exitCode).toBe(1);
+    expect(error.join("\n")).toContain('Unknown highCut value: "2.6kHz"');
+  });
 });

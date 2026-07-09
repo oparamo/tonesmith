@@ -40,4 +40,19 @@ describe("gx1 read", () => {
     expect(exitCode).toBe(1);
     expect(error.length).toBeGreaterThan(0);
   });
+
+  it("prints the chain as a comma-separated list, not arrows", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, "0"]);
+    expect(exitCode, error.join("\n")).toBeUndefined();
+    const output = info.join("\n");
+    expect(output).toContain(`Chain: ${expected.patches[0].chain.join(", ")}`);
+    expect(output).not.toContain("→");
+  });
+
+  it("prints lookup-shaped fields (delay highCut) as their label, not a raw index", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, "0"]);
+    expect(exitCode, error.join("\n")).toBeUndefined();
+    const output = info.join("\n");
+    expect(output).toContain(`highCut=${String(expected.patches[0].delay.highCut)}`);
+  });
 });

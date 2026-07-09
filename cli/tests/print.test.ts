@@ -32,14 +32,14 @@ describe("printPatch", () => {
     expect(output).toContain("Solo=ON(75)");
   });
 
-  it("omits the params line for an FX slot with no params", () => {
+  it("shows the type's default params for an FX slot the caller didn't configure", () => {
     const patch = gx1.basePatch("Test");
     gx1.fx(patch, "fx1", "TREMOLO");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     printPatch(patch, 0);
     const output = info.mock.calls.map(call => String(call[0])).join("\n");
     expect(output).toContain("FX1 [ON]  TREMOLO");
-    expect(output).not.toMatch(/FX1.*\n\s+\w+=/);
+    expect(output).toContain("rate=0  depth=0  level=50");
   });
 
   it("omits the params line for a block whose type has no known fields", () => {
@@ -52,5 +52,15 @@ describe("printPatch", () => {
     const output = info.mock.calls.map(call => String(call[0])).join("\n");
     expect(output).toContain("PFX [ON]  BOGUS TYPE");
     expect(output).not.toMatch(/PFX.*\n\s+\w+=/);
+  });
+
+  it("omits the params line for an FX slot whose type has no known fields", () => {
+    const patch = gx1.basePatch("Test");
+    gx1.fx(patch, "fx1", "BOGUS EFFECT");
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    printPatch(patch, 0);
+    const output = info.mock.calls.map(call => String(call[0])).join("\n");
+    expect(output).toContain("FX1 [ON]  BOGUS EFFECT");
+    expect(output).not.toMatch(/FX1.*\n\s+\w+=/);
   });
 });
