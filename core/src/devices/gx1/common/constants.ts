@@ -104,6 +104,33 @@ const HARMONIST_HR = [
   "+2oct", "+3rd&+5th", "+3rd&-4th",
 ] as const;
 
+// The 1/3-octave series shared by every frequency-stepped lookup field (delay/reverb
+// highCut, PARA. EQ lowCut/highCut/midFreq). 29 steps, 20Hz–12.5kHz.
+const FREQ_STEPS = [
+  "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz",
+  "63Hz", "80Hz", "100Hz", "125Hz", "160Hz",
+  "200Hz", "250Hz", "315Hz", "400Hz", "500Hz",
+  "630Hz", "800Hz", "1kHz", "1.25kHz", "1.6kHz",
+  "2kHz", "2.5kHz", "3.15kHz", "4kHz",
+  "5kHz", "6.3kHz", "8kHz", "10kHz", "12.5kHz",
+] as const;
+
+// FREQ_STEPS plus a trailing FLAT (index 29) — used by delay/PARA. EQ highCut.
+const FREQ_HIGH_CUT = [...FREQ_STEPS, "FLAT"] as const;
+
+// FLAT first (index 0), then FREQ_STEPS ascending — used by PARA. EQ lowCut.
+const FREQ_LOW_CUT = ["FLAT", ...FREQ_STEPS] as const;
+
+// ENHANCER's LOW FREQ / HIGH FREQ bands. The manual (gx1_parameter_guide.md) only
+// documents the outer bounds (31.5 Hz–125 Hz / 800 Hz–8.00 kHz); the intermediate
+// steps aren't pinned down by any captured source, so this uses the same 1/3-octave
+// series as FREQ_STEPS, restricted to each band's documented range.
+const ENHANCER_LOW_FREQ = ["31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"] as const;
+const ENHANCER_HIGH_FREQ = [
+  "800Hz", "1kHz", "1.25kHz", "1.6kHz", "2kHz",
+  "2.5kHz", "3.15kHz", "4kHz", "5kHz", "6.3kHz", "8kHz",
+] as const;
+
 // The patch's song key (MEMORY%OTHER byte 4) — HARMONIST_HR's scale-degree entries
 // (+2nd, +3rd, +6th, etc.) are diatonic, so the actual semitone shift HARMONIST applies
 // depends on this key.
@@ -131,4 +158,5 @@ export {
   VIBE_MODES, HUM_MODES, HUM_VOWELS, RING_INTL, SBEND_PITCH, FB_MODE,
   SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
   HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, KEY_NAMES, KEY_IDX,
+  FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 };

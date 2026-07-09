@@ -1,9 +1,79 @@
 import { describe, it, expect } from "vitest";
-import type { Patch } from "../src/types";
-import { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits } from "../src/patch-utils";
+import type { Patch, PatchFile, PatchDriver } from "../src/types";
+import {
+  resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch,
+} from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
   ({ name });
+
+/** In-memory PatchDriver stand-in — upsertPatch is device-agnostic, so this proves it works against the PatchDriver interface alone, not gx1 specifics. */
+const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
+  id: "fake",
+  name: "Fake",
+  capabilities: { groups: [] },
+  readFile: (path) => {
+    const file = files.get(path);
+    if (!file) {
+      const error = new Error(`ENOENT: no such file, open '${path}'`) as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      throw error;
+    }
+    return file;
+  },
+  writeFile: (file, path) => { files.set(path, file); },
+  newFile: (setName, nPatches = 1) => ({
+    name: setName, device: "FAKE",
+    patches: Array.from({ length: nPatches }, () => makePatch("blank")),
+  }),
+  blankPatch: (name = "blank") => makePatch(name),
+  decodePatch: (raw) => raw as unknown as Patch,
+  encodePatch: (patch) => patch as unknown as Record<string, unknown>,
+});
+
+describe("upsertPatch", () => {
+  it("creates a new file when the path doesn't exist yet", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const patch = makePatch("Lead");
+
+    const file = upsertPatch(driver, "new.tsl", patch);
+
+    expect(file.patches).toEqual([patch]);
+    expect(files.get("new.tsl")).toBe(file);
+  });
+
+  it("appends when no patch in the existing file shares the name", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Set", device: "FAKE", patches: [makePatch("Lead")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+
+    const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+
+    expect(file.patches.map(p => p.name)).toEqual(["Lead", "Rhythm"]);
+  });
+
+  it("replaces the patch with the same name in place, idempotent across reruns", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Set", device: "FAKE", patches: [makePatch("Lead"), makePatch("Rhythm")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+
+    upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+    const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+
+    expect(file.patches.map(p => p.name)).toEqual(["Lead", "Rhythm"]);
+  });
+
+  it("propagates non-ENOENT errors from readFile", () => {
+    const driver: PatchDriver = {
+      ...makeFakeDriver(new Map()),
+      readFile: () => { throw new Error("disk on fire"); },
+    };
+    expect(() => upsertPatch(driver, "set.tsl", makePatch("Lead"))).toThrow("disk on fire");
+  });
+});
 
 describe("resolvePatchIndex", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Rock Lead")];

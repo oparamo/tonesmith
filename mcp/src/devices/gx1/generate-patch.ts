@@ -1,13 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { gx1, capabilityUtils } from "@tonesmith/core";
-const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, saveTsl } = gx1;
+import { gx1, capabilityUtils, patchUtils } from "@tonesmith/core";
+const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, normalizeChain } = gx1;
 import { ok, err } from "../../common";
 import { FxBlockSchema } from "./schemas";
-
-/** Parses a ">"-delimited chain key (e.g. "FX1>OD>AMP>NS>DLY>REV") into node names. */
-const parseChain = (chain: string | undefined): string[] | undefined =>
-  chain?.split(">").map(node => (node.trim() === "OD" ? "OD/DS" : node.trim()));
 
 /** Builds the type-catalog block of the tool description straight from gx1 capabilities, so it can't drift from constants.ts. */
 const buildCatalog = (): string => {
@@ -35,29 +31,37 @@ FV curves: ${paramRange("fv", "CURVE")}`;
 
 const inputSchema = z.object({
   name: z.string().max(13).describe("Patch name (max 13 characters)"),
-  outPath: z.string().describe("Output file path (e.g. my-tone.tsl)"),
-  chain: z.string().optional().describe('Signal chain key (default "FX1>AMP>NS>DLY>REV")'),
+  outPath: z.string().describe(
+    "Output file path (e.g. my-tone.tsl). Parent directories are created if missing. " +
+    "Generation upserts by patch name: an existing file with a patch of this name has it replaced; " +
+    "otherwise the patch is appended; a missing file is created."
+  ),
+  chain: z.array(z.string()).optional().describe(
+    'Signal chain as an ordered array of block names, first element = first in the chain ' +
+    '(e.g. ["FX1","OD","AMP","NS","DLY","REV"]). Omitted blocks are inserted at their default relative ' +
+    'position (default full chain: PFX, FX1, OD/DS, AMP, NS, FV, FX2, FX3, DLY, REV). "OD" is an alias for "OD/DS".'
+  ),
   key: z.string().optional().describe(
     "Song key for HARMONIST's diatonic intervals: C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B (default C)"
   ),
 
   amp: z.object({
     type: z.string().describe("Amplifier model"),
-    gain: z.number().int().min(0).max(100).describe("Gain 0–100"),
+    gain: z.number().int().min(0).max(120).describe("Gain 0–120"),
     bass: z.number().int().min(0).max(100).describe("Bass EQ 0–100 (50=flat)"),
     mid: z.number().int().min(0).max(100).describe("Mid EQ 0–100 (50=flat)"),
     treble: z.number().int().min(0).max(100).describe("Treble EQ 0–100 (50=flat)"),
     speaker: z.string().optional().describe("Cabinet model (default ORIGINAL)"),
     mic: z.string().optional().describe("Microphone model (default DYN57)"),
-    level: z.number().int().min(0).max(120).optional().describe("Output level 0–120 (default 100)"),
+    level: z.number().int().min(0).max(100).optional().describe("Output level 0–100 (default 100)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: z.number().int().min(0).max(100).optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
   }).describe("Amplifier block (required)"),
 
   odds: z.object({
     type: z.string().describe("OD/DS pedal type (e.g. BLUES OD, CRUNCH, METAL, DIST, FUZZ)"),
-    drive: z.number().int().min(0).max(100).describe("Drive 0–100"),
-    tone: z.number().int().min(0).max(100).describe("Tone 0–100"),
+    drive: z.number().int().min(1).max(120).describe("Drive 1–120"),
+    tone: z.number().int().min(-50).max(50).describe("Tone −50–+50"),
     level: z.number().int().min(0).max(100).describe("Level 0–100"),
     direct: z.number().int().min(0).max(100).optional().describe("Direct mix 0–100 (default 0)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
@@ -82,7 +86,7 @@ const inputSchema = z.object({
     release: z.number().int().min(0).max(100).describe("Release time 0–100"),
     on: z.boolean().optional().describe("Enable NS (default true)"),
     detect: z.string().optional().describe("Detection point: INPUT or NS INPUT (default INPUT)"),
-  }).optional().describe("Noise suppressor. Omit to use defaults."),
+  }).optional().describe("Noise suppressor. Omit to leave disabled."),
 
   fv: z.object({
     position: z.number().int().min(0).max(100).describe("Pedal position 0–100"),
@@ -93,9 +97,9 @@ const inputSchema = z.object({
 
   delay: z.object({
     type: z.string().describe("Delay type (STANDARD, MODULATE, PAN, REVERSE, ANALOG, ANLG MOD, SPACE ECHO, SHIMMER, WARP, TWIST, GLITCH)"),
-    timeMs: z.number().describe("Delay time in milliseconds"),
+    timeMs: z.number().min(1).max(2000).describe("Delay time in milliseconds, 1–2000"),
     feedback: z.number().int().min(0).max(100).describe("Feedback 0–100"),
-    level: z.number().int().min(0).max(100).describe("Effect level 0–100"),
+    level: z.number().int().min(1).max(120).describe("Effect level 1–120"),
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
     on: z.boolean().optional().describe("Enable delay (default true)"),
     extra: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
@@ -106,12 +110,12 @@ const inputSchema = z.object({
 
   reverb: z.object({
     type: z.string().describe("Reverb type (HALL S, HALL M, PLATE, ROOM S, ROOM L, AMBIENCE, SPRING, SHIMMER, SUB DELAY, TERA ECHO)"),
-    timeS: z.number().describe("Reverb time in seconds"),
-    level: z.number().int().min(0).max(100).describe("Effect level 0–100"),
-    preDelay: z.number().optional().describe("Pre-delay in ms 0–100 (default 0)"),
-    tone: z.number().int().optional().describe("Tone EQ −12 to +12 (default 0)"),
-    density: z.number().int().optional().describe("Density 1–10 (default 5)"),
-    direct: z.number().int().optional().describe("Direct level 0–100 (default 100)"),
+    timeS: z.number().min(0.1).max(10.0).describe("Reverb time in seconds, 0.1–10.0"),
+    level: z.number().int().min(1).max(100).describe("Effect level 1–100"),
+    preDelay: z.number().min(0).max(200).optional().describe("Pre-delay in ms 0–200 (default 0)"),
+    tone: z.number().int().min(-50).max(50).optional().describe("Tone EQ −50–+50 (default 0)"),
+    density: z.number().int().min(1).max(10).optional().describe("Density 1–10 (default 5)"),
+    direct: z.number().int().min(0).max(100).optional().describe("Direct level 0–100 (default 100)"),
     on: z.boolean().optional().describe("Enable reverb (default true)"),
     extra: z.record(z.string(), z.number()).optional().describe(
       "Extra type-specific params (e.g. { pitch: 12 } for SHIMMER)"
@@ -156,25 +160,42 @@ const applyReverb = (patch: Patch, reverbParams: GeneratePatchInput["reverb"]): 
   reverb(patch, reverbParams.type, reverbParams.timeS, reverbParams.level, reverbParams.preDelay, reverbParams.tone, reverbParams.density, reverbParams.direct, reverbParams.on ?? true, reverbParams.extra ?? {});
 };
 
+/** Counts patches already saved at `path`, or 0 if the file doesn't exist yet. */
+const countExistingPatches = (path: string): number => {
+  try {
+    return gx1.driver.readFile(path).patches.length;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+    throw error;
+  }
+};
+
+const describeUpsertAction = (patchCountBefore: number, patchCountAfter: number): string => {
+  if (patchCountBefore === 0) return "Created";
+  const verb = patchCountAfter > patchCountBefore ? "Appended" : "Replaced";
+  return verb;
+};
+
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
     "generate_gx1_patch",
     {
       description: `Build a BOSS GX-1 patch from structured parameters and save it as a .tsl file.
 
-Signal chains:
-  "FX1>AMP>NS>DLY>REV"        — FX1 before amp (most common)
-  "FX1>AMP>FX2>NS>DLY>REV"   — FX1 before amp, FX2 in loop
-  "FX1>AMP>NS>REV"            — no delay
-  "FX1>OD>AMP>NS>DLY>REV"    — OD/DS in chain
-  "FX1>OD>AMP>FX2>NS>DLY>REV"
+Signal chain: omit it to use the full default order —
+  ["PFX","FX1","OD/DS","AMP","NS","FV","FX2","FX3","DLY","REV"]
+— or pass just the blocks you care about, in the order you want them relative to each
+other (e.g. ["OD/DS","FX1","AMP"] to move OD/DS ahead of FX1). Any block you leave out
+is inserted at its default position, so you never have to spell out the whole chain to
+change one part of it. "OD" is accepted as shorthand for "OD/DS".
 
 ${buildCatalog()}`,
       inputSchema,
     },
     (params) => {
       try {
-        const patch = basePatch(params.name, parseChain(params.chain), params.key);
+        const chain = params.chain === undefined ? undefined : normalizeChain(params.chain);
+        const patch = basePatch(params.name, chain, params.key);
 
         const ampParams = params.amp;
         amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.mid, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level, ampParams.solo, ampParams.soloLevel);
@@ -191,8 +212,10 @@ ${buildCatalog()}`,
         applyDelay(patch, params.delay);
         applyReverb(patch, params.reverb);
 
-        saveTsl([patch], params.name, params.outPath);
-        return ok(`Saved patch "${params.name}" → ${params.outPath}`);
+        const patchCountBefore = countExistingPatches(params.outPath);
+        const file = patchUtils.upsertPatch(gx1.driver, params.outPath, patch);
+        const verb = describeUpsertAction(patchCountBefore, file.patches.length);
+        return ok(`${verb} patch "${params.name}" → ${params.outPath} (${file.patches.length} patch(es) total)`);
       } catch (error) {
         return err(error);
       }

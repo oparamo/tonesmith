@@ -92,15 +92,6 @@ MCP tools:
 | `describe_device`     | Browse a device's capability metadata (groups, types, params)                                       |
 | `generate_<id>_patch` | Build a new patch from structured parameters — one tool per device (currently `generate_gx1_patch`) |
 
-## Generating preset packs
-
-```bash
-pnpm --filter @tonesmith/core gen:bad-bunny   # → core/examples/gx1/bad-bunny.tsl  (8 patches)
-pnpm --filter @tonesmith/core gen:gilmour     # → core/examples/gx1/gilmour.tsl    (22 patches)
-```
-
-Tone descriptions are in `core/examples/gx1/bad-bunny.md` and `core/examples/gx1/gilmour.md`.
-
 ## Converting documentation to Markdown
 
 `tools/doc-to-md` converts one documentation source per run — an HTML page or a PDF, from a URL

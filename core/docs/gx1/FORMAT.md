@@ -154,13 +154,13 @@ where a given type's own parameters live.
 `p[0]`=sens `p[1]`=riseTime `p[2]`=level
 
 **ENHANCER** — starts at byte 19; p[0..5]
-`p[0]`=sens `p[1]`=low `p[2]`=high `p[3]`=lowFreq `p[4]`=highFreq `p[5]`=level
+`p[0]`=sens `p[1]`=low `p[2]`=high `p[3]`=lowFreq (index into `ENHANCER_LOW_FREQ`, `common/constants.ts`) `p[4]`=highFreq (index into `ENHANCER_HIGH_FREQ`) `p[5]`=level
 
 **SLICER** — starts at byte 25; p[0..5]
 `p[0]`=pattern (0–19 = PATTERN 1–20) `p[1]`=rate `p[2]`=level `p[3]`=attack `p[4]`=duty (signed, centre=-1: display=raw+1) `p[5]`=direct
 
 **PARA. EQ** — starts at byte 31; p[0..6]  *(EQ gains use centre=20)*
-`p[0]`=lowGain (signed20) `p[1]`=highGain (signed20) `p[2]`=level (signed20) `p[3]`=midFreq `p[4]`=midGain (signed20) `p[5]`=lowCut (see `LOW_CUT_MAP`, `builder.ts`) `p[6]`=highCut (see `HIGH_CUT_MAP`)
+`p[0]`=lowGain (signed20) `p[1]`=highGain (signed20) `p[2]`=level (signed20) `p[3]`=midFreq (index into `FREQ_STEPS`, `common/constants.ts`) `p[4]`=midGain (signed20) `p[5]`=lowCut (index into `FREQ_LOW_CUT`) `p[6]`=highCut (index into `FREQ_HIGH_CUT`)
 
 **GEQ** — starts at byte 38; p[0..6]
 `p[0..5]`=bands 125Hz/250Hz/500Hz/1kHz/2kHz/4kHz (signed20) `p[6]`=level (signed20)
@@ -273,7 +273,7 @@ diatonic intervals resolve against isn't stored here — it's the patch-level `k
 `p[0]`=pitch (signed12: raw-12, range -12..0 semitones)
 
 **DELAY** *(when FX slot type=DELAY)* — starts at byte 212; p[0..9]  *(only STANDARD/MODULATE/PAN/REVERSE/ANALOG are reachable — WARP/TWIST/GLITCH are dedicated-DLY-block-only)*
-`p[0]`=type (0..4) `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut `p[8]`=modRate `p[9]`=modDepth, plus `p[11]`=trigger (0=OFF,1=ON, used by REVERSE)
+`p[0]`=type (0..4) `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut (index into `FREQ_HIGH_CUT`, `common/constants.ts`) `p[8]`=modRate `p[9]`=modDepth, plus `p[11]`=trigger (0=OFF,1=ON, used by REVERSE)
 
 **REVERB** *(when FX slot type=REVERB)* — starts at byte 231; p[0..5]  *(only HALL S/HALL M/PLATE/ROOM S/ROOM L are reachable)*
 `p[0]`=type index (0..4) `p[1]`=time (raw × 0.1) `p[2..3]`=preDelay (8-bit) `p[4]`=level `p[5]`=direct
@@ -333,7 +333,7 @@ GLITCH.
 | 2–5     | time (16-bit, 4 hex-digit nibbles, MSB first) | STANDARD, MODULATE, PAN, REVERSE, ANLG MOD, SPACE ECHO, SHIMMER, WARP   |
 | 6       | feedback                                      | STANDARD, MODULATE, PAN, REVERSE, ANALOG, ANLG MOD, SPACE ECHO, SHIMMER |
 | 7       | level                                         | same set as feedback                                                    |
-| 8       | highCut                                       | same set as feedback                                                    |
+| 8       | highCut (index into `FREQ_HIGH_CUT`)          | same set as feedback                                                    |
 | 9       | modRate                                       | MODULATE, ANLG MOD                                                      |
 | 10      | modDepth                                      | MODULATE, ANLG MOD                                                      |
 | 11      | tapTime                                       | PAN                                                                     |
@@ -380,7 +380,7 @@ As with MEMORY%DLY, several fields are shared across types at the same address
 | 11–14   | time (16-bit, own field, ms)              | SUB DELAY                                                       |
 | 15      | level (own field)                         | SUB DELAY                                                       |
 | 16      | feedback                                  | SUB DELAY, TERA ECHO                                            |
-| 17      | highCut                                   | SUB DELAY                                                       |
+| 17      | highCut (index into `FREQ_HIGH_CUT`)      | SUB DELAY                                                       |
 | 18      | spreadTime ("S-TIME")                     | TERA ECHO                                                       |
 | 19      | trigger                                   | TERA ECHO                                                       |
 

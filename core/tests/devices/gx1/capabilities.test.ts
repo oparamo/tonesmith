@@ -12,7 +12,11 @@ import {
 } from "../../../src/devices/gx1/common";
 import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
 import { FX_PARAM_MAPS } from "../../../src/devices/gx1/codec/fx-params";
-import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS } from "../../../src/devices/gx1/codec/blocks";
+import {
+  PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS,
+  decodeAmp, decodeOdDs, decodeNs, decodeFv,
+} from "../../../src/devices/gx1/codec/blocks";
+import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import type { CapabilityItem } from "../../../src/types";
 
 const groupItems = (groupId: string): CapabilityItem[] =>
@@ -112,35 +116,67 @@ describe("GX-1 capabilities drift guard", () => {
 // capabilities.ts and the codec's field maps drift apart silently (e.g. FIXED WAH's
 // FREQ/wahType mismatch).
 describe("GX-1 capabilities/codec semantic drift guard", () => {
-  // Capability params with no direct codec field match, for a documented reason —
-  // not drift. Every other param must normalize-match a real codec field name.
-  const FX_PARAM_EXCEPTIONS: Record<string, Set<string>> = {
+  // Fields whose codec name and capabilities label deliberately differ in wording — not
+  // drift. Maps FX type -> codec field name -> the capabilities param name it corresponds to.
+  const FX_FIELD_ALIASES: Record<string, Record<string, string>> = {
     // codec field is "octFeedback"; capabilities label matches the hardware's own knob text.
-    "FEEDBACKER": new Set(["OCT F-BACK"]),
+    "FEEDBACKER": { octFeedback: "OCT F-BACK" },
     // stage count (4/8/12) is derived from the codec's numeric "stage" field, not a lookup-named one.
-    "PHASER": new Set(["TYPE"]),
+    "PHASER": { stage: "TYPE" },
     // codec field is "speed"; capabilities label matches the hardware's own knob text.
-    "ROTARY": new Set(["SPEED SELECT"]),
+    "ROTARY": { speed: "SPEED SELECT" },
+    // codec fields are "minus1Oct"/"minus2Oct"; capabilities labels match the hardware's own knob text.
+    "OCTAVE": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
+    "HEAVY OCT": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
+  };
+
+  // Capability params with no codec field at all, for a documented reason — not drift.
+  const FX_PARAM_ONLY_EXCEPTIONS: Record<string, Set<string>> = {
     // KEY is the patch's global key (Patch.key), not a per-effect param.
     "HARMONIST": new Set(["KEY"]),
-    // codec fields are "minus1Oct"/"minus2Oct"; capabilities labels match the hardware's own knob text.
-    "OCTAVE": new Set(["-1 OCT", "-2 OCT"]),
-    "HEAVY OCT": new Set(["-1 OCT", "-2 OCT"]),
   };
+
+  const aliasTargets = (fxType: string): Set<string> =>
+    new Set(Object.values(FX_FIELD_ALIASES[fxType] ?? {}));
 
   it("every fx item's params match a codec field in FX_PARAM_MAPS", () => {
     for (const item of groupItems("fx")) {
       const codecFields = FX_PARAM_MAPS[item.id];
       expect(codecFields, `FX item "${item.id}" has no FX_PARAM_MAPS entry`).toBeDefined();
+      if (!codecFields) continue;
 
       const codecNames = codecFieldNames(codecFields);
-      const exceptions = FX_PARAM_EXCEPTIONS[item.id] ?? new Set<string>();
+      const targets = aliasTargets(item.id);
+      const paramOnlyExceptions = FX_PARAM_ONLY_EXCEPTIONS[item.id] ?? new Set<string>();
       for (const param of item.params ?? []) {
-        if (exceptions.has(param.name)) continue;
+        const matches = paramOnlyExceptions.has(param.name)
+          || codecNames.has(normalize(param.name))
+          || targets.has(param.name);
         expect(
-          codecNames,
+          matches,
           `FX item "${item.id}" param "${param.name}" has no matching codec field in FX_PARAM_MAPS["${item.id}"]`
-        ).toContain(normalize(param.name));
+        ).toBe(true);
+      }
+    }
+  });
+
+  // The reverse direction: every codec field FX_PARAM_MAPS actually decodes must be
+  // documented as a capabilities param, or describe_device/the CLI under-report it (the
+  // bug that left CHORUS/FLANGER/PHASER/ROTARY's DIRECT param undocumented).
+  it("every codec field in FX_PARAM_MAPS has a matching fx item param", () => {
+    for (const item of groupItems("fx")) {
+      const codecFields = FX_PARAM_MAPS[item.id];
+      if (!codecFields) continue;
+
+      const normalizedParamNames = new Set((item.params ?? []).map(param => normalize(param.name)));
+      const aliases = FX_FIELD_ALIASES[item.id] ?? {};
+      for (const field of codecFields) {
+        if (field.name === "type") continue;
+        const matches = normalizedParamNames.has(normalize(field.name)) || field.name in aliases;
+        expect(
+          matches,
+          `FX item "${item.id}" codec field "${field.name}" is missing from its capabilities params`
+        ).toBe(true);
       }
     }
   });
@@ -170,6 +206,33 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
     }
   });
 
+  it("every codec field in PFX_TYPE_MAPS has a matching pfx item param", () => {
+    // wahType is WAH's own sub-model selector, modeled via subTypes (CRY WAH, VO WAH, ...)
+    // rather than a params entry — same treatment as FX's "type" field.
+    const PFX_FIELD_EXCEPTIONS = new Set(["wahType"]);
+
+    for (const item of groupItems("pfx")) {
+      const codecFields = PFX_TYPE_MAPS[item.id];
+      if (!codecFields) continue;
+
+      const normalizedParamNames = new Set((item.params ?? []).map(param => normalize(param.name)));
+      for (const field of codecFields) {
+        if (PFX_FIELD_EXCEPTIONS.has(field.name)) continue;
+        expect(
+          normalizedParamNames.has(normalize(field.name)),
+          `PFX item "${item.id}" codec field "${field.name}" is missing from its capabilities params`
+        ).toBe(true);
+      }
+    }
+  });
+
+  // Delay/reverb group params document only the fields shared across most types at the
+  // same byte offset (TIME/FEEDBACK/LEVEL/HIGH CUT; TIME/TONE/DENSITY/PRE-DELAY/LEVEL/DIRECT).
+  // Special-effect types (WARP/TWIST/GLITCH for delay) have their own extra fields
+  // (modRate, pitch, head, ...) that are deliberately per-type, not promoted to the
+  // group level — so unlike fx/pfx, there's no clean reverse (codec -> capabilities)
+  // check here without inventing a shared/per-type taxonomy the codec doesn't model.
+
   it("delay group params match a codec field in some DELAY_TYPE_MAPS entry", () => {
     const allDelayFields = new Set(
       Object.values(DELAY_TYPE_MAPS).flatMap(fields => [...codecFieldNames(fields)])
@@ -194,5 +257,50 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
         `Reverb group param "${param.name}" has no matching codec field in any REV_TYPE_MAPS entry`
       ).toContain(normalize(param.name));
     }
+  });
+
+  // amp/odds/ns/fv are single fixed-shape blocks (no per-type field maps), decoded via
+  // hand-written functions rather than a FieldCodec table — so unlike fx/pfx/delay/reverb,
+  // there's no exported field-name list to import. Decoding placeholder bytes and reading
+  // the resulting object's keys gets the same effect without duplicating a field list here
+  // that could silently drift from blocks.ts.
+  const decodedFieldNames = (decoded: object, exceptions: Set<string>): Set<string> =>
+    new Set(Object.keys(decoded).filter(key => !exceptions.has(key)).map(normalize));
+
+  const groupParamNames = (groupId: string): Set<string> =>
+    new Set((gx1Capabilities.groups.find(g => g.id === groupId)?.params ?? []).map(param => normalize(param.name)));
+
+  const assertBidirectionalMatch = (groupId: string, codecNames: Set<string>): void => {
+    const paramNames = groupParamNames(groupId);
+    for (const name of codecNames) {
+      expect(paramNames, `"${groupId}" codec field "${name}" is missing from its capabilities params`).toContain(name);
+    }
+    for (const name of paramNames) {
+      expect(codecNames, `"${groupId}" capabilities param "${name}" has no matching codec field`).toContain(name);
+    }
+  };
+
+  it("amp group params exactly match decodeAmp's fields (excluding type/speaker/mic, covered by their own groups)", () => {
+    const decoded = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
+    const codecNames = decodedFieldNames(decoded, new Set(["on", "type", "speaker", "mic"]));
+    assertBidirectionalMatch("amp", codecNames);
+  });
+
+  it("odds group params exactly match decodeOdDs's fields (excluding on/type, covered elsewhere)", () => {
+    const decoded = decodeOdDs(hexFromBytes(new Array<number>(8).fill(0)));
+    const codecNames = decodedFieldNames(decoded, new Set(["on", "type"]));
+    assertBidirectionalMatch("odds", codecNames);
+  });
+
+  it("ns group params exactly match decodeNs's fields (excluding on)", () => {
+    const decoded = decodeNs(hexFromBytes(new Array<number>(4).fill(0)));
+    const codecNames = decodedFieldNames(decoded, new Set(["on"]));
+    assertBidirectionalMatch("ns", codecNames);
+  });
+
+  it("fv group params exactly match decodeFv's fields", () => {
+    const decoded = decodeFv(hexFromBytes(new Array<number>(4).fill(0)));
+    const codecNames = decodedFieldNames(decoded, new Set());
+    assertBidirectionalMatch("fv", codecNames);
   });
 });

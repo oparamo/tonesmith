@@ -8,10 +8,10 @@ const registerWriteField = (server: McpServer): void => {
     "write_field",
     {
       description:
-        "Edit a specific field in a patch within a .tsl file using dot-notation. " +
+        "Edit a specific field in a patch within a patch file using dot-notation. " +
         "Examples: 'amp.gain', 'fx1.params.rate', 'ns.threshold', 'delay.timeMs'.",
       inputSchema: z.object({
-        file: z.string().describe("Path to the .tsl file"),
+        file: z.string().describe("Path to the patch file"),
         device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
         ref: z.string().describe("Patch index (0-based integer) or exact patch name"),
         field: z.string().describe("Dot-notation field path (e.g. 'amp.gain', 'fx1.params.rate')"),

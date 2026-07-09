@@ -38,7 +38,7 @@ describe("generate_gx1_patch", () => {
       outPath,
       key: "G",
       amp: { type: "JC-120", gain: 60, bass: 55, mid: 45, treble: 50 },
-      odds: { type: "BLUES OD", drive: 40, tone: 60, level: 70 },
+      odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
       pfx: { type: "PEDAL BEND", params: { pitchMin: 0, pitchMax: 12, position: 100, level: 100, direct: 0 } },
       fx1: { type: "COMPRESSOR", subType: "D-COMP", params: { sustain: 30, attack: 30, level: 70 } },
       ns: { threshold: 45, release: 30 },
@@ -73,9 +73,9 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Chain",
       outPath,
-      chain: "FX1>OD>AMP>NS>DLY>REV",
+      chain: ["FX1", "OD", "AMP", "NS", "DLY", "REV"],
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
-      odds: { type: "BLUES OD", drive: 40, tone: 60, level: 70 },
+      odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
     };
     await client.callTool("generate_gx1_patch", patchSpec);
 
@@ -313,5 +313,106 @@ describe("generate_gx1_patch", () => {
     };
     const { isError } = await client.callTool("generate_gx1_patch", patchSpec);
     expect(isError).toBe(true);
+  });
+
+  it("creates missing parent directories", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "nested", "sub", "deep.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const patchSpec = {
+      name: "Deep",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+    };
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+    expect(isError, text).toBe(false);
+    expect(text).toContain("Created");
+    expect(gx1.driver.readFile(outPath).patches[0].name.trim()).toBe("Deep");
+  });
+
+  it("propagates a non-ENOENT read error instead of treating it as a new file", async () => {
+    temp = emptyTempDir();
+    // outPath points at a directory, not a file: readFileSync throws EISDIR, not ENOENT.
+    const outPath = temp.dir;
+    const client = await connectClient();
+    close = client.close;
+
+    const patchSpec = {
+      name: "Bad Path",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+    };
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+    expect(isError).toBe(true);
+    expect(text.toLowerCase()).toContain("eisdir");
+  });
+
+  it("normalizes a partial chain into the full 10-block chain", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "partial-chain.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const patchSpec = {
+      name: "Partial",
+      outPath,
+      chain: ["FX1", "OD", "AMP", "FX2", "NS", "DLY", "REV"],
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      odds: { type: "BLUES OD", drive: 40, tone: 0, level: 70 },
+    };
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.chain).toEqual(["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"]);
+  });
+
+  it("upserts by patch name: same name replaces, different name appends", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "upsert.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const ampSpec = { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 };
+    const first = await client.callTool("generate_gx1_patch", { name: "Lead", outPath, amp: ampSpec });
+    expect(first.isError, first.text).toBe(false);
+    expect(first.text).toContain("Created");
+
+    const second = await client.callTool("generate_gx1_patch", { name: "Rhythm", outPath, amp: ampSpec });
+    expect(second.isError, second.text).toBe(false);
+    expect(second.text).toContain("Appended");
+    expect(gx1.driver.readFile(outPath).patches.map(p => p.name.trim())).toEqual(["Lead", "Rhythm"]);
+
+    const replaced = await client.callTool("generate_gx1_patch", {
+      name: "Lead", outPath, amp: { ...ampSpec, gain: 90 },
+    });
+    expect(replaced.isError, replaced.text).toBe(false);
+    expect(replaced.text).toContain("Replaced");
+    const file = gx1.driver.readFile(outPath);
+    expect(file.patches.map(p => p.name.trim())).toEqual(["Lead", "Rhythm"]);
+    expect(file.patches[0].amp.gain).toBe(90);
+  });
+
+  it("defaults unset HIGH GEQ bands to 0 dB instead of the signed-centre raw byte", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "geq.tsl");
+    const client = await connectClient();
+    close = client.close;
+
+    const patchSpec = {
+      name: "GEQ",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      fx1: { type: "HIGH GEQ", params: { level: 80, "4kHz": 5 } },
+    };
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+    expect(isError, text).toBe(false);
+
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.fx1.params).toEqual({
+      "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 5, "8kHz": 0, level: 80,
+    });
   });
 });

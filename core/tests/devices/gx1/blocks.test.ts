@@ -226,7 +226,7 @@ describe("Real device values (default-init.tsl)", () => {
   });
 
   it("decodes the dedicated DLY block (active type: STANDARD)", () => {
-    expect(patch.delay).toMatchObject({ type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: 25 });
+    expect(patch.delay).toMatchObject({ type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz" });
   });
 
   it("decodes the dedicated REV block (active type: HALL M)", () => {
@@ -246,14 +246,14 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes DLY shadow bytes for MODULATE (shares time/feedback/level/highCut with STANDARD)", () => {
     expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX.MODULATE, ...dlyBytes.slice(2)])))
-      .toMatchObject({ time: 400, feedback: 30, level: 50, highCut: 25, modRate: 50, modDepth: 30 });
+      .toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 30 });
   });
 
   it("decodes DLY shadow bytes for ANALOG (its own 4-byte time at offset 13)", () => {
-    // highCut is the same shared byte STANDARD (the patch's active type) left at 25;
-    // ANALOG's own device-default of 29 only applies when ANALOG itself is selected.
+    // highCut is the same shared byte STANDARD (the patch's active type) left at "6.3kHz";
+    // ANALOG's own device-default of "FLAT" only applies when ANALOG itself is selected.
     expect(decodeDelay(hexFromBytes([...dlyBytes.slice(0, 1), DLY_TYPE_IDX.ANALOG, ...dlyBytes.slice(2)])))
-      .toMatchObject({ time: 400, feedback: 30, level: 50, highCut: 25 });
+      .toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz" });
   });
 
   it("decodes DLY shadow bytes for WARP (time shared at offset 2, trigger/level at 21/25)", () => {
@@ -273,7 +273,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes REV shadow bytes for SUB DELAY (its own 4-byte time at offset 11)", () => {
     expect(decodeReverb(hexFromBytes([...revBytes.slice(0, 1), REV_TYPE_IDX["SUB DELAY"], ...revBytes.slice(2)])))
-      .toMatchObject({ on: false, type: "SUB DELAY", time: 400, level: 50, feedback: 30, highCut: 25 });
+      .toMatchObject({ on: false, type: "SUB DELAY", time: 400, level: 50, feedback: 30, highCut: "6.3kHz" });
   });
 
   it("decodes REV shadow bytes for TERA ECHO (spreadTime at 18, not a shared time field)", () => {
