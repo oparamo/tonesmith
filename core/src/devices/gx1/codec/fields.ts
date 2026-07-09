@@ -16,6 +16,11 @@ import type { FxParams } from "../types";
  */
 interface FieldCodec {
   readonly name: string;
+  /** Present on fields built by the constructors below; hand-written FieldCodec
+   * object literals (e.g. PHASER's "stage") may omit it. */
+  readonly kind?: "u8" | "signed" | "lookup" | "scaled" | "nibblePair" | "nibbleQuad" | "indexTable";
+  readonly centre?: number;
+  readonly table?: readonly (string | number)[];
   decode(bytes: number[]): string | number | number[];
   encode(value: string | number | number[], bytes: number[]): void;
 }
@@ -26,6 +31,7 @@ interface FieldCodec {
 /** A raw unsigned byte: decoded value is identical to the stored byte. */
 const u8 = (name: string, offset: number): FieldCodec => ({
   name,
+  kind: "u8",
   decode: bytes => bytes[offset],
   encode: (value, bytes) => {
     const n = value as number;
@@ -41,6 +47,8 @@ const u8 = (name: string, offset: number): FieldCodec => ({
  */
 const signed = (name: string, offset: number, centre = 50): FieldCodec => ({
   name,
+  kind: "signed",
+  centre,
   decode: bytes => toSigned(bytes[offset], centre),
   encode: (value, bytes) => { bytes[offset] = toUnsigned(value as number, centre); },
 });
@@ -53,6 +61,8 @@ const signed = (name: string, offset: number, centre = 50): FieldCodec => ({
  */
 const lookup = (name: string, offset: number, table: readonly string[]): FieldCodec => ({
   name,
+  kind: "lookup",
+  table,
   decode: bytes => lookupName(table, bytes[offset]),
   encode: (value, bytes) => {
     const index = table.indexOf(value as string);
@@ -68,6 +78,7 @@ const lookup = (name: string, offset: number, table: readonly string[]): FieldCo
  */
 const scaled = (name: string, offset: number, factor: number): FieldCodec => ({
   name,
+  kind: "scaled",
   decode: bytes => Math.round(bytes[offset] * factor * 10) / 10,
   encode: (value, bytes) => { bytes[offset] = Math.round((value as number) / factor); },
 });
@@ -78,6 +89,7 @@ const scaled = (name: string, offset: number, factor: number): FieldCodec => ({
  */
 const nibblePair = (name: string, offset: number): FieldCodec => ({
   name,
+  kind: "nibblePair",
   decode: bytes => bytes[offset] * 16 + bytes[offset + 1],
   encode: (value, bytes) => {
     const n = value as number;
@@ -92,6 +104,7 @@ const nibblePair = (name: string, offset: number): FieldCodec => ({
  */
 const nibbleQuad = (name: string, offset: number): FieldCodec => ({
   name,
+  kind: "nibbleQuad",
   decode: bytes =>
     bytes[offset] * 4096 + bytes[offset + 1] * 256 + bytes[offset + 2] * 16 + bytes[offset + 3],
   encode: (value, bytes) => {
