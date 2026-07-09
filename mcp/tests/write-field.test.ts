@@ -49,4 +49,26 @@ describe("write_field", () => {
     expect(isError).toBe(true);
     expect(text).toContain('No patch named "No Such Patch"');
   });
+
+  it("writes a lookup field by label and reads it back as that label", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+
+    const input = { device: "gx1", file: temp.fixture, ref: "0", field: "delay.highCut", value: "2.5kHz" };
+    const { isError } = await client.callTool("write_field", input);
+    expect(isError).toBe(false);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].delay.highCut).toBe("2.5kHz");
+  });
+
+  it("surfaces the codec's error for a label not in the field's table", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+
+    const input = { device: "gx1", file: temp.fixture, ref: "0", field: "delay.highCut", value: "2.6kHz" };
+    const { isError, text } = await client.callTool("write_field", input);
+    expect(isError).toBe(true);
+    expect(text).toContain('Unknown highCut value: "2.6kHz"');
+  });
 });
