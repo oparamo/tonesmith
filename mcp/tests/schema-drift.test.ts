@@ -118,16 +118,20 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
     for (const field of BOUNDED_FIELDS) {
       const { min, max } = rangeFor(field.groupId, field.paramName);
 
-      const atMin = await client.callTool("generate_gx1_patch", withOverride(basePatchSpec, field.path, min));
+      const atMinSpec = withOverride(basePatchSpec, field.path, min);
+      const atMin = await client.callTool("generate_gx1_patch", atMinSpec);
       expect(atMin.isError, `${field.path}=${min} (documented min) should be accepted: ${atMin.text}`).toBe(false);
 
-      const atMax = await client.callTool("generate_gx1_patch", withOverride(basePatchSpec, field.path, max));
+      const atMaxSpec = withOverride(basePatchSpec, field.path, max);
+      const atMax = await client.callTool("generate_gx1_patch", atMaxSpec);
       expect(atMax.isError, `${field.path}=${max} (documented max) should be accepted: ${atMax.text}`).toBe(false);
 
-      const belowMin = await client.callTool("generate_gx1_patch", withOverride(basePatchSpec, field.path, min - 1));
+      const belowMinSpec = withOverride(basePatchSpec, field.path, min - 1);
+      const belowMin = await client.callTool("generate_gx1_patch", belowMinSpec);
       expect(belowMin.isError, `${field.path}=${min - 1} (below documented min) should be rejected`).toBe(true);
 
-      const aboveMax = await client.callTool("generate_gx1_patch", withOverride(basePatchSpec, field.path, max + 1));
+      const aboveMaxSpec = withOverride(basePatchSpec, field.path, max + 1);
+      const aboveMax = await client.callTool("generate_gx1_patch", aboveMaxSpec);
       expect(aboveMax.isError, `${field.path}=${max + 1} (above documented max) should be rejected`).toBe(true);
     }
   });

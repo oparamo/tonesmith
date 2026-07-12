@@ -73,7 +73,10 @@ describe("upsertPatch", () => {
       ...makeFakeDriver(new Map()),
       readFile: () => { throw new Error("disk on fire"); },
     };
-    expect(() => upsertPatch(driver, "set.tsl", makePatch("Lead"))).toThrow("disk on fire");
+
+    const upsertWithBrokenReadFile = () => upsertPatch(driver, "set.tsl", makePatch("Lead"));
+
+    expect(upsertWithBrokenReadFile).toThrow("disk on fire");
   });
 });
 
@@ -81,22 +84,32 @@ describe("resolvePatchIndex", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Rock Lead")];
 
   it("returns numeric index when ref is an integer string", () => {
-    expect(resolvePatchIndex(patches, "0")).toBe(0);
-    expect(resolvePatchIndex(patches, "2")).toBe(2);
+    const firstIndex = resolvePatchIndex(patches, "0");
+    const thirdIndex = resolvePatchIndex(patches, "2");
+
+    expect(firstIndex).toBe(0);
+    expect(thirdIndex).toBe(2);
   });
 
   it("resolves name case-insensitively (trims stored patch name, not ref)", () => {
-    expect(resolvePatchIndex(patches, "clean jazz")).toBe(1);
-    expect(resolvePatchIndex(patches, "CLEAN JAZZ")).toBe(1);
+    const lowerCaseMatch = resolvePatchIndex(patches, "clean jazz");
+    const upperCaseMatch = resolvePatchIndex(patches, "CLEAN JAZZ");
+
+    expect(lowerCaseMatch).toBe(1);
+    expect(upperCaseMatch).toBe(1);
   });
 
   it("throws when no patch matches the name", () => {
-    expect(() => resolvePatchIndex(patches, "Metal")).toThrow('No patch named "Metal"');
+    const resolveMissingName = () => resolvePatchIndex(patches, "Metal");
+
+    expect(resolveMissingName).toThrow('No patch named "Metal"');
   });
 
   it("throws when multiple patches share the same name", () => {
-    expect(() => resolvePatchIndex(patches, "rock lead")).toThrow(/Ambiguous name/);
-    expect(() => resolvePatchIndex(patches, "rock lead")).toThrow(/0.*2|2.*0/);
+    const resolveAmbiguousName = () => resolvePatchIndex(patches, "rock lead");
+
+    expect(resolveAmbiguousName).toThrow(/Ambiguous name/);
+    expect(resolveAmbiguousName).toThrow(/0.*2|2.*0/);
   });
 });
 
@@ -141,28 +154,38 @@ describe("resolvePatchIndices", () => {
   });
 
   it("propagates resolvePatchIndex's not-found error", () => {
-    expect(() => resolvePatchIndices(patches, "Bogus")).toThrow('No patch named "Bogus"');
+    const resolveMissingName = () => resolvePatchIndices(patches, "Bogus");
+
+    expect(resolveMissingName).toThrow('No patch named "Bogus"');
   });
 });
 
 describe("applyFieldEdits", () => {
   it("applies a single edit with coercion", () => {
     const patch: Record<string, unknown> = { amp: { gain: 0 } };
+
     applyFieldEdits(patch, [["amp.gain", "72"]]);
-    expect((patch.amp as Record<string, unknown>).gain).toBe(72);
+
+    const amp = patch.amp as Record<string, unknown>;
+    expect(amp.gain).toBe(72);
   });
 
   it("applies multiple edits in order, including booleans", () => {
     const patch: Record<string, unknown> = { key: "C", amp: { solo: false, gain: 0 } };
+
     applyFieldEdits(patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
+
+    const amp = patch.amp as Record<string, unknown>;
     expect(patch.key).toBe("G");
-    expect((patch.amp as Record<string, unknown>).solo).toBe(true);
-    expect((patch.amp as Record<string, unknown>).gain).toBe(50);
+    expect(amp.solo).toBe(true);
+    expect(amp.gain).toBe(50);
   });
 
   it("does nothing given an empty edit list", () => {
     const patch: Record<string, unknown> = { key: "C" };
+
     applyFieldEdits(patch, []);
+
     expect(patch.key).toBe("C");
   });
 });
@@ -170,28 +193,38 @@ describe("applyFieldEdits", () => {
 describe("setByPath", () => {
   it("sets a top-level key", () => {
     const obj: Record<string, unknown> = { x: 1 };
+
     setByPath(obj, "x", 99);
+
     expect(obj.x).toBe(99);
   });
 
   it("sets a nested key", () => {
     const obj: Record<string, unknown> = { a: { b: { c: 0 } } };
+
     setByPath(obj, "a.b.c", 42);
-    expect((obj.a as Record<string, unknown>).b).toEqual({ c: 42 });
+
+    const a = obj.a as Record<string, unknown>;
+    expect(a.b).toEqual({ c: 42 });
   });
 
   it("sets a two-level nested key", () => {
     const obj: Record<string, unknown> = { amp: { gain: 0, level: 0 } };
+
     setByPath(obj, "amp.gain", 80);
-    expect((obj.amp as Record<string, unknown>).gain).toBe(80);
-    expect((obj.amp as Record<string, unknown>).level).toBe(0);
+
+    const amp = obj.amp as Record<string, unknown>;
+    expect(amp.gain).toBe(80);
+    expect(amp.level).toBe(0);
   });
 
   it("overwrites an existing nested value", () => {
     const obj: Record<string, unknown> = { fx1: { params: { rate: 10 } } };
+
     setByPath(obj, "fx1.params.rate", 50);
-    expect(
-      ((obj.fx1 as Record<string, unknown>).params as Record<string, unknown>).rate,
-    ).toBe(50);
+
+    const fx1 = obj.fx1 as Record<string, unknown>;
+    const params = fx1.params as Record<string, unknown>;
+    expect(params.rate).toBe(50);
   });
 });

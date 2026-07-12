@@ -10,7 +10,8 @@ const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tone
 describe("GX-1 round-trip", () => {
   it("decodes and re-encodes every patch byte-for-byte", () => {
     const file = readFile(FIXTURE);
-    const raw = JSON.parse(readFileSync(FIXTURE, "utf8")) as {
+    const rawFileContents = readFileSync(FIXTURE, "utf8");
+    const raw = JSON.parse(rawFileContents) as {
       data: [{ paramSet: Record<string, string[]> }[], unknown[]];
     };
 
@@ -29,6 +30,7 @@ describe("GX-1 round-trip", () => {
 
   it("patch names round-trip cleanly", () => {
     const file = readFile(FIXTURE);
+
     for (const patch of file.patches) {
       expect(typeof patch.name).toBe("string");
       expect(patch.name.length).toBeGreaterThanOrEqual(0);
@@ -38,7 +40,11 @@ describe("GX-1 round-trip", () => {
 
 describe("decodePatch", () => {
   it("defaults memo to an empty string when the raw envelope omits it", () => {
-    const paramSet = readFile(FIXTURE).patches[0][RAW];
-    expect(decodePatch({ paramSet }).memo).toBe("");
+    const file = readFile(FIXTURE);
+    const paramSet = file.patches[0][RAW];
+
+    const decoded = decodePatch({ paramSet });
+
+    expect(decoded.memo).toBe("");
   });
 });

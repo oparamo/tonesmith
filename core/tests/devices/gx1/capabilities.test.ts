@@ -20,7 +20,7 @@ import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import type { CapabilityItem } from "../../../src/types";
 
 const groupItems = (groupId: string): CapabilityItem[] =>
-  gx1Capabilities.groups.find(g => g.id === groupId)?.items ?? [];
+  gx1Capabilities.groups.find(group => group.id === groupId)?.items ?? [];
 
 // Normalizes a param/field name for comparison: lowercase, strip anything that isn't
 // a letter or digit — so "PRE-DELAY" (capabilities) and "preDelay" (codec) match.
@@ -31,49 +31,56 @@ const codecFieldNames = (fields: readonly { name: string }[] | undefined): Set<s
 
 describe("GX-1 capabilities drift guard", () => {
   it("covers every FX_TYPES entry", () => {
-    const fxIds = new Set(groupItems("fx").map(i => i.id));
+    const fxIds = new Set(groupItems("fx").map(item => item.id));
+
     for (const type of FX_TYPES) {
       expect(fxIds, `FX_TYPES "${type}" is missing from capabilities.groups.fx`).toContain(type);
     }
   });
 
   it("covers every AMP_TYPES entry", () => {
-    const ampIds = new Set(groupItems("amp").map(i => i.id));
+    const ampIds = new Set(groupItems("amp").map(item => item.id));
+
     for (const type of AMP_TYPES) {
       expect(ampIds, `AMP_TYPES "${type}" is missing from capabilities.groups.amp`).toContain(type);
     }
   });
 
   it("covers every SP_TYPES entry", () => {
-    const cabIds = new Set(groupItems("cab").map(i => i.id));
+    const cabIds = new Set(groupItems("cab").map(item => item.id));
+
     for (const type of SP_TYPES) {
       expect(cabIds, `SP_TYPES "${type}" is missing from capabilities.groups.cab`).toContain(type);
     }
   });
 
   it("covers every MIC_TYPES entry", () => {
-    const micIds = new Set(groupItems("mic").map(i => i.id));
+    const micIds = new Set(groupItems("mic").map(item => item.id));
+
     for (const type of MIC_TYPES) {
       expect(micIds, `MIC_TYPES "${type}" is missing from capabilities.groups.mic`).toContain(type);
     }
   });
 
   it("covers every ODDS_TYPES entry", () => {
-    const oddsIds = new Set(groupItems("odds").map(i => i.id));
+    const oddsIds = new Set(groupItems("odds").map(item => item.id));
+
     for (const type of ODDS_TYPES) {
       expect(oddsIds, `ODDS_TYPES "${type}" is missing from capabilities.groups.odds`).toContain(type);
     }
   });
 
   it("covers every DLY_TYPES entry", () => {
-    const dlyIds = new Set(groupItems("delay").map(i => i.id));
+    const dlyIds = new Set(groupItems("delay").map(item => item.id));
+
     for (const type of DLY_TYPES) {
       expect(dlyIds, `DLY_TYPES "${type}" is missing from capabilities.groups.delay`).toContain(type);
     }
   });
 
   it("covers every REV_TYPES entry", () => {
-    const revIds = new Set(groupItems("reverb").map(i => i.id));
+    const revIds = new Set(groupItems("reverb").map(item => item.id));
+
     for (const type of REV_TYPES) {
       expect(revIds, `REV_TYPES "${type}" is missing from capabilities.groups.reverb`).toContain(type);
     }
@@ -94,13 +101,13 @@ describe("GX-1 capabilities drift guard", () => {
     const fxItems = groupItems("fx");
 
     for (const [fxType, subTypes] of Object.entries(paramSubtypeTables)) {
-      const fxItem = fxItems.find(i => i.id === fxType);
+      const fxItem = fxItems.find(item => item.id === fxType);
       expect(
         fxItem,
         `FX item "${fxType}" from PARAM_SUBTYPE_EFFECTS is missing from capabilities.groups.fx`
       ).toBeDefined();
 
-      const itemSubTypeIds = new Set((fxItem?.subTypes ?? []).map(s => s.id));
+      const itemSubTypeIds = new Set((fxItem?.subTypes ?? []).map(subType => subType.id));
       for (const subId of subTypes) {
         expect(
           itemSubTypeIds,
@@ -148,6 +155,7 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
       const codecNames = codecFieldNames(codecFields);
       const targets = aliasTargets(item.id);
       const paramOnlyExceptions = FX_PARAM_ONLY_EXCEPTIONS[item.id] ?? new Set<string>();
+
       for (const param of item.params ?? []) {
         const matches = paramOnlyExceptions.has(param.name)
           || codecNames.has(normalize(param.name))
@@ -170,6 +178,7 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
 
       const normalizedParamNames = new Set((item.params ?? []).map(param => normalize(param.name)));
       const aliases = FX_FIELD_ALIASES[item.id] ?? {};
+
       for (const field of codecFields) {
         if (field.name === "type") continue;
         const matches = normalizedParamNames.has(normalize(field.name)) || field.name in aliases;
@@ -197,6 +206,7 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
       expect(codecFields, `PFX item "${item.id}" has no PFX_TYPE_MAPS entry`).toBeDefined();
 
       const codecNames = codecFieldNames(codecFields);
+
       for (const param of item.params ?? []) {
         expect(
           codecNames,
@@ -216,6 +226,7 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
       if (!codecFields) continue;
 
       const normalizedParamNames = new Set((item.params ?? []).map(param => normalize(param.name)));
+
       for (const field of codecFields) {
         if (PFX_FIELD_EXCEPTIONS.has(field.name)) continue;
         expect(
@@ -237,7 +248,9 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
     const allDelayFields = new Set(
       Object.values(DELAY_TYPE_MAPS).flatMap(fields => [...codecFieldNames(fields)])
     );
-    const delayParams = gx1Capabilities.groups.find(g => g.id === "delay")?.params ?? [];
+    const delayGroup = gx1Capabilities.groups.find(group => group.id === "delay");
+    const delayParams = delayGroup?.params ?? [];
+
     for (const param of delayParams) {
       expect(
         allDelayFields,
@@ -250,7 +263,9 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
     const allReverbFields = new Set(
       Object.values(REV_TYPE_MAPS).flatMap(fields => [...codecFieldNames(fields)])
     );
-    const reverbParams = gx1Capabilities.groups.find(g => g.id === "reverb")?.params ?? [];
+    const reverbGroup = gx1Capabilities.groups.find(group => group.id === "reverb");
+    const reverbParams = reverbGroup?.params ?? [];
+
     for (const param of reverbParams) {
       expect(
         allReverbFields,
@@ -267,8 +282,11 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
   const decodedFieldNames = (decoded: object, exceptions: Set<string>): Set<string> =>
     new Set(Object.keys(decoded).filter(key => !exceptions.has(key)).map(normalize));
 
-  const groupParamNames = (groupId: string): Set<string> =>
-    new Set((gx1Capabilities.groups.find(g => g.id === groupId)?.params ?? []).map(param => normalize(param.name)));
+  const groupParamNames = (groupId: string): Set<string> => {
+    const group = gx1Capabilities.groups.find(candidate => candidate.id === groupId);
+    const params = group?.params ?? [];
+    return new Set(params.map(param => normalize(param.name)));
+  };
 
   const assertBidirectionalMatch = (groupId: string, codecNames: Set<string>): void => {
     const paramNames = groupParamNames(groupId);
@@ -281,26 +299,38 @@ describe("GX-1 capabilities/codec semantic drift guard", () => {
   };
 
   it("amp group params exactly match decodeAmp's fields (excluding type/speaker/mic, covered by their own groups)", () => {
-    const decoded = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
+    const hexList = hexFromBytes(new Array<number>(13).fill(0));
+    const decoded = decodeAmp(hexList);
+
     const codecNames = decodedFieldNames(decoded, new Set(["on", "type", "speaker", "mic"]));
+
     assertBidirectionalMatch("amp", codecNames);
   });
 
   it("odds group params exactly match decodeOdDs's fields (excluding on/type, covered elsewhere)", () => {
-    const decoded = decodeOdDs(hexFromBytes(new Array<number>(8).fill(0)));
+    const hexList = hexFromBytes(new Array<number>(8).fill(0));
+    const decoded = decodeOdDs(hexList);
+
     const codecNames = decodedFieldNames(decoded, new Set(["on", "type"]));
+
     assertBidirectionalMatch("odds", codecNames);
   });
 
   it("ns group params exactly match decodeNs's fields (excluding on)", () => {
-    const decoded = decodeNs(hexFromBytes(new Array<number>(4).fill(0)));
+    const hexList = hexFromBytes(new Array<number>(4).fill(0));
+    const decoded = decodeNs(hexList);
+
     const codecNames = decodedFieldNames(decoded, new Set(["on"]));
+
     assertBidirectionalMatch("ns", codecNames);
   });
 
   it("fv group params exactly match decodeFv's fields", () => {
-    const decoded = decodeFv(hexFromBytes(new Array<number>(4).fill(0)));
+    const hexList = hexFromBytes(new Array<number>(4).fill(0));
+    const decoded = decodeFv(hexList);
+
     const codecNames = decodedFieldNames(decoded, new Set());
+
     assertBidirectionalMatch("fv", codecNames);
   });
 });

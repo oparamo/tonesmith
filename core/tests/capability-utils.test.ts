@@ -26,17 +26,24 @@ const caps: DeviceCapabilities = {
 
 describe("findGroup", () => {
   it("finds a group by exact id", () => {
-    expect(findGroup(caps, "amp").id).toBe("amp");
+    const group = findGroup(caps, "amp");
+
+    expect(group.id).toBe("amp");
   });
 
   it("finds a group case-insensitively", () => {
-    expect(findGroup(caps, "AMP").id).toBe("amp");
-    expect(findGroup(caps, "Delay").id).toBe("delay");
+    const upperCaseMatch = findGroup(caps, "AMP");
+    const mixedCaseMatch = findGroup(caps, "Delay");
+
+    expect(upperCaseMatch.id).toBe("amp");
+    expect(mixedCaseMatch.id).toBe("delay");
   });
 
   it("throws listing available group ids when not found", () => {
-    expect(() => findGroup(caps, "reverb")).toThrow('Unknown group "reverb"');
-    expect(() => findGroup(caps, "reverb")).toThrow(/amp, delay/);
+    const findMissingGroup = () => findGroup(caps, "reverb");
+
+    expect(findMissingGroup).toThrow('Unknown group "reverb"');
+    expect(findMissingGroup).toThrow(/amp, delay/);
   });
 });
 
@@ -44,16 +51,23 @@ describe("findItem", () => {
   const ampGroup = findGroup(caps, "amp");
 
   it("finds an item by exact id, case-insensitively", () => {
-    expect(findItem(ampGroup, "JC-120").id).toBe("JC-120");
-    expect(findItem(ampGroup, "jc-120").id).toBe("JC-120");
+    const exactMatch = findItem(ampGroup, "JC-120");
+    const lowerCaseMatch = findItem(ampGroup, "jc-120");
+
+    expect(exactMatch.id).toBe("JC-120");
+    expect(lowerCaseMatch.id).toBe("JC-120");
   });
 
   it("finds an item by name prefix when id doesn't match", () => {
-    expect(findItem(ampGroup, "Twi").id).toBe("TWIN");
+    const item = findItem(ampGroup, "Twi");
+
+    expect(item.id).toBe("TWIN");
   });
 
   it("throws listing available item ids when not found", () => {
-    expect(() => findItem(ampGroup, "MISSING")).toThrow('Unknown item "MISSING" in group "amp"');
-    expect(() => findItem(ampGroup, "MISSING")).toThrow(/JC-120, TWIN/);
+    const findMissingItem = () => findItem(ampGroup, "MISSING");
+
+    expect(findMissingItem).toThrow('Unknown item "MISSING" in group "amp"');
+    expect(findMissingItem).toThrow(/JC-120, TWIN/);
   });
 });

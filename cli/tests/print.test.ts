@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, type MockInstance } from "vitest";
 import { gx1 } from "@tonesmith/core";
 import { printPatch } from "../src/devices/gx1/print";
+
+const capturedOutput = (info: MockInstance<(message?: unknown) => void>): string =>
+  info.mock.calls.map(call => String(call[0])).join("\n");
 
 describe("printPatch", () => {
   afterEach(() => { vi.restoreAllMocks(); });
@@ -8,8 +11,10 @@ describe("printPatch", () => {
   it("omits the bracketed index label when index is not given", () => {
     const patch = gx1.basePatch("Solo Patch");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
     printPatch(patch);
-    const output = info.mock.calls.map(call => String(call[0])).join("\n");
+
+    const output = capturedOutput(info);
     expect(output).toContain("Solo Patch");
     expect(output).not.toMatch(/\[\d+\] Solo Patch/);
   });
@@ -18,8 +23,10 @@ describe("printPatch", () => {
     const patch = gx1.basePatch("Test");
     gx1.clearOdds(patch);
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
     printPatch(patch, 0);
-    const output = info.mock.calls.map(call => String(call[0])).join("\n");
+
+    const output = capturedOutput(info);
     expect(output).not.toContain("Drive=");
   });
 
@@ -27,8 +34,10 @@ describe("printPatch", () => {
     const patch = gx1.basePatch("Test");
     gx1.odds(patch, "OVERDRIVE", 50, 0, 50, 0, true, 75);
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
     printPatch(patch, 0);
-    const output = info.mock.calls.map(call => String(call[0])).join("\n");
+
+    const output = capturedOutput(info);
     expect(output).toContain("Solo=ON(75)");
   });
 
@@ -36,8 +45,10 @@ describe("printPatch", () => {
     const patch = gx1.basePatch("Test");
     gx1.fx(patch, "fx1", "TREMOLO");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
     printPatch(patch, 0);
-    const output = info.mock.calls.map(call => String(call[0])).join("\n");
+
+    const output = capturedOutput(info);
     expect(output).toContain("FX1 [ON]  TREMOLO");
     expect(output).toContain("rate=0  depth=0  level=50");
   });
@@ -48,8 +59,10 @@ describe("printPatch", () => {
     // printParams should print nothing beyond the PFX header line for it.
     patch.pfx = { on: true, type: "BOGUS TYPE" } as unknown as gx1.Patch["pfx"];
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
     printPatch(patch, 0);
-    const output = info.mock.calls.map(call => String(call[0])).join("\n");
+
+    const output = capturedOutput(info);
     expect(output).toContain("PFX [ON]  BOGUS TYPE");
     expect(output).not.toMatch(/PFX.*\n\s+\w+=/);
   });
@@ -58,8 +71,10 @@ describe("printPatch", () => {
     const patch = gx1.basePatch("Test");
     gx1.fx(patch, "fx1", "BOGUS EFFECT");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
     printPatch(patch, 0);
-    const output = info.mock.calls.map(call => String(call[0])).join("\n");
+
+    const output = capturedOutput(info);
     expect(output).toContain("FX1 [ON]  BOGUS EFFECT");
     expect(output).not.toMatch(/FX1.*\n\s+\w+=/);
   });

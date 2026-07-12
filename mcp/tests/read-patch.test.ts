@@ -12,19 +12,25 @@ describe("read_patch", () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", file: FIXTURE };
+
     const { text, isError } = await client.callTool("read_patch", input);
+
     expect(isError, text).toBe(false);
     const body = JSON.parse(text) as { setName: string; patches: { index: number; name: string }[] };
     expect(body.setName).toBe(expected.name);
     expect(body.patches).toHaveLength(expected.patches.length);
-    expect(body.patches.map(p => p.name)).toEqual(expected.patches.map(p => p.name));
+    const actualNames = body.patches.map(patch => patch.name);
+    const expectedNames = expected.patches.map(patch => patch.name);
+    expect(actualNames).toEqual(expectedNames);
   });
 
   it("returns a single patch by numeric index", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", file: FIXTURE, ref: "0" };
+
     const { text, isError } = await client.callTool("read_patch", input);
+
     expect(isError, text).toBe(false);
     const body = JSON.parse(text) as { index: number; name: string };
     expect(body.index).toBe(0);
@@ -35,7 +41,9 @@ describe("read_patch", () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "nonexistent", file: FIXTURE };
+
     const { isError, text } = await client.callTool("read_patch", input);
+
     expect(isError).toBe(true);
     expect(text).toContain('Unknown device "nonexistent"');
   });
@@ -44,7 +52,9 @@ describe("read_patch", () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", file: "/no/such/file.tsl" };
+
     const { isError } = await client.callTool("read_patch", input);
+
     expect(isError).toBe(true);
   });
 
@@ -52,7 +62,9 @@ describe("read_patch", () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", file: FIXTURE, ref: "No Such Patch" };
+
     const { isError, text } = await client.callTool("read_patch", input);
+
     expect(isError).toBe(true);
     expect(text).toContain('No patch named "No Such Patch"');
   });

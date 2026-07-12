@@ -5,19 +5,27 @@ describe("lookupName", () => {
   const table = ["ONE", "TWO", "THREE"];
 
   it("returns the name at a valid index", () => {
-    expect(lookupName(table, 1)).toBe("TWO");
+    const name = lookupName(table, 1);
+
+    expect(name).toBe("TWO");
   });
 
   it("falls back to an UNKNOWN_N sentinel for an index past the end of the table", () => {
-    expect(lookupName(table, 5)).toBe("UNKNOWN_5");
+    const name = lookupName(table, 5);
+
+    expect(name).toBe("UNKNOWN_5");
   });
 
   it("falls back to an UNKNOWN_N sentinel for a negative index", () => {
-    expect(lookupName(table, -1)).toBe("UNKNOWN_-1");
+    const name = lookupName(table, -1);
+
+    expect(name).toBe("UNKNOWN_-1");
   });
 
   it("includes the label in the sentinel when given", () => {
-    expect(lookupName(table, 9, "FX")).toBe("UNKNOWN_FX9");
+    const name = lookupName(table, 9, "FX");
+
+    expect(name).toBe("UNKNOWN_FX9");
   });
 });
 
@@ -25,14 +33,20 @@ describe("lookupIndex", () => {
   const tableMap = { ONE: 0, TWO: 1, THREE: 2 };
 
   it("returns the index for a known name", () => {
-    expect(lookupIndex(tableMap, "TWO")).toBe(1);
+    const index = lookupIndex(tableMap, "TWO");
+
+    expect(index).toBe(1);
   });
 
   it("throws for a name not present in the table", () => {
-    expect(() => lookupIndex(tableMap, "FOUR")).toThrow('Unknown : "FOUR"');
+    const lookupUnknownName = () => lookupIndex(tableMap, "FOUR");
+
+    expect(lookupUnknownName).toThrow('Unknown : "FOUR"');
   });
 
   it("includes the label in the error message when given", () => {
-    expect(() => lookupIndex(tableMap, "FOUR", "key")).toThrow('Unknown key: "FOUR"');
+    const lookupUnknownName = () => lookupIndex(tableMap, "FOUR", "key");
+
+    expect(lookupUnknownName).toThrow('Unknown key: "FOUR"');
   });
 });

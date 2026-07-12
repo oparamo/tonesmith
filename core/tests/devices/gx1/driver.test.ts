@@ -15,23 +15,31 @@ describe("gx1 driver", () => {
   });
 
   it("blankPatch delegates to the gx1 builder", () => {
-    expect(driver.blankPatch("Test").name).toBe("Test");
+    const patch = driver.blankPatch("Test");
+
+    expect(patch.name).toBe("Test");
   });
 
   it("newFile delegates to the gx1 file builder", () => {
     const file = driver.newFile("My Set", 2);
+
     expect(file.name).toBe("My Set");
     expect(file.patches).toHaveLength(2);
   });
 
   it("readFile decodes a real fixture", () => {
     const file = driver.readFile(FIXTURE);
+
     expect(file.patches.length).toBeGreaterThan(0);
   });
 
   it("encodePatch/decodePatch round-trip a patch through the driver", () => {
-    const patch = driver.readFile(FIXTURE).patches[0];
-    const decoded = driver.decodePatch(driver.encodePatch(patch));
+    const file = driver.readFile(FIXTURE);
+    const patch = file.patches[0];
+
+    const encoded = driver.encodePatch(patch);
+    const decoded = driver.decodePatch(encoded);
+
     expect(decoded.name).toBe(patch.name);
   });
 
@@ -44,8 +52,11 @@ describe("gx1 driver", () => {
 
     it("writes a file that can be read back", () => {
       const file = driver.newFile("Driver Set");
+
       driver.writeFile(file, tmpPath);
-      expect(driver.readFile(tmpPath).name).toBe("Driver Set");
+
+      const loaded = driver.readFile(tmpPath);
+      expect(loaded.name).toBe("Driver Set");
     });
   });
 });
