@@ -395,7 +395,7 @@ describe("generate_gx1_patch", () => {
     expect(file.patches[0].amp.gain).toBe(90);
   });
 
-  it("defaults unset HIGH GEQ bands to 0 dB instead of the signed-centre raw byte", async () => {
+  it("defaults unset HIGH GEQ bands to 0 dB instead of the signed-center raw byte", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "geq.tsl");
     const client = await connectClient();

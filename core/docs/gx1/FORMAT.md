@@ -128,7 +128,7 @@ list says otherwise); see the conventions table for every other encoding used in
 
 | Convention             | Formula                                                                                                                                                                                                                                                                             |
 |------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Signed (centre C)      | `display = raw - C` — the default centre is 50 (range -50..+50) when not noted. Other centres seen in this format: 20 (EQ gains, range -20..+20), 24 (pitch semitones, range -24..+24), 12 (TUNE DOWN, range -12..0), -1 (SLICER `duty`, range -1..+254 but only 0..100 meaningful) |
+| Signed (center C)      | `display = raw - C` — the default center is 50 (range -50..+50) when not noted. Other centers seen in this format: 20 (EQ gains, range -20..+20), 24 (pitch semitones, range -24..+24), 12 (TUNE DOWN, range -12..0), -1 (SLICER `duty`, range -1..+254 but only 0..100 meaningful) |
 | Scaled (×factor)       | `display = raw × factor`, rounded to 1 decimal — used for CHORUS `preDelay` (factor 0.5, in ms) and REVERB `time` (factor 0.1, in seconds), both the dedicated REV block and REVERB-as-FX-slot                                                                                      |
 | 16-bit time (4-nibble) | one hex digit per byte across 4 consecutive bytes, MSB first                                                                                                                                                                                                                        |
 | 8-bit value (2-nibble) | one hex digit per byte across 2 consecutive bytes, MSB first (reverb pre-delay)                                                                                                                                                                                                     |
@@ -157,9 +157,9 @@ where a given type's own parameters live.
 `p[0]`=sens `p[1]`=low `p[2]`=high `p[3]`=lowFreq (index into `ENHANCER_LOW_FREQ`, `common/constants.ts`) `p[4]`=highFreq (index into `ENHANCER_HIGH_FREQ`) `p[5]`=level
 
 **SLICER** — starts at byte 25; p[0..5]
-`p[0]`=pattern (0–19 = PATTERN 1–20) `p[1]`=rate `p[2]`=level `p[3]`=attack `p[4]`=duty (signed, centre=-1: display=raw+1) `p[5]`=direct
+`p[0]`=pattern (0–19 = PATTERN 1–20) `p[1]`=rate `p[2]`=level `p[3]`=attack `p[4]`=duty (signed, center=-1: display=raw+1) `p[5]`=direct
 
-**PARA. EQ** — starts at byte 31; p[0..6]  *(EQ gains use centre=20)*
+**PARA. EQ** — starts at byte 31; p[0..6]  *(EQ gains use center=20)*
 `p[0]`=lowGain (signed20) `p[1]`=highGain (signed20) `p[2]`=level (signed20) `p[3]`=midFreq (index into `FREQ_STEPS`, `common/constants.ts`) `p[4]`=midGain (signed20) `p[5]`=lowCut (index into `FREQ_LOW_CUT`) `p[6]`=highCut (index into `FREQ_HIGH_CUT`)
 
 **GEQ** — starts at byte 38; p[0..6]
@@ -288,7 +288,7 @@ diatonic intervals resolve against isn't stored here — it's the patch-level `k
 | 0    | on        | 0=OFF, 1=ON                                   |
 | 1    | type      | ODDS_TYPES index (0–34)                       |
 | 2    | drive     | 0–100                                         |
-| 3    | tone      | signed, centre=50                             |
+| 3    | tone      | signed, center=50                             |
 | 4    | level     | 0–100                                         |
 | 5    | direct    | 0–100                                         |
 | 6    | solo      | 0=OFF, 1=ON — temporary level boost for solos |

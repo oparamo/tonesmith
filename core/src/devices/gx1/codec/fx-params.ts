@@ -125,7 +125,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     lookup("midFreq", 3, FREQ_STEPS), signed("midGain", 4, 20),
     lookup("lowCut", 5, FREQ_LOW_CUT), lookup("highCut", 6, FREQ_HIGH_CUT),
   ],
-  // GEQ band gains use signed(centre=20) — each band covers ±20 dB.
+  // GEQ band gains use signed(center=20) — each band covers ±20 dB.
   "GEQ": [
     signed("125Hz", 0, 20), signed("250Hz", 1, 20), signed("500Hz", 2, 20),
     signed("1kHz",  3, 20), signed("2kHz",  4, 20), signed("4kHz",  5, 20),
@@ -136,7 +136,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("500Hz", 3, 20), signed("1kHz",  4, 20), signed("2kHz",  5, 20),
     signed("level", 6, 20),
   ],
-  // All bands and level use signed(centre=20). Band order: standard frequency order.
+  // All bands and level use signed(center=20). Band order: standard frequency order.
   "HIGH GEQ": [
     signed("250Hz", 0, 20), signed("500Hz", 1, 20), signed("1kHz", 2, 20),
     signed("2kHz",  3, 20), signed("4kHz",  4, 20), signed("8kHz", 5, 20),

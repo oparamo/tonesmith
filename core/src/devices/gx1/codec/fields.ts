@@ -19,7 +19,7 @@ interface FieldCodec {
   /** Present on fields built by the constructors below; hand-written FieldCodec
    * object literals (e.g. PHASER's "stage") may omit it. */
   readonly kind?: "u8" | "signed" | "lookup" | "scaled" | "nibblePair" | "nibbleQuad" | "indexTable";
-  readonly centre?: number;
+  readonly center?: number;
   readonly table?: readonly (string | number)[];
   decode(bytes: number[]): string | number | number[];
   encode(value: string | number | number[], bytes: number[]): void;
@@ -41,16 +41,16 @@ const u8 = (name: string, offset: number): FieldCodec => ({
 });
 
 /**
- * A signed/biased byte: raw value is stored as (decoded + centre).
- * Used for EQ gains (centre=50 or 20), pitch offsets (centre=24 or 12),
+ * A signed/biased byte: raw value is stored as (decoded + center).
+ * Used for EQ gains (center=50 or 20), pitch offsets (center=24 or 12),
  * and any parameter that is "zero" at a non-zero byte value.
  */
-const signed = (name: string, offset: number, centre = 50): FieldCodec => ({
+const signed = (name: string, offset: number, center = 50): FieldCodec => ({
   name,
   kind: "signed",
-  centre,
-  decode: bytes => toSigned(bytes[offset], centre),
-  encode: (value, bytes) => { bytes[offset] = toUnsigned(value as number, centre); },
+  center,
+  decode: bytes => toSigned(bytes[offset], center),
+  encode: (value, bytes) => { bytes[offset] = toUnsigned(value as number, center); },
 });
 
 /**

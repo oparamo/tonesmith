@@ -251,7 +251,7 @@ describe("fx", () => {
       .toThrow(/fx1 param "speedSelect" is not valid for type "ROTARY"/);
   });
 
-  it("defaults unset GEQ bands to 0 dB instead of the signed-centre raw byte", () => {
+  it("defaults unset GEQ bands to 0 dB instead of the signed-center raw byte", () => {
     const patch = basePatch("Test");
     fx(patch, "fx1", "HIGH GEQ", null, { level: 80, "4kHz": 5 });
     expect(patch.fx1.params).toEqual({

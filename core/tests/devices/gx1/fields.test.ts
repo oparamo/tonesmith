@@ -30,9 +30,9 @@ describe("u8", () => {
 describe("signed", () => {
   const field = signed("gain", 0, 20);
 
-  it("tags itself with kind \"signed\" and the given centre", () => {
+  it("tags itself with kind \"signed\" and the given center", () => {
     expect(field.kind).toBe("signed");
-    expect(field.centre).toBe(20);
+    expect(field.center).toBe(20);
   });
 });
 

@@ -33,14 +33,14 @@ const lookupIndex = (tableMap: Record<string, number>, name: string, label = "")
 // ── Signed / unsigned conversion ──────────────────────────────────────────────
 
 /**
- * Decode a raw byte value to a signed offset from a centre point.
- * Example: centre=50, raw=60 → decoded=10; raw=40 → decoded=−10.
- * Covers GX-1 parameters that are stored as offset-from-centre (EQ bands, tone, etc.)
- * and also pitch/bias fields where centre is the zero-pitch byte value (e.g. 24, 12).
+ * Decode a raw byte value to a signed offset from a center point.
+ * Example: center=50, raw=60 → decoded=10; raw=40 → decoded=−10.
+ * Covers GX-1 parameters that are stored as offset-from-center (EQ bands, tone, etc.)
+ * and also pitch/bias fields where center is the zero-pitch byte value (e.g. 24, 12).
  */
-const toSigned = (raw: number, centre = 50): number => raw - centre;
+const toSigned = (raw: number, center = 50): number => raw - center;
 
 /** Inverse of toSigned: encode a signed value back to a raw byte. */
-const toUnsigned = (value: number, centre = 50): number => value + centre;
+const toUnsigned = (value: number, center = 50): number => value + center;
 
 export { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned };

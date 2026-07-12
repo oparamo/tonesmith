@@ -127,7 +127,7 @@ const NEUTRAL_LOOKUP_VALUE = "FLAT";
 
 /**
  * Generic per-field default, used for any field FX_DEFAULT_OVERRIDES doesn't cover:
- * a signed (offset-encoded) field defaults to its centre (i.e. 0, "0 dB" for EQ gains);
+ * a signed (offset-encoded) field defaults to its center (i.e. 0, "0 dB" for EQ gains);
  * a lookup field defaults to its table's bypass value if it has one, else its first entry;
  * a plain level-like field defaults to 50; anything else defaults to 0.
  */
