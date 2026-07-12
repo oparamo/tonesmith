@@ -11,7 +11,8 @@ describe("describe_device", () => {
     const { text, isError } = await client.callTool("describe_device", { device: "gx1" });
     expect(isError, text).toBe(false);
     const groups = JSON.parse(text) as { id: string }[];
-    expect(groups.map(g => g.id)).toContain("amp");
+    const groupIds = groups.map(group => group.id);
+    expect(groupIds).toContain("amp");
   });
 
   it("returns full detail for a single group", async () => {
@@ -21,8 +22,9 @@ describe("describe_device", () => {
     const { text, isError } = await client.callTool("describe_device", input);
     expect(isError, text).toBe(false);
     const group = JSON.parse(text) as { id: string; items: { id: string }[] };
+    const itemIds = group.items.map(item => item.id);
     expect(group.id).toBe("amp");
-    expect(group.items.map(i => i.id)).toContain("JC-120");
+    expect(itemIds).toContain("JC-120");
   });
 
   it("returns full detail for a single item", async () => {

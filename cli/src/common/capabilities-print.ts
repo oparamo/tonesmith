@@ -34,7 +34,8 @@ const printGroupItems = (items: CapabilityGroup["items"]): void => {
     console.info(`  ${CYAN}${item.id}${RESET}${modelTag}`);
     console.info(`    ${item.description}`);
     if (item.subTypes && item.subTypes.length > 0) {
-      console.info(`    ${DIM}Subtypes: ${item.subTypes.map(subType => subType.id).join(", ")}${RESET}`);
+      const subTypeIds = item.subTypes.map(subType => subType.id).join(", ");
+      console.info(`    ${DIM}Subtypes: ${subTypeIds}${RESET}`);
     }
     console.info();
   }

@@ -50,8 +50,9 @@ describe("upsertPatch", () => {
     const driver = makeFakeDriver(files);
 
     const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+    const patchNames = file.patches.map(patch => patch.name);
 
-    expect(file.patches.map(p => p.name)).toEqual(["Lead", "Rhythm"]);
+    expect(patchNames).toEqual(["Lead", "Rhythm"]);
   });
 
   it("replaces the patch with the same name in place, idempotent across reruns", () => {
@@ -62,8 +63,9 @@ describe("upsertPatch", () => {
 
     upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
     const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+    const patchNames = file.patches.map(patch => patch.name);
 
-    expect(file.patches.map(p => p.name)).toEqual(["Lead", "Rhythm"]);
+    expect(patchNames).toEqual(["Lead", "Rhythm"]);
   });
 
   it("propagates non-ENOENT errors from readFile", () => {

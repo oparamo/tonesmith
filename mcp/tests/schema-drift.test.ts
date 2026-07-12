@@ -4,11 +4,19 @@ import { gx1, capabilityUtils } from "@tonesmith/core";
 import { connectClient, emptyTempDir } from "./helpers";
 
 /**
- * Drift guard: generate_gx1_patch's zod bounds must match the capabilities ParamSpec
- * ranges they're supposed to mirror, for every top-level (non-record) numeric field.
- * Catches the class of bug where the MCP schema's bounds silently drifted from the
- * device reality documented in capabilities.ts (e.g. odds.tone allowing 0-100 instead
- * of the real -50-+50, or reverb.tone described as +/-12 instead of the real +/-50).
+ * Two drift guards for generate_gx1_patch:
+ *
+ * 1. Bounds: the zod schema's numeric min/max must match the capabilities ParamSpec
+ *    ranges they're supposed to mirror, for every top-level (non-record) numeric field.
+ *    Catches the class of bug where the MCP schema's bounds silently drifted from the
+ *    device reality documented in capabilities.ts (e.g. odds.tone allowing 0-100 instead
+ *    of the real -50-+50, or reverb.tone described as +/-12 instead of the real +/-50).
+ *
+ * 2. Type catalog: delay/reverb/pfx `type` fields are plain z.string() (core, not zod,
+ *    validates the actual value), so their .describe() text is the only place the valid
+ *    values are surfaced to a client. Catches the class of bug where that text is a
+ *    hardcoded, complete-looking enumeration that silently goes stale when a new type is
+ *    added to constants.ts/capabilities.ts.
  */
 
 const parseRange = (range: string): { min: number; max: number } => {
@@ -63,6 +71,28 @@ const withOverride = (base: Record<string, unknown>, path: string, value: number
   target[parts[parts.length - 1]] = value;
   return clone;
 };
+
+describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () => {
+  let close: () => Promise<void>;
+  afterEach(async () => { await close(); });
+
+  it("mentions every current delay/reverb/pfx type id in the tool's client-visible schema", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const toolSchema = await client.getToolSchema("generate_gx1_patch");
+    const toolSchemaText = JSON.stringify(toolSchema);
+
+    const delayTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "delay").items.map(item => item.id);
+    const reverbTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "reverb").items.map(item => item.id);
+    const pfxTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "pfx").items.map(item => item.id);
+    const allTypeIds = [...delayTypeIds, ...reverbTypeIds, ...pfxTypeIds];
+
+    for (const typeId of allTypeIds) {
+      expect(toolSchemaText, `expected the tool schema to mention delay/reverb/pfx type "${typeId}"`).toContain(typeId);
+    }
+  });
+});
 
 describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
   let close: () => Promise<void>;

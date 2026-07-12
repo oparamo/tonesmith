@@ -5,28 +5,30 @@ const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, normali
 import { ok, err } from "../../common";
 import { FxBlockSchema } from "./schemas";
 
+const capabilities = gx1.driver.capabilities;
+
+/** Every item id in a capability group, comma-separated — sourced from gx1 capabilities so it can't drift from constants.ts. */
+const capabilityItemIds = (groupId: string): string =>
+  capabilityUtils.findGroup(capabilities, groupId).items.map(item => item.id).join(", ");
+
+const capabilityParamRange = (groupId: string, paramName: string): string =>
+  capabilityUtils.findGroup(capabilities, groupId).params?.find(param => param.name === paramName)?.range ?? "";
+
 /** Builds the type-catalog block of the tool description straight from gx1 capabilities, so it can't drift from constants.ts. */
 const buildCatalog = (): string => {
-  const caps = gx1.driver.capabilities;
-  const itemIds = (groupId: string): string =>
-    capabilityUtils.findGroup(caps, groupId).items.map(item => item.id).join(" ");
-  const paramRange = (groupId: string, paramName: string): string =>
-    capabilityUtils.findGroup(caps, groupId).params?.find(param => param.name === paramName)?.range ?? "";
-
-  const pfxGroup = capabilityUtils.findGroup(caps, "pfx");
-  const pfxItems = pfxGroup.items;
+  const pfxGroup = capabilityUtils.findGroup(capabilities, "pfx");
   const wahItem = capabilityUtils.findItem(pfxGroup, "WAH");
-  const wahSubTypes = wahItem.subTypes?.map(subType => subType.id).join(" ") ?? "";
+  const wahSubTypeIds = wahItem.subTypes?.map(subType => subType.id).join(", ") ?? "";
 
-  return `Amp types: ${itemIds("amp")}
-Speaker: ${itemIds("cab")}
-Mic: ${itemIds("mic")}
-Delay types: ${itemIds("delay")}
-Reverb types: ${itemIds("reverb")}
-Pedal FX types: ${pfxItems.map(item => item.id).join(", ")}
-Wah types: ${wahSubTypes}
-NS detect points: ${paramRange("ns", "DETECT")}
-FV curves: ${paramRange("fv", "CURVE")}`;
+  return `Amp types: ${capabilityItemIds("amp")}
+Speaker: ${capabilityItemIds("cab")}
+Mic: ${capabilityItemIds("mic")}
+Delay types: ${capabilityItemIds("delay")}
+Reverb types: ${capabilityItemIds("reverb")}
+Pedal FX types: ${capabilityItemIds("pfx")}
+Wah types: ${wahSubTypeIds}
+NS detect points: ${capabilityParamRange("ns", "DETECT")}
+FV curves: ${capabilityParamRange("fv", "CURVE")}`;
 };
 
 const inputSchema = z.object({
@@ -69,7 +71,7 @@ const inputSchema = z.object({
   }).optional().describe("Overdrive/distortion block. Omit to disable."),
 
   pfx: z.object({
-    type: z.string().describe("Pedal FX type: WAH or PEDAL BEND"),
+    type: z.string().describe(`Pedal FX type: ${capabilityItemIds("pfx")}`),
     params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
       "Type-specific params (e.g. { wahType: \"CRY WAH\", level: 100, direct: 0, position: 100, min: 0, max: 100 } for WAH; " +
       "{ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 } for PEDAL BEND)"
@@ -96,7 +98,7 @@ const inputSchema = z.object({
   }).optional().describe("Foot volume block. Omit to use defaults."),
 
   delay: z.object({
-    type: z.string().describe("Delay type (STANDARD, MODULATE, PAN, REVERSE, ANALOG, ANLG MOD, SPACE ECHO, SHIMMER, WARP, TWIST, GLITCH)"),
+    type: z.string().describe(`Delay type (${capabilityItemIds("delay")})`),
     timeMs: z.number().min(1).max(2000).describe("Delay time in milliseconds, 1–2000"),
     feedback: z.number().int().min(0).max(100).describe("Feedback 0–100"),
     level: z.number().int().min(1).max(120).describe("Effect level 1–120"),
@@ -109,7 +111,7 @@ const inputSchema = z.object({
   }).optional().describe("Delay block. Omit to disable."),
 
   reverb: z.object({
-    type: z.string().describe("Reverb type (HALL S, HALL M, PLATE, ROOM S, ROOM L, AMBIENCE, SPRING, SHIMMER, SUB DELAY, TERA ECHO)"),
+    type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
     timeS: z.number().min(0.1).max(10.0).describe("Reverb time in seconds, 0.1–10.0"),
     level: z.number().int().min(1).max(100).describe("Effect level 1–100"),
     preDelay: z.number().min(0).max(200).optional().describe("Pre-delay in ms 0–200 (default 0)"),
