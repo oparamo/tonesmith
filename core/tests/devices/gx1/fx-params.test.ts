@@ -16,20 +16,18 @@ const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/de
 describe("FX param map symmetry (all types)", () => {
   const zeroBytes = new Array<number>(251).fill(0);
 
-  for (const fxType of FX_TYPES) {
-    it(`${fxType}: encode(decode(zeros)) equals decode(zeros)`, () => {
-      const decoded = decodeFxParams(fxType, zeroBytes);
+  it.each(FX_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (fxType) => {
+    const decoded = decodeFxParams(fxType, zeroBytes);
 
-      // Types not yet in FX_PARAM_MAPS return { unknownBytes: [...] } — skip them
-      if ("unknownBytes" in decoded) return;
+    // Types not yet in FX_PARAM_MAPS return { unknownBytes: [...] } — skip them
+    if ("unknownBytes" in decoded) return;
 
-      const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
-      const reencodedBytes = bytesFromHex(reencoded);
-      const reDecoded = decodeFxParams(fxType, reencodedBytes);
+    const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
+    const reencodedBytes = bytesFromHex(reencoded);
+    const reDecoded = decodeFxParams(fxType, reencodedBytes);
 
-      expect(reDecoded).toEqual(decoded);
-    });
-  }
+    expect(reDecoded).toEqual(decoded);
+  });
 });
 
 

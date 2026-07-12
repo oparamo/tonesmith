@@ -15,40 +15,36 @@ const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/de
 // ── Delay block symmetry tests ────────────────────────────────────────────────
 
 describe("Delay block symmetry (all types)", () => {
-  for (const dlyType of DLY_TYPES) {
-    it(`${dlyType}: encode(decode(zeros)) equals decode(zeros)`, () => {
-      const bytes = new Array<number>(29).fill(0);
-      bytes[0] = 1;
-      bytes[1] = DLY_TYPE_IDX[dlyType];
-      const hexList = hexFromBytes(bytes);
+  it.each(DLY_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (dlyType) => {
+    const bytes = new Array<number>(29).fill(0);
+    bytes[0] = 1;
+    bytes[1] = DLY_TYPE_IDX[dlyType];
+    const hexList = hexFromBytes(bytes);
 
-      const decoded = decodeDelay(hexList);
-      const reencoded = encodeDelay(decoded);
-      const reDecoded = decodeDelay(reencoded);
+    const decoded = decodeDelay(hexList);
+    const reencoded = encodeDelay(decoded);
+    const reDecoded = decodeDelay(reencoded);
 
-      expect(reDecoded).toEqual(decoded);
-    });
-  }
+    expect(reDecoded).toEqual(decoded);
+  });
 });
 
 
 // ── Reverb block symmetry tests ───────────────────────────────────────────────
 
 describe("Reverb block symmetry (all types)", () => {
-  for (const revType of REV_TYPES) {
-    it(`${revType}: encode(decode(zeros)) equals decode(zeros)`, () => {
-      const bytes = new Array<number>(20).fill(0);
-      bytes[0] = 1;
-      bytes[1] = REV_TYPE_IDX[revType];
-      const hexList = hexFromBytes(bytes);
+  it.each(REV_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (revType) => {
+    const bytes = new Array<number>(20).fill(0);
+    bytes[0] = 1;
+    bytes[1] = REV_TYPE_IDX[revType];
+    const hexList = hexFromBytes(bytes);
 
-      const decoded = decodeReverb(hexList);
-      const reencoded = encodeReverb(decoded);
-      const reDecoded = decodeReverb(reencoded);
+    const decoded = decodeReverb(hexList);
+    const reencoded = encodeReverb(decoded);
+    const reDecoded = decodeReverb(reencoded);
 
-      expect(reDecoded).toEqual(decoded);
-    });
-  }
+    expect(reDecoded).toEqual(decoded);
+  });
 });
 
 

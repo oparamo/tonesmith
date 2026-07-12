@@ -7,30 +7,36 @@ import { RAW } from "../../../src/devices/gx1/common";
 
 const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tones.tsl");
 
+const file = readFile(FIXTURE);
+const rawFileContents = readFileSync(FIXTURE, "utf8");
+const raw = JSON.parse(rawFileContents) as {
+  data: [{ paramSet: Record<string, string[]> }[], unknown[]];
+};
+
+type GxPatch = (typeof file.patches)[number];
+
+interface PatchCase {
+  index: number;
+  patch: GxPatch;
+  original: { paramSet: Record<string, string[]> };
+}
+
+const patchCases: PatchCase[] = file.patches.map((patch, index) => ({
+  index,
+  patch,
+  original: raw.data[0][index],
+}));
+
 describe("GX-1 round-trip", () => {
-  it("decodes and re-encodes every patch byte-for-byte", () => {
-    const file = readFile(FIXTURE);
-    const rawFileContents = readFileSync(FIXTURE, "utf8");
-    const raw = JSON.parse(rawFileContents) as {
-      data: [{ paramSet: Record<string, string[]> }[], unknown[]];
-    };
+  it.each(patchCases)("decodes and re-encodes patch $index byte-for-byte", ({ patch, index, original }) => {
+    const reencoded = encodePatch(patch);
 
-    for (let i = 0; i < file.patches.length; i++) {
-      const patch = file.patches[i];
-      const original = raw.data[0][i];
-      const reencoded = encodePatch(patch);
-
-      for (const key of Object.keys(original.paramSet)) {
-        expect(reencoded.paramSet[key], `patch ${i} key ${key}`).toEqual(
-          original.paramSet[key]
-        );
-      }
+    for (const key of Object.keys(original.paramSet)) {
+      expect(reencoded.paramSet[key], `patch ${index} key ${key}`).toEqual(original.paramSet[key]);
     }
   });
 
   it("patch names round-trip cleanly", () => {
-    const file = readFile(FIXTURE);
-
     for (const patch of file.patches) {
       expect(typeof patch.name).toBe("string");
       expect(patch.name.length).toBeGreaterThanOrEqual(0);
@@ -40,7 +46,6 @@ describe("GX-1 round-trip", () => {
 
 describe("decodePatch", () => {
   it("defaults memo to an empty string when the raw envelope omits it", () => {
-    const file = readFile(FIXTURE);
     const paramSet = file.patches[0][RAW];
 
     const decoded = decodePatch({ paramSet });

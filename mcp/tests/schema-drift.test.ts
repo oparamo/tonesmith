@@ -72,6 +72,26 @@ const withOverride = (base: Record<string, unknown>, path: string, value: number
   return clone;
 };
 
+interface BoundsCheck {
+  path: string;
+  value: number;
+  shouldError: boolean;
+  description: string;
+}
+
+/** One accept-case and one reject-case just past each side of a field's documented range. */
+const boundsChecksFor = (field: BoundedField): BoundsCheck[] => {
+  const { min, max } = rangeFor(field.groupId, field.paramName);
+  return [
+    { path: field.path, value: min, shouldError: false, description: `${field.path}=${min} (documented min) is accepted` },
+    { path: field.path, value: max, shouldError: false, description: `${field.path}=${max} (documented max) is accepted` },
+    { path: field.path, value: min - 1, shouldError: true, description: `${field.path}=${min - 1} (below documented min) is rejected` },
+    { path: field.path, value: max + 1, shouldError: true, description: `${field.path}=${max + 1} (above documented max) is rejected` },
+  ];
+};
+
+const BOUNDS_CHECKS: BoundsCheck[] = BOUNDED_FIELDS.flatMap(boundsChecksFor);
+
 describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () => {
   let close: () => Promise<void>;
   afterEach(async () => { await close(); });
@@ -99,11 +119,10 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
   let temp: ReturnType<typeof emptyTempDir>;
   afterEach(async () => { await close(); temp.cleanup(); });
 
-  it("accepts every field's documented min/max and rejects just outside them", async () => {
+  it.each(BOUNDS_CHECKS)("$description", async ({ path, value, shouldError }) => {
     temp = emptyTempDir();
     const client = await connectClient();
     close = client.close;
-
     const basePatchSpec = {
       name: "Bounds",
       outPath: join(temp.dir, "bounds.tsl"),
@@ -114,25 +133,10 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
       delay: { type: "STANDARD", timeMs: 500, feedback: 20, level: 25 },
       reverb: { type: "HALL S", timeS: 2.4, level: 20 },
     };
+    const patchSpec = withOverride(basePatchSpec, path, value);
 
-    for (const field of BOUNDED_FIELDS) {
-      const { min, max } = rangeFor(field.groupId, field.paramName);
+    const result = await client.callTool("generate_gx1_patch", patchSpec);
 
-      const atMinSpec = withOverride(basePatchSpec, field.path, min);
-      const atMin = await client.callTool("generate_gx1_patch", atMinSpec);
-      expect(atMin.isError, `${field.path}=${min} (documented min) should be accepted: ${atMin.text}`).toBe(false);
-
-      const atMaxSpec = withOverride(basePatchSpec, field.path, max);
-      const atMax = await client.callTool("generate_gx1_patch", atMaxSpec);
-      expect(atMax.isError, `${field.path}=${max} (documented max) should be accepted: ${atMax.text}`).toBe(false);
-
-      const belowMinSpec = withOverride(basePatchSpec, field.path, min - 1);
-      const belowMin = await client.callTool("generate_gx1_patch", belowMinSpec);
-      expect(belowMin.isError, `${field.path}=${min - 1} (below documented min) should be rejected`).toBe(true);
-
-      const aboveMaxSpec = withOverride(basePatchSpec, field.path, max + 1);
-      const aboveMax = await client.callTool("generate_gx1_patch", aboveMaxSpec);
-      expect(aboveMax.isError, `${field.path}=${max + 1} (above documented max) should be rejected`).toBe(true);
-    }
+    expect(result.isError, result.text).toBe(shouldError);
   });
 });

@@ -83,21 +83,23 @@ describe("upsertPatch", () => {
 describe("resolvePatchIndex", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Rock Lead")];
 
-  it("returns numeric index when ref is an integer string", () => {
-    const firstIndex = resolvePatchIndex(patches, "0");
-    const thirdIndex = resolvePatchIndex(patches, "2");
+  it.each([
+    { ref: "0", expected: 0 },
+    { ref: "2", expected: 2 },
+  ])("returns numeric index when ref is the integer string $ref", ({ ref, expected }) => {
+    const index = resolvePatchIndex(patches, ref);
 
-    expect(firstIndex).toBe(0);
-    expect(thirdIndex).toBe(2);
+    expect(index).toBe(expected);
   });
 
-  it("resolves name case-insensitively (trims stored patch name, not ref)", () => {
-    const lowerCaseMatch = resolvePatchIndex(patches, "clean jazz");
-    const upperCaseMatch = resolvePatchIndex(patches, "CLEAN JAZZ");
+  it.each(["clean jazz", "CLEAN JAZZ"])(
+    "resolves name case-insensitively (trims stored patch name, not ref): %s",
+    (ref) => {
+      const index = resolvePatchIndex(patches, ref);
 
-    expect(lowerCaseMatch).toBe(1);
-    expect(upperCaseMatch).toBe(1);
-  });
+      expect(index).toBe(1);
+    }
+  );
 
   it("throws when no patch matches the name", () => {
     const resolveMissingName = () => resolvePatchIndex(patches, "Metal");
@@ -114,30 +116,22 @@ describe("resolvePatchIndex", () => {
 });
 
 describe("coerceValue", () => {
-  it("converts integer strings to numbers", () => {
-    expect(coerceValue("0")).toBe(0);
-    expect(coerceValue("72")).toBe(72);
-    expect(coerceValue("-5")).toBe(-5);
-  });
+  it.each([
+    { input: "0", expected: 0 },
+    { input: "72", expected: 72 },
+    { input: "-5", expected: -5 },
+    { input: "3.14", expected: 3.14 },
+    { input: "0.5", expected: 0.5 },
+    { input: "", expected: 0 },
+    { input: "hello", expected: "hello" },
+    { input: "NaN", expected: "NaN" },
+    { input: "FLAT", expected: "FLAT" },
+    { input: "true", expected: true },
+    { input: "false", expected: false },
+  ])("coerces \"$input\" to $expected", ({ input, expected }) => {
+    const result = coerceValue(input);
 
-  it("converts float strings to numbers", () => {
-    expect(coerceValue("3.14")).toBe(3.14);
-    expect(coerceValue("0.5")).toBe(0.5);
-  });
-
-  it("converts empty string to 0", () => {
-    expect(coerceValue("")).toBe(0);
-  });
-
-  it("returns non-numeric, non-boolean strings unchanged", () => {
-    expect(coerceValue("hello")).toBe("hello");
-    expect(coerceValue("NaN")).toBe("NaN");
-    expect(coerceValue("FLAT")).toBe("FLAT");
-  });
-
-  it("converts \"true\"/\"false\" strings to booleans", () => {
-    expect(coerceValue("true")).toBe(true);
-    expect(coerceValue("false")).toBe(false);
+    expect(result).toBe(expected);
   });
 });
 
@@ -148,9 +142,13 @@ describe("resolvePatchIndices", () => {
     expect(resolvePatchIndices(patches)).toEqual([0, 1, 2]);
   });
 
-  it("returns a single resolved index when ref is given", () => {
-    expect(resolvePatchIndices(patches, "1")).toEqual([1]);
-    expect(resolvePatchIndices(patches, "metal")).toEqual([2]);
+  it.each([
+    { ref: "1", expected: [1] },
+    { ref: "metal", expected: [2] },
+  ])("returns a single resolved index when ref is $ref", ({ ref, expected }) => {
+    const indices = resolvePatchIndices(patches, ref);
+
+    expect(indices).toEqual(expected);
   });
 
   it("propagates resolvePatchIndex's not-found error", () => {

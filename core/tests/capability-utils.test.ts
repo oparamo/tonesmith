@@ -31,12 +31,13 @@ describe("findGroup", () => {
     expect(group.id).toBe("amp");
   });
 
-  it("finds a group case-insensitively", () => {
-    const upperCaseMatch = findGroup(caps, "AMP");
-    const mixedCaseMatch = findGroup(caps, "Delay");
+  it.each([
+    { ref: "AMP", expectedId: "amp" },
+    { ref: "Delay", expectedId: "delay" },
+  ])("finds a group case-insensitively ($ref)", ({ ref, expectedId }) => {
+    const group = findGroup(caps, ref);
 
-    expect(upperCaseMatch.id).toBe("amp");
-    expect(mixedCaseMatch.id).toBe("delay");
+    expect(group.id).toBe(expectedId);
   });
 
   it("throws listing available group ids when not found", () => {
@@ -50,12 +51,10 @@ describe("findGroup", () => {
 describe("findItem", () => {
   const ampGroup = findGroup(caps, "amp");
 
-  it("finds an item by exact id, case-insensitively", () => {
-    const exactMatch = findItem(ampGroup, "JC-120");
-    const lowerCaseMatch = findItem(ampGroup, "jc-120");
+  it.each(["JC-120", "jc-120"])("finds an item by id regardless of case (%s)", (ref) => {
+    const item = findItem(ampGroup, ref);
 
-    expect(exactMatch.id).toBe("JC-120");
-    expect(lowerCaseMatch.id).toBe("JC-120");
+    expect(item.id).toBe("JC-120");
   });
 
   it("finds an item by name prefix when id doesn't match", () => {
