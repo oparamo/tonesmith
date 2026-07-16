@@ -192,7 +192,7 @@ where a given type's own parameters live.
 `p[0]`=type (0=NATURAL,1=WIDE,2=BRIGHT) `p[1]`=reso `p[2]`=tone (signed50) `p[3]`=level
 
 **FEEDBACKER** — starts at byte 101; p[0..6]
-`p[0]`=mode (0=PITCH,1=BRUSH,2=SCREEM) `p[1]`=trigger `p[2]`=depth `p[3]`=riseTime `p[4]`=octRiseTm `p[5]`=feedback `p[6]`=octFeedback
+`p[0]`=mode (0=NORMAL,1=OSC) `p[1]`=trigger `p[2]`=depth `p[3]`=riseTime `p[4]`=octRiseTm `p[5]`=feedback `p[6]`=octFeedback
 
 **SITAR SIM** — starts at byte 108; p[0..6]
 `p[0]`=sens `p[1]`=depth `p[2]`=tone (signed50) `p[3]`=level `p[4]`=reso `p[5]`=buzz `p[6]`=direct
@@ -249,7 +249,7 @@ as with the other sub-model-selector effects — this codec still uses `type` fo
 
 **HUMANIZER** — starts at byte 172; p[0..6]  *(Roland's manual labels p[0] `MODE`, not `TYPE`
 as with the other sub-model-selector effects — this codec still uses `type` for consistency)*
-`p[0]`=type (0=PICKING,1=AUTO) `p[1]`=vowel1 `p[2]`=vowel2 (0–9 = a,e,i,o,u,A,E,I,O,U) `p[3]`=sens `p[4]`=rate `p[5]`=manual `p[6]`=level
+`p[0]`=type (0=PICKING,1=AUTO) `p[1]`=vowel1 `p[2]`=vowel2 (0–4 = a,e,i,o,u) `p[3]`=sens `p[4]`=rate `p[5]`=manual `p[6]`=level
 
 **PITCH SHIFT** — starts at byte 179; p[0..8]  *(preDelay is 16-bit, not a plain byte)*
 `p[0]`=mode (0=FAST,1=MEDIUM,2=SLOW,3=MONO) `p[1]`=pitch — index into a 51-entry table: 0="+7&-5", 1–49 → semitones -24..+24 (index-25), 50="+12&-5" `p[2..5]`=preDelay (16-bit) `p[6]`=level `p[7]`=feedback `p[8]`=direct
