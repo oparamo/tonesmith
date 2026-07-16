@@ -256,6 +256,73 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
   });
 });
 
+// ── enum-value parity: codec lookup table values ↔ catalog range (discrete enums) ──
+//
+// The name-parity guards above match field/param NAMES, never enum VALUES — so a codec
+// lookup table with the wrong labels (right shape) decodes silently-wrong and no test
+// catches it (this is how FEEDBACKER's mode and HUMANIZER's vowels drifted). For the
+// discrete-enum lookup PARAMS below — whose values live only in the catalog `range` string,
+// not as capability item/subtype ids (those are already value-checked by id/subtype
+// coverage) — the codec table must equal the catalog range verbatim.
+//
+// Guarding each shared enum constant once here locks it against drift everywhere it's used.
+// Intentionally excluded: quantized-numeric lookups (frequency tables) and compact-range
+// enums (HARMONIST harmony "-2oct-+2oct", SLICER "P01-P20", PITCH SHIFT pitch "-24-+24"),
+// whose catalog range is a compact string rather than a verbatim value list.
+
+interface EnumValueCheck {
+  block: PerTypeBlock;
+  type: string;
+  /** codec lookup field name (mapped to its catalog param via the block's alias map). */
+  field: string;
+}
+
+const requireBlock = (id: PerTypeBlock["block"]): PerTypeBlock => {
+  const found = PER_TYPE_BLOCKS.find(block => block.block === id);
+  if (!found) throw new Error(`PER_TYPE_BLOCKS has no "${id}" block`);
+  return found;
+};
+
+const fxValueBlock = requireBlock("fx");
+
+const ENUM_VALUE_CHECKS: EnumValueCheck[] = [
+  { block: fxValueBlock, type: "TOUCH WAH",   field: "filter" },
+  { block: fxValueBlock, type: "TOUCH WAH",   field: "polarity" },
+  { block: fxValueBlock, type: "AUTO WAH",    field: "filter" },
+  { block: fxValueBlock, type: "FEEDBACKER",  field: "mode" },
+  { block: fxValueBlock, type: "ROTARY",      field: "speed" },
+  { block: fxValueBlock, type: "RING MOD",    field: "intelligent" },
+  { block: fxValueBlock, type: "HUMANIZER",   field: "vowel1" },
+  { block: fxValueBlock, type: "HUMANIZER",   field: "vowel2" },
+  { block: fxValueBlock, type: "PITCH SHIFT", field: "mode" },
+  { block: fxValueBlock, type: "S-BEND",      field: "pitch" },
+  { block: FX_DELAY_BLOCK, type: "WARP",   field: "trigger" },
+  { block: FX_DELAY_BLOCK, type: "TWIST",  field: "trigger" },
+  { block: FX_DELAY_BLOCK, type: "TWIST",  field: "mode" },
+  { block: FX_DELAY_BLOCK, type: "GLITCH", field: "trigger" },
+];
+
+const assertEnumValueParity = ({ block, type, field }: EnumValueCheck): void => {
+  const codecField = (block.codecFields(type) ?? []).find(candidate => candidate.name === field);
+  expect(codecField, `${block.block} "${type}" has no codec field "${field}"`).toBeDefined();
+  const table = codecField?.table;
+  expect(table, `${block.block} "${type}" field "${field}" is not a lookup (no table)`).toBeDefined();
+
+  const aliases = block.aliases[type] ?? {};
+  const catalogLabel = field in aliases ? aliases[field] : field;
+  const param = PARAMS_BY_TYPE[block.block][type].find(candidate => normalize(candidate.name) === normalize(catalogLabel));
+  expect(param, `${block.block} "${type}" catalog has no param for codec field "${field}"`).toBeDefined();
+
+  const codecValues = (table ?? []).join(", ");
+  expect(codecValues, `${block.block} "${type}" field "${field}": codec table vs catalog range`).toBe(param?.range);
+};
+
+describe("GX-1 codec ↔ catalog enum-value parity (discrete enums)", () => {
+  it.each(ENUM_VALUE_CHECKS)("$type.$field: codec lookup values match the catalog range", (check) => {
+    assertEnumValueParity(check);
+  });
+});
+
 // ── subtype coverage: capabilities subTypes ↔ PARAM_SUBTYPE_EFFECTS ─────────────
 
 describe("GX-1 FX subtype coverage", () => {
