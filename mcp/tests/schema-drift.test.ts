@@ -30,6 +30,12 @@ interface BoundedField {
   path: string;
   groupId: string;
   paramName: string;
+  /**
+   * For per-type blocks (delay/reverb) whose params live on each type item rather than the
+   * group, the representative type whose params the flat generate schema mirrors. Omit for
+   * single-shape blocks (amp/odds/ns/fv) that carry their params at the group level.
+   */
+  typeId?: string;
 }
 
 const BOUNDED_FIELDS: BoundedField[] = [
@@ -44,21 +50,25 @@ const BOUNDED_FIELDS: BoundedField[] = [
   { path: "ns.threshold", groupId: "ns", paramName: "THRESHOLD" },
   { path: "ns.release", groupId: "ns", paramName: "RELEASE" },
   { path: "fv.position", groupId: "fv", paramName: "POSITION" },
-  { path: "delay.feedback", groupId: "delay", paramName: "FEEDBACK" },
-  { path: "delay.level", groupId: "delay", paramName: "LEVEL" },
-  { path: "delay.timeMs", groupId: "delay", paramName: "TIME" },
-  { path: "reverb.level", groupId: "reverb", paramName: "LEVEL" },
-  { path: "reverb.preDelay", groupId: "reverb", paramName: "PRE-DELAY" },
-  { path: "reverb.tone", groupId: "reverb", paramName: "TONE" },
-  { path: "reverb.density", groupId: "reverb", paramName: "DENSITY" },
-  { path: "reverb.direct", groupId: "reverb", paramName: "DIRECT" },
-  { path: "reverb.timeS", groupId: "reverb", paramName: "TIME" },
+  { path: "delay.feedback", groupId: "delay", paramName: "FEEDBACK", typeId: "STANDARD" },
+  { path: "delay.level", groupId: "delay", paramName: "LEVEL", typeId: "STANDARD" },
+  { path: "delay.timeMs", groupId: "delay", paramName: "TIME", typeId: "STANDARD" },
+  { path: "reverb.level", groupId: "reverb", paramName: "LEVEL", typeId: "HALL S" },
+  { path: "reverb.preDelay", groupId: "reverb", paramName: "PRE-DELAY", typeId: "HALL S" },
+  { path: "reverb.tone", groupId: "reverb", paramName: "TONE", typeId: "HALL S" },
+  { path: "reverb.density", groupId: "reverb", paramName: "DENSITY", typeId: "HALL S" },
+  { path: "reverb.direct", groupId: "reverb", paramName: "DIRECT", typeId: "HALL S" },
+  { path: "reverb.timeS", groupId: "reverb", paramName: "TIME", typeId: "HALL S" },
 ];
 
-const rangeFor = (groupId: string, paramName: string): { min: number; max: number } => {
+const rangeFor = ({ groupId, paramName, typeId }: BoundedField): { min: number; max: number } => {
   const group = capabilityUtils.findGroup(gx1.driver.capabilities, groupId);
-  const param = group.params?.find(p => p.name === paramName);
-  if (!param) throw new Error(`No ParamSpec "${paramName}" in capabilities group "${groupId}"`);
+  const params = typeId === undefined
+    ? group.params
+    : capabilityUtils.findItem(group, typeId).params;
+  const param = params?.find(p => p.name === paramName);
+  const where = typeId === undefined ? `group "${groupId}"` : `${groupId} type "${typeId}"`;
+  if (!param) throw new Error(`No ParamSpec "${paramName}" in capabilities ${where}`);
   return parseRange(param.range);
 };
 
@@ -81,7 +91,7 @@ interface BoundsCheck {
 
 /** One accept-case and one reject-case just past each side of a field's documented range. */
 const boundsChecksFor = (field: BoundedField): BoundsCheck[] => {
-  const { min, max } = rangeFor(field.groupId, field.paramName);
+  const { min, max } = rangeFor(field);
   return [
     { path: field.path, value: min, shouldError: false, description: `${field.path}=${min} (documented min) is accepted` },
     { path: field.path, value: max, shouldError: false, description: `${field.path}=${max} (documented max) is accepted` },

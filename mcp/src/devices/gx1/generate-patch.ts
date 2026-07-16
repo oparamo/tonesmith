@@ -105,8 +105,9 @@ const inputSchema = z.object({
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
     on: z.boolean().optional().describe("Enable delay (default true)"),
     extra: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
-      "Extra type-specific params (e.g. { modRate: 12, modDepth: 18 } for MODULATE; " +
-      "{ mode: \"TAPE\" } for TWIST; { head: \"1+2\" } for SPACE ECHO)"
+      "Extra type-specific params beyond the common ones above (e.g. modRate/modDepth for " +
+      "MODULATE, mode/riseTime for TWIST, head for SPACE ECHO). Call describe_device with " +
+      "group=delay and the chosen type for the authoritative names, ranges, and string values."
     ),
   }).optional().describe("Delay block. Omit to disable."),
 
@@ -120,7 +121,9 @@ const inputSchema = z.object({
     direct: z.number().int().min(0).max(100).optional().describe("Direct level 0–100 (default 100)"),
     on: z.boolean().optional().describe("Enable reverb (default true)"),
     extra: z.record(z.string(), z.number()).optional().describe(
-      "Extra type-specific params (e.g. { pitch: 12 } for SHIMMER)"
+      "Extra type-specific params beyond the common ones above (e.g. pitch/pitchLevel for " +
+      "SHIMMER, feedback/highCut for SUB DELAY). Call describe_device with group=reverb and " +
+      "the chosen type for the authoritative names and ranges."
     ),
   }).optional().describe("Reverb block. Omit to disable."),
 });

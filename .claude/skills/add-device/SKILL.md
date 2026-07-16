@@ -50,8 +50,8 @@ stay valid across the gap. Keep received exports somewhere private (not committe
 step 4, when one becomes the public round-trip fixture.
 
 **Documentation to collect** — at minimum the **parameter reference** (every effect/model name
-and its value range; this later becomes the source of truth for the capabilities metadata in
-step 5) and the **operation manual**. Vendors publish these as web pages, downloadable PDFs,
+and its value range; this later becomes the source of truth for the param catalog in
+step 5, which capabilities derives from) and the **operation manual**. Vendors publish these as web pages, downloadable PDFs,
 or both — either works.
 
 Convert sources to Markdown with the repo's `doc-to-md` tool — it converts exactly one URL or
@@ -116,6 +116,12 @@ observed but not yet decoded. Define a thing before referencing it; don't make t
 context from far earlier in the file. The finished spec should read top-to-bottom in a single
 pass, with little to no jumping around the page to follow it.
 
+Keep FORMAT.md to the **byte-layout narrative** — offsets, encoding families, per-field byte
+homes. The **param surface** (param names, value ranges, descriptions) is owned by
+`param-catalog.ts` (step 5); don't duplicate ranges/descriptions here. Field names in the byte
+maps are fine (they're the byte layout), and are what the drift guard reconciles against the
+catalog.
+
 In committed docs and commit messages, describe the vendor's editor software generically —
 never name its internal files, paths, or implementation details.
 
@@ -132,6 +138,9 @@ Create `core/src/devices/<id>/` with:
   device's own patch-file format, not a borrowed name
 - `builder.ts` — high-level, no-"set"-prefix construction helpers (an unknown field key should
   throw rather than write silently)
+- `param-catalog.ts` — the param surface (per block/type → param name + range + description),
+  the in-repo ground truth capabilities derives from and the drift guard checks the codec
+  against; authored in step 5 (see there for what it's built from)
 - `driver.ts` — exports a `PatchDriver<T>` object (the contract lives in
   `core/src/types/driver.ts`) wiring the codec and file-I/O functions together (a driver
   never self-registers)
@@ -162,19 +171,33 @@ Add targeted tests for individual field codecs and any lookup-table edge cases
 throwing). Tests are BDD-style (`describe` behavior / `it` does-X) and assert through public
 surfaces — the driver and exported helpers — never internals.
 
-## 5. Author capabilities metadata
+## 5. Author the param catalog, then capabilities
 
-Write `core/src/devices/<id>/capabilities.ts` — a `DeviceCapabilities` object built from the
-parameter reference captured in step 1, covering every parameter group the device exposes
-(effect types, amp/cab models, etc., whatever applies). Wire it into the driver object from
-step 3.
+Author the param surface **once**, in `core/src/devices/<id>/param-catalog.ts`, then build
+capabilities on top of it — don't hand-write param ranges twice.
 
-Add two drift guards as tests:
-- **Coverage guard**: every id in the device's constant lookup arrays has a matching
-  `CapabilityItem` entry, and vice versa.
-- **Semantic guard**: for at least the trickiest shared/aliased parameter groups, assert that
-  the capability metadata's field list actually matches what the codec reads/writes for that
-  type — a params-vs-codec drift is a silent correctness bug, not just a docs gap.
+1. **`param-catalog.ts`** — from the parameter reference captured in step 1, write the param
+   surface: per block/type → ordered params `{ name, range, description }`. This is the in-repo
+   ground truth for what params the device actually has. Verify each param's presence and range
+   against the vendor's own ground-truth data where available (kept out of the repo and
+   described generically, per step 2's discretion rule); its completeness is what makes the
+   drift guard below meaningful.
+2. **`capabilities.ts`** — a `DeviceCapabilities` object covering every group the device exposes
+   (effect types, amp/cab models, subtypes, etc.). It holds only what's its own —
+   group/item structure, real-world models, sonic descriptions, subtypes — and **derives each
+   item's `params` from the catalog** rather than restating them. Types whose param set varies
+   by sub-model are modeled per-subtype (each subtype carries its own catalog-derived params).
+   Wire capabilities into the driver object from step 3.
+
+Add the drift guard as a test. Because capabilities derives from the catalog, `capabilities ↔
+codec` can't drift by construction; the real risk is between the two independently authored
+sources — the catalog (from the parameter reference) and the codec field maps (from byte
+reverse-engineering). So the guard is **`codec ↔ catalog`**, table-driven and bidirectional:
+for every type of every block, the codec's field names must match the catalog's param names
+(minus type/subtype selectors), with per-block alias/exception maps for the unavoidable
+naming mismatches. Adding a new type or field that isn't in both sources fails the suite.
+Verifying the catalog against the vendor's ground-truth data stays a manual authoring step
+(that data isn't in the repo, so it can't be a CI dependency).
 
 ## 6. Wire the presentation layers
 
@@ -203,8 +226,8 @@ the device lists in `README.md` and `CLAUDE.md`'s Project section.
 
 - `pnpm lint && pnpm build && pnpm coverage` is green from the repo root.
 - The committed fixture round-trips byte-for-byte through the driver's decode → encode.
-- Both drift guards pass — and fail when you deliberately break one capability entry
-  (spot-check once, then revert).
+- The codec↔catalog drift guard passes — and fails when you deliberately drop a param from a
+  catalog type or a field from the codec (spot-check once, then revert).
 - Against the built output, `node cli/dist/index.js <id> read fixtures/<id>/<fixture>` prints
   the patches and `node cli/dist/index.js <id> capabilities` lists the device's groups.
 - CLI and MCP behavior tests cover the new device's happy paths and error paths, including

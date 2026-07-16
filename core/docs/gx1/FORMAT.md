@@ -2,6 +2,8 @@
 
 Reverse-engineered format for BOSS GX-1 `.tsl` patch files, built by studying real `.tsl` exports from the device alongside the BOSS Tone Studio app. All byte values are stored as hex strings in a JSON array (e.g. `["01","2A","FF"]`).
 
+This document is the **byte-layout narrative** only — offsets, encoding families, and how each block maps to raw bytes. The **parameter surface** (every block/type's param names, value ranges, and descriptions) lives in `core/src/devices/gx1/param-catalog.ts`, the in-repo source of truth that `capabilities.ts` derives from and the `codec ↔ catalog` drift guard checks against. Field names here are guarded against that catalog; ranges/descriptions are not duplicated here.
+
 ## TSL JSON Envelope
 
 ```json
@@ -272,11 +274,23 @@ diatonic intervals resolve against isn't stored here — it's the patch-level `k
 **TUNE DOWN** — starts at byte 211; p[0]
 `p[0]`=pitch (signed12: raw-12, range -12..0 semitones)
 
-**DELAY** *(when FX slot type=DELAY)* — starts at byte 212; p[0..9]  *(only STANDARD/MODULATE/PAN/REVERSE/ANALOG are reachable — WARP/TWIST/GLITCH are dedicated-DLY-block-only)*
-`p[0]`=type (0..4) `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut (index into `FREQ_HIGH_CUT`, `common/constants.ts`) `p[8]`=modRate `p[9]`=modDepth, plus `p[11]`=trigger (0=OFF,1=ON, used by REVERSE)
+**DELAY** *(when FX slot type=DELAY)* — starts at byte 212; p[0..18]. This is the one FX-slot
+type modeled **per sub-algorithm** (like the dedicated DLY block): p[0] selects the
+sub-algorithm from `FX_DLY_TYPES` (0=STANDARD, 1=MODULATE, 2=WARP, 3=TWIST, 4=GLITCH — its own
+set, **not** the dedicated block's `DLY_TYPES`), and each one uses a different subset of the
+19-byte block. p[0] is promoted to `block.subType` (via `PARAM_SUBTYPE_EFFECTS`); the codec's
+field map lives in `FX_DELAY_TYPE_MAPS` (`codec/fx-params.ts`). Byte homes are distinct across
+sub-algorithms (no offset reuse):
+- **STANDARD** — `p[0]`=type `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut (index into `FREQ_HIGH_CUT`, `common/constants.ts`)
+- **MODULATE** — STANDARD's fields plus `p[8]`=modRate `p[9]`=modDepth
+- **WARP** — `p[0]`=type `p[1..4]`=time (16-bit) `p[11]`=trigger (0=OFF,1=ON) `p[12]`=level
+- **TWIST** — `p[0]`=type `p[10]`=mode (`TWIST_MODES`: 0=RISE-FALL, 1=RISE-FADE) `p[11]`=trigger `p[12]`=level `p[13]`=riseTime `p[14]`=fallTime `p[15]`=fadeTime
+- **GLITCH** — `p[0]`=type `p[11]`=trigger `p[16]`=time `p[17]`=glitch `p[18]`=balance
 
-**REVERB** *(when FX slot type=REVERB)* — starts at byte 231; p[0..5]  *(only HALL S/HALL M/PLATE/ROOM S/ROOM L are reachable)*
-`p[0]`=type index (0..4) `p[1]`=time (raw × 0.1) `p[2..3]`=preDelay (8-bit) `p[4]`=level `p[5]`=direct
+**REVERB** *(when FX slot type=REVERB)* — starts at byte 231; p[0..5]. Its 5 types are its own
+set (`FX_REV_TYPES`: 0=HALL S, 1=HALL M, 2=PLATE, 3=ROOM, 4=STUDIO — **not** the dedicated REV
+block's `REV_TYPES`), and all 5 share one field set:
+`p[0]`=type index `p[1]`=time (raw × 0.1) `p[2..3]`=preDelay (8-bit) `p[4]`=level `p[5]`=direct
 
 **OVERTONE** *(FX3 only — stored in MEMORY%FX3A, not MEMORY%FX3)* — p[0..4]
 `p[0]`=lower `p[1]`=upper `p[2]`=unison `p[3]`=direct `p[4]`=detune
@@ -342,7 +356,7 @@ GLITCH.
 | 17      | head*                                         | SPACE ECHO                                                              |
 | 18      | pitch (signed24)                              | SHIMMER                                                                 |
 | 19      | balance                                       | SHIMMER                                                                 |
-| 20      | mode (0=TAPE,1=TAPE-ECH,2=REVERSE)            | TWIST                                                                   |
+| 20      | mode (`TWIST_MODES`: 0=RISE-FALL, 1=RISE-FADE) | TWIST                                                                  |
 | 21      | trigger                                       | WARP, TWIST, GLITCH                                                     |
 | 22      | riseTime                                      | TWIST                                                                   |
 | 23      | fallTime                                      | TWIST                                                                   |
@@ -372,11 +386,11 @@ As with MEMORY%DLY, several fields are shared across types at the same address
 | 2       | time (raw × 0.1)                          | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, SHIMMER            |
 | 3       | tone (signed50)                           | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, SHIMMER, TERA ECHO |
 | 4       | density (raw+1)                           | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING                     |
-| 5       | level                                     | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, TERA ECHO          |
+| 5       | level                                     | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, SHIMMER, TERA ECHO |
 | 6–7     | preDelay (8-bit, 2 hex-digit nibbles, ms) | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, SHIMMER            |
 | 8       | direct                                    | HALL S/M, PLATE, ROOM S/L, AMBIENCE, SPRING, TERA ECHO          |
 | 9       | pitch (signed24)                          | SHIMMER                                                         |
-| 10      | level (own field)                         | SHIMMER                                                         |
+| 10      | pitchLevel ("PITCH LVL", own field)       | SHIMMER                                                         |
 | 11–14   | time (16-bit, own field, ms)              | SUB DELAY                                                       |
 | 15      | level (own field)                         | SUB DELAY                                                       |
 | 16      | feedback                                  | SUB DELAY, TERA ECHO                                            |

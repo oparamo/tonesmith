@@ -321,8 +321,8 @@ const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("level", 5), nibblePair("preDelay", 6), u8("direct", 8),
   ],
   "SHIMMER": [
-    scaled("time", 2, 0.1), signed("tone", 3, 50), nibblePair("preDelay", 6),
-    signed("pitch", 9, 24), u8("level", 10),
+    scaled("time", 2, 0.1), signed("tone", 3, 50), u8("level", 5), nibblePair("preDelay", 6),
+    signed("pitch", 9, 24), u8("pitchLevel", 10),
   ],
   "SUB DELAY": [
     nibbleQuad("time", 11), u8("level", 15), u8("feedback", 16), lookup("highCut", 17, FREQ_HIGH_CUT),

@@ -216,6 +216,27 @@ describe("generate_gx1_patch", () => {
     expect(patch.fx1.subType).toBe("CRY WAH");
   });
 
+  it("builds an fx-slot DELAY whose sub-algorithm is selected by subType, with its own params", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "fx-delay.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Fx Delay",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      fx1: { type: "DELAY", subType: "MODULATE", params: { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 12, modDepth: 18 } },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError, text).toBe(false);
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.fx1.type).toBe("DELAY");
+    expect(patch.fx1.subType).toBe("MODULATE");
+    expect(patch.fx1.params).toMatchObject({ type: "MODULATE", modRate: 12, modDepth: 18 });
+  });
+
   it("builds an fx-slot SLICER whose pattern is selected by a string params.pattern", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "slicer.tsl");
@@ -267,7 +288,7 @@ describe("generate_gx1_patch", () => {
       amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
       delay: {
         type: "TWIST", timeMs: 500, feedback: 20, level: 25,
-        extra: { mode: "TAPE-ECH", riseTime: 10, fallTime: 10, fadeTime: 10 },
+        extra: { mode: "RISE-FADE", riseTime: 10, fallTime: 10, fadeTime: 10 },
       },
     };
 
@@ -276,7 +297,7 @@ describe("generate_gx1_patch", () => {
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.delay.type).toBe("TWIST");
-    expect(patch.delay.mode).toBe("TAPE-ECH");
+    expect(patch.delay.mode).toBe("RISE-FADE");
   });
 
   it("builds a SPACE ECHO delay whose head is selected by a string extra.head", async () => {

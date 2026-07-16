@@ -68,12 +68,16 @@ core/                       @tonesmith/core
       <format>.ts           file I/O (readFile / writeFile / blankPatch / newFile), named after the
                             device's patch-file format (gx1: tsl.ts)
       builder.ts            high-level patch-construction helpers
-      capabilities.ts       the device's full DeviceCapabilities metadata
+      param-catalog.ts      per block/type param surface (name + range + description) — the
+                            in-repo param ground truth; capabilities derives from it and the
+                            codec↔catalog drift guard checks against it
+      capabilities.ts       the device's DeviceCapabilities metadata (structure/models/subtypes;
+                            each item's params come from param-catalog.ts)
       driver.ts             PatchDriver<T> object wiring codec + file I/O together
       index.ts              device barrel — driver, patch types, builder helpers
     index.ts                registers the roster; public re-exports + one namespace per device
   tests/                    mirrors src/ — shared-util suites + devices/<id>/ suites (codec
-                            round-trip + both capabilities drift guards per device)
+                            round-trip + the codec↔catalog drift guard per device)
     fixtures/<id>/          supplementary per-device fixtures (gx1: default-init.tsl, a
                             factory-default clean baseline complementing the root fixture)
   docs/<id>/                captured manuals as subject-sized Markdown + FORMAT.md (the

@@ -43,6 +43,13 @@ const REV_TYPES = [
   "SPRING", "SHIMMER", "SUB DELAY", "TERA ECHO",
 ] as const;
 
+// The FX-slot DELAY / REVERB (an effect selectable in an FX1/2/3 slot) expose their OWN,
+// smaller type sets — NOT the dedicated DLY/REV block's tables above. Each is a distinct
+// enum indexed by the FX-slot's own type byte (0-4); reusing DLY_TYPES/REV_TYPES here would
+// mislabel types 2-4 (e.g. FX-slot delay type 2 is WARP, not the dedicated block's PAN).
+const FX_DLY_TYPES = ["STANDARD", "MODULATE", "WARP", "TWIST", "GLITCH"] as const;
+const FX_REV_TYPES = ["HALL S", "HALL M", "PLATE", "ROOM", "STUDIO"] as const;
+
 // The pedal-controlled effect assigned to the expression pedal input (MEMORY%PFX).
 const PFX_TYPES = ["WAH", "PEDAL BEND"] as const;
 
@@ -91,7 +98,7 @@ const FB_MODE      = ["PITCH", "BRUSH", "SCREEM"] as const;
 const SLICER_PAT   = Array.from({ length: 20 }, (_, i) => `PATTERN ${i + 1}`);
 const NS_DETECT    = ["INPUT", "NS INPUT"] as const;
 const FV_CURVE     = ["SLOW1", "SLOW2", "NORMAL", "FAST"] as const;
-const TWIST_MODES  = ["TAPE", "TAPE-ECH", "REVERSE"] as const;
+const TWIST_MODES  = ["RISE-FALL", "RISE-FADE"] as const;
 const ON_OFF       = ["OFF", "ON"] as const;
 // Playback head combinations.
 const SPACE_ECHO_HEAD = ["1", "1+2", "1+3", "2+3", "1+2+3"] as const;
@@ -148,10 +155,14 @@ const KEY_IDX = indexMap(KEY_NAMES);
 // subType argument into params.type so it actually encodes).
 const PARAM_SUBTYPE_EFFECTS = new Set([
   "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER", "OD/DS", "FIXED WAH",
+  // DELAY's p[0] selector is its sub-algorithm (STANDARD/MODULATE/WARP/TWIST/GLITCH), each with
+  // its own param set — modeled per-subtype in FX_DELAY_TYPE_MAPS and surfaced as subTypes.
+  "DELAY",
 ]);
 
 export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
+  FX_DLY_TYPES, FX_REV_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,

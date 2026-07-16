@@ -51,6 +51,19 @@ describe("gx1 capabilities", () => {
     expect(output).toContain("Parameters:");
   });
 
+  it("prints per-subtype params for the FX-slot DELAY sub-algorithms", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx", "delay"]);
+
+    const errorOutput = error.join("\n");
+    expect(exitCode, errorOutput).toBeUndefined();
+    const output = info.join("\n");
+    expect(output).toContain("Subtypes:");
+    expect(output).toContain("MODULATE");
+    // MODULATE carries params STANDARD lacks — proof each sub-algorithm's own set is printed
+    expect(output).toContain("MOD RATE");
+    expect(output).toContain("MOD DEPTH");
+  });
+
   it("omits the Parameters section for an item with no params of its own or from its group", async () => {
     const { info, error, exitCode } = await runCli(["gx1", "capabilities", "cab", "original"]);
 
