@@ -1,7 +1,7 @@
 import type { Patch, FxParams, NsBlock, FvBlock } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
 import { PARAM_SUBTYPE_EFFECTS, NS_DETECT } from "./common";
-import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, type FieldCodec } from "./codec";
+import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
 
 // The 10 reorderable blocks — OUTPUT is a fixed endpoint, not part of the chain array
 // (see CHAIN_BLOCK_ORDER in common/constants.ts for the underlying byte encoding).
@@ -151,8 +151,18 @@ const defaultForField = (field: FieldCodec): string | number => {
  * whatever stale raw byte was in the slot before — the class of bug that left
  * unset GEQ bands decoding to −20 dB instead of 0 dB.
  */
-const defaultFxParams = (fxType: string): Record<string, string | number> => {
-  const fields = FX_PARAM_MAPS[fxType] ?? [];
+/**
+ * Resolve an FX type's field map. DELAY is per-sub-algorithm (its fields depend on `subType`);
+ * every other FX type has one flat map. Returns undefined when the map isn't known.
+ */
+const fxFieldMap = (fxType: string, subType: string | null): FieldCodec[] | undefined => {
+  if (fxType !== "DELAY") return FX_PARAM_MAPS[fxType];
+  if (subType == null) return undefined;
+  return FX_DELAY_TYPE_MAPS[subType];
+};
+
+const defaultFxParams = (fxType: string, subType: string | null = null): Record<string, string | number> => {
+  const fields = fxFieldMap(fxType, subType) ?? [];
   const overrides = FX_DEFAULT_OVERRIDES[fxType] ?? {};
   const defaults: Record<string, string | number> = {};
   for (const field of fields) {
@@ -195,8 +205,8 @@ const fx = (
     subType != null && PARAM_SUBTYPE_EFFECTS.has(fxType) && !("type" in params)
       ? { ...params, type: subType }
       : params;
-  validateParamKeys(Object.keys(merged), FX_PARAM_MAPS[fxType], `${slot} param`, fxType);
-  block.params = { ...defaultFxParams(fxType), ...merged };
+  validateParamKeys(Object.keys(merged), fxFieldMap(fxType, subType), `${slot} param`, fxType);
+  block.params = { ...defaultFxParams(fxType, subType), ...merged };
 };
 
 const ns = (patch: Patch, threshold: number, release: number, on = true, detect: string = NS_DETECT[0]): void => {

@@ -358,13 +358,15 @@ describe("Real device values (default-init.tsl)", () => {
     expect(decoded).toMatchObject({ on: false, type: "GLITCH", trigger: 0, time: 50, glitch: 50, balance: 100 });
   });
 
-  it("decodes REV shadow bytes for SHIMMER (its own level at offset 10, not the shared EFFECT_LEVEL at 5)", () => {
+  it("decodes REV shadow bytes for SHIMMER (LEVEL is the shared EFFECT_LEVEL at 5; its own PITCH LVL is at offset 10)", () => {
     const shimmerBytes = [...revBytes.slice(0, 1), REV_TYPE_IDX.SHIMMER, ...revBytes.slice(2)];
     const hexList = hexFromBytes(shimmerBytes);
 
     const decoded = decodeReverb(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "SHIMMER", time: 2.6, tone: 0, preDelay: 30, pitch: 12, level: 100 });
+    expect(decoded).toMatchObject({
+      on: false, type: "SHIMMER", time: 2.6, tone: 0, level: 25, preDelay: 30, pitch: 12, pitchLevel: 100,
+    });
   });
 
   it("decodes REV shadow bytes for SUB DELAY (its own 4-byte time at offset 11)", () => {

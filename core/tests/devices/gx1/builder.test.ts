@@ -266,6 +266,27 @@ describe("fx", () => {
     expect(patch.fx1.params).toEqual({ rate: 0, depth: 0, level: 50 });
   });
 
+  it("fx DELAY with no sub-algorithm yields empty params (the sub-algorithm selects the field set)", () => {
+    const patch = basePatch("Test");
+
+    // DELAY is modeled per-sub-algorithm, so without one there is no field map to default from.
+    fx(patch, "fx1", "DELAY");
+
+    expect(patch.fx1.type).toBe("DELAY");
+    expect(patch.fx1.subType).toBeNull();
+    expect(patch.fx1.params).toEqual({});
+  });
+
+  it("fx DELAY with a WARP sub-algorithm defaults that sub-algorithm's own fields", () => {
+    const patch = basePatch("Test");
+
+    fx(patch, "fx1", "DELAY", "WARP", { level: 80 });
+
+    expect(patch.fx1.subType).toBe("WARP");
+    // WARP's fields are time/trigger/level (type is threaded in but not a defaulted param).
+    expect(patch.fx1.params).toEqual({ time: 0, trigger: "OFF", level: 80, type: "WARP" });
+  });
+
   // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS),
   // not FX_COM byte[2] — this proves both halves of that threading: fx() writing
   // subType into params.type on encode, and decodePatch promoting it back on decode.

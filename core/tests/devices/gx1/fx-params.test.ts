@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { readFile } from "../../../src/devices/gx1/tsl";
 import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
-import { FX_TYPES, RAW } from "../../../src/devices/gx1/common";
+import { FX_TYPES, FX_DLY_TYPES, RAW } from "../../../src/devices/gx1/common";
 const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
 
 // ── Per-effect-type symmetry tests ────────────────────────────────────────────
@@ -27,6 +27,37 @@ describe("FX param map symmetry (all types)", () => {
     const reDecoded = decodeFxParams(fxType, reencodedBytes);
 
     expect(reDecoded).toEqual(decoded);
+  });
+});
+
+
+// ── FX-slot DELAY: every sub-algorithm round-trips losslessly ─────────────────
+//
+// The zeros symmetry test above only reaches STANDARD (type byte 0). The FX-slot DELAY is
+// per-sub-algorithm, so each of the 5 sub-algorithms is exercised here with a distinct type
+// selector and in-range field values, asserting decode↔encode is a true inverse AND that the
+// 251-byte block round-trips byte-for-byte (unread offsets pass through untouched).
+
+describe("FX-slot DELAY per-sub-algorithm round-trip", () => {
+  const DELAY_OFFSET = 212;
+
+  it.each(FX_DLY_TYPES)("%s: decode↔encode is lossless and byte-preserving", (subType) => {
+    const bytes = new Array<number>(251).fill(0);
+    bytes[DELAY_OFFSET] = FX_DLY_TYPES.indexOf(subType); // sub-algorithm selector (p[0])
+    bytes[DELAY_OFFSET + 5] = 40;   // feedback (STANDARD/MODULATE)
+    bytes[DELAY_OFFSET + 6] = 80;   // level (STANDARD/MODULATE)
+    bytes[DELAY_OFFSET + 12] = 70;  // level (WARP/TWIST)
+    bytes[DELAY_OFFSET + 13] = 30;  // riseTime (TWIST)
+    bytes[DELAY_OFFSET + 16] = 55;  // time (GLITCH)
+    bytes[DELAY_OFFSET + 17] = 60;  // glitch (GLITCH)
+    bytes[DELAY_OFFSET + 18] = 100; // balance (GLITCH)
+
+    const decoded = decodeFxParams("DELAY", bytes);
+    expect(decoded.type).toBe(subType);
+
+    const reencoded = bytesFromHex(encodeFxParams("DELAY", decoded, bytes));
+    expect(reencoded).toEqual(bytes);
+    expect(decodeFxParams("DELAY", reencoded)).toEqual(decoded);
   });
 });
 
@@ -248,11 +279,13 @@ describe("Real device values (default-init.tsl)", () => {
     expect(decoded).toEqual({ pitch: -2 });
   });
 
-  it("decodes FX1 shadow bytes for DELAY as an FX-slot type (byte offset 212)", () => {
+  it("decodes FX1 shadow bytes for DELAY as an FX-slot type (byte offset 212, STANDARD sub-algorithm)", () => {
     const decoded = decodeFxParams("DELAY", fx1Bytes);
 
+    // The FX-slot DELAY is per-sub-algorithm; the shadow bytes select STANDARD (type byte 0),
+    // whose fields are TIME/FEEDBACK/LEVEL/HIGH CUT (no MOD RATE/DEPTH — those are MODULATE's).
     expect(decoded).toEqual({
-      type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 0, trigger: "OFF",
+      type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz",
     });
   });
 
