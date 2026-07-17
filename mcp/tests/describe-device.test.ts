@@ -74,4 +74,19 @@ describe("describe_device", () => {
     expect(isError).toBe(true);
     expect(text).toContain('Unknown item "nonexistent"');
   });
+
+  it("enumerates the exact valid labels for a frequency-lookup param", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", group: "delay", item: "STANDARD" };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const item = JSON.parse(text) as { params: { name: string; values?: string[] }[] };
+    const highCut = item.params.find(param => param.name === "HIGH CUT");
+    expect(highCut?.values, "HIGH CUT should surface its enumerated labels").toBeDefined();
+    expect(highCut?.values).toContain("FLAT");
+    expect(highCut?.values).toContain("2.5kHz");
+  });
 });

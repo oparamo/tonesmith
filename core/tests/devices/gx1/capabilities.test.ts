@@ -323,6 +323,48 @@ describe("GX-1 codec ↔ catalog enum-value parity (discrete enums)", () => {
   });
 });
 
+// ── value enumeration parity: frequency-lookup params ──────────────────────────
+//
+// The quantized frequency tables (delay/PARA. EQ high/low cut, PARA. EQ mid freq,
+// ENHANCER low/high freq) summarize their range as a compact string ("20 Hz-12.5 kHz,
+// FLAT"), so the enum-value guard above can't check them. Instead they carry the full
+// ordered label list in ParamSpec.values (surfaced by describe_device). This guard locks
+// that list to the codec's actual lookup table — catching both a stale enumeration and a
+// table attached to the wrong field (e.g. LOW CUT given the HIGH CUT list).
+
+const FREQ_VALUE_CHECKS: EnumValueCheck[] = [
+  { block: fxValueBlock,           type: "PARA. EQ", field: "lowCut" },
+  { block: fxValueBlock,           type: "PARA. EQ", field: "midFreq" },
+  { block: fxValueBlock,           type: "PARA. EQ", field: "highCut" },
+  { block: fxValueBlock,           type: "ENHANCER", field: "lowFreq" },
+  { block: fxValueBlock,           type: "ENHANCER", field: "highFreq" },
+  { block: requireBlock("delay"),  type: "STANDARD", field: "highCut" },
+  { block: requireBlock("reverb"), type: "SUB DELAY", field: "highCut" },
+  { block: FX_DELAY_BLOCK,         type: "STANDARD", field: "highCut" },
+];
+
+const assertFreqValueParity = ({ block, type, field }: EnumValueCheck): void => {
+  const codecField = (block.codecFields(type) ?? []).find(candidate => candidate.name === field);
+  expect(codecField, `${block.block} "${type}" has no codec field "${field}"`).toBeDefined();
+  const table = codecField?.table;
+  expect(table, `${block.block} "${type}" field "${field}" is not a lookup (no table)`).toBeDefined();
+
+  const aliases = block.aliases[type] ?? {};
+  const catalogLabel = field in aliases ? aliases[field] : field;
+  const param = PARAMS_BY_TYPE[block.block][type].find(candidate => normalize(candidate.name) === normalize(catalogLabel));
+  expect(param, `${block.block} "${type}" catalog has no param for codec field "${field}"`).toBeDefined();
+
+  expect(param?.values, `${block.block} "${type}" param "${field}" carries no enumerated values`).toBeDefined();
+  const catalogValues = [...(param?.values ?? [])];
+  expect(catalogValues, `${block.block} "${type}" field "${field}": codec table vs catalog values`).toEqual([...(table ?? [])]);
+};
+
+describe("GX-1 codec ↔ catalog value-enumeration parity (frequency lookups)", () => {
+  it.each(FREQ_VALUE_CHECKS)("$type.$field: catalog values enumerate the codec lookup table", (check) => {
+    assertFreqValueParity(check);
+  });
+});
+
 // ── subtype coverage: capabilities subTypes ↔ PARAM_SUBTYPE_EFFECTS ─────────────
 
 describe("GX-1 FX subtype coverage", () => {

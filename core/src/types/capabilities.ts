@@ -4,6 +4,14 @@ interface ParamSpec {
   /** Free text: "0–100", "–12–+12 semitones", enum list, etc. */
   range: string;
   description: string;
+  /**
+   * For discrete lookup-valued params whose `range` is only a compact summary (e.g. the
+   * 1/3-octave frequency tables), the full ordered list of exact valid labels — the
+   * machine-readable companion to `range`, so a consumer can enumerate the valid values
+   * instead of guessing their spelling. Omitted for plain numeric params and for short
+   * enums that already spell their values out in `range`.
+   */
+  values?: readonly string[];
 }
 
 /**

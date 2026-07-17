@@ -19,6 +19,7 @@
  * `range` is free text following the same convention as `ParamSpec` elsewhere.
  */
 import type { ParamSpec } from "../../types";
+import { FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ } from "./common";
 
 // ── Shared param fragments (identical across many types — defined once) ────────
 
@@ -47,9 +48,9 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   "ENHANCER": [
     { name: "SENS", range: "0-100", description: "Sensitivity — how readily the effect activates on softer playing." },
     { name: "LOW", range: "0-100", description: "Volume of the low-band enhanced signal." },
-    { name: "LOW FREQ", range: "31.5 Hz-125 Hz", description: "Center frequency of the low-band enhancer." },
+    { name: "LOW FREQ", range: "31.5 Hz-125 Hz", values: ENHANCER_LOW_FREQ, description: "Center frequency of the low-band enhancer." },
     { name: "HIGH", range: "0-100", description: "Volume of the high-band enhanced signal." },
-    { name: "HIGH FREQ", range: "800 Hz-8.00 kHz", description: "Center frequency of the high-band enhancer." },
+    { name: "HIGH FREQ", range: "800 Hz-8.00 kHz", values: ENHANCER_HIGH_FREQ, description: "Center frequency of the high-band enhancer." },
     LEVEL_0_100,
   ],
   "TOUCH WAH": [
@@ -129,9 +130,9 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     { name: "LOW GAIN", range: "-20-+20 dB", description: "Low-frequency gain." },
     { name: "MID GAIN", range: "-20-+20 dB", description: "Mid-frequency gain." },
     { name: "HIGH GAIN", range: "-20-+20 dB", description: "High-frequency gain." },
-    { name: "LOW CUT", range: "FLAT, 20.0 Hz-12.5 kHz", description: "Low-cut filter frequency." },
-    { name: "MID FREQ", range: "20 Hz-12.5 kHz", description: "Center frequency for the mid band." },
-    { name: "HIGH CUT", range: "20.0 Hz-12.5 kHz, FLAT", description: "High-cut filter frequency." },
+    { name: "LOW CUT", range: "FLAT, 20.0 Hz-12.5 kHz", values: FREQ_LOW_CUT, description: "Low-cut filter frequency." },
+    { name: "MID FREQ", range: "20 Hz-12.5 kHz", values: FREQ_STEPS, description: "Center frequency for the mid band." },
+    { name: "HIGH CUT", range: "20.0 Hz-12.5 kHz, FLAT", values: FREQ_HIGH_CUT, description: "High-cut filter frequency." },
     { name: "LEVEL", range: "-20-+20 dB", description: "Overall output level of the equalizer." },
   ],
   "GEQ": [
@@ -335,7 +336,7 @@ const DLY_TIME_ANALOG: ParamSpec = { name: "TIME", range: "12-1200 ms, BPM", des
 const DLY_FEEDBACK: ParamSpec = { name: "FEEDBACK", range: "0-100", description: "Number of delay repeats." };
 const DLY_LEVEL: ParamSpec = { name: "LEVEL", range: "1-120", description: "Volume of the delay sound." };
 const DLY_LEVEL_0: ParamSpec = { name: "LEVEL", range: "0-120", description: "Volume of the delay sound." };
-const DLY_HIGH_CUT: ParamSpec = { name: "HIGH CUT", range: "20 Hz-12.5 kHz, FLAT", description: "High-cut filter on delay repeats." };
+const DLY_HIGH_CUT: ParamSpec = { name: "HIGH CUT", range: "20 Hz-12.5 kHz, FLAT", values: FREQ_HIGH_CUT, description: "High-cut filter on delay repeats." };
 const DLY_MOD: ParamSpec[] = [
   { name: "MOD RATE", range: "0-100", description: "Modulation rate of the delay sound." },
   { name: "MOD DEPTH", range: "0-100", description: "Modulation depth of the delay sound." },
@@ -427,7 +428,7 @@ const REVERB_PARAMS: Record<string, ParamSpec[]> = {
     { name: "TIME", range: "1-2000 ms, BPM", description: "Delay time." },
     { name: "FEEDBACK", range: "0-100", description: "Number of delay repeats." },
     { name: "LEVEL", range: "1-120", description: "Volume of the delay sound." },
-    { name: "HIGH CUT", range: "20 Hz-12.5 kHz, FLAT", description: "High-cut filter on delay repeats." },
+    DLY_HIGH_CUT,
   ],
   "TERA ECHO": [
     { name: "S-TIME", range: "0-100", description: "Length of the effect sound." },
