@@ -4,6 +4,7 @@ import { gx1, capabilityUtils, patchUtils } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, normalizeChain } = gx1;
 import { ok, err } from "../../common";
 import { FxBlockSchema } from "./schemas";
+import { boundedNumber, boundedInt } from "./bounds";
 
 const capabilities = gx1.driver.capabilities;
 
@@ -49,25 +50,25 @@ const inputSchema = z.object({
 
   amp: z.object({
     type: z.string().describe("Amplifier model"),
-    gain: z.number().int().min(0).max(120).describe("Gain 0–120"),
-    bass: z.number().int().min(0).max(100).describe("Bass EQ 0–100 (50=flat)"),
-    mid: z.number().int().min(0).max(100).describe("Mid EQ 0–100 (50=flat)"),
-    treble: z.number().int().min(0).max(100).describe("Treble EQ 0–100 (50=flat)"),
+    gain: boundedInt("amp", "GAIN").describe("Gain 0–120"),
+    bass: boundedInt("amp", "BASS").describe("Bass EQ 0–100 (50=flat)"),
+    mid: boundedInt("amp", "MIDDLE").describe("Mid EQ 0–100 (50=flat)"),
+    treble: boundedInt("amp", "TREBLE").describe("Treble EQ 0–100 (50=flat)"),
     speaker: z.string().optional().describe("Cabinet model (default ORIGINAL)"),
     mic: z.string().optional().describe("Microphone model (default DYN57)"),
-    level: z.number().int().min(0).max(100).optional().describe("Output level 0–100 (default 100)"),
+    level: boundedInt("amp", "LEVEL").optional().describe("Output level 0–100 (default 100)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
-    soloLevel: z.number().int().min(0).max(100).optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
+    soloLevel: boundedInt("amp", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
   }).describe("Amplifier block (required)"),
 
   odds: z.object({
     type: z.string().describe("OD/DS pedal type (e.g. BLUES OD, CRUNCH, METAL, DIST, FUZZ)"),
-    drive: z.number().int().min(1).max(120).describe("Drive 1–120"),
-    tone: z.number().int().min(-50).max(50).describe("Tone −50–+50"),
-    level: z.number().int().min(0).max(100).describe("Level 0–100"),
-    direct: z.number().int().min(0).max(100).optional().describe("Direct mix 0–100 (default 0)"),
+    drive: boundedInt("odds", "DRIVE").describe("Drive 1–120"),
+    tone: boundedInt("odds", "TONE").describe("Tone −50–+50"),
+    level: boundedInt("odds", "LEVEL").describe("Level 0–100"),
+    direct: boundedInt("odds", "DIRECT").optional().describe("Direct mix 0–100 (default 0)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
-    soloLevel: z.number().int().min(0).max(100).optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
+    soloLevel: boundedInt("odds", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
   }).optional().describe("Overdrive/distortion block. Omit to disable."),
 
   pfx: z.object({
@@ -84,24 +85,24 @@ const inputSchema = z.object({
   fx3: FxBlockSchema.describe("FX3 slot. Omit to leave empty."),
 
   ns: z.object({
-    threshold: z.number().int().min(0).max(100).describe("Noise threshold 0–100"),
-    release: z.number().int().min(0).max(100).describe("Release time 0–100"),
+    threshold: boundedInt("ns", "THRESHOLD").describe("Noise threshold 0–100"),
+    release: boundedInt("ns", "RELEASE").describe("Release time 0–100"),
     on: z.boolean().optional().describe("Enable NS (default true)"),
     detect: z.string().optional().describe("Detection point: INPUT or NS INPUT (default INPUT)"),
   }).optional().describe("Noise suppressor. Omit to leave disabled."),
 
   fv: z.object({
-    position: z.number().int().min(0).max(100).describe("Pedal position 0–100"),
-    min: z.number().int().min(0).max(100).describe("Minimum volume 0–100"),
-    max: z.number().int().min(0).max(100).describe("Maximum volume 0–100"),
+    position: boundedInt("fv", "POSITION").describe("Pedal position 0–100"),
+    min: boundedInt("fv", "MIN").describe("Minimum volume 0–100"),
+    max: boundedInt("fv", "MAX").describe("Maximum volume 0–100"),
     curve: z.string().optional().describe("Response curve: SLOW1, SLOW2, NORMAL, FAST (default NORMAL)"),
   }).optional().describe("Foot volume block. Omit to use defaults."),
 
   delay: z.object({
     type: z.string().describe(`Delay type (${capabilityItemIds("delay")})`),
-    timeMs: z.number().min(1).max(2000).describe("Delay time in milliseconds, 1–2000"),
-    feedback: z.number().int().min(0).max(100).describe("Feedback 0–100"),
-    level: z.number().int().min(1).max(120).describe("Effect level 1–120"),
+    timeMs: boundedNumber("delay", "TIME", "STANDARD").describe("Delay time in milliseconds, 1–2000"),
+    feedback: boundedInt("delay", "FEEDBACK", "STANDARD").describe("Feedback 0–100"),
+    level: boundedInt("delay", "LEVEL", "STANDARD").describe("Effect level 1–120"),
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
     on: z.boolean().optional().describe("Enable delay (default true)"),
     extra: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
@@ -113,12 +114,12 @@ const inputSchema = z.object({
 
   reverb: z.object({
     type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
-    timeS: z.number().min(0.1).max(10.0).describe("Reverb time in seconds, 0.1–10.0"),
-    level: z.number().int().min(1).max(100).describe("Effect level 1–100"),
-    preDelay: z.number().min(0).max(200).optional().describe("Pre-delay in ms 0–200 (default 0)"),
-    tone: z.number().int().min(-50).max(50).optional().describe("Tone EQ −50–+50 (default 0)"),
-    density: z.number().int().min(1).max(10).optional().describe("Density 1–10 (default 5)"),
-    direct: z.number().int().min(0).max(100).optional().describe("Direct level 0–100 (default 100)"),
+    timeS: boundedNumber("reverb", "TIME", "HALL S").describe("Reverb time in seconds, 0.1–10.0"),
+    level: boundedInt("reverb", "LEVEL", "HALL S").describe("Effect level 1–100"),
+    preDelay: boundedNumber("reverb", "PRE-DELAY", "HALL S").optional().describe("Pre-delay in ms 0–200 (default 0)"),
+    tone: boundedInt("reverb", "TONE", "HALL S").optional().describe("Tone EQ −50–+50 (default 0)"),
+    density: boundedInt("reverb", "DENSITY", "HALL S").optional().describe("Density 1–10 (default 5)"),
+    direct: boundedInt("reverb", "DIRECT", "HALL S").optional().describe("Direct level 0–100 (default 100)"),
     on: z.boolean().optional().describe("Enable reverb (default true)"),
     extra: z.record(z.string(), z.number()).optional().describe(
       "Extra type-specific params beyond the common ones above (e.g. pitch/pitchLevel for " +

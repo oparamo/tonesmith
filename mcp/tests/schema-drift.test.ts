@@ -1,16 +1,18 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { join } from "node:path";
 import { gx1, capabilityUtils } from "@tonesmith/core";
-import { connectClient, emptyTempDir } from "./helpers";
+import { connectClient } from "./helpers";
 
 /**
  * Two drift guards for generate_gx1_patch:
  *
- * 1. Bounds: the zod schema's numeric min/max must match the capabilities ParamSpec
- *    ranges they're supposed to mirror, for every top-level (non-record) numeric field.
- *    Catches the class of bug where the MCP schema's bounds silently drifted from the
- *    device reality documented in capabilities.ts (e.g. odds.tone allowing 0-100 instead
- *    of the real -50-+50, or reverb.tone described as +/-12 instead of the real +/-50).
+ * 1. Bounds: every numeric schema field derives its min/max from the capabilities
+ *    ParamSpec range via boundedNumber(), so the two can no longer hold divergent
+ *    numbers — the schema doesn't restate the range, it reads it. What can still go
+ *    wrong is the *wiring*: a field left unbounded (boundedNumber not applied), or
+ *    pointed at the wrong / a non-numeric param. This guard introspects the actually-
+ *    wired tool inputSchema and asserts each field carries a finite bound equal to the
+ *    catalog range for the param it's supposed to mirror (a non-numeric range can't
+ *    parse, so a mis-mapped enum field would throw at load rather than go unbounded).
  *
  * 2. Type catalog: delay/reverb/pfx `type` fields are plain z.string() (core, not zod,
  *    validates the actual value), so their .describe() text is the only place the valid
@@ -26,7 +28,7 @@ const parseRange = (range: string): { min: number; max: number } => {
 };
 
 interface BoundedField {
-  /** Dot path within the generate_gx1_patch input to override. */
+  /** Dot path within the generate_gx1_patch inputSchema. */
   path: string;
   groupId: string;
   paramName: string;
@@ -44,21 +46,26 @@ const BOUNDED_FIELDS: BoundedField[] = [
   { path: "amp.mid", groupId: "amp", paramName: "MIDDLE" },
   { path: "amp.treble", groupId: "amp", paramName: "TREBLE" },
   { path: "amp.level", groupId: "amp", paramName: "LEVEL" },
+  { path: "amp.soloLevel", groupId: "amp", paramName: "SOLO LEVEL" },
   { path: "odds.drive", groupId: "odds", paramName: "DRIVE" },
   { path: "odds.tone", groupId: "odds", paramName: "TONE" },
   { path: "odds.level", groupId: "odds", paramName: "LEVEL" },
+  { path: "odds.direct", groupId: "odds", paramName: "DIRECT" },
+  { path: "odds.soloLevel", groupId: "odds", paramName: "SOLO LEVEL" },
   { path: "ns.threshold", groupId: "ns", paramName: "THRESHOLD" },
   { path: "ns.release", groupId: "ns", paramName: "RELEASE" },
   { path: "fv.position", groupId: "fv", paramName: "POSITION" },
+  { path: "fv.min", groupId: "fv", paramName: "MIN" },
+  { path: "fv.max", groupId: "fv", paramName: "MAX" },
+  { path: "delay.timeMs", groupId: "delay", paramName: "TIME", typeId: "STANDARD" },
   { path: "delay.feedback", groupId: "delay", paramName: "FEEDBACK", typeId: "STANDARD" },
   { path: "delay.level", groupId: "delay", paramName: "LEVEL", typeId: "STANDARD" },
-  { path: "delay.timeMs", groupId: "delay", paramName: "TIME", typeId: "STANDARD" },
+  { path: "reverb.timeS", groupId: "reverb", paramName: "TIME", typeId: "HALL S" },
   { path: "reverb.level", groupId: "reverb", paramName: "LEVEL", typeId: "HALL S" },
   { path: "reverb.preDelay", groupId: "reverb", paramName: "PRE-DELAY", typeId: "HALL S" },
   { path: "reverb.tone", groupId: "reverb", paramName: "TONE", typeId: "HALL S" },
   { path: "reverb.density", groupId: "reverb", paramName: "DENSITY", typeId: "HALL S" },
   { path: "reverb.direct", groupId: "reverb", paramName: "DIRECT", typeId: "HALL S" },
-  { path: "reverb.timeS", groupId: "reverb", paramName: "TIME", typeId: "HALL S" },
 ];
 
 const rangeFor = ({ groupId, paramName, typeId }: BoundedField): { min: number; max: number } => {
@@ -72,35 +79,39 @@ const rangeFor = ({ groupId, paramName, typeId }: BoundedField): { min: number; 
   return parseRange(param.range);
 };
 
-/** Deep-clones `base` and sets a dot-path field to `value`. */
-const withOverride = (base: Record<string, unknown>, path: string, value: number): Record<string, unknown> => {
-  const clone = structuredClone(base);
-  const parts = path.split(".");
-  let target = clone;
-  for (const part of parts.slice(0, -1)) target = target[part] as Record<string, unknown>;
-  target[parts[parts.length - 1]] = value;
-  return clone;
-};
-
-interface BoundsCheck {
-  path: string;
-  value: number;
-  shouldError: boolean;
-  description: string;
+interface JsonSchemaNode {
+  minimum?: number;
+  maximum?: number;
+  properties?: Record<string, JsonSchemaNode>;
 }
 
-/** One accept-case and one reject-case just past each side of a field's documented range. */
-const boundsChecksFor = (field: BoundedField): BoundsCheck[] => {
-  const { min, max } = rangeFor(field);
-  return [
-    { path: field.path, value: min, shouldError: false, description: `${field.path}=${min} (documented min) is accepted` },
-    { path: field.path, value: max, shouldError: false, description: `${field.path}=${max} (documented max) is accepted` },
-    { path: field.path, value: min - 1, shouldError: true, description: `${field.path}=${min - 1} (below documented min) is rejected` },
-    { path: field.path, value: max + 1, shouldError: true, description: `${field.path}=${max + 1} (above documented max) is rejected` },
-  ];
+/** Walks a dot-path through a JSON-schema object's nested `properties` to the leaf node. */
+const nodeAt = (root: JsonSchemaNode, path: string): JsonSchemaNode => {
+  let node = root;
+  for (const part of path.split(".")) {
+    const next = node.properties?.[part];
+    if (!next) throw new Error(`No schema node at "${path}" (missing "${part}")`);
+    node = next;
+  }
+  return node;
 };
 
-const BOUNDS_CHECKS: BoundsCheck[] = BOUNDED_FIELDS.flatMap(boundsChecksFor);
+describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
+  let close: () => Promise<void> = async () => { /* set per test */ };
+  afterEach(async () => { await close(); });
+
+  it.each(BOUNDED_FIELDS)("$path derives a finite bound matching its catalog range", async (field) => {
+    const client = await connectClient();
+    close = client.close;
+    const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
+
+    const node = nodeAt(tool.inputSchema, field.path);
+    const { min, max } = rangeFor(field);
+
+    expect(node.minimum, `${field.path} should carry a finite min`).toBe(min);
+    expect(node.maximum, `${field.path} should carry a finite max`).toBe(max);
+  });
+});
 
 describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () => {
   let close: () => Promise<void>;
@@ -121,32 +132,5 @@ describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () =
     for (const typeId of allTypeIds) {
       expect(toolSchemaText, `expected the tool schema to mention delay/reverb/pfx type "${typeId}"`).toContain(typeId);
     }
-  });
-});
-
-describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
-  let close: () => Promise<void>;
-  let temp: ReturnType<typeof emptyTempDir>;
-  afterEach(async () => { await close(); temp.cleanup(); });
-
-  it.each(BOUNDS_CHECKS)("$description", async ({ path, value, shouldError }) => {
-    temp = emptyTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const basePatchSpec = {
-      name: "Bounds",
-      outPath: join(temp.dir, "bounds.tsl"),
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
-      odds: { type: "BLUES OD", drive: 40, tone: 0, level: 70 },
-      ns: { threshold: 20, release: 20 },
-      fv: { position: 100, min: 0, max: 100 },
-      delay: { type: "STANDARD", timeMs: 500, feedback: 20, level: 25 },
-      reverb: { type: "HALL S", timeS: 2.4, level: 20 },
-    };
-    const patchSpec = withOverride(basePatchSpec, path, value);
-
-    const result = await client.callTool("generate_gx1_patch", patchSpec);
-
-    expect(result.isError, result.text).toBe(shouldError);
   });
 });
