@@ -429,7 +429,7 @@ describe("pfx", () => {
     const patch = basePatch("Test");
     const setInvalidParam = () => { pfx(patch, "WAH", { pitchMin: -12 }); };
 
-    expect(setInvalidParam).toThrow(/pfx extra param "pitchMin" is not valid for type "WAH"/);
+    expect(setInvalidParam).toThrow(/pfx param "pitchMin" is not valid for type "WAH"/);
   });
 
   it("can disable pfx", () => {
@@ -517,7 +517,7 @@ describe("delay", () => {
     expect(encodeWithBadHighCut).toThrow(/Unknown highCut value: "UNKNOWN"/);
   });
 
-  it("merges extra params", () => {
+  it("merges type-specific params-bag entries", () => {
     const patch = basePatch("Test");
 
     delay(patch, "MODULATE", 1, 50, 50, "FLAT", true, { modRate: 5 });
@@ -526,11 +526,18 @@ describe("delay", () => {
     expect(block.modRate).toBe(5);
   });
 
-  it("throws when an extra param isn't valid for the delay type", () => {
+  it("throws when a params-bag key isn't valid for the delay type", () => {
     const patch = basePatch("Test");
     const setInvalidExtra = () => { delay(patch, "STANDARD", 7, 50, 60, "FLAT", true, { modRate: 5 }); };
 
-    expect(setInvalidExtra).toThrow(/extra param "modRate" is not valid for type "STANDARD"/);
+    expect(setInvalidExtra).toThrow(/delay param "modRate" is not valid for type "STANDARD"/);
+  });
+
+  it("rejects a common control (a named field) passed in the params bag", () => {
+    const patch = basePatch("Test");
+    const setCovered = () => { delay(patch, "STANDARD", 7, 50, 60, "FLAT", true, { feedback: 80 }); };
+
+    expect(setCovered).toThrow(/delay param "feedback" is one of this block's common controls/);
   });
 
   it("can disable delay", () => {
@@ -589,7 +596,7 @@ describe("reverb", () => {
     expect(patch.reverb.direct).toBe(100);
   });
 
-  it("merges extra params", () => {
+  it("merges type-specific params-bag entries", () => {
     const patch = basePatch("Test");
 
     reverb(patch, "SHIMMER", 3.0, 60, 0, 0, 5, 100, true, { pitch: 12 });
@@ -598,11 +605,11 @@ describe("reverb", () => {
     expect(block.pitch).toBe(12);
   });
 
-  it("throws when an extra param isn't valid for the reverb type", () => {
+  it("throws when a params-bag key isn't valid for the reverb type", () => {
     const patch = basePatch("Test");
     const setInvalidExtra = () => { reverb(patch, "PLATE", 1.5, 50, 0, 0, 5, 100, true, { pitch: 12 }); };
 
-    expect(setInvalidExtra).toThrow(/extra param "pitch" is not valid for type "PLATE"/);
+    expect(setInvalidExtra).toThrow(/reverb param "pitch" is not valid for type "PLATE"/);
   });
 
   it("can disable reverb", () => {

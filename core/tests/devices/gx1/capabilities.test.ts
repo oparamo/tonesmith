@@ -19,7 +19,7 @@ import {
   PARAM_SUBTYPE_EFFECTS,
 } from "../../../src/devices/gx1/common";
 import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
-import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK } from "../../../src/devices/gx1/param-catalog";
+import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../src/devices/gx1/param-catalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../src/devices/gx1/codec/fx-params";
 import {
   PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES,
@@ -70,17 +70,7 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
     types: FX_TYPES,
     codecFields: (type) => FX_PARAM_MAPS[type],
     reverseSkip: new Set(["type"]),
-    aliases: {
-      // codec field is "octFeedback"; catalog label matches the hardware's own knob text.
-      "FEEDBACKER": { octFeedback: "OCT F-BACK" },
-      // stage count (4/8/12) is the codec's numeric "stage" field; catalog labels it TYPE.
-      "PHASER": { stage: "TYPE" },
-      // codec field is "speed"; catalog matches the hardware's own knob text.
-      "ROTARY": { speed: "SPEED SELECT" },
-      // codec fields are "minus1Oct"/"minus2Oct"; catalog matches the hardware's own knob text.
-      "OCTAVE": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
-      "HEAVY OCT": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
-    },
+    aliases: FIELD_LABEL_ALIASES.fx,
     paramOnly: {
       // KEY is the patch's global key (Patch.key), not a per-effect param.
       "HARMONIST": new Set(["KEY"]),
@@ -92,7 +82,7 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
     codecFields: (type) => PFX_TYPE_MAPS[type],
     // wahType is WAH's own sub-model selector, modeled via subTypes rather than a param.
     reverseSkip: new Set(["wahType"]),
-    aliases: {},
+    aliases: FIELD_LABEL_ALIASES.pfx,
     paramOnly: {},
   },
   {
@@ -100,7 +90,7 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
     types: DLY_TYPES,
     codecFields: (type) => DELAY_TYPE_MAPS[type],
     reverseSkip: new Set(),
-    aliases: {},
+    aliases: FIELD_LABEL_ALIASES.delay,
     paramOnly: {},
   },
   {
@@ -108,12 +98,7 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
     types: REV_TYPES,
     codecFields: reverbCodecFields,
     reverseSkip: new Set(),
-    aliases: {
-      // codec field is "spreadTime"; the device labels it S-TIME.
-      "TERA ECHO": { spreadTime: "S-TIME" },
-      // codec field is "pitchLevel"; the device labels it PITCH LVL.
-      "SHIMMER": { pitchLevel: "PITCH LVL" },
-    },
+    aliases: FIELD_LABEL_ALIASES.reverb,
     paramOnly: {},
   },
 ];
@@ -126,7 +111,7 @@ const FX_DELAY_BLOCK: PerTypeBlock = {
   types: FX_DLY_TYPES,
   codecFields: (type) => FX_DELAY_TYPE_MAPS[type],
   reverseSkip: new Set(["type"]),
-  aliases: {},
+  aliases: FIELD_LABEL_ALIASES.fxDelay,
   paramOnly: {},
 };
 
@@ -362,6 +347,49 @@ const assertFreqValueParity = ({ block, type, field }: EnumValueCheck): void => 
 describe("GX-1 codec ↔ catalog value-enumeration parity (frequency lookups)", () => {
   it.each(FREQ_VALUE_CHECKS)("$type.$field: catalog values enumerate the codec lookup table", (check) => {
     assertFreqValueParity(check);
+  });
+});
+
+// ── param key stamping: describe_device param.key === the codec/decoded field name ──
+//
+// Each per-type param carries `key` = the field name used in decoded patches (read_patch) and
+// in an effect's params record when building — stamped automatically from the codec map,
+// so an agent never has to guess "PRE-DELAY" → preDelay or "OCT F-BACK" → octFeedback.
+
+const paramKey = (groupId: string, itemId: string, paramName: string): string | undefined =>
+  groupItems(groupId).find(item => item.id === itemId)?.params?.find(param => param.name === paramName)?.key;
+
+describe("GX-1 param key stamping", () => {
+  it.each([
+    { group: "fx",     item: "CHORUS",     name: "PRE-DELAY",    key: "preDelay" },
+    { group: "fx",     item: "PHASER",     name: "TYPE",         key: "stage" },
+    { group: "fx",     item: "ROTARY",     name: "SPEED SELECT", key: "speed" },
+    { group: "fx",     item: "FEEDBACKER", name: "OCT F-BACK",   key: "octFeedback" },
+    { group: "delay",  item: "STANDARD",   name: "HIGH CUT",     key: "highCut" },
+    { group: "reverb", item: "SHIMMER",    name: "PITCH LVL",    key: "pitchLevel" },
+    { group: "reverb", item: "TERA ECHO",  name: "S-TIME",       key: "spreadTime" },
+  ])("$group $item \"$name\" → key \"$key\"", ({ group, item, name, key }) => {
+    expect(paramKey(group, item, name)).toBe(key);
+  });
+
+  // item params + any per-subtype params (fx DELAY's sub-algorithms carry their own).
+  const itemParams = (item: CapabilityItem): ParamSpec[] =>
+    [item.params ?? [], ...(item.subTypes ?? []).map(sub => sub.params ?? [])].flat();
+
+  const keyedParams = (groupId: string): { item: string; param: ParamSpec }[] =>
+    groupItems(groupId).flatMap(item => itemParams(item).map(param => ({ item: item.id, param })));
+
+  // HARMONIST's KEY is the patch-level key, not a codec field — the one param without a `key`.
+  const isParamOnly = (groupId: string, item: string, name: string): boolean =>
+    groupId === "fx" && item === "HARMONIST" && name === "KEY";
+
+  it("stamps a key on every per-type capability param (except paramOnly HARMONIST KEY)", () => {
+    for (const groupId of ["fx", "pfx", "delay", "reverb"]) {
+      for (const { item, param } of keyedParams(groupId)) {
+        if (isParamOnly(groupId, item, param.name)) continue;
+        expect(param.key, `${groupId} "${item}" param "${param.name}"`).toBeDefined();
+      }
+    }
   });
 });
 

@@ -16,7 +16,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Minimal",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
     };
 
     const { isError } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -25,6 +25,28 @@ describe("generate_gx1_patch", () => {
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.amp.type).toBe("JC-120");
     expect(patch.amp.gain).toBe(50);
+  });
+
+  it("echoes the saved decoded patch with its resolved chain in the response", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "echo.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Echo",
+      outPath,
+      chain: ["OD", "FX1", "AMP"],
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
+    };
+
+    const { text, isError } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError, text).toBe(false);
+    const echoed = JSON.parse(text.slice(text.indexOf("{"))) as { name: string; chain: string[]; amp: { type: string } };
+    expect(echoed.name).toBe("Echo");
+    expect(echoed.amp.type).toBe("JC-120");
+    // resolved chain echoed back: OD/DS was moved ahead of FX1.
+    expect(echoed.chain.indexOf("OD/DS")).toBeLessThan(echoed.chain.indexOf("FX1"));
   });
 
   it("round-trips a full patch with every optional block", async () => {
@@ -36,7 +58,7 @@ describe("generate_gx1_patch", () => {
       name: "Full Patch",
       outPath,
       key: "G",
-      amp: { type: "JC-120", gain: 60, bass: 55, mid: 45, treble: 50 },
+      amp: { type: "JC-120", gain: 60, bass: 55, middle: 45, treble: 50 },
       odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
       pfx: { type: "PEDAL BEND", params: { pitchMin: 0, pitchMax: 12, position: 100, level: 100, direct: 0 } },
       fx1: { type: "COMPRESSOR", subType: "D-COMP", params: { sustain: 30, attack: 30, level: 70 } },
@@ -73,7 +95,7 @@ describe("generate_gx1_patch", () => {
       name: "Chain",
       outPath,
       chain: ["FX1", "OD", "AMP", "NS", "DLY", "REV"],
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
     };
 
@@ -91,7 +113,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Omitted",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
     };
 
     await client.callTool("generate_gx1_patch", patchSpec);
@@ -110,7 +132,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Explicit Off",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       pfx: { type: "WAH", on: false, params: { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 } },
       fx1: { type: "COMPRESSOR", subType: "D-COMP", on: false, params: { sustain: 30, attack: 30, level: 70 } },
     };
@@ -131,7 +153,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Pfx No Params",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       pfx: { type: "WAH" },
     };
 
@@ -151,7 +173,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Bad Amp",
       outPath,
-      amp: { type: "NOT-A-REAL-AMP", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "NOT-A-REAL-AMP", gain: 50, bass: 50, middle: 50, treble: 50 },
     };
 
     const { isError } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -167,7 +189,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Bad FX",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       fx1: { type: "NOT-A-REAL-EFFECT" },
     };
 
@@ -184,7 +206,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Pedal Wah",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       pfx: { type: "WAH", params: { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 } },
     };
 
@@ -204,7 +226,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Fixed Wah",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       fx1: { type: "FIXED WAH", subType: "CRY WAH", params: { level: 100, direct: 0, manual: 50 } },
     };
 
@@ -224,7 +246,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Fx Delay",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       fx1: { type: "DELAY", subType: "MODULATE", params: { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 12, modDepth: 18 } },
     };
 
@@ -245,7 +267,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Slicer",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       fx1: { type: "SLICER", params: { pattern: "PATTERN 3", rate: 50, level: 70, attack: 30, duty: 0, direct: 0 } },
     };
 
@@ -265,7 +287,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Harmonist",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       fx1: { type: "HARMONIST", params: { harmony: "+3rd", preDelay: 0, level: 70, feedback: 0, direct: 100 } },
     };
 
@@ -277,7 +299,7 @@ describe("generate_gx1_patch", () => {
     expect(patch.fx1.params.harmony).toBe("+3rd");
   });
 
-  it("builds a TWIST delay whose mode is selected by a string extra.mode", async () => {
+  it("builds a TWIST delay whose mode is selected by a string params.mode", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "twist.tsl");
     const client = await connectClient();
@@ -285,10 +307,10 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Twist Delay",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       delay: {
         type: "TWIST", timeMs: 500, feedback: 20, level: 25,
-        extra: { mode: "RISE-FADE", riseTime: 10, fallTime: 10, fadeTime: 10 },
+        params: { mode: "RISE-FADE", riseTime: 10, fallTime: 10, fadeTime: 10 },
       },
     };
 
@@ -300,7 +322,7 @@ describe("generate_gx1_patch", () => {
     expect(patch.delay.mode).toBe("RISE-FADE");
   });
 
-  it("builds a SPACE ECHO delay whose head is selected by a string extra.head", async () => {
+  it("builds a SPACE ECHO delay whose head is selected by a string params.head", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "space-echo.tsl");
     const client = await connectClient();
@@ -308,10 +330,10 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Space Echo",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       delay: {
         type: "SPACE ECHO", timeMs: 500, feedback: 20, level: 25,
-        extra: { head: "1+2" },
+        params: { head: "1+2" },
       },
     };
 
@@ -331,7 +353,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Bad Range",
       outPath,
-      amp: { type: "JC-120", gain: 150, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 150, bass: 50, middle: 50, treble: 50 },
     };
 
     const { isError } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -347,7 +369,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Deep",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -367,7 +389,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Bad Path",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -386,7 +408,7 @@ describe("generate_gx1_patch", () => {
       name: "Partial",
       outPath,
       chain: ["FX1", "OD", "AMP", "FX2", "NS", "DLY", "REV"],
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       odds: { type: "BLUES OD", drive: 40, tone: 0, level: 70 },
     };
 
@@ -402,7 +424,7 @@ describe("generate_gx1_patch", () => {
     const outPath = join(temp.dir, "upsert.tsl");
     const client = await connectClient();
     close = client.close;
-    const ampSpec = { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 };
+    const ampSpec = { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 };
 
     const first = await client.callTool("generate_gx1_patch", { name: "Lead", outPath, amp: ampSpec });
 
@@ -437,7 +459,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "GEQ",
       outPath,
-      amp: { type: "JC-120", gain: 50, bass: 50, mid: 50, treble: 50 },
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       fx1: { type: "HIGH GEQ", params: { level: 80, "4kHz": 5 } },
     };
 

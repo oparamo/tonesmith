@@ -11,12 +11,42 @@
  * tool) consume. The drift-guard tests in `capabilities.test.ts` enforce that the catalog
  * (and therefore the params surfaced here) stays in lockstep with the codec's field maps.
  */
-import type { DeviceCapabilities, CapabilityItem } from "../../types";
-import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, type PerTypeBlockId } from "./param-catalog";
+import type { DeviceCapabilities, CapabilityItem, ParamSpec } from "../../types";
+import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlockId } from "./param-catalog";
+import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
+import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
+import type { FieldCodec } from "./codec/fields";
 
-/** Attaches each item's params from the catalog for a per-type block (fx/pfx/delay/reverb). */
+const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const PER_TYPE_CODEC_MAPS: Record<PerTypeBlockId, Partial<Record<string, readonly FieldCodec[]>>> = {
+  fx: FX_PARAM_MAPS, pfx: PFX_TYPE_MAPS, delay: DELAY_TYPE_MAPS,
+  reverb: REV_TYPE_MAPS, fxDelay: FX_DELAY_TYPE_MAPS,
+};
+
+const codecFieldsFor = (block: PerTypeBlockId, type: string): readonly FieldCodec[] => {
+  // Every reverb type but the STANDARD group shares STANDARD's field map.
+  const resolvedType = block === "reverb" && (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
+    ? "STANDARD"
+    : type;
+  return PER_TYPE_CODEC_MAPS[block][resolvedType] ?? [];
+};
+
+/** Stamps each catalog param with its backing codec field name (`key`), matched by label. */
+const withKeys = (block: PerTypeBlockId, type: string, params: readonly ParamSpec[]): ParamSpec[] => {
+  const fields = codecFieldsFor(block, type);
+  const aliases = FIELD_LABEL_ALIASES[block][type] ?? {};
+  return params.map(param => {
+    const target = normalizeLabel(param.name);
+    const field = fields.find(candidate => normalizeLabel(aliases[candidate.name] ?? candidate.name) === target);
+    const stamped = field ? { ...param, key: field.name } : param;
+    return stamped;
+  });
+};
+
+/** Attaches each item's params (with `key` stamped on) from the catalog for a per-type block. */
 const withTypeParams = (block: PerTypeBlockId, items: readonly CapabilityItem[]): CapabilityItem[] =>
-  items.map(item => ({ ...item, params: PARAMS_BY_TYPE[block][item.id] ?? [] }));
+  items.map(item => ({ ...item, params: withKeys(block, item.id, PARAMS_BY_TYPE[block][item.id] ?? []) }));
 
 // FX-slot DELAY is the one fx type modeled per-sub-algorithm: its subTypes carry the params
 // (from the "fxDelay" catalog block), unlike the flat fx types whose params sit on the item.

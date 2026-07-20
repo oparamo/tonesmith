@@ -75,6 +75,19 @@ describe("describe_device", () => {
     expect(text).toContain('Unknown item "nonexistent"');
   });
 
+  it("stamps the machine key on each param (the generate/read field name)", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", group: "fx", item: "CHORUS" };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const item = JSON.parse(text) as { params: { name: string; key?: string }[] };
+    const preDelay = item.params.find(param => param.name === "PRE-DELAY");
+    expect(preDelay?.key, "PRE-DELAY should carry its machine key").toBe("preDelay");
+  });
+
   it("enumerates the exact valid labels for a frequency-lookup param", async () => {
     const client = await connectClient();
     close = client.close;

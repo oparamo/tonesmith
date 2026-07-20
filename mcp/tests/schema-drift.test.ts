@@ -43,7 +43,7 @@ interface BoundedField {
 const BOUNDED_FIELDS: BoundedField[] = [
   { path: "amp.gain", groupId: "amp", paramName: "GAIN" },
   { path: "amp.bass", groupId: "amp", paramName: "BASS" },
-  { path: "amp.mid", groupId: "amp", paramName: "MIDDLE" },
+  { path: "amp.middle", groupId: "amp", paramName: "MIDDLE" },
   { path: "amp.treble", groupId: "amp", paramName: "TREBLE" },
   { path: "amp.level", groupId: "amp", paramName: "LEVEL" },
   { path: "amp.soloLevel", groupId: "amp", paramName: "SOLO LEVEL" },

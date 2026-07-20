@@ -1,6 +1,14 @@
 /** A single parameter on a capability item or group (informational; not used for encoding). */
 interface ParamSpec {
   name: string;
+  /**
+   * The exact property key for this param in machine surfaces — the field name in decoded
+   * patches (`read_patch` output) and the key to use inside a block's `params` record when
+   * building a patch. Distinct from `name`, which is the human display label
+   * ("PRE-DELAY" vs `preDelay`, "OCT F-BACK" vs `octFeedback`). Absent only for params with
+   * no backing codec field (e.g. HARMONIST's KEY, which is the patch-level key).
+   */
+  key?: string;
   /** Free text: "0–100", "–12–+12 semitones", enum list, etc. */
   range: string;
   description: string;
