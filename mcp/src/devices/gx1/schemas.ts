@@ -15,9 +15,11 @@ const FxBlockSchema = z.object({
   ),
   on: z.boolean().optional().describe("Whether the slot is active (default true)"),
   params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
-    "Effect parameter values as name→value pairs. Most are numbers, but some select a model or " +
-    "mode by name instead (e.g. SLICER's pattern, HARMONIST's harmony) — use describe_device with " +
-    "group=fx and the item's id for the authoritative list of names, ranges, and string values."
+    "Every effect parameter as key→value pairs (an fx slot has no named param fields, so all of its " +
+    "params live here). The key is each param's `key` from describe_device (group=fx, the item's id) " +
+    "— e.g. preDelay, octFeedback — NOT its display name. Most values are numbers, but some select a " +
+    "model or mode by name (e.g. SLICER's pattern, HARMONIST's harmony); describe_device lists each " +
+    "param's key, range, and (for lookups) its exact string values."
   ),
 }).optional();
 

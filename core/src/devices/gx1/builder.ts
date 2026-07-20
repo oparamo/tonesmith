@@ -172,17 +172,27 @@ const defaultFxParams = (fxType: string, subType: string | null = null): Record<
   return defaults;
 };
 
-/** Rejects any key in `params` that isn't one of `fields`' names. Shared by fx() and assignExtra. */
+/**
+ * Rejects any key in a params bag that isn't valid. Shared by fx() and assignExtra. Two rejects:
+ * a `named` key (one of the block's dedicated common-control fields — set it there, not in the
+ * bag; enforces the "bag holds only the non-named params" rule), or a key that isn't a field of
+ * the current type at all. `named` is empty for blocks with no dedicated fields (fx/pfx).
+ */
 const validateParamKeys = (
   keys: Iterable<string>,
   fields: FieldCodec[] | undefined,
   label: string,
   type: string,
+  named: ReadonlySet<string> = new Set(),
 ): void => {
   const validNames = new Set((fields ?? []).map(field => field.name));
   for (const key of keys) {
+    if (named.has(key)) {
+      throw new Error(`${label} "${key}" is one of this block's common controls — set it via its own field, not the params bag`);
+    }
     if (!validNames.has(key)) {
-      throw new Error(`${label} "${key}" is not valid for type "${type}"`);
+      const valid = [...validNames].join(", ");
+      throw new Error(`${label} "${key}" is not valid for type "${type}" (valid keys: ${valid})`);
     }
   }
 };
@@ -224,12 +234,12 @@ const fv = (patch: Patch, position: number, min: number, max: number, curve = "N
 };
 
 /**
- * Merges `extra` into `target`, rejecting any key that isn't one of `fields`'
- * names — a typo'd or type-mismatched extra param would otherwise write a byte
- * offset that's meaningless for the current type and silently corrupt an
- * unrelated field on encode. Shared by pfx/delay/reverb, whose field sets vary by type.
+ * Merges the type-specific `params` bag into `target`, rejecting any key that isn't one of
+ * `fields`' names (or that duplicates a `covered` common control) — a typo'd or type-mismatched
+ * param would otherwise write a byte offset that's meaningless for the current type and silently
+ * corrupt an unrelated field on encode. Shared by pfx/delay/reverb, whose field sets vary by type.
  *
- * Any field in `fields` that neither the caller (via `extra`) nor the builder's own
+ * Any field in `fields` that neither the caller (via `params`) nor the builder's own
  * positional params (named in `covered`) sets is filled from `defaultForField` — the
  * same fix as `fx()`'s `defaultFxParams`, extended here so type-specific fields (e.g.
  * SHIMMER delay's `pitch`, every PEDAL BEND/WAH field) can't inherit a stale raw byte
@@ -241,19 +251,19 @@ const fv = (patch: Patch, position: number, min: number, max: number, curve = "N
  */
 const assignExtra = (
   target: Record<string, unknown>,
-  extra: Record<string, unknown>,
+  params: Record<string, unknown>,
   fields: FieldCodec[] | undefined,
   blockLabel: string,
   type: string,
   covered: ReadonlySet<string> = new Set(),
 ): void => {
-  validateParamKeys(Object.keys(extra), fields, `${blockLabel} extra param`, type);
+  validateParamKeys(Object.keys(params), fields, `${blockLabel} param`, type, covered);
   for (const field of fields ?? []) {
-    if (!covered.has(field.name) && !(field.name in extra)) {
+    if (!covered.has(field.name) && !(field.name in params)) {
       target[field.name] = defaultForField(field);
     }
   }
-  Object.assign(target, extra);
+  Object.assign(target, params);
 };
 
 /** Sets the expression pedal effect: "WAH" (wahType/level/direct/position/min/max) or "PEDAL BEND" (pitchMin/pitchMax/position/level/direct). */
@@ -273,7 +283,7 @@ const delay = (
   level: number,
   highCut = "FLAT",
   on = true,
-  extra: Record<string, unknown> = {},
+  params: Record<string, unknown> = {},
 ): void => {
   patch.delay.on = on;
   patch.delay.type = type;
@@ -281,7 +291,7 @@ const delay = (
   patch.delay.feedback = feedback;
   patch.delay.level = level;
   patch.delay.highCut = highCut;
-  assignExtra(patch.delay, extra, DELAY_TYPE_MAPS[type], "delay", type, DELAY_COVERED_FIELDS);
+  assignExtra(patch.delay, params, DELAY_TYPE_MAPS[type], "delay", type, DELAY_COVERED_FIELDS);
 };
 
 const REVERB_COVERED_FIELDS = new Set(["time", "level", "preDelay", "tone", "density", "direct"]);
@@ -296,7 +306,7 @@ const reverb = (
   density = 5,
   direct = 100,
   on = true,
-  extra: Record<string, unknown> = {},
+  params: Record<string, unknown> = {},
 ): void => {
   patch.reverb.on = on;
   patch.reverb.type = type;
@@ -309,7 +319,7 @@ const reverb = (
   const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
     ? REV_TYPE_MAPS.STANDARD
     : REV_TYPE_MAPS[type];
-  assignExtra(patch.reverb, extra, fields, "reverb", type, REVERB_COVERED_FIELDS);
+  assignExtra(patch.reverb, params, fields, "reverb", type, REVERB_COVERED_FIELDS);
 };
 
 const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {

@@ -496,5 +496,35 @@ const PARAMS_BY_BLOCK = {
 type PerTypeBlockId = keyof typeof PARAMS_BY_TYPE;
 type SingleShapeBlockId = keyof typeof PARAMS_BY_BLOCK;
 
-export { PARAMS_BY_TYPE, PARAMS_BY_BLOCK };
+/**
+ * Codec field name → its human display label, per block and type, for the few fields whose
+ * label diverges from the field name (e.g. codec `octFeedback` ↔ catalog "OCT F-BACK", codec
+ * `stage` ↔ catalog "TYPE"). Single source of truth for these aliases, consumed by two places
+ * that must agree: `capabilities.ts` uses it to stamp each param's `key`, and the codec↔catalog
+ * drift guard uses it to line codec fields up with their catalog params.
+ */
+const FIELD_LABEL_ALIASES: Record<PerTypeBlockId, Record<string, Record<string, string>>> = {
+  fx: {
+    // codec field is "octFeedback"; catalog label matches the hardware's own knob text.
+    "FEEDBACKER": { octFeedback: "OCT F-BACK" },
+    // stage count (4/8/12) is the codec's numeric "stage" field; catalog labels it TYPE.
+    "PHASER": { stage: "TYPE" },
+    // codec field is "speed"; catalog matches the hardware's own knob text.
+    "ROTARY": { speed: "SPEED SELECT" },
+    // codec fields are "minus1Oct"/"minus2Oct"; catalog matches the hardware's own knob text.
+    "OCTAVE": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
+    "HEAVY OCT": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
+  },
+  pfx: {},
+  delay: {},
+  reverb: {
+    // codec field is "spreadTime"; the device labels it S-TIME.
+    "TERA ECHO": { spreadTime: "S-TIME" },
+    // codec field is "pitchLevel"; the device labels it PITCH LVL.
+    "SHIMMER": { pitchLevel: "PITCH LVL" },
+  },
+  fxDelay: {},
+};
+
+export { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES };
 export type { PerTypeBlockId, SingleShapeBlockId };

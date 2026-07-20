@@ -52,7 +52,7 @@ const inputSchema = z.object({
     type: z.string().describe("Amplifier model"),
     gain: boundedInt("amp", "GAIN").describe("Gain 0–120"),
     bass: boundedInt("amp", "BASS").describe("Bass EQ 0–100 (50=flat)"),
-    mid: boundedInt("amp", "MIDDLE").describe("Mid EQ 0–100 (50=flat)"),
+    middle: boundedInt("amp", "MIDDLE").describe("Mid EQ 0–100 (50=flat)"),
     treble: boundedInt("amp", "TREBLE").describe("Treble EQ 0–100 (50=flat)"),
     speaker: z.string().optional().describe("Cabinet model (default ORIGINAL)"),
     mic: z.string().optional().describe("Microphone model (default DYN57)"),
@@ -100,31 +100,35 @@ const inputSchema = z.object({
 
   delay: z.object({
     type: z.string().describe(`Delay type (${capabilityItemIds("delay")})`),
-    timeMs: boundedNumber("delay", "TIME", "STANDARD").describe("Delay time in milliseconds, 1–2000"),
+    timeMs: boundedNumber("delay", "TIME", "STANDARD").describe("Delay time in milliseconds, 1–2000. Unit-bearing alias for the decoded `time` field (read_patch shows it as `time`)."),
     feedback: boundedInt("delay", "FEEDBACK", "STANDARD").describe("Feedback 0–100"),
     level: boundedInt("delay", "LEVEL", "STANDARD").describe("Effect level 1–120"),
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
     on: z.boolean().optional().describe("Enable delay (default true)"),
-    extra: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
-      "Extra type-specific params beyond the common ones above (e.g. modRate/modDepth for " +
-      "MODULATE, mode/riseTime for TWIST, head for SPACE ECHO). Call describe_device with " +
-      "group=delay and the chosen type for the authoritative names, ranges, and string values."
+    params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+      "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
+      "describe_device (e.g. modRate/modDepth for MODULATE, mode/riseTime for TWIST, head for SPACE " +
+      "ECHO). Call describe_device with group=delay and the chosen type for the keys, ranges, and " +
+      "values. The common controls (timeMs/feedback/level/highCut) are the named fields above — set " +
+      "them there, not here."
     ),
   }).optional().describe("Delay block. Omit to disable."),
 
   reverb: z.object({
     type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
-    timeS: boundedNumber("reverb", "TIME", "HALL S").describe("Reverb time in seconds, 0.1–10.0"),
+    timeS: boundedNumber("reverb", "TIME", "HALL S").describe("Reverb time in seconds, 0.1–10.0. Unit-bearing alias for the decoded `time` field (read_patch shows it as `time`)."),
     level: boundedInt("reverb", "LEVEL", "HALL S").describe("Effect level 1–100"),
     preDelay: boundedNumber("reverb", "PRE-DELAY", "HALL S").optional().describe("Pre-delay in ms 0–200 (default 0)"),
     tone: boundedInt("reverb", "TONE", "HALL S").optional().describe("Tone EQ −50–+50 (default 0)"),
     density: boundedInt("reverb", "DENSITY", "HALL S").optional().describe("Density 1–10 (default 5)"),
     direct: boundedInt("reverb", "DIRECT", "HALL S").optional().describe("Direct level 0–100 (default 100)"),
     on: z.boolean().optional().describe("Enable reverb (default true)"),
-    extra: z.record(z.string(), z.number()).optional().describe(
-      "Extra type-specific params beyond the common ones above (e.g. pitch/pitchLevel for " +
-      "SHIMMER, feedback/highCut for SUB DELAY). Call describe_device with group=reverb and " +
-      "the chosen type for the authoritative names and ranges."
+    params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+      "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
+      "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY). Call " +
+      "describe_device with group=reverb and the chosen type for the keys, ranges, and values. The " +
+      "common controls (timeS/level/preDelay/tone/density/direct) are the named fields above — set " +
+      "them there, not here."
     ),
   }).optional().describe("Reverb block. Omit to disable."),
 });
@@ -158,12 +162,12 @@ const applyFv = (patch: Patch, fvParams: GeneratePatchInput["fv"]): void => {
 
 const applyDelay = (patch: Patch, delayParams: GeneratePatchInput["delay"]): void => {
   if (!delayParams) { patch.delay.on = false; return; }
-  delay(patch, delayParams.type, delayParams.timeMs, delayParams.feedback, delayParams.level, delayParams.highCut, delayParams.on ?? true, delayParams.extra ?? {});
+  delay(patch, delayParams.type, delayParams.timeMs, delayParams.feedback, delayParams.level, delayParams.highCut, delayParams.on ?? true, delayParams.params ?? {});
 };
 
 const applyReverb = (patch: Patch, reverbParams: GeneratePatchInput["reverb"]): void => {
   if (!reverbParams) return;
-  reverb(patch, reverbParams.type, reverbParams.timeS, reverbParams.level, reverbParams.preDelay, reverbParams.tone, reverbParams.density, reverbParams.direct, reverbParams.on ?? true, reverbParams.extra ?? {});
+  reverb(patch, reverbParams.type, reverbParams.timeS, reverbParams.level, reverbParams.preDelay, reverbParams.tone, reverbParams.density, reverbParams.direct, reverbParams.on ?? true, reverbParams.params ?? {});
 };
 
 /** Counts patches already saved at `path`, or 0 if the file doesn't exist yet. */
@@ -195,6 +199,14 @@ other (e.g. ["OD/DS","FX1","AMP"] to move OD/DS ahead of FX1). Any block you lea
 is inserted at its default position, so you never have to spell out the whole chain to
 change one part of it. "OD" is accepted as shorthand for "OD/DS".
 
+Setting parameters: every block's type-specific params go in its \`params\` record, keyed by
+the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fields, so their
+\`params\` record holds every effect param. delay and reverb additionally expose their common
+controls as named fields (timeMs/feedback/level/…) — set those directly and put only the
+remaining params in \`params\`. amp/odds/ns/fv are single-shape blocks whose params are named
+fields. Rule of thumb: if a describe_device param's \`key\` matches a named field on the block,
+set that field; otherwise put it in \`params[key]\`.
+
 ${buildCatalog()}`,
       inputSchema,
     },
@@ -204,7 +216,7 @@ ${buildCatalog()}`,
         const patch = basePatch(params.name, chain, params.key);
 
         const ampParams = params.amp;
-        amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.mid, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level, ampParams.solo, ampParams.soloLevel);
+        amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.middle, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level, ampParams.solo, ampParams.soloLevel);
 
         applyOdds(patch, params.odds);
         applyPfx(patch, params.pfx);
@@ -221,7 +233,10 @@ ${buildCatalog()}`,
         const patchCountBefore = countExistingPatches(params.outPath);
         const file = patchUtils.upsertPatch(gx1.driver, params.outPath, patch);
         const verb = describeUpsertAction(patchCountBefore, file.patches.length);
-        return ok(`${verb} patch "${params.name}" → ${params.outPath} (${file.patches.length} patch(es) total)`);
+        const summary = `${verb} patch "${params.name}" → ${params.outPath} (${file.patches.length} patch(es) total)`;
+        // Echo back the built patch so the caller can confirm the resolved chain and every field
+        // the builder defaulted, without a follow-up read_patch.
+        return ok(`${summary}\n\n${JSON.stringify(patch, null, 2)}`);
       } catch (error) {
         return err(error);
       }
