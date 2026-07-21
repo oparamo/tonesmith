@@ -50,7 +50,7 @@ describe("printPatch", () => {
 
     const output = capturedOutput(info);
     expect(output).toContain("FX1 [ON]  TREMOLO");
-    expect(output).toContain("rate=0  depth=0  level=50");
+    expect(output).toContain("rate=75  depth=50  level=100");
   });
 
   it("omits the params line for a block whose type has no known fields", () => {

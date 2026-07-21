@@ -7,7 +7,6 @@ import {
   moveBefore,
   normalizeChain,
   defaultFxParams,
-  defaultForField,
   basePatch,
   amp,
   odds,
@@ -263,7 +262,7 @@ describe("fx", () => {
     fx(patch, "fx1", "TREMOLO");
 
     expect(patch.fx1.subType).toBeNull();
-    expect(patch.fx1.params).toEqual({ rate: 0, depth: 0, level: 50 });
+    expect(patch.fx1.params).toEqual({ rate: 75, depth: 50, level: 100 });
   });
 
   it("fx DELAY with no sub-algorithm yields empty params (the sub-algorithm selects the field set)", () => {
@@ -284,7 +283,7 @@ describe("fx", () => {
 
     expect(patch.fx1.subType).toBe("WARP");
     // WARP's fields are time/trigger/level (type is threaded in but not a defaulted param).
-    expect(patch.fx1.params).toEqual({ time: 0, trigger: "OFF", level: 80, type: "WARP" });
+    expect(patch.fx1.params).toEqual({ time: 400, trigger: "OFF", level: 80, type: "WARP" });
   });
 
   // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS),
@@ -448,30 +447,30 @@ describe("pfx", () => {
     expect(patch.pfx.type).toBe("BOGUS TYPE");
   });
 
-  it("fills every WAH field with sane defaults when called with no params", () => {
+  it("fills every WAH field with real factory defaults when called with no params", () => {
     const patch = basePatch("Test");
 
     pfx(patch, "WAH", {});
 
     const block = patch.pfx as Record<string, unknown>;
     expect(block.wahType).toBe("CRY WAH");
-    expect(block.level).toBe(50);
+    expect(block.level).toBe(100);
     expect(block.direct).toBe(0);
-    expect(block.position).toBe(0);
+    expect(block.position).toBe(100);
     expect(block.min).toBe(0);
-    expect(block.max).toBe(0);
+    expect(block.max).toBe(100);
   });
 
-  it("fills PEDAL BEND fields (including signed pitchMin/pitchMax) with sane defaults when called with no params", () => {
+  it("fills PEDAL BEND fields (including signed pitchMin/pitchMax) with real factory defaults when called with no params", () => {
     const patch = basePatch("Test");
 
     pfx(patch, "PEDAL BEND", {});
 
     const block = patch.pfx as Record<string, unknown>;
     expect(block.pitchMin).toBe(0);
-    expect(block.pitchMax).toBe(0);
-    expect(block.position).toBe(0);
-    expect(block.level).toBe(50);
+    expect(block.pitchMax).toBe(24);
+    expect(block.position).toBe(100);
+    expect(block.level).toBe(100);
     expect(block.direct).toBe(0);
   });
 
@@ -548,14 +547,14 @@ describe("delay", () => {
     expect(patch.delay.on).toBe(false);
   });
 
-  it("fills SHIMMER's type-specific pitch/balance fields (not covered by any positional param) with sane defaults", () => {
+  it("fills SHIMMER's type-specific pitch/balance fields (not covered by any positional param) with real factory defaults", () => {
     const patch = basePatch("Test");
 
     delay(patch, "SHIMMER", 1, 40, 50, "FLAT");
 
     const block = patch.delay as Record<string, unknown>;
-    expect(block.pitch).toBe(0);
-    expect(block.balance).toBe(0);
+    expect(block.pitch).toBe(12);
+    expect(block.balance).toBe(50);
   });
 
   it("fills WARP's trigger field (entirely uncovered by delay()'s positional params) with a sane default", () => {
@@ -620,23 +619,24 @@ describe("reverb", () => {
     expect(patch.reverb.on).toBe(false);
   });
 
-  it("fills SUB DELAY's feedback/highCut fields (not covered by any positional param) with sane defaults, preferring FLAT over the table's first entry", () => {
+  it("fills SUB DELAY's feedback/highCut fields (not covered by any positional param) with real factory defaults", () => {
     const patch = basePatch("Test");
 
     reverb(patch, "SUB DELAY", 1, 60);
 
     const block = patch.reverb as Record<string, unknown>;
-    expect(block.feedback).toBe(0);
-    expect(block.highCut).toBe("FLAT");
+    expect(block.feedback).toBe(30);
+    expect(block.highCut).toBe("6.3kHz");
   });
 
-  it("fills SHIMMER's pitch field with a sane default when the caller doesn't pass it via extra", () => {
+  it("fills SHIMMER's pitch/pitchLevel fields with real factory defaults when the caller doesn't pass them via params", () => {
     const patch = basePatch("Test");
 
     reverb(patch, "SHIMMER", 1, 60);
 
     const block = patch.reverb as Record<string, unknown>;
-    expect(block.pitch).toBe(0);
+    expect(block.pitch).toBe(12);
+    expect(block.pitchLevel).toBe(100);
   });
 });
 
@@ -676,16 +676,6 @@ describe("defaultFxParams (anchored to default-init.tsl)", () => {
       rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100,
     });
     expect(patch.fx3.params).toMatchObject(chorusDefaults);
-  });
-});
-
-describe("defaultForField", () => {
-  it("throws for a malformed lookup/indexTable field with no table entries", () => {
-    const malformedField = { name: "bogus", kind: "lookup" as const, table: [], decode: () => "", encode: () => undefined };
-
-    const getDefaultForMalformedField = () => defaultForField(malformedField);
-
-    expect(getDefaultForMalformedField).toThrow('Field "bogus" has kind "lookup" but no table entries');
   });
 });
 

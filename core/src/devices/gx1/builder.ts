@@ -2,6 +2,7 @@ import type { Patch, FxParams, NsBlock, FvBlock } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
 import { PARAM_SUBTYPE_EFFECTS, NS_DETECT } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
+import { DEFAULTS_BY_TYPE, type ParamDefaults } from "./defaults";
 
 // The 10 reorderable blocks — OUTPUT is a fixed endpoint, not part of the chain array
 // (see CHAIN_BLOCK_ORDER in common/constants.ts for the underlying byte encoding).
@@ -107,50 +108,6 @@ const clearOdds = (patch: Patch): void => {
   patch.odds.on = false;
 };
 
-// Real factory-default FX param values, anchored to core/tests/fixtures/gx1/default-init.tsl
-// (the only captured source of truth for these). Only the types actually present in that
-// fixture are overridden here — every other type falls back to the generic rule in
-// defaultForField, since no other type's real factory default has been captured.
-const FX_DEFAULT_OVERRIDES: Partial<Record<string, Record<string, string | number>>> = {
-  "COMPRESSOR": { sustain: 50, attack: 50, level: 60 },
-  "PARA. EQ":   { midFreq: "4kHz" },
-  "CHORUS":     { rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100 },
-};
-
-const LEVEL_FIELD = /level/i;
-
-// The bypass/no-op value for tone-shaping lookup tables (e.g. FREQ_HIGH_CUT) isn't always
-// table[0] — FREQ_HIGH_CUT lists it last. Preferring it over "first entry" whenever it's
-// present keeps the generic rule from defaulting a highCut/lowCut-style field to an audible
-// filter setting (e.g. "20Hz", a hard low-pass) just because of table ordering.
-const NEUTRAL_LOOKUP_VALUE = "FLAT";
-
-/**
- * Generic per-field default, used for any field FX_DEFAULT_OVERRIDES doesn't cover:
- * a signed (offset-encoded) field defaults to its center (i.e. 0, "0 dB" for EQ gains);
- * a lookup field defaults to its table's bypass value if it has one, else its first entry;
- * a plain level-like field defaults to 50; anything else defaults to 0.
- */
-const defaultForField = (field: FieldCodec): string | number => {
-  if (field.kind === "lookup" || field.kind === "indexTable") {
-    const table = field.table ?? [];
-    if (table.length === 0) {
-      throw new Error(`Field "${field.name}" has kind "${field.kind}" but no table entries`);
-    }
-    const value = table.includes(NEUTRAL_LOOKUP_VALUE) ? NEUTRAL_LOOKUP_VALUE : table[0];
-    return value;
-  }
-  if (field.kind === "signed") return 0;
-  if (LEVEL_FIELD.test(field.name)) return 50;
-  return 0;
-};
-
-/**
- * Computes the full set of parameter defaults for switching an FX slot to `fxType`,
- * so any field the caller doesn't set gets a sane value instead of inheriting
- * whatever stale raw byte was in the slot before — the class of bug that left
- * unset GEQ bands decoding to −20 dB instead of 0 dB.
- */
 /**
  * Resolve an FX type's field map. DELAY is per-sub-algorithm (its fields depend on `subType`);
  * every other FX type has one flat map. Returns undefined when the map isn't known.
@@ -161,15 +118,18 @@ const fxFieldMap = (fxType: string, subType: string | null): FieldCodec[] | unde
   return FX_DELAY_TYPE_MAPS[subType];
 };
 
+/**
+ * The FX param defaults for switching a slot to `fxType` — the device's own factory values from
+ * DEFAULTS_BY_TYPE, so any field the caller doesn't set gets a real default instead of inheriting
+ * whatever stale raw byte was in the slot before (the class of bug that left unset GEQ bands
+ * decoding to −20 dB instead of 0 dB). DELAY is per-sub-algorithm (its defaults live under fxDelay).
+ */
 const defaultFxParams = (fxType: string, subType: string | null = null): Record<string, string | number> => {
-  const fields = fxFieldMap(fxType, subType) ?? [];
-  const overrides = FX_DEFAULT_OVERRIDES[fxType] ?? {};
-  const defaults: Record<string, string | number> = {};
-  for (const field of fields) {
-    if (field.name === "type") continue;
-    defaults[field.name] = overrides[field.name] ?? defaultForField(field);
+  if (fxType === "DELAY") {
+    const subDefaults = subType == null ? undefined : DEFAULTS_BY_TYPE.fxDelay[subType];
+    return { ...(subDefaults ?? {}) };
   }
-  return defaults;
+  return { ...(DEFAULTS_BY_TYPE.fx[fxType] ?? {}) };
 };
 
 /**
@@ -240,14 +200,14 @@ const fv = (patch: Patch, position: number, min: number, max: number, curve = "N
  * corrupt an unrelated field on encode. Shared by pfx/delay/reverb, whose field sets vary by type.
  *
  * Any field in `fields` that neither the caller (via `params`) nor the builder's own
- * positional params (named in `covered`) sets is filled from `defaultForField` — the
- * same fix as `fx()`'s `defaultFxParams`, extended here so type-specific fields (e.g.
- * SHIMMER delay's `pitch`, every PEDAL BEND/WAH field) can't inherit a stale raw byte
- * left on `target` by whatever type previously occupied the block. `covered` (rather
- * than checking `field.name in target`) is what makes this safe to call on a block
- * object that's mutated in place call after call: a field name shared between two
- * types (e.g. WAH's and PEDAL BEND's `level`) must still get re-defaulted on a type
- * switch, even though the property already exists on `target` from the prior type.
+ * positional params (named in `covered`) sets is filled from `defaults` (the type's real
+ * factory values from DEFAULTS_BY_TYPE) — so type-specific fields (e.g. SHIMMER delay's
+ * `pitch`, every PEDAL BEND/WAH field) can't inherit a stale raw byte left on `target` by
+ * whatever type previously occupied the block. `covered` (rather than checking
+ * `field.name in target`) is what makes this safe to call on a block object that's mutated
+ * in place call after call: a field name shared between two types (e.g. WAH's and PEDAL
+ * BEND's `level`) must still get re-defaulted on a type switch, even though the property
+ * already exists on `target` from the prior type.
  */
 const assignExtra = (
   target: Record<string, unknown>,
@@ -255,12 +215,15 @@ const assignExtra = (
   fields: FieldCodec[] | undefined,
   blockLabel: string,
   type: string,
-  covered: ReadonlySet<string> = new Set(),
+  covered: ReadonlySet<string>,
+  defaults: ParamDefaults,
 ): void => {
   validateParamKeys(Object.keys(params), fields, `${blockLabel} param`, type, covered);
   for (const field of fields ?? []) {
+    // `defaults` covers every field the codec map produces (it's harvested from the same maps and
+    // locked to them by the defaults drift guard), so every non-covered field is present here.
     if (!covered.has(field.name) && !(field.name in params)) {
-      target[field.name] = defaultForField(field);
+      target[field.name] = defaults[field.name];
     }
   }
   Object.assign(target, params);
@@ -270,7 +233,7 @@ const assignExtra = (
 const pfx = (patch: Patch, type: string, params: Record<string, unknown> = {}, on = true): void => {
   patch.pfx.on = on;
   patch.pfx.type = type;
-  assignExtra(patch.pfx, params, PFX_TYPE_MAPS[type], "pfx", type);
+  assignExtra(patch.pfx, params, PFX_TYPE_MAPS[type], "pfx", type, new Set(), DEFAULTS_BY_TYPE.pfx[type] ?? {});
 };
 
 const DELAY_COVERED_FIELDS = new Set(["time", "feedback", "level", "highCut"]);
@@ -291,7 +254,7 @@ const delay = (
   patch.delay.feedback = feedback;
   patch.delay.level = level;
   patch.delay.highCut = highCut;
-  assignExtra(patch.delay, params, DELAY_TYPE_MAPS[type], "delay", type, DELAY_COVERED_FIELDS);
+  assignExtra(patch.delay, params, DELAY_TYPE_MAPS[type], "delay", type, DELAY_COVERED_FIELDS, DEFAULTS_BY_TYPE.delay[type]);
 };
 
 const REVERB_COVERED_FIELDS = new Set(["time", "level", "preDelay", "tone", "density", "direct"]);
@@ -319,7 +282,7 @@ const reverb = (
   const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
     ? REV_TYPE_MAPS.STANDARD
     : REV_TYPE_MAPS[type];
-  assignExtra(patch.reverb, params, fields, "reverb", type, REVERB_COVERED_FIELDS);
+  assignExtra(patch.reverb, params, fields, "reverb", type, REVERB_COVERED_FIELDS, DEFAULTS_BY_TYPE.reverb[type]);
 };
 
 const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
@@ -329,10 +292,7 @@ const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
   console.info(`Saved ${outPath} (${patches.length} patches)`);
 };
 
-// defaultForField is exported for direct unit testing of its per-kind default rules
-// (including the invariant guard on malformed lookup/indexTable fields) — it's not part
-// of the public gx1 API surface (not re-exported from devices/gx1/index.ts).
 export {
-  DEFAULT_CHAIN, moveBefore, normalizeChain, defaultFxParams, defaultForField,
+  DEFAULT_CHAIN, moveBefore, normalizeChain, defaultFxParams,
   basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, saveTsl,
 };
