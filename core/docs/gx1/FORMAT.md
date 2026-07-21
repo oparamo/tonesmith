@@ -404,6 +404,15 @@ The effect assigned to the expression pedal input: WAH or PEDAL BEND. Both effec
 fields always occupy their fixed byte ranges regardless of which is selected (the
 same "shadow bytes" union layout as MEMORY%DLY/MEMORY%REV).
 
+> **Shadow bytes = factory defaults.** Because every type's fields have a permanent home in the
+> union layout (this holds for FX1/2/3, DLY, REV, and PFX), a factory-default patch export carries
+> the device's real factory default for *every* type at once, not just the selected one — decode a
+> non-active type's window and you get genuine device data. `core/src/devices/gx1/defaults.ts`
+> (`DEFAULTS_BY_TYPE`) is harvested exactly this way from `tests/fixtures/gx1/default-init.tsl`, so
+> the builder fills unset params with real per-type defaults instead of guesses. (fx windows don't
+> overlap → always correct; DLY/REV share some offsets, but those are the builder's positional
+> "covered" fields, so only each type's own unshared fields are read from the harvest.)
+
 | Byte | Field        | Notes                                                                            |
 |------|--------------|----------------------------------------------------------------------------------|
 | 0    | on           | 0=OFF, 1=ON                                                                      |

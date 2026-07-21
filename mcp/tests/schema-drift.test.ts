@@ -21,11 +21,6 @@ import { connectClient } from "./helpers";
  *    added to constants.ts/capabilities.ts.
  */
 
-const parseRange = (range: string): { min: number; max: number } => {
-  const match = /(-?\d+(?:\.\d+)?)-\+?(-?\d+(?:\.\d+)?)/.exec(range);
-  if (!match) throw new Error(`Could not parse range: "${range}"`);
-  return { min: Number(match[1]), max: Number(match[2]) };
-};
 
 interface BoundedField {
   /** Dot path within the generate_gx1_patch inputSchema. */
@@ -76,7 +71,10 @@ const rangeFor = ({ groupId, paramName, typeId }: BoundedField): { min: number; 
   const param = params?.find(p => p.name === paramName);
   const where = typeId === undefined ? `group "${groupId}"` : `${groupId} type "${typeId}"`;
   if (!param) throw new Error(`No ParamSpec "${paramName}" in capabilities ${where}`);
-  return parseRange(param.range);
+  if (param.min === undefined || param.max === undefined) {
+    throw new Error(`ParamSpec "${paramName}" in ${where} has no numeric bounds`);
+  }
+  return { min: param.min, max: param.max };
 };
 
 interface JsonSchemaNode {

@@ -9,8 +9,14 @@ interface ParamSpec {
    * no backing codec field (e.g. HARMONIST's KEY, which is the patch-level key).
    */
   key?: string;
-  /** Free text: "0–100", "–12–+12 semitones", enum list, etc. */
+  /** Free text: "0–100", "–12–+12 semitones", enum list, etc. Derived from the param's domain. */
   range: string;
+  /**
+   * Machine-readable numeric bounds, present only for numeric params (derived from a `range`-kind
+   * domain). Lets a consumer (e.g. the MCP generate schema) apply min/max without parsing `range`.
+   */
+  min?: number;
+  max?: number;
   description: string;
   /**
    * For discrete lookup-valued params whose `range` is only a compact summary (e.g. the

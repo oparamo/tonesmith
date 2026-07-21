@@ -1,42 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { parseNumericRange, rangeFor, boundedNumber, boundedInt } from "../src/devices/gx1/bounds";
+import { boundsFor, boundedNumber, boundedInt } from "../src/devices/gx1/bounds";
 
-describe("parseNumericRange", () => {
-  it.each([
-    { range: "0-100", min: 0, max: 100 },
-    { range: "1-120", min: 1, max: 120 },
-    { range: "-50-+50", min: -50, max: 50 },
-    { range: "1-2000 ms, BPM", min: 1, max: 2000 },
-    { range: "0.1-10.0 s", min: 0.1, max: 10 },
-    { range: "0-200 ms", min: 0, max: 200 },
-  ])("reads the numeric endpoints out of \"$range\"", ({ range, min, max }) => {
-    const parsed = parseNumericRange(range);
-
-    expect(parsed).toEqual({ min, max });
+describe("boundsFor", () => {
+  it("reads a group-level param's numeric bounds off its ParamSpec", () => {
+    expect(boundsFor("amp", "GAIN")).toEqual({ min: 0, max: 120 });
   });
 
-  it("throws on a non-numeric (enum) range rather than yielding a silent unbounded number", () => {
-    const parse = (): { min: number; max: number } => parseNumericRange("LPF, BPF, HPF");
-
-    expect(parse).toThrow(/not a numeric min-max range/);
-  });
-});
-
-describe("rangeFor", () => {
-  it("resolves a group-level param's range", () => {
-    const range = rangeFor("amp", "GAIN");
-
-    expect(range).toBe("0-120");
+  it("reads a per-type param's bounds via the representative type", () => {
+    expect(boundsFor("reverb", "LEVEL", "HALL S")).toEqual({ min: 1, max: 100 });
+    expect(boundsFor("delay", "TIME", "STANDARD")).toEqual({ min: 1, max: 2000 });
   });
 
-  it("resolves a per-type param's range via the representative type", () => {
-    const range = rangeFor("reverb", "LEVEL", "HALL S");
+  it("throws for a non-numeric (enum) group param rather than yielding a silent unbounded number", () => {
+    const lookup = (): { min: number; max: number } => boundsFor("fv", "CURVE");
 
-    expect(range).toBe("1-100");
+    expect(lookup).toThrow(/group "fv" has no numeric bounds/);
+  });
+
+  it("throws for a non-numeric per-type param, naming the type", () => {
+    const lookup = (): { min: number; max: number } => boundsFor("delay", "TRIGGER", "REVERSE");
+
+    expect(lookup).toThrow(/delay type "REVERSE" has no numeric bounds/);
   });
 
   it("throws when the param name doesn't exist on the group", () => {
-    const lookup = (): string => rangeFor("amp", "NOPE");
+    const lookup = (): { min: number; max: number } => boundsFor("amp", "NOPE");
 
     expect(lookup).toThrow(/No ParamSpec "NOPE"/);
   });
