@@ -268,7 +268,7 @@ describe("generate_gx1_patch", () => {
       name: "Slicer",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
-      fx1: { type: "SLICER", params: { pattern: "PATTERN 3", rate: 50, level: 70, attack: 30, duty: 0, direct: 0 } },
+      fx1: { type: "SLICER", params: { pattern: "PATTERN 3", rate: 50, level: 70, attack: 30, duty: 50, direct: 0 } },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -460,7 +460,7 @@ describe("generate_gx1_patch", () => {
       name: "GEQ",
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
-      fx1: { type: "HIGH GEQ", params: { level: 80, "4kHz": 5 } },
+      fx1: { type: "HIGH GEQ", params: { level: 15, "4kHz": 5 } },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -468,7 +468,137 @@ describe("generate_gx1_patch", () => {
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.fx1.params).toEqual({
-      "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 5, "8kHz": 0, level: 80,
+      "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 5, "8kHz": 0, level: 15,
     });
+  });
+
+  it("names the patch set via setName (and defaults to the first patch name without it)", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const ampSpec = { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 };
+
+    const named = join(temp.dir, "named.tsl");
+    const withName = await client.callTool("generate_gx1_patch", { name: "First", outPath: named, setName: "My Library", amp: ampSpec });
+    expect(withName.isError, withName.text).toBe(false);
+    expect(gx1.driver.readFile(named).name).toBe("My Library");
+
+    const unnamed = join(temp.dir, "unnamed.tsl");
+    const noName = await client.callTool("generate_gx1_patch", { name: "First", outPath: unnamed, amp: ampSpec });
+    expect(noName.isError, noName.text).toBe(false);
+    expect(gx1.driver.readFile(unnamed).name).toBe("First");
+  });
+
+  it("hides the redundant params.type mirror from the echo and read_patch, keeping subType canonical", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "comp.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Comp",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
+      fx1: { type: "COMPRESSOR", subType: "ORANGE", params: { sustain: 35, attack: 65, level: 55 } },
+    };
+
+    const gen = await client.callTool("generate_gx1_patch", patchSpec);
+    expect(gen.isError, gen.text).toBe(false);
+    const echoed = JSON.parse(gen.text.slice(gen.text.indexOf("{"))) as { fx1: { subType: string; params: Record<string, unknown> } };
+    expect(echoed.fx1.subType).toBe("ORANGE");
+    expect(echoed.fx1.params).not.toHaveProperty("type");
+    expect(echoed.fx1.params).toMatchObject({ sustain: 35, attack: 65, level: 55 });
+
+    const read = await client.callTool("read_patch", { device: "gx1", file: outPath, ref: "0" });
+    expect(read.isError, read.text).toBe(false);
+    const body = JSON.parse(read.text) as { fx1: { subType: string; params: Record<string, unknown> } };
+    expect(body.fx1.subType).toBe("ORANGE");
+    expect(body.fx1.params).not.toHaveProperty("type");
+
+    // The internal byte storage still carries params.type (driver read bypasses presentPatch).
+    expect(gx1.driver.readFile(outPath).patches[0].fx1.params.type).toBe("ORANGE");
+  });
+
+  it("rejects a named delay control outside the chosen type's per-type range", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const ampSpec = { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 };
+    const base = { name: "Dly", outPath: join(temp.dir, "dly.tsl"), amp: ampSpec };
+
+    // ANALOG's TIME max is 1200ms (narrower than the flat 2000 schema bound).
+    const overMax = await client.callTool("generate_gx1_patch", { ...base, delay: { type: "ANALOG", timeMs: 1201, feedback: 20, level: 40 } });
+    expect(overMax.isError).toBe(true);
+    expect(overMax.text).toContain("delay TIME for ANALOG");
+
+    const atMax = await client.callTool("generate_gx1_patch", { ...base, delay: { type: "ANALOG", timeMs: 1200, feedback: 20, level: 40 } });
+    expect(atMax.isError, atMax.text).toBe(false);
+  });
+
+  it("rejects an out-of-range params-bag numeric against the effect type's catalog range", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Comp",
+      outPath: join(temp.dir, "comp-bad.tsl"),
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
+      fx1: { type: "COMPRESSOR", subType: "ORANGE", params: { sustain: 200, attack: 65, level: 55 } },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError).toBe(true);
+    expect(text).toContain("fx SUSTAIN for COMPRESSOR");
+  });
+
+  it("rejects a discrete param value that isn't in the type's value list", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Dly",
+      outPath: join(temp.dir, "dly-enum.tsl"),
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
+      delay: { type: "ANALOG", timeMs: 360, feedback: 20, level: 40, highCut: "9kHz" },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError).toBe(true);
+    expect(text).toContain("delay HIGH CUT for ANALOG");
+  });
+
+  it("rejects a reverb control outside the chosen type's range", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Rev",
+      outPath: join(temp.dir, "rev-bad.tsl"),
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
+      reverb: { type: "HALL M", timeS: 2.0, level: 40, density: 20 },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError).toBe(true);
+    expect(text).toContain("reverb DENSITY for HALL M");
+  });
+
+  it("rejects a pfx param outside the chosen type's range", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Wah",
+      outPath: join(temp.dir, "wah-bad.tsl"),
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
+      pfx: { type: "WAH", params: { wahType: "CRY WAH", level: 200, direct: 0, position: 100, min: 0, max: 100 } },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError).toBe(true);
+    expect(text).toContain("pfx LEVEL for WAH");
   });
 });

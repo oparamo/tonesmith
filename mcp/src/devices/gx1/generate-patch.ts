@@ -2,9 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { gx1, capabilityUtils, patchUtils } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, normalizeChain } = gx1;
-import { ok, err } from "../../common";
+import { ok, err, presentPatch } from "../../common";
 import { FxBlockSchema } from "./schemas";
 import { boundedNumber, boundedInt } from "./bounds";
+import { validateTypeParams } from "./validate-params";
 
 const capabilities = gx1.driver.capabilities;
 
@@ -34,6 +35,11 @@ FV curves: ${capabilityParamRange("fv", "CURVE")}`;
 
 const inputSchema = z.object({
   name: z.string().max(13).describe("Patch name (max 13 characters)"),
+  setName: z.string().optional().describe(
+    "Name for the patch set/library stored in the file. Defaults to the first patch's name — " +
+    "provide it to name the set yourself. `outPath` still controls the filename on disk; this is " +
+    "the internal set label."
+  ),
   outPath: z.string().describe(
     "Output file path (e.g. my-tone.tsl). Parent directories are created if missing. " +
     "Generation upserts by patch name: an existing file with a patch of this name has it replaced; " +
@@ -78,6 +84,8 @@ const inputSchema = z.object({
       "{ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 } for PEDAL BEND)"
     ),
     on: z.boolean().optional().describe("Enable the pedal effect (default true)"),
+  }).superRefine((pfx, ctx) => {
+    validateTypeParams(msg => { ctx.addIssue(msg); }, "pfx", pfx.type, undefined, pfx.params ?? {});
   }).optional().describe("Expression pedal effect block. Omit to disable."),
 
   fx1: FxBlockSchema.describe("FX1 slot (pre-amp or first in chain). Omit to leave empty."),
@@ -112,6 +120,12 @@ const inputSchema = z.object({
       "values. The common controls (timeMs/feedback/level/highCut) are the named fields above — set " +
       "them there, not here."
     ),
+  }).superRefine((delayBlock, ctx) => {
+    const values = {
+      time: delayBlock.timeMs, feedback: delayBlock.feedback, level: delayBlock.level,
+      highCut: delayBlock.highCut, ...(delayBlock.params ?? {}),
+    };
+    validateTypeParams(msg => { ctx.addIssue(msg); }, "delay", delayBlock.type, undefined, values);
   }).optional().describe("Delay block. Omit to disable."),
 
   reverb: z.object({
@@ -130,6 +144,13 @@ const inputSchema = z.object({
       "common controls (timeS/level/preDelay/tone/density/direct) are the named fields above — set " +
       "them there, not here."
     ),
+  }).superRefine((reverbBlock, ctx) => {
+    const values = {
+      time: reverbBlock.timeS, level: reverbBlock.level, preDelay: reverbBlock.preDelay,
+      tone: reverbBlock.tone, density: reverbBlock.density, direct: reverbBlock.direct,
+      ...(reverbBlock.params ?? {}),
+    };
+    validateTypeParams(msg => { ctx.addIssue(msg); }, "reverb", reverbBlock.type, undefined, values);
   }).optional().describe("Reverb block. Omit to disable."),
 });
 
@@ -231,12 +252,12 @@ ${buildCatalog()}`,
         applyReverb(patch, params.reverb);
 
         const patchCountBefore = countExistingPatches(params.outPath);
-        const file = patchUtils.upsertPatch(gx1.driver, params.outPath, patch);
+        const file = patchUtils.upsertPatch(gx1.driver, params.outPath, patch, params.setName);
         const verb = describeUpsertAction(patchCountBefore, file.patches.length);
         const summary = `${verb} patch "${params.name}" → ${params.outPath} (${file.patches.length} patch(es) total)`;
         // Echo back the built patch so the caller can confirm the resolved chain and every field
         // the builder defaulted, without a follow-up read_patch.
-        return ok(`${summary}\n\n${JSON.stringify(patch, null, 2)}`);
+        return ok(`${summary}\n\n${JSON.stringify(presentPatch(patch), null, 2)}`);
       } catch (error) {
         return err(error);
       }

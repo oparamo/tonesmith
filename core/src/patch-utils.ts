@@ -93,9 +93,14 @@ const readExistingOrNew = <T extends Patch>(
  * patch of the same name if one is found, otherwise appends. Creates the file (and,
  * via the driver's writeFile, any missing parent directories) if `path` doesn't exist
  * yet. Device-agnostic — works for any PatchDriver, not just gx1.
+ *
+ * `setName` names the patch set/library itself: when provided it names a freshly created
+ * file and renames an existing one; when omitted a new file is named after `patch`, and an
+ * existing file keeps its current name.
  */
-const upsertPatch = <T extends Patch>(driver: PatchDriver<T>, path: string, patch: T): PatchFile<T> => {
-  const file = readExistingOrNew(driver, path, patch.name);
+const upsertPatch = <T extends Patch>(driver: PatchDriver<T>, path: string, patch: T, setName?: string): PatchFile<T> => {
+  const file = readExistingOrNew(driver, path, setName ?? patch.name);
+  if (setName !== undefined) file.name = setName;
   const index = file.patches.findIndex(existing => existing.name === patch.name);
   if (index >= 0) file.patches[index] = patch;
   else file.patches.push(patch);

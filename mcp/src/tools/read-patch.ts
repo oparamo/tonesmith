@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
-import { ok, err } from "../common";
+import { ok, err, presentPatch } from "../common";
 
 const registerReadPatch = (server: McpServer): void => {
   server.registerTool(
@@ -23,12 +23,12 @@ const registerReadPatch = (server: McpServer): void => {
         const indices = patchUtils.resolvePatchIndices(patchFile.patches, ref);
         if (ref !== undefined) {
           const idx = indices[0];
-          const patchWithIndex = { index: idx, ...patchFile.patches[idx] };
+          const patchWithIndex = { index: idx, ...presentPatch(patchFile.patches[idx]) };
           return ok(JSON.stringify(patchWithIndex, null, 2));
         }
         const result = {
           setName: patchFile.name,
-          patches: indices.map(index => ({ index, ...patchFile.patches[index] })),
+          patches: indices.map(index => ({ index, ...presentPatch(patchFile.patches[index]) })),
         };
         return ok(JSON.stringify(result, null, 2));
       } catch (error) {

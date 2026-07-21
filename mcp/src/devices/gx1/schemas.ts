@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { gx1, capabilityUtils } from "@tonesmith/core";
+import { validateTypeParams } from "./validate-params";
 
 /** Every selectable FX1/FX2/FX3 effect type, sourced from gx1 capabilities so this can't drift from constants.ts. */
 const fxTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "fx").items.map(item => item.id).join(", ");
@@ -7,11 +8,12 @@ const fxTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "fx").items
 const FxBlockSchema = z.object({
   type: z.string().describe(`Effect type. One of: ${fxTypeIds}. (OVERTONE is FX3-only.)`),
   subType: z.string().optional().describe(
-    "Model variant, only for effects that actually have one — not every effect does. DELAY uses it to " +
-    "pick its sub-algorithm (STANDARD, MODULATE, WARP, TWIST, GLITCH), each with its own param set; " +
-    "some other effects instead select their model via a params entry (e.g. PHASER's TYPE, REVERB's " +
-    "TYPE). Use describe_device with group=fx and the item's id to see whether it has a subType and, " +
-    "if not, which params field selects its model."
+    "Model variant, only for effects that actually have one — not every effect does. Any effect that " +
+    "lists `subTypes` in describe_device selects its model here (e.g. COMPRESSOR's ORANGE, DELAY's " +
+    "STANDARD/MODULATE/WARP/TWIST/GLITCH — each delay sub-algorithm has its own param set). Some other " +
+    "effects instead select their model via a params entry (e.g. PHASER's TYPE, REVERB's TYPE). Use " +
+    "describe_device with group=fx and the item's id to see whether it has a subType and, if not, which " +
+    "params field selects its model."
   ),
   on: z.boolean().optional().describe("Whether the slot is active (default true)"),
   params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
@@ -21,6 +23,8 @@ const FxBlockSchema = z.object({
     "model or mode by name (e.g. SLICER's pattern, HARMONIST's harmony); describe_device lists each " +
     "param's key, range, and (for lookups) its exact string values."
   ),
+}).superRefine((fx, ctx) => {
+  validateTypeParams(msg => { ctx.addIssue(msg); }, "fx", fx.type, fx.subType, fx.params ?? {});
 }).optional();
 
 export { FxBlockSchema };

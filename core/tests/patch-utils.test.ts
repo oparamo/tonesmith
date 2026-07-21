@@ -78,6 +78,30 @@ describe("upsertPatch", () => {
 
     expect(upsertWithBrokenReadFile).toThrow("disk on fire");
   });
+
+  it("names a freshly created file after setName when provided, else after the patch", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+
+    const named = upsertPatch(driver, "named.tsl", makePatch("Lead"), "My Library");
+    expect(named.name).toBe("My Library");
+
+    const unnamed = upsertPatch(driver, "unnamed.tsl", makePatch("Lead"));
+    expect(unnamed.name).toBe("Lead");
+  });
+
+  it("renames an existing set when setName is given, and preserves it when omitted", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Old Name", device: "FAKE", patches: [makePatch("Lead")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+
+    const kept = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+    expect(kept.name).toBe("Old Name");
+
+    const renamed = upsertPatch(driver, "set.tsl", makePatch("Solo"), "New Name");
+    expect(renamed.name).toBe("New Name");
+  });
 });
 
 describe("resolvePatchIndex", () => {
