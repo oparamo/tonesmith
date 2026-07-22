@@ -9,7 +9,7 @@ const registerWriteField = (server: McpServer): void => {
     {
       description:
         "Edit a specific field in a patch within a patch file using dot-notation. " +
-        "Examples: 'amp.gain', 'fx1.params.rate', 'ns.threshold', 'delay.timeMs'.",
+        "Examples: 'amp.gain', 'fx1.params.rate', 'ns.threshold', 'delay.time'.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
         device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),

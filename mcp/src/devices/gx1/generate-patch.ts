@@ -1,8 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { gx1, capabilityUtils, patchUtils } from "@tonesmith/core";
+import { gx1, capabilityUtils, patchUtils, patchView } from "@tonesmith/core";
 const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, normalizeChain } = gx1;
-import { ok, err, presentPatch } from "../../common";
+import { ok, err } from "../../common";
 import { FxBlockSchema } from "./schemas";
 import { boundedNumber, boundedInt } from "./bounds";
 import { validateTypeParams } from "./validate-params";
@@ -48,7 +48,9 @@ const inputSchema = z.object({
   chain: z.array(z.string()).optional().describe(
     'Signal chain as an ordered array of block names, first element = first in the chain ' +
     '(e.g. ["FX1","OD","AMP","NS","DLY","REV"]). Omitted blocks are inserted at their default relative ' +
-    'position (default full chain: PFX, FX1, OD/DS, AMP, NS, FV, FX2, FX3, DLY, REV). "OD" is an alias for "OD/DS".'
+    'position (default full chain: PFX, FX1, OD/DS, AMP, NS, FV, FX2, FX3, DLY, REV). "OD" is an alias for "OD/DS". ' +
+    "The response states the resolved full chain — omitted blocks appear at their default positions, and " +
+    "disabled blocks still appear (turn a block off via its `on` field, not by leaving it out of `chain`)."
   ),
   key: z.string().optional().describe(
     "Song key for HARMONIST's diatonic intervals: C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B (default C)"
@@ -108,7 +110,7 @@ const inputSchema = z.object({
 
   delay: z.object({
     type: z.string().describe(`Delay type (${capabilityItemIds("delay")})`),
-    timeMs: boundedNumber("delay", "TIME", "STANDARD").describe("Delay time in milliseconds, 1–2000. Unit-bearing alias for the decoded `time` field (read_patch shows it as `time`)."),
+    time: boundedNumber("delay", "TIME", "STANDARD").describe("Delay time in milliseconds, 1–2000."),
     feedback: boundedInt("delay", "FEEDBACK", "STANDARD").describe("Feedback 0–100"),
     level: boundedInt("delay", "LEVEL", "STANDARD").describe("Effect level 1–120"),
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
@@ -117,12 +119,12 @@ const inputSchema = z.object({
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. modRate/modDepth for MODULATE, mode/riseTime for TWIST, head for SPACE " +
       "ECHO). Call describe_device with group=delay and the chosen type for the keys, ranges, and " +
-      "values. The common controls (timeMs/feedback/level/highCut) are the named fields above — set " +
+      "values. The common controls (time/feedback/level/highCut) are the named fields above — set " +
       "them there, not here."
     ),
   }).superRefine((delayBlock, ctx) => {
     const values = {
-      time: delayBlock.timeMs, feedback: delayBlock.feedback, level: delayBlock.level,
+      time: delayBlock.time, feedback: delayBlock.feedback, level: delayBlock.level,
       highCut: delayBlock.highCut, ...(delayBlock.params ?? {}),
     };
     validateTypeParams(msg => { ctx.addIssue(msg); }, "delay", delayBlock.type, undefined, values);
@@ -130,7 +132,7 @@ const inputSchema = z.object({
 
   reverb: z.object({
     type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
-    timeS: boundedNumber("reverb", "TIME", "HALL S").describe("Reverb time in seconds, 0.1–10.0. Unit-bearing alias for the decoded `time` field (read_patch shows it as `time`)."),
+    time: boundedNumber("reverb", "TIME", "HALL S").describe("Reverb time in seconds, 0.1–10.0."),
     level: boundedInt("reverb", "LEVEL", "HALL S").describe("Effect level 1–100"),
     preDelay: boundedNumber("reverb", "PRE-DELAY", "HALL S").optional().describe("Pre-delay in ms 0–200 (default 0)"),
     tone: boundedInt("reverb", "TONE", "HALL S").optional().describe("Tone EQ −50–+50 (default 0)"),
@@ -141,12 +143,12 @@ const inputSchema = z.object({
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY). Call " +
       "describe_device with group=reverb and the chosen type for the keys, ranges, and values. The " +
-      "common controls (timeS/level/preDelay/tone/density/direct) are the named fields above — set " +
+      "common controls (time/level/preDelay/tone/density/direct) are the named fields above — set " +
       "them there, not here."
     ),
   }).superRefine((reverbBlock, ctx) => {
     const values = {
-      time: reverbBlock.timeS, level: reverbBlock.level, preDelay: reverbBlock.preDelay,
+      time: reverbBlock.time, level: reverbBlock.level, preDelay: reverbBlock.preDelay,
       tone: reverbBlock.tone, density: reverbBlock.density, direct: reverbBlock.direct,
       ...(reverbBlock.params ?? {}),
     };
@@ -183,12 +185,12 @@ const applyFv = (patch: Patch, fvParams: GeneratePatchInput["fv"]): void => {
 
 const applyDelay = (patch: Patch, delayParams: GeneratePatchInput["delay"]): void => {
   if (!delayParams) { patch.delay.on = false; return; }
-  delay(patch, delayParams.type, delayParams.timeMs, delayParams.feedback, delayParams.level, delayParams.highCut, delayParams.on ?? true, delayParams.params ?? {});
+  delay(patch, delayParams.type, delayParams.time, delayParams.feedback, delayParams.level, delayParams.highCut, delayParams.on ?? true, delayParams.params ?? {});
 };
 
 const applyReverb = (patch: Patch, reverbParams: GeneratePatchInput["reverb"]): void => {
   if (!reverbParams) return;
-  reverb(patch, reverbParams.type, reverbParams.timeS, reverbParams.level, reverbParams.preDelay, reverbParams.tone, reverbParams.density, reverbParams.direct, reverbParams.on ?? true, reverbParams.params ?? {});
+  reverb(patch, reverbParams.type, reverbParams.time, reverbParams.level, reverbParams.preDelay, reverbParams.tone, reverbParams.density, reverbParams.direct, reverbParams.on ?? true, reverbParams.params ?? {});
 };
 
 /** Counts patches already saved at `path`, or 0 if the file doesn't exist yet. */
@@ -223,7 +225,7 @@ change one part of it. "OD" is accepted as shorthand for "OD/DS".
 Setting parameters: every block's type-specific params go in its \`params\` record, keyed by
 the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fields, so their
 \`params\` record holds every effect param. delay and reverb additionally expose their common
-controls as named fields (timeMs/feedback/level/…) — set those directly and put only the
+controls as named fields (time/feedback/level/…) — set those directly and put only the
 remaining params in \`params\`. amp/odds/ns/fv are single-shape blocks whose params are named
 fields. Rule of thumb: if a describe_device param's \`key\` matches a named field on the block,
 set that field; otherwise put it in \`params[key]\`.
@@ -255,9 +257,12 @@ ${buildCatalog()}`,
         const file = patchUtils.upsertPatch(gx1.driver, params.outPath, patch, params.setName);
         const verb = describeUpsertAction(patchCountBefore, file.patches.length);
         const summary = `${verb} patch "${params.name}" → ${params.outPath} (${file.patches.length} patch(es) total)`;
-        // Echo back the built patch so the caller can confirm the resolved chain and every field
-        // the builder defaulted, without a follow-up read_patch.
-        return ok(`${summary}\n\n${JSON.stringify(presentPatch(patch), null, 2)}`);
+        // Confirm the resolved chain explicitly — a partial `chain` input expands to the full
+        // block order, and without this line a caller can't tell its reorder was honored.
+        const chainLine = `chain resolved as: ${patch.chain.join(" → ")}`;
+        // Echo back the built patch so the caller can confirm every field the builder defaulted,
+        // without a follow-up read_patch.
+        return ok(`${summary}\n${chainLine}\n\n${JSON.stringify(patchView.presentPatch(patch), null, 2)}`);
       } catch (error) {
         return err(error);
       }

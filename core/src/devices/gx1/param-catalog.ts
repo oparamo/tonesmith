@@ -296,7 +296,6 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   // This empty entry keeps DELAY present as an fx type for id-coverage, with no flat params.
   "DELAY": [],
   "REVERB": [
-    def("TYPE", oneOf("HALL S", "HALL M", "PLATE", "ROOM", "STUDIO"), "Reverb algorithm type."),
     def("TIME", num(0.1, 10, { unit: "s", decimals: 1 }), "Reverb decay time."),
     def("PRE-DELAY", num(0, 200, { unit: "ms" }), "Time until reverb starts."),
     def("LEVEL", num(0, 100), "Volume of the reverb sound."),

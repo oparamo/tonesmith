@@ -15,14 +15,14 @@ const isMirrorBlock = (value: unknown): value is MirrorBlock => {
 };
 
 /**
- * Produces an agent-facing view of a decoded patch for serialization: drops the redundant
- * `params.type` from every block that mirrors it onto `subType`. The model selector lives in
- * `params.type` internally (canonical storage) and is surfaced as `subType` for display, so
- * emitting both just confuses a consumer about which to set. Device-agnostic — it keys on the
+ * Produces a consumer-facing view of a decoded patch for display or serialization: drops the
+ * redundant `params.type` from every block that mirrors it onto `subType`. The model selector
+ * lives in `params.type` internally (canonical storage) and is surfaced as `subType` for display,
+ * so emitting both just confuses a consumer about which to set. Device-agnostic — it keys on the
  * mirror relationship itself, never on any device's block names. Returns a shallow copy; the
  * input patch is left untouched.
  */
-const presentPatch = (patch: object): Record<string, unknown> => {
+const presentPatch = <T extends object>(patch: T): T => {
   const view: Record<string, unknown> = { ...(patch as Record<string, unknown>) };
   for (const [key, block] of Object.entries(view)) {
     if (!isMirrorBlock(block)) continue;
@@ -30,7 +30,7 @@ const presentPatch = (patch: object): Record<string, unknown> => {
     delete params.type;
     view[key] = { ...block, params };
   }
-  return view;
+  return view as T;
 };
 
 export { presentPatch };

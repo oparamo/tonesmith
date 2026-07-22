@@ -17,8 +17,7 @@ Make patches easier to build and describe from the MCP surface alone (no source-
   `params[key]`.* Passing a common control inside `params` now errors instead of silently
   overriding the named field.
 - **Consistent input names** — `amp.mid` is renamed to `amp.middle` to match its decoded field
-  name; `delay.timeMs`/`reverb.timeS` stay as deliberate unit-bearing aliases for the decoded
-  `time` field (units differ: ms vs seconds), now documented as such.
+  name.
 - **`generate_gx1_patch` echoes the saved patch** — the response now includes the decoded patch
   JSON (resolved chain + every defaulted field), so a caller can confirm the result without a
   follow-up `read_patch`.

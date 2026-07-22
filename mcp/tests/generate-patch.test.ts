@@ -47,6 +47,9 @@ describe("generate_gx1_patch", () => {
     expect(echoed.amp.type).toBe("JC-120");
     // resolved chain echoed back: OD/DS was moved ahead of FX1.
     expect(echoed.chain.indexOf("OD/DS")).toBeLessThan(echoed.chain.indexOf("FX1"));
+    // ...and confirmed explicitly in the summary, so a caller never has to infer whether
+    // its partial-chain reorder was honored from the expanded chain array.
+    expect(text).toContain("chain resolved as: PFX → OD/DS → FX1 → AMP → NS → FV → FX2 → FX3 → DLY → REV");
   });
 
   it("round-trips a full patch with every optional block", async () => {
@@ -64,8 +67,8 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "COMPRESSOR", subType: "D-COMP", params: { sustain: 30, attack: 30, level: 70 } },
       ns: { threshold: 45, release: 30 },
       fv: { position: 100, min: 0, max: 100 },
-      delay: { type: "STANDARD", timeMs: 500, feedback: 20, level: 25 },
-      reverb: { type: "HALL S", timeS: 2.4, level: 20 },
+      delay: { type: "STANDARD", time: 500, feedback: 20, level: 25 },
+      reverb: { type: "HALL S", time: 2.4, level: 20 },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -259,6 +262,27 @@ describe("generate_gx1_patch", () => {
     expect(patch.fx1.params).toMatchObject({ type: "MODULATE", modRate: 12, modDepth: 18 });
   });
 
+  it("builds an fx-slot REVERB whose algorithm is selected by subType", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "fx-reverb.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Fx Reverb",
+      outPath,
+      amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
+      fx1: { type: "REVERB", subType: "HALL M", params: { time: 2.5, level: 40 } },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError, text).toBe(false);
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.fx1.type).toBe("REVERB");
+    expect(patch.fx1.subType).toBe("HALL M");
+    expect(patch.fx1.params).toMatchObject({ time: 2.5, level: 40 });
+  });
+
   it("builds an fx-slot SLICER whose pattern is selected by a string params.pattern", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "slicer.tsl");
@@ -309,7 +333,7 @@ describe("generate_gx1_patch", () => {
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       delay: {
-        type: "TWIST", timeMs: 500, feedback: 20, level: 25,
+        type: "TWIST", time: 500, feedback: 20, level: 25,
         params: { mode: "RISE-FADE", riseTime: 10, fallTime: 10, fadeTime: 10 },
       },
     };
@@ -332,7 +356,7 @@ describe("generate_gx1_patch", () => {
       outPath,
       amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
       delay: {
-        type: "SPACE ECHO", timeMs: 500, feedback: 20, level: 25,
+        type: "SPACE ECHO", time: 500, feedback: 20, level: 25,
         params: { head: "1+2" },
       },
     };
@@ -526,11 +550,11 @@ describe("generate_gx1_patch", () => {
     const base = { name: "Dly", outPath: join(temp.dir, "dly.tsl"), amp: ampSpec };
 
     // ANALOG's TIME max is 1200ms (narrower than the flat 2000 schema bound).
-    const overMax = await client.callTool("generate_gx1_patch", { ...base, delay: { type: "ANALOG", timeMs: 1201, feedback: 20, level: 40 } });
+    const overMax = await client.callTool("generate_gx1_patch", { ...base, delay: { type: "ANALOG", time: 1201, feedback: 20, level: 40 } });
     expect(overMax.isError).toBe(true);
     expect(overMax.text).toContain("delay TIME for ANALOG");
 
-    const atMax = await client.callTool("generate_gx1_patch", { ...base, delay: { type: "ANALOG", timeMs: 1200, feedback: 20, level: 40 } });
+    const atMax = await client.callTool("generate_gx1_patch", { ...base, delay: { type: "ANALOG", time: 1200, feedback: 20, level: 40 } });
     expect(atMax.isError, atMax.text).toBe(false);
   });
 
@@ -559,7 +583,7 @@ describe("generate_gx1_patch", () => {
       name: "Dly",
       outPath: join(temp.dir, "dly-enum.tsl"),
       amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
-      delay: { type: "ANALOG", timeMs: 360, feedback: 20, level: 40, highCut: "9kHz" },
+      delay: { type: "ANALOG", time: 360, feedback: 20, level: 40, highCut: "9kHz" },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
@@ -576,7 +600,7 @@ describe("generate_gx1_patch", () => {
       name: "Rev",
       outPath: join(temp.dir, "rev-bad.tsl"),
       amp: { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 },
-      reverb: { type: "HALL M", timeS: 2.0, level: 40, density: 20 },
+      reverb: { type: "HALL M", time: 2.0, level: 40, density: 20 },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);

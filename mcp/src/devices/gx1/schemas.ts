@@ -9,11 +9,12 @@ const FxBlockSchema = z.object({
   type: z.string().describe(`Effect type. One of: ${fxTypeIds}. (OVERTONE is FX3-only.)`),
   subType: z.string().optional().describe(
     "Model variant, only for effects that actually have one — not every effect does. Any effect that " +
-    "lists `subTypes` in describe_device selects its model here (e.g. COMPRESSOR's ORANGE, DELAY's " +
-    "STANDARD/MODULATE/WARP/TWIST/GLITCH — each delay sub-algorithm has its own param set). Some other " +
-    "effects instead select their model via a params entry (e.g. PHASER's TYPE, REVERB's TYPE). Use " +
-    "describe_device with group=fx and the item's id to see whether it has a subType and, if not, which " +
-    "params field selects its model."
+    "lists `subTypes` in describe_device selects its model here (e.g. COMPRESSOR's ORANGE, REVERB's " +
+    "HALL M, DELAY's STANDARD/MODULATE/WARP/TWIST/GLITCH — each delay sub-algorithm has its own param " +
+    "set); this is the only model-selection mechanism. An effect without `subTypes` has no model " +
+    "variant — everything else that shapes its sound (e.g. PHASER's stage, SLICER's pattern) is an " +
+    "ordinary entry in `params`. Use describe_device with group=fx and the item's id to see an " +
+    "effect's subTypes, params, and values."
   ),
   on: z.boolean().optional().describe("Whether the slot is active (default true)"),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(

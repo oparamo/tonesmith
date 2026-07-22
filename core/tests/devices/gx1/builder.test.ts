@@ -300,6 +300,19 @@ describe("fx", () => {
     expect(decoded.fx1.params).toMatchObject({ level: 80, direct: 20, manual: 60 });
   });
 
+  // The FX-slot REVERB's algorithm selector also lives in param-block byte p[0]
+  // (PARAM_SUBTYPE_EFFECTS) — the shared-param-set case, like CHORUS.
+  it("round-trips the FX-slot REVERB's subType through encode/decode", () => {
+    const patch = basePatch("Test");
+    fx(patch, "fx1", "REVERB", "HALL M", { time: 2.5, level: 40 });
+
+    const encoded = encodePatch(patch);
+    const decoded = decodePatch(encoded);
+
+    expect(decoded.fx1.subType).toBe("HALL M");
+    expect(decoded.fx1.params).toMatchObject({ time: 2.5, level: 40 });
+  });
+
   // OVERTONE (FX3-only) stores its params in the separate MEMORY%FX3A block instead
   // of the shared 251-byte FX param block — proves both halves of that special-casing
   // in codec/patch.ts round-trip correctly.

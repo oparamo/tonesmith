@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { presentPatch } from "../src/common/patch-view";
+import { presentPatch } from "../src/patch-view";
 
 describe("presentPatch", () => {
   it("drops params.type from a block that mirrors it onto subType", () => {

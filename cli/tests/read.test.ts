@@ -60,6 +60,21 @@ describe("gx1 read", () => {
     expect(output).not.toContain("→");
   });
 
+  it("hides the redundant params.type mirror — the model shows once, as the subType label", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, "0"]);
+
+    const errorOutput = error.join("\n");
+    expect(exitCode, errorOutput).toBeUndefined();
+    const output = info.join("\n");
+    const patch = expected.patches[0];
+    const mirror = [patch.fx1, patch.fx2, patch.fx3].find(
+      block => block.subType !== null && block.params.type === block.subType,
+    );
+    expect(mirror, "fixture patch 0 has no subtype fx block to prove the mirror is hidden").toBeDefined();
+    expect(output).toContain(`(${mirror?.subType})`);
+    expect(output).not.toContain("type=");
+  });
+
   it("prints lookup-shaped fields (delay highCut) as their label, not a raw index", async () => {
     const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, "0"]);
 

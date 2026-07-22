@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, ODDS_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
-  FX_DLY_TYPES,
+  FX_DLY_TYPES, FX_REV_TYPES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES,
   PARAM_SUBTYPE_EFFECTS,
 } from "../../../src/devices/gx1/common";
@@ -371,6 +371,7 @@ describe("GX-1 FX subtype coverage", () => {
       "HUMANIZER":    HUM_MODES,
       "OD/DS":        ODDS_TYPES,
       "DELAY":        FX_DLY_TYPES,
+      "REVERB":       FX_REV_TYPES,
     };
     const fxItems = groupItems("fx");
 

@@ -249,7 +249,18 @@ const FX_META: CapabilityItem[] = [
     description: "Delay effect in the FX slot. Adds delayed sound for echo, depth, or special effects. The sub-algorithm selects which controls are available.",
     subTypes: FX_DELAY_SUBTYPES,
   },
-  { id: "REVERB",      name: "Reverb (FX slot)", description: "Reverb effect in the FX slot. Adds reverberation — hall, plate, room, ambience, or spring types." },
+  {
+    id: "REVERB",
+    name: "Reverb (FX slot)",
+    description: "Reverb effect in the FX slot. Adds reverberation to the sound; the subtype selects the reverb algorithm.",
+    subTypes: [
+      { id: "HALL S", name: "Hall S", description: "Concert hall reverb — clear and spacious, short tail." },
+      { id: "HALL M", name: "Hall M", description: "Concert hall reverb — mild, medium tail." },
+      { id: "PLATE",  name: "Plate",  description: "Plate reverb — metallic character with a distinct upper range, dense early reflections." },
+      { id: "ROOM",   name: "Room",   description: "Room reverb — warm, intimate reflections." },
+      { id: "STUDIO", name: "Studio", description: "Studio reverb — tight ambience of a recording room." },
+    ],
+  },
   { id: "OVERTONE",    name: "Overtone",      description: "FX3 only. Uses MDP technology to add new harmonics to the sound, producing richness and resonance not present in the original — adds octave-up, octave-down, and detuned unison voices." },
 ];
 

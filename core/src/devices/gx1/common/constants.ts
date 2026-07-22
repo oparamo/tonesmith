@@ -158,6 +158,9 @@ const PARAM_SUBTYPE_EFFECTS = new Set([
   // DELAY's p[0] selector is its sub-algorithm (STANDARD/MODULATE/WARP/TWIST/GLITCH), each with
   // its own param set — modeled per-subtype in FX_DELAY_TYPE_MAPS and surfaced as subTypes.
   "DELAY",
+  // REVERB's p[0] selects its algorithm (FX_REV_TYPES) the same way — one shared param set,
+  // surfaced as subTypes like CHORUS.
+  "REVERB",
 ]);
 
 export {
