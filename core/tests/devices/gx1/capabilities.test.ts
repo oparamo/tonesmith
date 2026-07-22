@@ -241,112 +241,77 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
   });
 });
 
-// ── enum-value parity: codec lookup table values ↔ catalog range (discrete enums) ──
+// ── representation parity: codec field kind ↔ catalog param domain ─────────────
 //
-// The name-parity guards above match field/param NAMES, never enum VALUES — so a codec
-// lookup table with the wrong labels (right shape) decodes silently-wrong and no test
-// catches it (this is how FEEDBACKER's mode and HUMANIZER's vowels drifted). For the
-// discrete-enum lookup PARAMS below — whose values live only in the catalog `range` string,
-// not as capability item/subtype ids (those are already value-checked by id/subtype
-// coverage) — the codec table must equal the catalog range verbatim.
-//
-// Guarding each shared enum constant once here locks it against drift everywhere it's used.
-// Intentionally excluded: quantized-numeric lookups (frequency tables) and compact-range
-// enums (HARMONIST harmony "-2oct-+2oct", SLICER "P01-P20", PITCH SHIFT pitch "-24-+24"),
-// whose catalog range is a compact string rather than a verbatim value list.
+// The name-parity guards above match field/param NAMES only. This guard is auto-derived over
+// every per-type codec field and asserts its *representation* agrees with the catalog's authored
+// domain: a boolean toggle is a `bool` field; an enum/lookup is a `lookup`/`indexTable` whose
+// table equals the catalog `values` verbatim; a numeric range is a numeric field. It catches a
+// catalog enum backed by a hand-rolled numeric codec (how PHASER `stage` shipped a raw index) and
+// the trigger/solo drift between strings, numbers, and booleans — without a hand-maintained list,
+// so a new effect/field can't silently reintroduce the class. Catalog `text` domains (compact
+// displays like SLICER "P01-P20", HARMONIST harmony) are opaque by design, so their representation
+// is intentionally not pinned. (amp/odds/ns/fv are hand-decoded, not FieldCodec maps, so they're
+// covered by their own round-trip guards above rather than here.)
 
-interface EnumValueCheck {
-  block: PerTypeBlock;
-  type: string;
-  /** codec lookup field name (mapped to its catalog param via the block's alias map). */
-  field: string;
-}
+const NUMERIC_KINDS = new Set(["u8", "signed", "scaled", "nibblePair", "nibbleQuad"]);
 
-const requireBlock = (id: PerTypeBlock["block"]): PerTypeBlock => {
-  const found = PER_TYPE_BLOCKS.find(block => block.block === id);
-  if (!found) throw new Error(`PER_TYPE_BLOCKS has no "${id}" block`);
-  return found;
+type ReprClass = "numeric" | "discrete" | "boolean" | "text" | "unknown";
+
+const codecClass = (field: FieldCodec): ReprClass => {
+  if (field.kind === "bool") return "boolean";
+  if (field.kind === "lookup") return "discrete";
+  // indexTable holds a mixed string/number table (PITCH SHIFT's pitch presets) — opaque like a
+  // catalog `text` domain, so its representation isn't strictly pinned.
+  if (field.kind === "indexTable") return "text";
+  const numeric = field.kind !== undefined && NUMERIC_KINDS.has(field.kind);
+  const cls: ReprClass = numeric ? "numeric" : "unknown";
+  return cls;
 };
 
-const fxValueBlock = requireBlock("fx");
+const catalogClass = (param: ParamSpec): ReprClass => {
+  if (param.values !== undefined) return "discrete";
+  if (param.min !== undefined) return "numeric";
+  const cls: ReprClass = param.range === "true, false" ? "boolean" : "text";
+  return cls;
+};
 
-const ENUM_VALUE_CHECKS: EnumValueCheck[] = [
-  { block: fxValueBlock, type: "TOUCH WAH",   field: "filter" },
-  { block: fxValueBlock, type: "TOUCH WAH",   field: "polarity" },
-  { block: fxValueBlock, type: "AUTO WAH",    field: "filter" },
-  { block: fxValueBlock, type: "FEEDBACKER",  field: "mode" },
-  { block: fxValueBlock, type: "ROTARY",      field: "speed" },
-  { block: fxValueBlock, type: "RING MOD",    field: "intelligent" },
-  { block: fxValueBlock, type: "HUMANIZER",   field: "vowel1" },
-  { block: fxValueBlock, type: "HUMANIZER",   field: "vowel2" },
-  { block: fxValueBlock, type: "PITCH SHIFT", field: "mode" },
-  { block: fxValueBlock, type: "S-BEND",      field: "pitch" },
-  { block: FX_DELAY_BLOCK, type: "WARP",   field: "trigger" },
-  { block: FX_DELAY_BLOCK, type: "TWIST",  field: "trigger" },
-  { block: FX_DELAY_BLOCK, type: "TWIST",  field: "mode" },
-  { block: FX_DELAY_BLOCK, type: "GLITCH", field: "trigger" },
-];
+const representationChecks = [...PER_TYPE_BLOCKS, FX_DELAY_BLOCK].flatMap(block =>
+  block.types.flatMap(type =>
+    (block.codecFields(type) ?? [])
+      .filter(field => !block.reverseSkip.has(field.name))
+      .map(field => ({ title: `${block.block} ${type}.${field.name}`, block, type, field })),
+  ),
+);
 
-const assertEnumValueParity = ({ block, type, field }: EnumValueCheck): void => {
-  const codecField = (block.codecFields(type) ?? []).find(candidate => candidate.name === field);
-  expect(codecField, `${block.block} "${type}" has no codec field "${field}"`).toBeDefined();
-  const table = codecField?.table;
-  expect(table, `${block.block} "${type}" field "${field}" is not a lookup (no table)`).toBeDefined();
-
+const assertRepresentationParity = (block: PerTypeBlock, type: string, field: FieldCodec): void => {
   const aliases = block.aliases[type] ?? {};
-  const catalogLabel = field in aliases ? aliases[field] : field;
+  const catalogLabel = field.name in aliases ? aliases[field.name] : field.name;
   const param = PARAMS_BY_TYPE[block.block][type].find(candidate => normalize(candidate.name) === normalize(catalogLabel));
-  expect(param, `${block.block} "${type}" catalog has no param for codec field "${field}"`).toBeDefined();
+  expect(param, `${block.block} "${type}" catalog has no param for codec field "${field.name}"`).toBeDefined();
+  if (!param) return;
 
-  const codecValues = (table ?? []).join(", ");
-  expect(codecValues, `${block.block} "${type}" field "${field}": codec table vs catalog range`).toBe(param?.range);
+  const catClass = catalogClass(param);
+  const codClass = codecClass(field);
+  // Opaque on either side (catalog `text` display, or a mixed indexTable) — not strictly pinned.
+  if (catClass === "text" || codClass === "text") return;
+
+  expect(
+    codClass,
+    `${block.block} "${type}" field "${field.name}": codec kind "${field.kind ?? "none"}" vs catalog domain "${catClass}"`,
+  ).toBe(catClass);
+
+  if (catClass === "discrete") {
+    expect(
+      [...(field.table ?? [])],
+      `${block.block} "${type}" field "${field.name}": codec table vs catalog values`,
+    ).toEqual([...(param.values ?? [])]);
+  }
 };
 
-describe("GX-1 codec ↔ catalog enum-value parity (discrete enums)", () => {
-  it.each(ENUM_VALUE_CHECKS)("$type.$field: codec lookup values match the catalog range", (check) => {
-    assertEnumValueParity(check);
-  });
-});
-
-// ── value enumeration parity: frequency-lookup params ──────────────────────────
-//
-// The quantized frequency tables (delay/PARA. EQ high/low cut, PARA. EQ mid freq,
-// ENHANCER low/high freq) summarize their range as a compact string ("20 Hz-12.5 kHz,
-// FLAT"), so the enum-value guard above can't check them. Instead they carry the full
-// ordered label list in ParamSpec.values (surfaced by describe_device). This guard locks
-// that list to the codec's actual lookup table — catching both a stale enumeration and a
-// table attached to the wrong field (e.g. LOW CUT given the HIGH CUT list).
-
-const FREQ_VALUE_CHECKS: EnumValueCheck[] = [
-  { block: fxValueBlock,           type: "PARA. EQ", field: "lowCut" },
-  { block: fxValueBlock,           type: "PARA. EQ", field: "midFreq" },
-  { block: fxValueBlock,           type: "PARA. EQ", field: "highCut" },
-  { block: fxValueBlock,           type: "ENHANCER", field: "lowFreq" },
-  { block: fxValueBlock,           type: "ENHANCER", field: "highFreq" },
-  { block: requireBlock("delay"),  type: "STANDARD", field: "highCut" },
-  { block: requireBlock("reverb"), type: "SUB DELAY", field: "highCut" },
-  { block: FX_DELAY_BLOCK,         type: "STANDARD", field: "highCut" },
-];
-
-const assertFreqValueParity = ({ block, type, field }: EnumValueCheck): void => {
-  const codecField = (block.codecFields(type) ?? []).find(candidate => candidate.name === field);
-  expect(codecField, `${block.block} "${type}" has no codec field "${field}"`).toBeDefined();
-  const table = codecField?.table;
-  expect(table, `${block.block} "${type}" field "${field}" is not a lookup (no table)`).toBeDefined();
-
-  const aliases = block.aliases[type] ?? {};
-  const catalogLabel = field in aliases ? aliases[field] : field;
-  const param = PARAMS_BY_TYPE[block.block][type].find(candidate => normalize(candidate.name) === normalize(catalogLabel));
-  expect(param, `${block.block} "${type}" catalog has no param for codec field "${field}"`).toBeDefined();
-
-  expect(param?.values, `${block.block} "${type}" param "${field}" carries no enumerated values`).toBeDefined();
-  const catalogValues = [...(param?.values ?? [])];
-  expect(catalogValues, `${block.block} "${type}" field "${field}": codec table vs catalog values`).toEqual([...(table ?? [])]);
-};
-
-describe("GX-1 codec ↔ catalog value-enumeration parity (frequency lookups)", () => {
-  it.each(FREQ_VALUE_CHECKS)("$type.$field: catalog values enumerate the codec lookup table", (check) => {
-    assertFreqValueParity(check);
+describe("GX-1 codec ↔ catalog representation parity", () => {
+  it.each(representationChecks)("$title", ({ block, type, field }) => {
+    assertRepresentationParity(block, type, field);
   });
 });
 

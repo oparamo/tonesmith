@@ -1,14 +1,14 @@
 import {
   FX_TYPES, FX_TYPE_IDX, ODDS_TYPES,
-  WAH_TYPES, ROTARY_SPEED, FB_MODE, RING_INTL, HUM_VOWELS, HUM_MODES,
+  WAH_TYPES, ROTARY_SPEED, FB_MODE, HUM_VOWELS, HUM_MODES,
   SBEND_PITCH, SLICER_PAT, HARMONIST_HR,
-  FX_DLY_TYPES, FX_REV_TYPES, TWIST_MODES, ON_OFF,
+  FX_DLY_TYPES, FX_REV_TYPES, TWIST_MODES, PHASER_STAGES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 } from "../common";
 import type { FxParams } from "../types";
 import { hexFromBytes, lookupName, lookupIndex } from "./primitives";
-import { u8, signed, lookup, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
+import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 
 // ── FX type encode / decode ───────────────────────────────────────────────────
 //
@@ -167,7 +167,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("reso", 1), signed("tone", 2), u8("level", 3),
   ],
   "FEEDBACKER": [
-    lookup("mode", 0, FB_MODE), u8("trigger", 1), u8("depth", 2), u8("riseTime", 3),
+    lookup("mode", 0, FB_MODE), bool("trigger", 1), u8("depth", 2), u8("riseTime", 3),
     u8("octRiseTm", 4), u8("feedback", 5), u8("octFeedback", 6),
   ],
   "SITAR SIM": [
@@ -181,7 +181,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "OD/DS": [
     lookup("type", 0, ODDS_TYPES),
     u8("drive", 1), signed("tone", 2), u8("level", 3), u8("direct", 4),
-    u8("solo", 5), u8("soloLevel", 6),
+    bool("solo", 5), u8("soloLevel", 6),
   ],
   // OVERTONE: FX3-only, stored in the separate 5-byte MEMORY%FX3A block rather than
   // the 251-byte FX3 block — see the FX3A handling in patch.ts. Offset 0 here refers
@@ -198,13 +198,9 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "FLANGER": [
     u8("rate", 0), u8("depth", 1), u8("reso", 2), u8("manual", 3), u8("level", 4), u8("direct", 5),
   ],
-  // PHASER: stage is stored as (stage−2)/2 and recovered as bytes[0]*2+2.
+  // PHASER: p[0] selects the stage count as a plain enum (raw 0/1/2 = 4/8/12 STAGE).
   "PHASER": [
-    {
-      name: "stage",
-      decode: bytes => bytes[0] * 2 + 2,
-      encode: (value, bytes) => { bytes[0] = ((value as number) - 2) >> 1; },
-    },
+    lookup("stage", 0, PHASER_STAGES),
     u8("rate", 1), u8("depth", 2), u8("reso", 3), u8("manual", 4), u8("level", 5), u8("direct", 6),
   ],
   "SCRIPT PH": [
@@ -221,7 +217,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("balance", 4), u8("drive", 5), u8("direct", 6),
   ],
   "VIBRATO": [
-    u8("rate", 0), u8("depth", 1), u8("riseTime", 2), u8("trigger", 3), u8("level", 4),
+    u8("rate", 0), u8("depth", 1), u8("riseTime", 2), bool("trigger", 3), u8("level", 4),
   ],
   "TREMOLO": [
     u8("rate", 0), u8("depth", 1), u8("level", 2),
@@ -230,7 +226,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("rate", 0), u8("depth", 1), u8("level", 2),
   ],
   "RING MOD": [
-    lookup("intelligent", 0, RING_INTL),
+    bool("intelligent", 0),
     u8("freq", 1), u8("modRate", 2), u8("modDepth", 3), u8("level", 4), u8("direct", 5),
   ],
   // HUMANIZER: p[0]=mode (stored in param block), then params shifted by one.
@@ -256,7 +252,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("minus1Oct", 0), u8("minus2Oct", 1), u8("direct", 2),
   ],
   "S-BEND": [
-    u8("trigger", 0), lookup("pitch", 1, SBEND_PITCH), u8("riseTime", 2), u8("fallTime", 3),
+    bool("trigger", 0), lookup("pitch", 1, SBEND_PITCH), u8("riseTime", 2), u8("fallTime", 3),
   ],
   // PEDAL BEND: pitchMin/pitchMax stored as (value + 24), range −24..+24 semitones.
   "PEDAL BEND": [
@@ -294,14 +290,14 @@ const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
   ],
   "WARP": [
     lookup("type", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
-    lookup("trigger", 11, ON_OFF), u8("level", 12),
+    bool("trigger", 11), u8("level", 12),
   ],
   "TWIST": [
-    lookup("type", 0, FX_DLY_TYPES), lookup("mode", 10, TWIST_MODES), lookup("trigger", 11, ON_OFF),
+    lookup("type", 0, FX_DLY_TYPES), lookup("mode", 10, TWIST_MODES), bool("trigger", 11),
     u8("riseTime", 13), u8("fallTime", 14), u8("fadeTime", 15), u8("level", 12),
   ],
   "GLITCH": [
-    lookup("type", 0, FX_DLY_TYPES), lookup("trigger", 11, ON_OFF),
+    lookup("type", 0, FX_DLY_TYPES), bool("trigger", 11),
     u8("time", 16), u8("glitch", 17), u8("balance", 18),
   ],
 };

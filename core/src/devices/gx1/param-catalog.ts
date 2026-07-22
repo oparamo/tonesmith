@@ -22,14 +22,14 @@
  */
 import type { ParamSpec } from "../../types";
 import { FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ } from "./common";
-import { def, num, oneOf, lookupOf, text } from "./param-domain";
+import { def, num, oneOf, lookupOf, bool, text } from "./param-domain";
 
 // ── Shared param fragments (identical across many types — defined once) ────────
 
 const LEVEL_0_100: ParamSpec = def("LEVEL", num(0, 100), "Output volume.");
 const DIRECT: ParamSpec = def("DIRECT", num(0, 100), "Volume of the direct (unaffected) signal.");
 const OD_SOLO: ParamSpec[] = [
-  def("SOLO", oneOf("OFF", "ON"), "Temporary level boost for solo sections."),
+  def("SOLO", bool(), "Temporary level boost for solo sections."),
   def("SOLO LEVEL", num(0, 100), "Output volume while SOLO is engaged."),
 ];
 
@@ -115,7 +115,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   ],
   "FEEDBACKER": [
     def("MODE", oneOf("NORMAL", "OSC"), "NORMAL analyzes input pitch; OSC creates internal simulated feedback."),
-    def("TRIGGER", oneOf("OFF", "ON"), "Applies feedback when ON."),
+    def("TRIGGER", bool(), "Applies feedback when ON."),
     def("DEPTH", num(0, 100), "How readily feedback occurs when the effect is on (NORMAL mode)."),
     def("RISE TIME", num(0, 100), "Time for the feedback volume to reach its maximum (OSC mode)."),
     def("OCT RISE TM", num(0, 100), "Time for the octave-up feedback volume to reach its maximum (OSC mode)."),
@@ -212,7 +212,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     def("RATE", num(0, 100, { bpm: true }), "Speed of the vibrato."),
     def("DEPTH", num(0, 100), "Depth of the pitch modulation."),
     def("RISE TIME", num(0, 100), "Time from trigger-on until full vibrato is reached."),
-    def("TRIGGER", oneOf("OFF", "ON"), "Activates the vibrato."),
+    def("TRIGGER", bool(), "Activates the vibrato."),
     LEVEL_0_100,
   ],
   "TREMOLO": [
@@ -234,7 +234,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     LEVEL_0_100,
   ],
   "RING MOD": [
-    def("INTELLIGENT", oneOf("OFF", "ON"), "When ON, oscillator tracks input pitch for a more musical result."),
+    def("INTELLIGENT", bool(), "When ON, oscillator tracks input pitch for a more musical result."),
     def("FREQ", num(0, 100), "Internal oscillator frequency."),
     def("MOD RATE", num(0, 100, { bpm: true }), "Rate of oscillator modulation."),
     def("MOD DEPTH", num(0, 100), "Depth of oscillator modulation."),
@@ -276,7 +276,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     def("DIRECT", num(0, 100), "Volume of the direct signal."),
   ],
   "S-BEND": [
-    def("TRIGGER", oneOf("OFF", "ON"), "Activates the pitch bend."),
+    def("TRIGGER", bool(), "Activates the pitch bend."),
     def("PITCH", oneOf("-3oct", "-2oct", "-1oct", "+1oct", "+2oct", "+3oct", "+4oct"), "Amount of pitch shift in octave steps."),
     def("RISE TIME", num(0, 100), "Time for the effect to reach maximum."),
     def("FALL TIME", num(0, 100), "Time for the effect to return to the original pitch."),
@@ -348,17 +348,17 @@ const DLY_MOD: ParamSpec[] = [
 // WARP/TWIST/GLITCH have identical param sets in the dedicated DLY block and the FX-slot
 // DELAY, so their param lists are defined once and reused by both (DELAY_PARAMS + FX_DELAY_PARAMS).
 const DLY_WARP_PARAMS: ParamSpec[] = [DLY_TIME,
-  def("TRIGGER", oneOf("OFF", "ON"), "Applies the WARP effect when ON."),
+  def("TRIGGER", bool(), "Applies the WARP effect when ON."),
   def("LEVEL", num(0, 100), "Volume of the effect sound.")];
 const DLY_TWIST_PARAMS: ParamSpec[] = [
   def("MODE", oneOf("RISE-FALL", "RISE-FADE"), "How rotation stops when TRIGGER goes ON to OFF."),
-  def("TRIGGER", oneOf("OFF", "ON"), "Applies the TWIST effect when ON."),
+  def("TRIGGER", bool(), "Applies the TWIST effect when ON."),
   def("RISE TIME", num(0, 100), "Time for the effect to transition to maximum."),
   def("FALL TIME", num(0, 100), "Stop time when MODE changes from RISE to FALL."),
   def("FADE TIME", num(0, 100), "Fade-out time when MODE changes from RISE to FADE."),
   def("LEVEL", num(0, 100), "Volume of the effect sound.")];
 const DLY_GLITCH_PARAMS: ParamSpec[] = [
-  def("TRIGGER", oneOf("OFF", "ON"), "Applies the GLITCH effect when ON."),
+  def("TRIGGER", bool(), "Applies the GLITCH effect when ON."),
   def("TIME", num(0, 100), "Length of the effect sound."),
   def("GLITCH", num(0, 100), "Intensity of the effect."),
   def("BALANCE", num(0, 100), "Balance between the direct and effect sound (100 mutes the direct).")];
@@ -369,7 +369,7 @@ const DELAY_PARAMS: Record<string, ParamSpec[]> = {
   "PAN": [DLY_TIME, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT,
     def("TAP TIME", num(0, 100, { percent: true }), "R-channel delay time relative to the L-channel time (100%).")],
   "REVERSE": [DLY_TIME, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT,
-    def("TRIGGER", oneOf("OFF", "ON"), "Produces an effect matching what you're playing when ON.")],
+    def("TRIGGER", bool(), "Produces an effect matching what you're playing when ON.")],
   "ANALOG": [DLY_TIME_ANALOG, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT],
   "ANLG MOD": [DLY_TIME_ANALOG, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT, ...DLY_MOD],
   "SPACE ECHO": [DLY_TIME, DLY_FEEDBACK, DLY_LEVEL_0, DLY_HIGH_CUT,
@@ -439,7 +439,7 @@ const REVERB_PARAMS: Record<string, ParamSpec[]> = {
     def("LEVEL", num(0, 100), "Volume of the effect sound."),
     def("FEEDBACK", num(0, 100), "Decay of the effect sound."),
     def("DIRECT", num(0, 100), "Volume of the direct sound."),
-    def("TRIGGER", oneOf("OFF", "ON"), "Holds the effect sound when ON (written to memory as OFF)."),
+    def("TRIGGER", bool(), "Holds the effect sound when ON (written to memory as OFF)."),
   ],
 };
 

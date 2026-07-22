@@ -7,13 +7,13 @@ import {
   REV_TYPES, REV_TYPE_IDX,
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
-  NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
+  NS_DETECT, FV_CURVE, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
   FREQ_HIGH_CUT,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
 import { RAW } from "../common";
 import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
-import { u8, signed, lookup, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
+import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";
 
 // ── Name block ────────────────────────────────────────────────────────────────
@@ -251,7 +251,7 @@ const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "REVERSE": [
     nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
-    lookup("trigger", 12, ON_OFF),
+    bool("trigger", 12),
   ],
   "ANALOG": [
     nibbleQuad("time", 13), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
@@ -269,14 +269,14 @@ const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("pitch", 18, 24), u8("balance", 19),
   ],
   "WARP": [
-    nibbleQuad("time", 2), u8("trigger", 21), u8("level", 25),
+    nibbleQuad("time", 2), bool("trigger", 21), u8("level", 25),
   ],
   "TWIST": [
-    lookup("mode", 20, TWIST_MODES), u8("trigger", 21),
+    lookup("mode", 20, TWIST_MODES), bool("trigger", 21),
     u8("riseTime", 22), u8("fallTime", 23), u8("fadeTime", 24), u8("level", 25),
   ],
   "GLITCH": [
-    u8("trigger", 21), u8("time", 26), u8("glitch", 27), u8("balance", 28),
+    bool("trigger", 21), u8("time", 26), u8("glitch", 27), u8("balance", 28),
   ],
 };
 
@@ -329,7 +329,7 @@ const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "TERA ECHO": [
     signed("tone", 3, 50), u8("level", 5), u8("direct", 8),
-    u8("feedback", 16), u8("spreadTime", 18), u8("trigger", 19),
+    u8("feedback", 16), u8("spreadTime", 18), bool("trigger", 19),
   ],
 };
 

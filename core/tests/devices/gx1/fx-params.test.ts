@@ -213,7 +213,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("OD/DS", fx1Bytes);
 
     expect(decoded).toEqual({
-      type: "CLEAN BST", drive: 50, tone: 0, level: 50, direct: 0, solo: 0, soloLevel: 50,
+      type: "CLEAN BST", drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50,
     });
   });
 
@@ -229,7 +229,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("PHASER", fx1Bytes);
 
     expect(decoded).toEqual({
-      stage: 2, rate: 30, depth: 70, reso: 30, manual: 50, level: 100, direct: 0,
+      stage: "4 STAGE", rate: 30, depth: 70, reso: 30, manual: 50, level: 100, direct: 0,
     });
   });
 
@@ -237,7 +237,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("VIBRATO", fx1Bytes);
 
     expect(decoded).toEqual({
-      rate: 80, depth: 20, riseTime: 30, trigger: 1, level: 100,
+      rate: 80, depth: 20, riseTime: 30, trigger: true, level: 100,
     });
   });
 

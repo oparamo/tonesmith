@@ -124,7 +124,7 @@ const fxFieldMap = (fxType: string, subType: string | null): FieldCodec[] | unde
  * whatever stale raw byte was in the slot before (the class of bug that left unset GEQ bands
  * decoding to −20 dB instead of 0 dB). DELAY is per-sub-algorithm (its defaults live under fxDelay).
  */
-const defaultFxParams = (fxType: string, subType: string | null = null): Record<string, string | number> => {
+const defaultFxParams = (fxType: string, subType: string | null = null): Record<string, string | number | boolean> => {
   if (fxType === "DELAY") {
     const subDefaults = subType == null ? undefined : DEFAULTS_BY_TYPE.fxDelay[subType];
     return { ...(subDefaults ?? {}) };

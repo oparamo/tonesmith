@@ -346,7 +346,7 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeDelay(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "WARP", time: 400, trigger: 0, level: 50 });
+    expect(decoded).toMatchObject({ on: false, type: "WARP", time: 400, trigger: false, level: 50 });
   });
 
   it("decodes DLY shadow bytes for GLITCH (own 1-byte time at offset 26, not the shared 4-byte field)", () => {
@@ -355,7 +355,7 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeDelay(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "GLITCH", trigger: 0, time: 50, glitch: 50, balance: 100 });
+    expect(decoded).toMatchObject({ on: false, type: "GLITCH", trigger: false, time: 50, glitch: 50, balance: 100 });
   });
 
   it("decodes REV shadow bytes for SHIMMER (LEVEL is the shared EFFECT_LEVEL at 5; its own PITCH LVL is at offset 10)", () => {
@@ -384,7 +384,7 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeReverb(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "TERA ECHO", tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: 0 });
+    expect(decoded).toMatchObject({ on: false, type: "TERA ECHO", tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: false });
   });
 
   it("decodes PFX shadow bytes for PEDAL BEND (its own pitchMin/pitchMax at offset 9/10)", () => {

@@ -92,14 +92,14 @@ const ROTARY_SPEED = ["SLOW", "FAST"] as const;
 const VIBE_MODES   = ["CHORUS", "VIBRATO"] as const;
 const HUM_MODES    = ["PICKING", "AUTO"] as const;
 const HUM_VOWELS   = ["a", "e", "i", "o", "u"] as const;
-const RING_INTL    = ["OFF", "ON"] as const;
 const SBEND_PITCH  = ["-3oct", "-2oct", "-1oct", "+1oct", "+2oct", "+3oct", "+4oct"] as const;
 const FB_MODE      = ["NORMAL", "OSC"] as const;
 const SLICER_PAT   = Array.from({ length: 20 }, (_, i) => `PATTERN ${i + 1}`);
 const NS_DETECT    = ["INPUT", "NS INPUT"] as const;
 const FV_CURVE     = ["SLOW1", "SLOW2", "NORMAL", "FAST"] as const;
 const TWIST_MODES  = ["RISE-FALL", "RISE-FADE"] as const;
-const ON_OFF       = ["OFF", "ON"] as const;
+// PHASER TYPE: raw byte 0/1/2 selects the number of phase-shifting stages.
+const PHASER_STAGES = ["4 STAGE", "8 STAGE", "12 STAGE"] as const;
 // Playback head combinations.
 const SPACE_ECHO_HEAD = ["1", "1+2", "1+3", "2+3", "1+2+3"] as const;
 
@@ -166,8 +166,8 @@ export {
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
-  VIBE_MODES, HUM_MODES, HUM_VOWELS, RING_INTL, SBEND_PITCH, FB_MODE,
-  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, ON_OFF, SPACE_ECHO_HEAD,
+  VIBE_MODES, HUM_MODES, HUM_VOWELS, SBEND_PITCH, FB_MODE,
+  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, PHASER_STAGES, SPACE_ECHO_HEAD,
   HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, KEY_NAMES, KEY_IDX,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 };

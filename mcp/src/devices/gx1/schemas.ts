@@ -16,7 +16,7 @@ const FxBlockSchema = z.object({
     "params field selects its model."
   ),
   on: z.boolean().optional().describe("Whether the slot is active (default true)"),
-  params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+  params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
     "Every effect parameter as key→value pairs (an fx slot has no named param fields, so all of its " +
     "params live here). The key is each param's `key` from describe_device (group=fx, the item's id) " +
     "— e.g. preDelay, octFeedback — NOT its display name. Most values are numbers, but some select a " +

@@ -283,7 +283,7 @@ describe("fx", () => {
 
     expect(patch.fx1.subType).toBe("WARP");
     // WARP's fields are time/trigger/level (type is threaded in but not a defaulted param).
-    expect(patch.fx1.params).toEqual({ time: 400, trigger: "OFF", level: 80, type: "WARP" });
+    expect(patch.fx1.params).toEqual({ time: 400, trigger: false, level: 80, type: "WARP" });
   });
 
   // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS),
@@ -563,7 +563,7 @@ describe("delay", () => {
     delay(patch, "WARP", 1, 40, 50);
 
     const block = patch.delay as Record<string, unknown>;
-    expect(block.trigger).toBe(0);
+    expect(block.trigger).toBe(false);
     expect(block.level).toBe(50);
   });
 });

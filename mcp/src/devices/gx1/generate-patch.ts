@@ -79,7 +79,7 @@ const inputSchema = z.object({
 
   pfx: z.object({
     type: z.string().describe(`Pedal FX type: ${capabilityItemIds("pfx")}`),
-    params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params (e.g. { wahType: \"CRY WAH\", level: 100, direct: 0, position: 100, min: 0, max: 100 } for WAH; " +
       "{ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 } for PEDAL BEND)"
     ),
@@ -113,7 +113,7 @@ const inputSchema = z.object({
     level: boundedInt("delay", "LEVEL", "STANDARD").describe("Effect level 1–120"),
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
     on: z.boolean().optional().describe("Enable delay (default true)"),
-    params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. modRate/modDepth for MODULATE, mode/riseTime for TWIST, head for SPACE " +
       "ECHO). Call describe_device with group=delay and the chosen type for the keys, ranges, and " +
@@ -137,7 +137,7 @@ const inputSchema = z.object({
     density: boundedInt("reverb", "DENSITY", "HALL S").optional().describe("Density 1–10 (default 5)"),
     direct: boundedInt("reverb", "DIRECT", "HALL S").optional().describe("Direct level 0–100 (default 100)"),
     on: z.boolean().optional().describe("Enable reverb (default true)"),
-    params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe(
+    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY). Call " +
       "describe_device with group=reverb and the chosen type for the keys, ranges, and values. The " +

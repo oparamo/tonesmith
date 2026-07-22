@@ -14,7 +14,7 @@
  *
  * Regenerate after a fixture change: see `tests/devices/gx1/defaults.test.ts`.
  */
-type ParamDefaults = Record<string, string | number>;
+type ParamDefaults = Record<string, string | number | boolean>;
 type BlockDefaults = Record<string, ParamDefaults>;
 
 interface DefaultsByType {
@@ -38,29 +38,29 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
     "AC. GTR SIM": { high: 0, body: 50, low: 0, level: 50 },
     "AC RESO": { reso: 50, tone: 0, level: 50 },
     "SITAR SIM": { sens: 50, depth: 50, tone: 0, level: 100, reso: 32, buzz: 40, direct: 0 },
-    "FEEDBACKER": { mode: "NORMAL", trigger: 0, depth: 50, riseTime: 70, octRiseTm: 85, feedback: 50, octFeedback: 30 },
-    "OD/DS": { drive: 50, tone: 0, level: 50, direct: 0, solo: 0, soloLevel: 50 },
+    "FEEDBACKER": { mode: "NORMAL", trigger: false, depth: 50, riseTime: 70, octRiseTm: 85, feedback: 50, octFeedback: 30 },
+    "OD/DS": { drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50 },
     "PARA. EQ": { lowGain: 0, highGain: 0, level: 0, midFreq: "4kHz", midGain: 0, lowCut: "FLAT", highCut: "FLAT" },
     "GEQ": { "125Hz": 0, "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 0, level: 0 },
     "LOW GEQ": { "63Hz": 0, "125Hz": 0, "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, level: 0 },
     "HIGH GEQ": { "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 0, "8kHz": 0, level: 0 },
     "CHORUS": { rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100 },
     "FLANGER": { rate: 25, depth: 60, reso: 35, manual: 55, level: 100, direct: 0 },
-    "PHASER": { stage: 2, rate: 30, depth: 70, reso: 30, manual: 50, level: 100, direct: 0 },
+    "PHASER": { stage: "4 STAGE", rate: 30, depth: 70, reso: 30, manual: 50, level: 100, direct: 0 },
     "SCRIPT PH": { rate: 50, depth: 50, level: 100 },
     "CLASSIC-VIBE": { rate: 50, depth: 100, level: 100 },
     "ROTARY": { speed: "SLOW", slowRate: 50, fastRate: 50, level: 100, balance: 50, drive: 0, direct: 0 },
-    "VIBRATO": { rate: 80, depth: 20, riseTime: 30, trigger: 1, level: 100 },
+    "VIBRATO": { rate: 80, depth: 20, riseTime: 30, trigger: true, level: 100 },
     "TREMOLO": { rate: 75, depth: 50, level: 100 },
     "SLICER": { pattern: "PATTERN 1", rate: 50, level: 100, attack: 50, duty: 50, direct: 0 },
     "PAN": { rate: 50, depth: 50, level: 100 },
-    "RING MOD": { intelligent: "OFF", freq: 50, modRate: 50, modDepth: 0, level: 100, direct: 0 },
+    "RING MOD": { intelligent: false, freq: 50, modRate: 50, modDepth: 0, level: 100, direct: 0 },
     "HUMANIZER": { vowel1: "a", vowel2: "i", sens: 50, rate: 50, manual: 50, level: 100 },
     "PITCH SHIFT": { mode: "MEDIUM", pitch: -5, preDelay: 0, level: 100, feedback: 0, direct: 100 },
     "HARMONIST": { harmony: "+3rd", preDelay: 0, level: 100, feedback: 0, direct: 100 },
     "OCTAVE": { minus1Oct: 50, minus2Oct: 50, direct: 100 },
     "HEAVY OCT": { minus1Oct: 50, minus2Oct: 50, direct: 100 },
-    "S-BEND": { trigger: 0, pitch: "+2oct", riseTime: 50, fallTime: 5 },
+    "S-BEND": { trigger: false, pitch: "+2oct", riseTime: 50, fallTime: 5 },
     "PEDAL BEND": { pitchMin: 0, pitchMax: 24, pdlPos: 100, level: 100, direct: 0 },
     "TUNE DOWN": { pitch: -2 },
     "REVERB": { time: 3, preDelay: 30, level: 30, direct: 100 },
@@ -69,22 +69,22 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
   fxDelay: {
     "STANDARD": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz" },
     "MODULATE": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 0 },
-    "WARP": { time: 400, trigger: "OFF", level: 50 },
-    "TWIST": { mode: "RISE-FALL", trigger: "OFF", riseTime: 50, fallTime: 50, fadeTime: 50, level: 50 },
-    "GLITCH": { trigger: "OFF", time: 50, glitch: 50, balance: 100 },
+    "WARP": { time: 400, trigger: false, level: 50 },
+    "TWIST": { mode: "RISE-FALL", trigger: false, riseTime: 50, fallTime: 50, fadeTime: 50, level: 50 },
+    "GLITCH": { trigger: false, time: 50, glitch: 50, balance: 100 },
   },
   delay: {
     "STANDARD": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz" },
     "MODULATE": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 30 },
     "PAN": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", tapTime: 50 },
-    "REVERSE": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", trigger: "ON" },
+    "REVERSE": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", trigger: true },
     "ANALOG": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz" },
     "ANLG MOD": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 30 },
     "SPACE ECHO": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", head: "1" },
     "SHIMMER": { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", pitch: 12, balance: 50 },
-    "WARP": { time: 400, trigger: 0, level: 50 },
-    "TWIST": { mode: "RISE-FALL", trigger: 0, riseTime: 50, fallTime: 50, fadeTime: 50, level: 50 },
-    "GLITCH": { trigger: 0, time: 50, glitch: 50, balance: 100 },
+    "WARP": { time: 400, trigger: false, level: 50 },
+    "TWIST": { mode: "RISE-FALL", trigger: false, riseTime: 50, fallTime: 50, fadeTime: 50, level: 50 },
+    "GLITCH": { trigger: false, time: 50, glitch: 50, balance: 100 },
   },
   reverb: {
     "HALL S": { time: 2.6, tone: 0, density: 5, level: 25, preDelay: 30, direct: 100 },
@@ -96,7 +96,7 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
     "SPRING": { time: 2.6, tone: 0, density: 5, level: 25, preDelay: 30, direct: 100 },
     "SHIMMER": { time: 2.6, tone: 0, level: 25, preDelay: 30, pitch: 12, pitchLevel: 100 },
     "SUB DELAY": { time: 400, level: 50, feedback: 30, highCut: "6.3kHz" },
-    "TERA ECHO": { tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: 0 },
+    "TERA ECHO": { tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: false },
   },
   pfx: {
     "WAH": { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 },

@@ -10,6 +10,7 @@
  *  - `enum`    — a small fixed set of string values; the `range` display is the joined list.
  *  - `lookup`  — a discrete quantized table (the frequency steps) whose full value list comes from a
  *                codec constant but whose `range` display is a compact human summary.
+ *  - `boolean` — an on/off toggle carried as a real boolean (`true`/`false`); no `values`/bounds.
  *  - `text`    — an opaque/compact range with no enumerable value list (e.g. "-2oct-+2oct").
  */
 import type { ParamSpec } from "../../types";
@@ -20,6 +21,7 @@ type Domain =
   | ({ kind: "range"; min: number; max: number } & RangeOpts)
   | { kind: "enum"; values: readonly string[] }
   | { kind: "lookup"; values: readonly string[]; display: string }
+  | { kind: "boolean" }
   | { kind: "text"; display: string };
 
 /** A numeric interval. `decimals` fixes display precision; `bpm`/`percent`/`unit` shape the suffix. */
@@ -28,6 +30,8 @@ const num = (min: number, max: number, opts: RangeOpts = {}): Domain => ({ kind:
 const oneOf = (...values: string[]): Domain => ({ kind: "enum", values });
 /** A quantized lookup table (values from a codec constant) with a compact human display. */
 const lookupOf = (values: readonly string[], display: string): Domain => ({ kind: "lookup", values, display });
+/** An on/off toggle carried as a real boolean (`true`/`false`). */
+const bool = (): Domain => ({ kind: "boolean" });
 /** An opaque/compact range with no enumerable value list. */
 const text = (display: string): Domain => ({ kind: "text", display });
 
@@ -36,6 +40,7 @@ const fmt = (n: number, decimals?: number): string => (decimals === undefined ? 
 /** Renders a domain to its human `range` string (matches the device parameter-guide wording). */
 const rangeText = (domain: Domain): string => {
   if (domain.kind === "enum") return domain.values.join(", ");
+  if (domain.kind === "boolean") return "true, false";
   if (domain.kind === "lookup" || domain.kind === "text") return domain.display;
   const signedMax = domain.min < 0 && domain.max > 0 ? `+${fmt(domain.max, domain.decimals)}` : fmt(domain.max, domain.decimals);
   const base = `${fmt(domain.min, domain.decimals)}-${signedMax}`;
@@ -61,5 +66,5 @@ const def = (name: string, domain: Domain, description: string): ParamSpec => {
   return spec;
 };
 
-export { num, oneOf, lookupOf, text, def, rangeText };
+export { num, oneOf, lookupOf, bool, text, def, rangeText };
 export type { Domain };

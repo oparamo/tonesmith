@@ -17,12 +17,12 @@ import type { FxParams } from "../types";
 interface FieldCodec {
   readonly name: string;
   /** Present on fields built by the constructors below; hand-written FieldCodec
-   * object literals (e.g. PHASER's "stage") may omit it. */
-  readonly kind?: "u8" | "signed" | "lookup" | "scaled" | "nibblePair" | "nibbleQuad" | "indexTable";
+   * object literals may omit it. */
+  readonly kind?: "u8" | "signed" | "lookup" | "bool" | "scaled" | "nibblePair" | "nibbleQuad" | "indexTable";
   readonly center?: number;
   readonly table?: readonly (string | number)[];
-  decode(bytes: number[]): string | number | number[];
-  encode(value: string | number | number[], bytes: number[]): void;
+  decode(bytes: number[]): string | number | boolean | number[];
+  encode(value: string | number | boolean | number[], bytes: number[]): void;
 }
 
 
@@ -71,6 +71,21 @@ const lookup = (name: string, offset: number, table: readonly string[]): FieldCo
   },
 });
 
+
+/**
+ * A boolean toggle: raw byte 0 = false, any non-zero (canonically 1) = true.
+ * Encoding validates the value is a boolean (mirrors `lookup`'s strictness) so a
+ * mistyped on/off param fails loudly rather than writing a garbage byte.
+ */
+const bool = (name: string, offset: number): FieldCodec => ({
+  name,
+  kind: "bool",
+  decode: bytes => bytes[offset] !== 0,
+  encode: (value, bytes) => {
+    if (typeof value !== "boolean") throw new Error(`${name}: expected a boolean, got ${JSON.stringify(value)}`);
+    bytes[offset] = value ? 1 : 0;
+  },
+});
 
 /**
  * A scaled byte: raw byte × factor gives the decoded value (rounded to 1 decimal).
@@ -138,4 +153,4 @@ const encodeFields = (fields: FieldCodec[], params: FxParams, bytes: number[]): 
 };
 
 export type { FieldCodec };
-export { u8, signed, lookup, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields };
+export { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields };

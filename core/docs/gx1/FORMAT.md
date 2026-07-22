@@ -223,7 +223,7 @@ block's own `type` byte below, `ODDS_TYPES`):
 `p[0]`=rate `p[1]`=depth `p[2]`=reso `p[3]`=manual `p[4]`=level `p[5]`=direct
 
 **PHASER** — starts at byte 134; p[0..6]
-`p[0]`=stage (raw*2+2, so raw 0=4stage,1=8stage,2=12stage) `p[1]`=rate `p[2]`=depth `p[3]`=reso `p[4]`=manual `p[5]`=level `p[6]`=direct
+`p[0]`=stage (enum select: raw 0=4 STAGE, 1=8 STAGE, 2=12 STAGE) `p[1]`=rate `p[2]`=depth `p[3]`=reso `p[4]`=manual `p[5]`=level `p[6]`=direct
 
 **SCRIPT PH** — starts at byte 141; p[0..2]
 `p[0]`=rate `p[1]`=depth `p[2]`=level
