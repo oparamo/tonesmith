@@ -6,10 +6,18 @@ import {
   registerDescribeDevice,
 } from "./tools";
 import { deviceTools } from "./devices";
+import { instructions } from "./instructions";
 import packageJson from "../package.json" with { type: "json" };
 
 const buildServer = (): McpServer => {
-  const server = new McpServer({ name: "@tonesmith/mcp", version: packageJson.version });
+  const serverInfo = {
+    name: "@tonesmith/mcp",
+    title: "tonesmith",
+    description: "Read, edit, and build guitar multi-effects processor patch files.",
+    websiteUrl: "https://github.com/oparamo/tonesmith",
+    version: packageJson.version,
+  };
+  const server = new McpServer(serverInfo, { instructions });
 
   registerListDevices(server);
   registerReadPatch(server);
