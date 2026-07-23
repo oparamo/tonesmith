@@ -65,6 +65,13 @@ tonesmith gx1 write my.tsl 0 amp.gain=72 fx1.params.rate=50 fx1.on=true key=G
 `@tonesmith/mcp` exposes the toolkit as an [MCP](https://modelcontextprotocol.io) server so Claude
 (or any MCP client) can read, edit, and generate patches from natural-language descriptions.
 
+The aim is a self-describing device surface: you ask your AI agent for "a patch for my *device*
+based on *some song or tone*", the agent works out what that tone needs, then leans on this server
+for everything device-specific — the supported devices, their signal blocks, effects, parameters,
+and value ranges. The tools carry that knowledge themselves (`describe_device` returns the full set
+of parameter keys, ranges, and values; patch generation echoes back the resolved signal chain), so
+a connected agent can build a patch without any extra setup.
+
 ```bash
 node mcp/dist/index.js   # runs the server over stdio
 ```

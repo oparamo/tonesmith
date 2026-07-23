@@ -132,3 +132,18 @@ describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () =
     }
   });
 });
+
+describe("generate_gx1_patch chain worked-example drift guard", () => {
+  let close: () => Promise<void>;
+  afterEach(async () => { await close(); });
+
+  it("shows the exact resolution normalizeChain produces for the description's example", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const toolSchema = await client.getToolSchema("generate_gx1_patch") as { description: string };
+    const resolvedExample = JSON.stringify(gx1.normalizeChain(["OD/DS", "FX1", "AMP"]));
+
+    expect(toolSchema.description, "the worked chain example must match the real merge rule").toContain(resolvedExample);
+  });
+});

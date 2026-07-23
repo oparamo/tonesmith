@@ -49,7 +49,7 @@ describe("generate_gx1_patch", () => {
     expect(echoed.chain.indexOf("OD/DS")).toBeLessThan(echoed.chain.indexOf("FX1"));
     // ...and confirmed explicitly in the summary, so a caller never has to infer whether
     // its partial-chain reorder was honored from the expanded chain array.
-    expect(text).toContain("chain resolved as: PFX → OD/DS → FX1 → AMP → NS → FV → FX2 → FX3 → DLY → REV");
+    expect(text).toContain('chain resolved as: ["PFX","OD/DS","FX1","AMP","NS","FV","FX2","FX3","DLY","REV"]');
   });
 
   it("round-trips a full patch with every optional block", async () => {

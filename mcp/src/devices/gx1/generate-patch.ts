@@ -218,9 +218,11 @@ const registerGeneratePatch = (server: McpServer): void => {
 Signal chain: omit it to use the full default order —
   ["PFX","FX1","OD/DS","AMP","NS","FV","FX2","FX3","DLY","REV"]
 — or pass just the blocks you care about, in the order you want them relative to each
-other (e.g. ["OD/DS","FX1","AMP"] to move OD/DS ahead of FX1). Any block you leave out
-is inserted at its default position, so you never have to spell out the whole chain to
-change one part of it. "OD" is accepted as shorthand for "OD/DS".
+other. Any block you leave out is inserted at its default position, so you never have to
+spell out the whole chain to change one part of it. For example, ["OD/DS","FX1","AMP"]
+moves OD/DS ahead of FX1 and resolves to
+["PFX","OD/DS","FX1","AMP","NS","FV","FX2","FX3","DLY","REV"]. "OD" is accepted as
+shorthand for "OD/DS".
 
 Setting parameters: every block's type-specific params go in its \`params\` record, keyed by
 the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fields, so their
@@ -259,7 +261,7 @@ ${buildCatalog()}`,
         const summary = `${verb} patch "${params.name}" → ${params.outPath} (${file.patches.length} patch(es) total)`;
         // Confirm the resolved chain explicitly — a partial `chain` input expands to the full
         // block order, and without this line a caller can't tell its reorder was honored.
-        const chainLine = `chain resolved as: ${patch.chain.join(" → ")}`;
+        const chainLine = `chain resolved as: ${JSON.stringify(patch.chain)}`;
         // Echo back the built patch so the caller can confirm every field the builder defaulted,
         // without a follow-up read_patch.
         return ok(`${summary}\n${chainLine}\n\n${JSON.stringify(patchView.presentPatch(patch), null, 2)}`);
