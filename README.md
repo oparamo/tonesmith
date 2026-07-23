@@ -127,5 +127,4 @@ pnpm clean        # remove dist/ directories
 
 ## Roadmap
 
-- REST API + web frontend — future workspaces over `@tonesmith/core`
-- Additional devices
+Additional devices, onboarded via the add-device skill (`.claude/skills/add-device/SKILL.md`).

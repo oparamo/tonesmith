@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
-import { patchUtils, capabilityUtils } from "@tonesmith/core";
+import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
 import { basename, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { printGroups, printGroup, printItem } from "./capabilities-print";
@@ -28,7 +28,7 @@ const configureDeviceCommands = <T extends Patch>(
         const patchFile = driver.readFile(file);
         console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
         for (const i of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
-          printPatch(patchFile.patches[i], i);
+          printPatch(patchView.presentPatch(patchFile.patches[i]), i);
         }
         console.info();
       });

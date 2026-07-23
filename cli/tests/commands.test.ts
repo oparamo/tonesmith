@@ -36,7 +36,9 @@ describe("configureDeviceCommands", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit(1)"); });
 
-    await expect(cmd.parseAsync(["read", "file.tsl"], { from: "user" })).rejects.toThrow("exit(1)");
+    const runReadCommand = cmd.parseAsync(["read", "file.tsl"], { from: "user" });
+
+    await expect(runReadCommand).rejects.toThrow("exit(1)");
     expect(errorSpy).toHaveBeenCalledWith("boom");
   });
 });

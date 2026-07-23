@@ -50,8 +50,9 @@ describe("upsertPatch", () => {
     const driver = makeFakeDriver(files);
 
     const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+    const patchNames = file.patches.map(patch => patch.name);
 
-    expect(file.patches.map(p => p.name)).toEqual(["Lead", "Rhythm"]);
+    expect(patchNames).toEqual(["Lead", "Rhythm"]);
   });
 
   it("replaces the patch with the same name in place, idempotent across reruns", () => {
@@ -62,8 +63,9 @@ describe("upsertPatch", () => {
 
     upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
     const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+    const patchNames = file.patches.map(patch => patch.name);
 
-    expect(file.patches.map(p => p.name)).toEqual(["Lead", "Rhythm"]);
+    expect(patchNames).toEqual(["Lead", "Rhythm"]);
   });
 
   it("propagates non-ENOENT errors from readFile", () => {
@@ -71,58 +73,89 @@ describe("upsertPatch", () => {
       ...makeFakeDriver(new Map()),
       readFile: () => { throw new Error("disk on fire"); },
     };
-    expect(() => upsertPatch(driver, "set.tsl", makePatch("Lead"))).toThrow("disk on fire");
+
+    const upsertWithBrokenReadFile = () => upsertPatch(driver, "set.tsl", makePatch("Lead"));
+
+    expect(upsertWithBrokenReadFile).toThrow("disk on fire");
+  });
+
+  it("names a freshly created file after setName when provided, else after the patch", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+
+    const named = upsertPatch(driver, "named.tsl", makePatch("Lead"), "My Library");
+    expect(named.name).toBe("My Library");
+
+    const unnamed = upsertPatch(driver, "unnamed.tsl", makePatch("Lead"));
+    expect(unnamed.name).toBe("Lead");
+  });
+
+  it("renames an existing set when setName is given, and preserves it when omitted", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Old Name", device: "FAKE", patches: [makePatch("Lead")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+
+    const kept = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
+    expect(kept.name).toBe("Old Name");
+
+    const renamed = upsertPatch(driver, "set.tsl", makePatch("Solo"), "New Name");
+    expect(renamed.name).toBe("New Name");
   });
 });
 
 describe("resolvePatchIndex", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Rock Lead")];
 
-  it("returns numeric index when ref is an integer string", () => {
-    expect(resolvePatchIndex(patches, "0")).toBe(0);
-    expect(resolvePatchIndex(patches, "2")).toBe(2);
+  it.each([
+    { ref: "0", expected: 0 },
+    { ref: "2", expected: 2 },
+  ])("returns numeric index when ref is the integer string $ref", ({ ref, expected }) => {
+    const index = resolvePatchIndex(patches, ref);
+
+    expect(index).toBe(expected);
   });
 
-  it("resolves name case-insensitively (trims stored patch name, not ref)", () => {
-    expect(resolvePatchIndex(patches, "clean jazz")).toBe(1);
-    expect(resolvePatchIndex(patches, "CLEAN JAZZ")).toBe(1);
-  });
+  it.each(["clean jazz", "CLEAN JAZZ"])(
+    "resolves name case-insensitively (trims stored patch name, not ref): %s",
+    (ref) => {
+      const index = resolvePatchIndex(patches, ref);
+
+      expect(index).toBe(1);
+    }
+  );
 
   it("throws when no patch matches the name", () => {
-    expect(() => resolvePatchIndex(patches, "Metal")).toThrow('No patch named "Metal"');
+    const resolveMissingName = () => resolvePatchIndex(patches, "Metal");
+
+    expect(resolveMissingName).toThrow('No patch named "Metal"');
   });
 
   it("throws when multiple patches share the same name", () => {
-    expect(() => resolvePatchIndex(patches, "rock lead")).toThrow(/Ambiguous name/);
-    expect(() => resolvePatchIndex(patches, "rock lead")).toThrow(/0.*2|2.*0/);
+    const resolveAmbiguousName = () => resolvePatchIndex(patches, "rock lead");
+
+    expect(resolveAmbiguousName).toThrow(/Ambiguous name/);
+    expect(resolveAmbiguousName).toThrow(/0.*2|2.*0/);
   });
 });
 
 describe("coerceValue", () => {
-  it("converts integer strings to numbers", () => {
-    expect(coerceValue("0")).toBe(0);
-    expect(coerceValue("72")).toBe(72);
-    expect(coerceValue("-5")).toBe(-5);
-  });
+  it.each([
+    { input: "0", expected: 0 },
+    { input: "72", expected: 72 },
+    { input: "-5", expected: -5 },
+    { input: "3.14", expected: 3.14 },
+    { input: "0.5", expected: 0.5 },
+    { input: "", expected: 0 },
+    { input: "hello", expected: "hello" },
+    { input: "NaN", expected: "NaN" },
+    { input: "FLAT", expected: "FLAT" },
+    { input: "true", expected: true },
+    { input: "false", expected: false },
+  ])("coerces \"$input\" to $expected", ({ input, expected }) => {
+    const result = coerceValue(input);
 
-  it("converts float strings to numbers", () => {
-    expect(coerceValue("3.14")).toBe(3.14);
-    expect(coerceValue("0.5")).toBe(0.5);
-  });
-
-  it("converts empty string to 0", () => {
-    expect(coerceValue("")).toBe(0);
-  });
-
-  it("returns non-numeric, non-boolean strings unchanged", () => {
-    expect(coerceValue("hello")).toBe("hello");
-    expect(coerceValue("NaN")).toBe("NaN");
-    expect(coerceValue("FLAT")).toBe("FLAT");
-  });
-
-  it("converts \"true\"/\"false\" strings to booleans", () => {
-    expect(coerceValue("true")).toBe(true);
-    expect(coerceValue("false")).toBe(false);
+    expect(result).toBe(expected);
   });
 });
 
@@ -133,34 +166,48 @@ describe("resolvePatchIndices", () => {
     expect(resolvePatchIndices(patches)).toEqual([0, 1, 2]);
   });
 
-  it("returns a single resolved index when ref is given", () => {
-    expect(resolvePatchIndices(patches, "1")).toEqual([1]);
-    expect(resolvePatchIndices(patches, "metal")).toEqual([2]);
+  it.each([
+    { ref: "1", expected: [1] },
+    { ref: "metal", expected: [2] },
+  ])("returns a single resolved index when ref is $ref", ({ ref, expected }) => {
+    const indices = resolvePatchIndices(patches, ref);
+
+    expect(indices).toEqual(expected);
   });
 
   it("propagates resolvePatchIndex's not-found error", () => {
-    expect(() => resolvePatchIndices(patches, "Bogus")).toThrow('No patch named "Bogus"');
+    const resolveMissingName = () => resolvePatchIndices(patches, "Bogus");
+
+    expect(resolveMissingName).toThrow('No patch named "Bogus"');
   });
 });
 
 describe("applyFieldEdits", () => {
   it("applies a single edit with coercion", () => {
     const patch: Record<string, unknown> = { amp: { gain: 0 } };
+
     applyFieldEdits(patch, [["amp.gain", "72"]]);
-    expect((patch.amp as Record<string, unknown>).gain).toBe(72);
+
+    const amp = patch.amp as Record<string, unknown>;
+    expect(amp.gain).toBe(72);
   });
 
   it("applies multiple edits in order, including booleans", () => {
     const patch: Record<string, unknown> = { key: "C", amp: { solo: false, gain: 0 } };
+
     applyFieldEdits(patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
+
+    const amp = patch.amp as Record<string, unknown>;
     expect(patch.key).toBe("G");
-    expect((patch.amp as Record<string, unknown>).solo).toBe(true);
-    expect((patch.amp as Record<string, unknown>).gain).toBe(50);
+    expect(amp.solo).toBe(true);
+    expect(amp.gain).toBe(50);
   });
 
   it("does nothing given an empty edit list", () => {
     const patch: Record<string, unknown> = { key: "C" };
+
     applyFieldEdits(patch, []);
+
     expect(patch.key).toBe("C");
   });
 });
@@ -168,28 +215,38 @@ describe("applyFieldEdits", () => {
 describe("setByPath", () => {
   it("sets a top-level key", () => {
     const obj: Record<string, unknown> = { x: 1 };
+
     setByPath(obj, "x", 99);
+
     expect(obj.x).toBe(99);
   });
 
   it("sets a nested key", () => {
     const obj: Record<string, unknown> = { a: { b: { c: 0 } } };
+
     setByPath(obj, "a.b.c", 42);
-    expect((obj.a as Record<string, unknown>).b).toEqual({ c: 42 });
+
+    const a = obj.a as Record<string, unknown>;
+    expect(a.b).toEqual({ c: 42 });
   });
 
   it("sets a two-level nested key", () => {
     const obj: Record<string, unknown> = { amp: { gain: 0, level: 0 } };
+
     setByPath(obj, "amp.gain", 80);
-    expect((obj.amp as Record<string, unknown>).gain).toBe(80);
-    expect((obj.amp as Record<string, unknown>).level).toBe(0);
+
+    const amp = obj.amp as Record<string, unknown>;
+    expect(amp.gain).toBe(80);
+    expect(amp.level).toBe(0);
   });
 
   it("overwrites an existing nested value", () => {
     const obj: Record<string, unknown> = { fx1: { params: { rate: 10 } } };
+
     setByPath(obj, "fx1.params.rate", 50);
-    expect(
-      ((obj.fx1 as Record<string, unknown>).params as Record<string, unknown>).rate,
-    ).toBe(50);
+
+    const fx1 = obj.fx1 as Record<string, unknown>;
+    const params = fx1.params as Record<string, unknown>;
+    expect(params.rate).toBe(50);
   });
 });

@@ -30,6 +30,7 @@ interface ToolResult {
  * that extracts the single text content block from the result. */
 const connectClient = async (): Promise<{
   callTool: (name: string, args: Record<string, unknown>) => Promise<ToolResult>;
+  getToolSchema: (name: string) => Promise<unknown>;
   close: () => Promise<void>;
 }> => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -45,11 +46,19 @@ const connectClient = async (): Promise<{
     return { text: block.text, isError: result.isError === true };
   };
 
+  /** Fetches one tool's client-visible definition (name/description/inputSchema) by name. */
+  const getToolSchema = async (name: string): Promise<unknown> => {
+    const { tools } = await client.listTools();
+    const tool = tools.find(candidate => candidate.name === name);
+    if (!tool) throw new Error(`No tool registered named "${name}"`);
+    return tool;
+  };
+
   const close = async (): Promise<void> => {
     await client.close();
   };
 
-  return { callTool, close };
+  return { callTool, getToolSchema, close };
 };
 
 export { connectClient, withTempDir, emptyTempDir, FIXTURE };

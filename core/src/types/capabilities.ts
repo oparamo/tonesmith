@@ -1,9 +1,31 @@
 /** A single parameter on a capability item or group (informational; not used for encoding). */
 interface ParamSpec {
   name: string;
-  /** Free text: "0–100", "–12–+12 semitones", enum list, etc. */
+  /**
+   * The exact property key for this param in machine surfaces — the field name in decoded
+   * patches (`read_patch` output) and the key to use inside a block's `params` record when
+   * building a patch. Distinct from `name`, which is the human display label
+   * ("PRE-DELAY" vs `preDelay`, "OCT F-BACK" vs `octFeedback`). Absent only for params with
+   * no backing codec field (e.g. HARMONIST's KEY, which is the patch-level key).
+   */
+  key?: string;
+  /** Free text: "0–100", "–12–+12 semitones", enum list, etc. Derived from the param's domain. */
   range: string;
+  /**
+   * Machine-readable numeric bounds, present only for numeric params (derived from a `range`-kind
+   * domain). Lets a consumer (e.g. the MCP generate schema) apply min/max without parsing `range`.
+   */
+  min?: number;
+  max?: number;
   description: string;
+  /**
+   * For discrete lookup-valued params whose `range` is only a compact summary (e.g. the
+   * 1/3-octave frequency tables), the full ordered list of exact valid labels — the
+   * machine-readable companion to `range`, so a consumer can enumerate the valid values
+   * instead of guessing their spelling. Omitted for plain numeric params and for short
+   * enums that already spell their values out in `range`.
+   */
+  values?: readonly string[];
 }
 
 /**

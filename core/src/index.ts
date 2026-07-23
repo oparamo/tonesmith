@@ -7,6 +7,7 @@ for (const driver of drivers) {
 
 export type { Patch, PatchFile, RawPatch, PatchDriver, DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec } from "./types";
 export * as patchUtils from "./patch-utils";
+export * as patchView from "./patch-view";
 export * as capabilityUtils from "./capability-utils";
 export * as registry from "./registry";
 

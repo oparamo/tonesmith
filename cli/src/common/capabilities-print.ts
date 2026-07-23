@@ -34,7 +34,8 @@ const printGroupItems = (items: CapabilityGroup["items"]): void => {
     console.info(`  ${CYAN}${item.id}${RESET}${modelTag}`);
     console.info(`    ${item.description}`);
     if (item.subTypes && item.subTypes.length > 0) {
-      console.info(`    ${DIM}Subtypes: ${item.subTypes.map(subType => subType.id).join(", ")}${RESET}`);
+      const subTypeIds = item.subTypes.map(subType => subType.id).join(", ");
+      console.info(`    ${DIM}Subtypes: ${subTypeIds}${RESET}`);
     }
     console.info();
   }
@@ -55,6 +56,15 @@ const printGroup = (group: CapabilityGroup): void => {
   printGroupItems(group.items);
 };
 
+// Most subtypes are pure model variants with no params of their own; FX-slot DELAY is the
+// exception — each sub-algorithm carries a distinct param set, so print those inline.
+const printSubTypeParams = (params: CapabilityItem["params"]): void => {
+  if (!params || params.length === 0) return;
+  for (const param of params) {
+    console.info(`      ${param.name.padEnd(12)} ${DIM}${param.range}${RESET}`);
+  }
+};
+
 const printItemSubTypes = (subTypes: CapabilityItem["subTypes"]): void => {
   if (!subTypes || subTypes.length === 0) return;
   console.info(`\n${YELLOW}Subtypes:${RESET}`);
@@ -62,6 +72,7 @@ const printItemSubTypes = (subTypes: CapabilityItem["subTypes"]): void => {
     const modelTag = subType.models ? `  ${DIM}[models: ${subType.models}]${RESET}` : "";
     console.info(`  ${CYAN}${subType.id}${RESET}${modelTag}`);
     console.info(`    ${subType.description}`);
+    printSubTypeParams(subType.params);
   }
 };
 

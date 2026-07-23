@@ -1,14 +1,14 @@
 import {
   FX_TYPES, FX_TYPE_IDX, ODDS_TYPES,
-  WAH_TYPES, ROTARY_SPEED, FB_MODE, RING_INTL, HUM_VOWELS, HUM_MODES,
+  WAH_TYPES, ROTARY_SPEED, FB_MODE, HUM_VOWELS, HUM_MODES,
   SBEND_PITCH, SLICER_PAT, HARMONIST_HR,
-  DLY_TYPES, REV_TYPES, ON_OFF,
+  FX_DLY_TYPES, FX_REV_TYPES, TWIST_MODES, PHASER_STAGES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 } from "../common";
 import type { FxParams } from "../types";
 import { hexFromBytes, lookupName, lookupIndex } from "./primitives";
-import { u8, signed, lookup, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
+import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 
 // ── FX type encode / decode ───────────────────────────────────────────────────
 //
@@ -125,7 +125,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     lookup("midFreq", 3, FREQ_STEPS), signed("midGain", 4, 20),
     lookup("lowCut", 5, FREQ_LOW_CUT), lookup("highCut", 6, FREQ_HIGH_CUT),
   ],
-  // GEQ band gains use signed(centre=20) — each band covers ±20 dB.
+  // GEQ band gains use signed(center=20) — each band covers ±20 dB.
   "GEQ": [
     signed("125Hz", 0, 20), signed("250Hz", 1, 20), signed("500Hz", 2, 20),
     signed("1kHz",  3, 20), signed("2kHz",  4, 20), signed("4kHz",  5, 20),
@@ -136,7 +136,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("500Hz", 3, 20), signed("1kHz",  4, 20), signed("2kHz",  5, 20),
     signed("level", 6, 20),
   ],
-  // All bands and level use signed(centre=20). Band order: standard frequency order.
+  // All bands and level use signed(center=20). Band order: standard frequency order.
   "HIGH GEQ": [
     signed("250Hz", 0, 20), signed("500Hz", 1, 20), signed("1kHz", 2, 20),
     signed("2kHz",  3, 20), signed("4kHz",  4, 20), signed("8kHz", 5, 20),
@@ -167,7 +167,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("reso", 1), signed("tone", 2), u8("level", 3),
   ],
   "FEEDBACKER": [
-    lookup("mode", 0, FB_MODE), u8("trigger", 1), u8("depth", 2), u8("riseTime", 3),
+    lookup("mode", 0, FB_MODE), bool("trigger", 1), u8("depth", 2), u8("riseTime", 3),
     u8("octRiseTm", 4), u8("feedback", 5), u8("octFeedback", 6),
   ],
   "SITAR SIM": [
@@ -181,7 +181,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "OD/DS": [
     lookup("type", 0, ODDS_TYPES),
     u8("drive", 1), signed("tone", 2), u8("level", 3), u8("direct", 4),
-    u8("solo", 5), u8("soloLevel", 6),
+    bool("solo", 5), u8("soloLevel", 6),
   ],
   // OVERTONE: FX3-only, stored in the separate 5-byte MEMORY%FX3A block rather than
   // the 251-byte FX3 block — see the FX3A handling in patch.ts. Offset 0 here refers
@@ -198,13 +198,9 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "FLANGER": [
     u8("rate", 0), u8("depth", 1), u8("reso", 2), u8("manual", 3), u8("level", 4), u8("direct", 5),
   ],
-  // PHASER: stage is stored as (stage−2)/2 and recovered as bytes[0]*2+2.
+  // PHASER: p[0] selects the stage count as a plain enum (raw 0/1/2 = 4/8/12 STAGE).
   "PHASER": [
-    {
-      name: "stage",
-      decode: bytes => bytes[0] * 2 + 2,
-      encode: (value, bytes) => { bytes[0] = ((value as number) - 2) >> 1; },
-    },
+    lookup("stage", 0, PHASER_STAGES),
     u8("rate", 1), u8("depth", 2), u8("reso", 3), u8("manual", 4), u8("level", 5), u8("direct", 6),
   ],
   "SCRIPT PH": [
@@ -221,7 +217,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("balance", 4), u8("drive", 5), u8("direct", 6),
   ],
   "VIBRATO": [
-    u8("rate", 0), u8("depth", 1), u8("riseTime", 2), u8("trigger", 3), u8("level", 4),
+    u8("rate", 0), u8("depth", 1), u8("riseTime", 2), bool("trigger", 3), u8("level", 4),
   ],
   "TREMOLO": [
     u8("rate", 0), u8("depth", 1), u8("level", 2),
@@ -230,7 +226,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("rate", 0), u8("depth", 1), u8("level", 2),
   ],
   "RING MOD": [
-    lookup("intelligent", 0, RING_INTL),
+    bool("intelligent", 0),
     u8("freq", 1), u8("modRate", 2), u8("modDepth", 3), u8("level", 4), u8("direct", 5),
   ],
   // HUMANIZER: p[0]=mode (stored in param block), then params shifted by one.
@@ -256,7 +252,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("minus1Oct", 0), u8("minus2Oct", 1), u8("direct", 2),
   ],
   "S-BEND": [
-    u8("trigger", 0), lookup("pitch", 1, SBEND_PITCH), u8("riseTime", 2), u8("fallTime", 3),
+    bool("trigger", 0), lookup("pitch", 1, SBEND_PITCH), u8("riseTime", 2), u8("fallTime", 3),
   ],
   // PEDAL BEND: pitchMin/pitchMax stored as (value + 24), range −24..+24 semitones.
   "PEDAL BEND": [
@@ -267,19 +263,42 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "TUNE DOWN": [
     signed("pitch", 0, 12),
   ],
-  // DELAY as an FX slot type (separate from the dedicated DLY block). Only the first
-  // 5 DLY_TYPES entries (STANDARD/MODULATE/PAN/REVERSE/ANALOG) are reachable here —
-  // WARP/TWIST/GLITCH are dedicated-block-only.
-  "DELAY": [
-    lookup("type", 0, DLY_TYPES), nibbleQuad("time", 1),
-    u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
-    u8("modRate", 8), u8("modDepth", 9), lookup("trigger", 11, ON_OFF),
-  ],
-  // REVERB as an FX slot type (separate from the dedicated REV block). Only the first
-  // 5 REV_TYPES entries (HALL S/HALL M/PLATE/ROOM S/ROOM L) are reachable here.
+  // DELAY as an FX slot type is per-sub-algorithm — see FX_DELAY_TYPE_MAPS below.
+  // REVERB as an FX slot type (separate from the dedicated REV block). Its 5 types are
+  // its own set (HALL S/HALL M/PLATE/ROOM/STUDIO — NOT the dedicated block's REV_TYPES),
+  // and all 5 share this one field set, so it stays a single flat map.
   "REVERB": [
-    lookup("type", 0, REV_TYPES), scaled("time", 1, 0.1),
+    lookup("type", 0, FX_REV_TYPES), scaled("time", 1, 0.1),
     nibblePair("preDelay", 2), u8("level", 4), u8("direct", 5),
+  ],
+};
+
+// FX-slot DELAY is the one FX type whose param set depends on the selected sub-algorithm,
+// so — like the dedicated DLY block — it is modeled per-subtype rather than with one flat
+// map. Offsets are 0-based within the DELAY param block (FX_PARAM_OFFSETS["DELAY"]); every
+// sub-algorithm's byte homes are distinct (no offset reuse), verified against the device's
+// address table. `type` (p[0]) is promoted to block.subType via PARAM_SUBTYPE_EFFECTS.
+const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
+  "STANDARD": [
+    lookup("type", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
+  ],
+  "MODULATE": [
+    lookup("type", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
+    u8("modRate", 8), u8("modDepth", 9),
+  ],
+  "WARP": [
+    lookup("type", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    bool("trigger", 11), u8("level", 12),
+  ],
+  "TWIST": [
+    lookup("type", 0, FX_DLY_TYPES), lookup("mode", 10, TWIST_MODES), bool("trigger", 11),
+    u8("riseTime", 13), u8("fallTime", 14), u8("fadeTime", 15), u8("level", 12),
+  ],
+  "GLITCH": [
+    lookup("type", 0, FX_DLY_TYPES), bool("trigger", 11),
+    u8("time", 16), u8("glitch", 17), u8("balance", 18),
   ],
 };
 
@@ -294,11 +313,14 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
  * bytes unchanged without data loss.
  */
 const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
-  const fields = FX_PARAM_MAPS[fxType];
-  if (!fields) return { unknownBytes: bytes.slice(0, 32) };
-
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
   const paramBytes = offset > 0 ? bytes.slice(offset) : bytes;
+  // DELAY selects its field map by the sub-algorithm byte (p[0]); every other type is flat.
+  const fields = fxType === "DELAY"
+    ? FX_DELAY_TYPE_MAPS[lookupName(FX_DLY_TYPES, paramBytes[0])]
+    : FX_PARAM_MAPS[fxType];
+  if (!fields) return { unknownBytes: bytes.slice(0, 32) };
+
   return decodeFields(fields, paramBytes);
 };
 
@@ -315,7 +337,9 @@ const encodeFxParams = (
   if ("unknownBytes" in params) return hexFromBytes(originalBytes);
 
   const bytes = [...originalBytes];
-  const fields = FX_PARAM_MAPS[fxType];
+  // DELAY's field map is chosen by the target sub-algorithm (params.type); others are flat.
+  const delaySubType = typeof params.type === "string" ? params.type : "";
+  const fields = fxType === "DELAY" ? FX_DELAY_TYPE_MAPS[delaySubType] : FX_PARAM_MAPS[fxType];
   if (fields) {
     const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
     if (offset > 0) {
@@ -329,4 +353,4 @@ const encodeFxParams = (
   return hexFromBytes(bytes);
 };
 
-export { decodeFxType, encodeFxType, decodeFxParams, encodeFxParams, FX_PARAM_MAPS };
+export { decodeFxType, encodeFxType, decodeFxParams, encodeFxParams, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS };

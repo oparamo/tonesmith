@@ -8,9 +8,12 @@ describe("list_devices", () => {
   it("includes gx1", async () => {
     const client = await connectClient();
     close = client.close;
+
     const { text, isError } = await client.callTool("list_devices", {});
+
     expect(isError, text).toBe(false);
     const devices = JSON.parse(text) as { id: string; name: string }[];
-    expect(devices.map(d => d.id)).toContain("gx1");
+    const deviceIds = devices.map(device => device.id);
+    expect(deviceIds).toContain("gx1");
   });
 });
