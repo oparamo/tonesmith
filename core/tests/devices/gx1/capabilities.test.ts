@@ -19,6 +19,7 @@ import {
   PARAM_SUBTYPE_EFFECTS,
 } from "../../../src/devices/gx1/common";
 import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
+import { DEFAULT_CHAIN } from "../../../src/devices/gx1/builder";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../src/devices/gx1/param-catalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../src/devices/gx1/codec/fx-params";
 import {
@@ -394,5 +395,19 @@ describe("GX-1 FX subtype coverage", () => {
         `FX item "${item.id}" has subTypes but is missing from PARAM_SUBTYPE_EFFECTS`
       ).toBe(true);
     }
+  });
+});
+
+// ── chain capability: defaultOrder can't drift from the builder's DEFAULT_CHAIN ──
+
+describe("GX-1 chain capability", () => {
+  it("defaultOrder equals the builder's DEFAULT_CHAIN", () => {
+    expect(gx1Capabilities.chain.defaultOrder).toEqual(DEFAULT_CHAIN);
+  });
+
+  it("describes bypass via `on` and names FV as the exception", () => {
+    const { description } = gx1Capabilities.chain;
+    expect(description, "chain description mentions bypass via on: false").toMatch(/on: false/);
+    expect(description, "chain description names the FV exception").toContain("FV");
   });
 });

@@ -21,7 +21,7 @@ describe("printPatch", () => {
 
   it("skips the OD/DS line entirely when odds is off", () => {
     const patch = gx1.basePatch("Test");
-    gx1.clearOdds(patch);
+    patch.odds.on = false;
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);

@@ -1,20 +1,39 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { gx1 } from "@tonesmith/core";
 import { connectClient } from "./helpers";
 
 describe("describe_device", () => {
   let close: () => Promise<void>;
   afterEach(async () => { await close(); });
 
-  it("lists all groups when group is omitted", async () => {
+  it("lists all groups plus a chain pointer when group is omitted", async () => {
     const client = await connectClient();
     close = client.close;
 
     const { text, isError } = await client.callTool("describe_device", { device: "gx1" });
 
     expect(isError, text).toBe(false);
-    const groups = JSON.parse(text) as { id: string }[];
-    const groupIds = groups.map(group => group.id);
+    const summary = JSON.parse(text) as {
+      chain: { defaultOrder: string[]; help: string };
+      groups: { id: string }[];
+    };
+    const groupIds = summary.groups.map(group => group.id);
     expect(groupIds).toContain("amp");
+    expect(summary.chain.defaultOrder, "no-group summary carries a chain pointer").toContain("AMP");
+    expect(summary.chain.help).toMatch(/chain/i);
+  });
+
+  it("returns the full chain model for group=chain", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const { text, isError } = await client.callTool("describe_device", { device: "gx1", group: "chain" });
+
+    expect(isError, text).toBe(false);
+    const chain = JSON.parse(text) as { description: string; defaultOrder: string[] };
+    expect(chain.defaultOrder, "chain view lists the default block order").toEqual(gx1.DEFAULT_CHAIN);
+    expect(chain.description, "chain view explains bypass").toMatch(/on: false/);
+    expect(chain.description, "chain view names the FV exception").toContain("FV");
   });
 
   it("returns full detail for a single group", async () => {

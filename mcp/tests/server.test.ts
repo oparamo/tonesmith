@@ -37,6 +37,14 @@ describe("server instructions", () => {
     }
   });
 
+  it("directs the client to learn the signal chain first", async () => {
+    const { client, close: cleanup } = await connect();
+    close = cleanup;
+
+    const instructions = client.getInstructions() ?? "";
+    expect(instructions, "instructions should surface the chain as an early step").toMatch(/describe_device <device> chain/);
+  });
+
   it("stays device-agnostic — no device-specific tokens leak in", async () => {
     const { client, close: cleanup } = await connect();
     close = cleanup;

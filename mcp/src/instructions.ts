@@ -4,22 +4,24 @@
  * so nothing here names a specific device.
  */
 const instructions = `tonesmith reads, edits, and builds patch files for guitar multi-effects
-processors. It carries the device knowledge you need — the supported devices, their signal
-blocks, effects, parameters, and value ranges — so you can build a patch for a device you know
-nothing about ahead of time.
+processors. The server carries the device knowledge — supported devices, their signal blocks,
+effects, parameters, and value ranges — so you can build a patch for a device you've never seen.
 
-A typical flow:
+A device arranges its effects as a signal chain of blocks: order matters, and most blocks can be
+turned on or off independently. These tools are the complete interface for working with patch
+files, covering the full lifecycle:
 
-1. list_devices — see the supported devices and pick the id you want.
-2. describe_device — with just the device, get its block structure (amp, drive, delay, reverb,
-   and so on). Pass a group, and optionally an item, to drill in and see each parameter's key,
-   range, and allowed values.
-3. generate_<device>_patch — build and save a patch. Each block's type-specific parameters go in
-   its \`params\` record, keyed by the parameter keys from describe_device. The response echoes the
-   full patch it built and the resolved signal chain.
-4. read_patch and write_field — read a saved patch back, and edit a single field by dot-path.
+1. list_devices — list the supported devices and pick an id.
+2. describe_device <device> chain — learn the signal chain first: the default block order, what can
+   be reordered, and how blocks are bypassed.
+3. describe_device <device> [group] — a block's structure and, drilling into a group or item, each
+   parameter's key, range, and allowed values.
+4. generate_<device>_patch — build a patch and save it. Set the block order, each block's
+   parameters, and its on/off state; the response echoes the full patch and the resolved chain, so
+   you confirm the result in one step.
+5. read_patch — read a saved patch back to inspect it.
+6. write_field — change a single field of a saved patch by dot-path.
 
-Reach for describe_device whenever you need a device's exact block names, parameter keys, or value
-ranges; it's the source of truth the generate and write tools expect you to build against.`;
+Everything you need to inspect, build, and edit a patch is here.`;
 
 export { instructions };

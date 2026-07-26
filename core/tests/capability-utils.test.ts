@@ -3,6 +3,7 @@ import type { DeviceCapabilities } from "../src/types";
 import { findGroup, findItem } from "../src/capability-utils";
 
 const caps: DeviceCapabilities = {
+  chain: { description: "Signal chain", defaultOrder: ["amp", "delay"] },
   groups: [
     {
       id: "amp",

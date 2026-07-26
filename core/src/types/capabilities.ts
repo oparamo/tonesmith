@@ -64,9 +64,23 @@ interface CapabilityGroup {
   params?: ParamSpec[];
 }
 
+/**
+ * The device's signal-chain model: how blocks are ordered and how they're turned on/off. Every
+ * device has one; it's the first thing to consult before building a patch. Device-agnostic — the
+ * block names and specifics live in each device's own `ChainSpec`.
+ */
+interface ChainSpec {
+  /** How the chain works — ordering, bypass, and the default arrangement — in prose. */
+  description: string;
+  /** The canonical block order used when a patch doesn't specify one. */
+  defaultOrder: string[];
+}
+
 /** All capability metadata for a device. */
 interface DeviceCapabilities {
+  /** The device's signal chain — block order and how blocks are reordered/bypassed. */
+  chain: ChainSpec;
   groups: CapabilityGroup[];
 }
 
-export type { ParamSpec, CapabilityItem, CapabilityGroup, DeviceCapabilities };
+export type { ParamSpec, CapabilityItem, CapabilityGroup, ChainSpec, DeviceCapabilities };

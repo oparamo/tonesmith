@@ -70,8 +70,9 @@ const amp = (
   level = 100,
   solo = false,
   soloLevel = 50,
+  on = true,
 ): void => {
-  patch.amp.on = true;
+  patch.amp.on = on;
   patch.amp.type = type;
   patch.amp.gain = gain;
   patch.amp.bass = bass;
@@ -93,8 +94,9 @@ const odds = (
   direct = 0,
   solo = false,
   soloLevel = 50,
+  on = true,
 ): void => {
-  patch.odds.on = true;
+  patch.odds.on = on;
   patch.odds.type = type;
   patch.odds.drive = drive;
   patch.odds.tone = tone;
@@ -102,10 +104,6 @@ const odds = (
   patch.odds.direct = direct;
   patch.odds.solo = solo;
   patch.odds.soloLevel = soloLevel;
-};
-
-const clearOdds = (patch: Patch): void => {
-  patch.odds.on = false;
 };
 
 /**
@@ -163,9 +161,10 @@ const fx = (
   fxType: string,
   subType: string | null = null,
   params: FxParams = {},
+  on = true,
 ): void => {
   const block = patch[slot];
-  block.on = true;
+  block.on = on;
   block.type = fxType;
   block.subType = subType;
   // For effects whose sub-model lives in param-block byte p[0] (not FX_COM byte[2]),
@@ -294,5 +293,5 @@ const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
 
 export {
   DEFAULT_CHAIN, moveBefore, normalizeChain, defaultFxParams,
-  basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, saveTsl,
+  basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, saveTsl,
 };

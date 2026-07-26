@@ -10,7 +10,6 @@ import {
   basePatch,
   amp,
   odds,
-  clearOdds,
   fx,
   ns,
   fv,
@@ -220,15 +219,31 @@ describe("odds", () => {
   });
 });
 
-describe("clearOdds", () => {
-  it("disables odds", () => {
+describe("block on/off", () => {
+  it("amp defaults on, and honors on=false", () => {
+    const patch = basePatch("Test");
+    amp(patch, "TWIN", 50, 50, 50, 50);
+    expect(patch.amp.on).toBe(true);
+
+    amp(patch, "TWIN", 50, 50, 50, 50, "ORIGINAL", "DYN57", 100, false, 50, false);
+    expect(patch.amp.on).toBe(false);
+  });
+
+  it("fx defaults on, and honors on=false", () => {
+    const patch = basePatch("Test");
+    fx(patch, "fx1", "CHORUS");
+    expect(patch.fx1.on).toBe(true);
+
+    fx(patch, "fx2", "CHORUS", null, {}, false);
+    expect(patch.fx2.on).toBe(false);
+  });
+
+  it("odds defaults on, and honors on=false", () => {
     const patch = basePatch("Test");
     odds(patch, "OVERDRIVE", 50, 50, 50);
-
     expect(patch.odds.on).toBe(true);
 
-    clearOdds(patch);
-
+    odds(patch, "OVERDRIVE", 50, 50, 50, 0, false, 50, false);
     expect(patch.odds.on).toBe(false);
   });
 });

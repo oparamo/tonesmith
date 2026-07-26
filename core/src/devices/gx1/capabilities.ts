@@ -16,6 +16,7 @@ import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlock
 import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
+import { DEFAULT_CHAIN } from "./builder";
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -409,6 +410,22 @@ const PFX_META: CapabilityItem[] = [
 // ---------------------------------------------------------------------------
 
 const gx1Capabilities: DeviceCapabilities = {
+  chain: {
+    defaultOrder: [...DEFAULT_CHAIN],
+    description:
+      "The signal chain is the ordered list of blocks the guitar signal passes through. Every " +
+      "block below is always part of the chain — you set their order and turn them on or off, but " +
+      "blocks are never added to or removed from the chain.\n\n" +
+      "Order and on/off are independent controls:\n" +
+      "• Order: when building a patch, list the blocks first-to-last. Any block you leave out of " +
+      "that list keeps its default position — it is not removed or disabled. The default order is " +
+      'the most common starting point, not a required or "correct" one; reorder freely to suit ' +
+      "the tone.\n" +
+      "• On/off: every block can be bypassed by turning it off (on: false), except FV (Foot " +
+      "Volume), which is always active. A block you don't configure when building a patch is left " +
+      "off.\n\n" +
+      `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
+  },
   groups: [
     {
       id: "fx",
@@ -419,7 +436,7 @@ const gx1Capabilities: DeviceCapabilities = {
     {
       id: "odds",
       name: "OD/DS",
-      description: "Dedicated overdrive/distortion block with 35 classic pedal models. Always in the signal chain (can be bypassed).",
+      description: "Dedicated overdrive/distortion block with 35 classic pedal models.",
       items: ODDS_ITEMS,
       params: PARAMS_BY_BLOCK.odds,
     },
@@ -458,7 +475,7 @@ const gx1Capabilities: DeviceCapabilities = {
     {
       id: "fv",
       name: "FV (Foot Volume)",
-      description: "Expression-pedal volume control. Typically assigned to the CTL 2/EXP 2 jack.",
+      description: "Expression-pedal volume control. Typically assigned to the CTL 2/EXP 2 jack. The one chain block that's always active — it can't be bypassed.",
       items: [],
       params: PARAMS_BY_BLOCK.fv,
     },

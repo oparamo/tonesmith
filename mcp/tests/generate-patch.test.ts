@@ -148,6 +148,29 @@ describe("generate_gx1_patch", () => {
     expect(patch.fx1.on).toBe(false);
   });
 
+  it("bypasses an explicitly-provided amp or odds via on: false, keeping settings", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "amp-odds-off.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Amp Odds Off",
+      outPath,
+      amp: { type: "JC-120", gain: 55, bass: 50, middle: 50, treble: 50, on: false },
+      odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70, on: false },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", patchSpec);
+
+    expect(isError, text).toBe(false);
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.amp.on).toBe(false);
+    expect(patch.amp.gain, "amp settings survive a bypass").toBe(55);
+    expect(patch.odds.on).toBe(false);
+    expect(patch.odds.type, "odds settings survive a bypass").toBe("BLUES OD");
+    expect(patch.odds.drive).toBe(40);
+  });
+
   it("builds a pfx block with no params, using its type's defaults", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "pfx-no-params.tsl");

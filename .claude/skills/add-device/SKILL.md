@@ -187,7 +187,11 @@ capabilities on top of it — don't hand-write param ranges twice.
    group/item structure, real-world models, sonic descriptions, subtypes — and **derives each
    item's `params` from the catalog** rather than restating them. Types whose param set varies
    by sub-model are modeled per-subtype (each subtype carries its own catalog-derived params).
-   Wire capabilities into the driver object from step 3.
+   Also author the required **`chain`** (`ChainSpec`): its `defaultOrder` is the device's block
+   order (derive it from the driver's own default-chain constant so the two can't drift), and its
+   `description` explains, for this device, how blocks are reordered and how they're turned on/off
+   (which blocks can be bypassed, and any that can't). This is the signal-chain model an agent
+   consults first. Wire capabilities into the driver object from step 3.
 
 Add the drift guard as a test. Because capabilities derives from the catalog, `capabilities ↔
 codec` can't drift by construction; the real risk is between the two independently authored

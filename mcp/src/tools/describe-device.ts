@@ -13,8 +13,9 @@ const registerDescribeDevice = (server: McpServer): void => {
       inputSchema: z.object({
         device: z.string().describe("Device ID (e.g. 'gx1'). Use list_devices to enumerate IDs."),
         group: z.string().optional().describe(
-          "Group ID to filter to (e.g. 'amp', 'fx', 'odds', 'delay', 'reverb', 'cab', 'mic', 'ns', 'fv'). " +
-            "Omit to list all groups."
+          "Group ID to filter to (e.g. 'amp', 'fx', 'odds', 'delay', 'reverb', 'cab', 'mic', 'ns', 'fv'), " +
+            "or 'chain' for the signal-chain model (default block order and how blocks are reordered/" +
+            "bypassed). Omit to list all groups plus a chain summary."
         ),
         item: z.string().optional().describe(
           "Item ID within the selected group to return in full detail. Requires 'group'."
@@ -26,13 +27,23 @@ const registerDescribeDevice = (server: McpServer): void => {
         const { capabilities } = registry.getDriver(device);
 
         if (!group) {
-          const summary = capabilities.groups.map(capGroup => ({
-            id: capGroup.id,
-            name: capGroup.name,
-            description: capGroup.description,
-            itemCount: capGroup.items.length,
-          }));
+          const summary = {
+            chain: {
+              defaultOrder: capabilities.chain.defaultOrder,
+              help: 'Call describe_device with group "chain" for how block order and on/off bypass work.',
+            },
+            groups: capabilities.groups.map(capGroup => ({
+              id: capGroup.id,
+              name: capGroup.name,
+              description: capGroup.description,
+              itemCount: capGroup.items.length,
+            })),
+          };
           return ok(JSON.stringify(summary, null, 2));
+        }
+
+        if (group === "chain") {
+          return ok(JSON.stringify(capabilities.chain, null, 2));
         }
 
         const matched = capabilityUtils.findGroup(capabilities, group);
