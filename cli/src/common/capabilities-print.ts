@@ -1,4 +1,4 @@
-import type { DeviceCapabilities, CapabilityGroup, CapabilityItem } from "@tonesmith/core";
+import type { DeviceCapabilities, CapabilityGroup, CapabilityItem, ChainSpec } from "@tonesmith/core";
 
 const RESET  = "\x1b[0m";
 const BOLD   = "\x1b[1m";
@@ -7,9 +7,20 @@ const CYAN   = "\x1b[36m";
 const YELLOW = "\x1b[33m";
 const GREEN  = "\x1b[32m";
 
-/** Print a summary table of all groups (id, name, item count). */
+/** Print the device's signal-chain model — default order + how ordering and bypass work. */
+const printChain = (chain: ChainSpec): void => {
+  console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
+  console.info(`${YELLOW}Default order:${RESET} ${chain.defaultOrder.join(" → ")}\n`);
+  console.info(chain.description);
+  console.info();
+};
+
+/** Print a summary table of all groups (id, name, item count), led by a chain pointer. */
 const printGroups = (caps: DeviceCapabilities): void => {
   console.info(`\n${BOLD}Capability groups${RESET}\n`);
+  console.info(`  ${CYAN}${"chain".padEnd(10)}${RESET}  ${BOLD}Signal Chain${RESET}  ${DIM}(block order + bypass)${RESET}`);
+  console.info(`  ${"".padEnd(10)}  Default: ${caps.chain.defaultOrder.join(" → ")}  ${DIM}— run \`capabilities chain\` for details${RESET}`);
+  console.info();
   for (const group of caps.groups) {
     const count = group.items.length > 0 ? `${group.items.length} types` : "—";
     console.info(`  ${CYAN}${group.id.padEnd(10)}${RESET}  ${BOLD}${group.name}${RESET}  ${DIM}(${count})${RESET}`);
@@ -102,4 +113,4 @@ const printItem = (group: CapabilityGroup, item: CapabilityItem): void => {
   console.info();
 };
 
-export { printGroups, printGroup, printItem };
+export { printChain, printGroups, printGroup, printItem };

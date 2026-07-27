@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { gx1, capabilityUtils, patchUtils, patchView } from "@tonesmith/core";
-const { basePatch, amp, odds, clearOdds, fx, ns, fv, pfx, delay, reverb, normalizeChain } = gx1;
+const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, normalizeChain, DEFAULT_CHAIN } = gx1;
 import { ok, err } from "../../common";
 import { FxBlockSchema } from "./schemas";
 import { boundedNumber, boundedInt } from "./bounds";
@@ -46,11 +46,10 @@ const inputSchema = z.object({
     "otherwise the patch is appended; a missing file is created."
   ),
   chain: z.array(z.string()).optional().describe(
-    'Signal chain as an ordered array of block names, first element = first in the chain ' +
-    '(e.g. ["FX1","OD","AMP","NS","DLY","REV"]). Omitted blocks are inserted at their default relative ' +
-    'position (default full chain: PFX, FX1, OD/DS, AMP, NS, FV, FX2, FX3, DLY, REV). "OD" is an alias for "OD/DS". ' +
-    "The response states the resolved full chain — omitted blocks appear at their default positions, and " +
-    "disabled blocks still appear (turn a block off via its `on` field, not by leaving it out of `chain`)."
+    "Block order as an array, first element = first in the chain. Pass just the blocks you want to " +
+    'move; any block you leave out keeps its default position (it is NOT disabled — bypass a block ' +
+    "via its `on` field instead). \"OD\" is an alias for \"OD/DS\". The response states the resolved " +
+    "full order. See `describe_device gx1 chain` for the default order and how ordering/bypass work."
   ),
   key: z.string().optional().describe(
     "Song key for HARMONIST's diatonic intervals: C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B (default C)"
@@ -67,6 +66,7 @@ const inputSchema = z.object({
     level: boundedInt("amp", "LEVEL").optional().describe("Output level 0–100 (default 100)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: boundedInt("amp", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
+    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
   }).describe("Amplifier block (required)"),
 
   odds: z.object({
@@ -77,7 +77,8 @@ const inputSchema = z.object({
     direct: boundedInt("odds", "DIRECT").optional().describe("Direct mix 0–100 (default 0)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: boundedInt("odds", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
-  }).optional().describe("Overdrive/distortion block. Omit to disable."),
+    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
+  }).optional().describe("Overdrive/distortion block. Omit to leave it off."),
 
   pfx: z.object({
     type: z.string().describe(`Pedal FX type: ${capabilityItemIds("pfx")}`),
@@ -85,10 +86,10 @@ const inputSchema = z.object({
       "Type-specific params (e.g. { wahType: \"CRY WAH\", level: 100, direct: 0, position: 100, min: 0, max: 100 } for WAH; " +
       "{ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 } for PEDAL BEND)"
     ),
-    on: z.boolean().optional().describe("Enable the pedal effect (default true)"),
+    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
   }).superRefine((pfx, ctx) => {
     validateTypeParams(msg => { ctx.addIssue(msg); }, "pfx", pfx.type, undefined, pfx.params ?? {});
-  }).optional().describe("Expression pedal effect block. Omit to disable."),
+  }).optional().describe("Expression pedal effect block. Omit to leave it off."),
 
   fx1: FxBlockSchema.describe("FX1 slot (pre-amp or first in chain). Omit to leave empty."),
   fx2: FxBlockSchema.describe("FX2 slot. Omit to leave empty."),
@@ -97,9 +98,9 @@ const inputSchema = z.object({
   ns: z.object({
     threshold: boundedInt("ns", "THRESHOLD").describe("Noise threshold 0–100"),
     release: boundedInt("ns", "RELEASE").describe("Release time 0–100"),
-    on: z.boolean().optional().describe("Enable NS (default true)"),
+    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
     detect: z.string().optional().describe("Detection point: INPUT or NS INPUT (default INPUT)"),
-  }).optional().describe("Noise suppressor. Omit to leave disabled."),
+  }).optional().describe("Noise suppressor. Omit to leave it off."),
 
   fv: z.object({
     position: boundedInt("fv", "POSITION").describe("Pedal position 0–100"),
@@ -114,7 +115,7 @@ const inputSchema = z.object({
     feedback: boundedInt("delay", "FEEDBACK", "STANDARD").describe("Feedback 0–100"),
     level: boundedInt("delay", "LEVEL", "STANDARD").describe("Effect level 1–120"),
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
-    on: z.boolean().optional().describe("Enable delay (default true)"),
+    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. modRate/modDepth for MODULATE, mode/riseTime for TWIST, head for SPACE " +
@@ -128,7 +129,7 @@ const inputSchema = z.object({
       highCut: delayBlock.highCut, ...(delayBlock.params ?? {}),
     };
     validateTypeParams(msg => { ctx.addIssue(msg); }, "delay", delayBlock.type, undefined, values);
-  }).optional().describe("Delay block. Omit to disable."),
+  }).optional().describe("Delay block. Omit to leave it off."),
 
   reverb: z.object({
     type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
@@ -138,7 +139,7 @@ const inputSchema = z.object({
     tone: boundedInt("reverb", "TONE", "HALL S").optional().describe("Tone EQ −50–+50 (default 0)"),
     density: boundedInt("reverb", "DENSITY", "HALL S").optional().describe("Density 1–10 (default 5)"),
     direct: boundedInt("reverb", "DIRECT", "HALL S").optional().describe("Direct level 0–100 (default 100)"),
-    on: z.boolean().optional().describe("Enable reverb (default true)"),
+    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY). Call " +
@@ -153,19 +154,22 @@ const inputSchema = z.object({
       ...(reverbBlock.params ?? {}),
     };
     validateTypeParams(msg => { ctx.addIssue(msg); }, "reverb", reverbBlock.type, undefined, values);
-  }).optional().describe("Reverb block. Omit to disable."),
+  }).optional().describe("Reverb block. Omit to leave it off."),
 });
 
 type GeneratePatchInput = z.infer<typeof inputSchema>;
 type Patch = gx1.Patch;
 
+// Every block is off in the base patch, so an omitted block needs no explicit disabling — just
+// return. A block that IS provided is configured through its builder, which now sets `on` itself
+// (default true); pass `on: false` to bypass it.
 const applyOdds = (patch: Patch, oddsParams: GeneratePatchInput["odds"]): void => {
-  if (!oddsParams) { clearOdds(patch); return; }
-  odds(patch, oddsParams.type, oddsParams.drive, oddsParams.tone, oddsParams.level, oddsParams.direct, oddsParams.solo, oddsParams.soloLevel);
+  if (!oddsParams) return;
+  odds(patch, oddsParams.type, oddsParams.drive, oddsParams.tone, oddsParams.level, oddsParams.direct, oddsParams.solo, oddsParams.soloLevel, oddsParams.on ?? true);
 };
 
 const applyPfx = (patch: Patch, pfxParams: GeneratePatchInput["pfx"]): void => {
-  if (!pfxParams) { patch.pfx.on = false; return; }
+  if (!pfxParams) return;
   pfx(patch, pfxParams.type, pfxParams.params ?? {}, pfxParams.on ?? true);
 };
 
@@ -173,8 +177,7 @@ const applyFxSlots = (patch: Patch, params: GeneratePatchInput): void => {
   for (const slot of ["fx1", "fx2", "fx3"] as const) {
     const block = params[slot];
     if (!block?.type || block.type === "NONE") continue;
-    fx(patch, slot, block.type, block.subType ?? null, block.params ?? {});
-    if (block.on === false) patch[slot].on = false;
+    fx(patch, slot, block.type, block.subType ?? null, block.params ?? {}, block.on ?? true);
   }
 };
 
@@ -184,7 +187,7 @@ const applyFv = (patch: Patch, fvParams: GeneratePatchInput["fv"]): void => {
 };
 
 const applyDelay = (patch: Patch, delayParams: GeneratePatchInput["delay"]): void => {
-  if (!delayParams) { patch.delay.on = false; return; }
+  if (!delayParams) return;
   delay(patch, delayParams.type, delayParams.time, delayParams.feedback, delayParams.level, delayParams.highCut, delayParams.on ?? true, delayParams.params ?? {});
 };
 
@@ -215,14 +218,11 @@ const registerGeneratePatch = (server: McpServer): void => {
     {
       description: `Build a BOSS GX-1 patch from structured parameters and save it as a .tsl file.
 
-Signal chain: omit it to use the full default order —
-  ["PFX","FX1","OD/DS","AMP","NS","FV","FX2","FX3","DLY","REV"]
-— or pass just the blocks you care about, in the order you want them relative to each
-other. Any block you leave out is inserted at its default position, so you never have to
-spell out the whole chain to change one part of it. For example, ["OD/DS","FX1","AMP"]
-moves OD/DS ahead of FX1 and resolves to
-["PFX","OD/DS","FX1","AMP","NS","FV","FX2","FX3","DLY","REV"]. "OD" is accepted as
-shorthand for "OD/DS".
+Signal chain: omit \`chain\` to use the default order (${DEFAULT_CHAIN.join(", ")}), or pass just the
+blocks you want to move, in order — any block you leave out keeps its default position. For example,
+["OD/DS","FX1","AMP"] moves OD/DS ahead of FX1 and resolves to
+${JSON.stringify(normalizeChain(["OD/DS", "FX1", "AMP"]))}. "OD" is shorthand for "OD/DS". See
+describe_device gx1 chain for how ordering and bypass work.
 
 Setting parameters: every block's type-specific params go in its \`params\` record, keyed by
 the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fields, so their
@@ -241,7 +241,7 @@ ${buildCatalog()}`,
         const patch = basePatch(params.name, chain, params.key);
 
         const ampParams = params.amp;
-        amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.middle, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level, ampParams.solo, ampParams.soloLevel);
+        amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.middle, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level, ampParams.solo, ampParams.soloLevel, ampParams.on ?? true);
 
         applyOdds(patch, params.odds);
         applyPfx(patch, params.pfx);

@@ -146,4 +146,13 @@ describe("generate_gx1_patch chain worked-example drift guard", () => {
 
     expect(toolSchema.description, "the worked chain example must match the real merge rule").toContain(resolvedExample);
   });
+
+  it("shows the default order straight from DEFAULT_CHAIN, so it can't drift", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const toolSchema = await client.getToolSchema("generate_gx1_patch") as { description: string };
+
+    expect(toolSchema.description, "the default order shown must come from DEFAULT_CHAIN").toContain(gx1.DEFAULT_CHAIN.join(", "));
+  });
 });

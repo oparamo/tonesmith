@@ -16,7 +16,7 @@ const FxBlockSchema = z.object({
     "ordinary entry in `params`. Use describe_device with group=fx and the item's id to see an " +
     "effect's subTypes, params, and values."
   ),
-  on: z.boolean().optional().describe("Whether the slot is active (default true)"),
+  on: z.boolean().optional().describe("Active by default; set false to bypass the slot"),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
     "Every effect parameter as key→value pairs (an fx slot has no named param fields, so all of its " +
     "params live here). The key is each param's `key` from describe_device (group=fx, the item's id) " +

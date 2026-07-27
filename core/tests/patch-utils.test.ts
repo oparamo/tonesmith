@@ -11,7 +11,7 @@ const makePatch = (name: string): Patch =>
 const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   id: "fake",
   name: "Fake",
-  capabilities: { groups: [] },
+  capabilities: { chain: { description: "", defaultOrder: [] }, groups: [] },
   readFile: (path) => {
     const file = files.get(path);
     if (!file) {

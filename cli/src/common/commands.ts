@@ -3,7 +3,7 @@ import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
 import { basename, extname } from "node:path";
 import { existsSync } from "node:fs";
-import { printGroups, printGroup, printItem } from "./capabilities-print";
+import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
 const run = (action: () => void): void => {
   try {
@@ -93,6 +93,11 @@ const configureDeviceCommands = <T extends Patch>(
 
         if (!groupId) {
           printGroups(caps);
+          return;
+        }
+
+        if (groupId === "chain") {
+          printChain(caps.chain);
           return;
         }
 

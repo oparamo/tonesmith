@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { runCli } from "./helpers";
 
 describe("gx1 capabilities", () => {
-  it("lists all groups when given no arguments", async () => {
+  it("lists all groups plus a chain pointer when given no arguments", async () => {
     const { info, error, exitCode } = await runCli(["gx1", "capabilities"]);
 
     const errorOutput = error.join("\n");
@@ -11,6 +11,19 @@ describe("gx1 capabilities", () => {
     expect(output).toContain("Capability groups");
     expect(output).toContain("amp");
     expect(output).toContain("fx");
+    expect(output).toContain("Signal Chain");
+    expect(output).toContain("capabilities chain");
+  });
+
+  it("prints the signal-chain model for the chain argument", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "chain"]);
+
+    const errorOutput = error.join("\n");
+    expect(exitCode, errorOutput).toBeUndefined();
+    const output = info.join("\n");
+    expect(output).toContain("Signal chain");
+    expect(output).toContain("Default order:");
+    expect(output).toContain("FV");
   });
 
   it("lists all items in a single group", async () => {

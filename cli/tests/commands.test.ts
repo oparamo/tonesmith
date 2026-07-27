@@ -3,7 +3,10 @@ import { Command } from "commander";
 import type { Patch, PatchDriver, DeviceCapabilities, RawPatch } from "@tonesmith/core";
 import { configureDeviceCommands } from "../src/common/commands";
 
-const caps: DeviceCapabilities = { groups: [] };
+const caps: DeviceCapabilities = {
+  chain: { description: "The signal chain model.", defaultOrder: ["amp", "delay"] },
+  groups: [],
+};
 
 const makeDriver = (overrides: Partial<PatchDriver> = {}): PatchDriver => ({
   id: "stub",
