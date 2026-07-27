@@ -95,7 +95,7 @@ MCP tools:
 |-----------------------|-----------------------------------------------------------------------------------------------------|
 | `list_devices`        | List supported devices                                                                              |
 | `read_patch`          | Read one or all patches from a patch file                                                           |
-| `write_field`         | Edit a single field in an existing patch                                                            |
+| `write_fields`        | Edit one or more fields in an existing patch, applied as one batch                                  |
 | `describe_device`     | Browse a device's capability metadata (groups, types, params)                                       |
 | `generate_<id>_patch` | Build a new patch from structured parameters — one tool per device (currently `generate_gx1_patch`) |
 

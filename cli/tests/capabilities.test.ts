@@ -77,6 +77,30 @@ describe("gx1 capabilities", () => {
     expect(output).toContain("MOD DEPTH");
   });
 
+  // Without the key you can't address the param in `write`, and for lookup params `range` is only
+  // a summary — the exact labels come from `values`.
+  it("prints each param's write key", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx", "chorus"]);
+
+    const errorOutput = error.join("\n");
+    expect(exitCode, errorOutput).toBeUndefined();
+    const output = info.join("\n");
+    expect(output).toContain("PRE-DELAY");
+    expect(output).toContain("preDelay");
+  });
+
+  it("enumerates the exact labels for a lookup param", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "delay", "standard"]);
+
+    const errorOutput = error.join("\n");
+    expect(exitCode, errorOutput).toBeUndefined();
+    const output = info.join("\n");
+    expect(output).toContain("HIGH CUT");
+    expect(output).toContain("Values:");
+    expect(output).toContain("2.5kHz");
+    expect(output).toContain("FLAT");
+  });
+
   it("omits the Parameters section for an item with no params of its own or from its group", async () => {
     const { info, error, exitCode } = await runCli(["gx1", "capabilities", "cab", "original"]);
 

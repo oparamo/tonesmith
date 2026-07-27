@@ -100,7 +100,7 @@ mcp/                        @tonesmith/mcp  (bin: tonesmith-mcp)
   src/
     common/                 response.ts — ok / err MCP response helpers (barrel: common/index.ts)
     tools/                  generic tool registrations, device-agnostic (barrel: tools/index.ts):
-                            list_devices, read_patch, write_field, describe_device
+                            list_devices, read_patch, write_fields, describe_device
     devices/index.ts        per-device tool roster
     devices/<id>/           per device: generate_<id>_patch tool + its zod schemas
     server.ts               buildServer() — registers generic tools, then the device roster
@@ -153,8 +153,8 @@ decoded-patch field lists) directly; don't duplicate any of it into this file.
 | `list_devices`        | —                                                                  | Returns `[{ id, name }]`                                                                                                                                                                                                                                  |
 | `read_patch`          | `device`, `file`, `ref?`                                           | `ref` = index or name; omit for all patches                                                                                                                                                                                                               |
 | `generate_<id>_patch` | device-specific (derived from the device's builder + capabilities) | One tool per device (currently `generate_gx1_patch`): builds a patch via the device's builder and upserts it by patch name into `outPath` (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed) |
-| `write_field`         | `device`, `file`, `ref`, `field`, `value`                          | Dot-path mutation, same as CLI `write`                                                                                                                                                                                                                    |
-| `describe_device`     | `device`, `group?`, `item?`                                        | Returns capability metadata; omit `group` for all groups, add `item` to drill into one type                                                                                                                                                               |
+| `write_fields`        | `device`, `file`, `ref`, `fields`                                  | Dot-path mutations as a `{path: value}` record, same as CLI `write`; the batch applies atomically — a rejected edit leaves the file untouched                                                                                                             |
+| `describe_device`     | `device`, `group?`, `item?`, `includeParams?`                      | Returns capability metadata; omit `group` for all groups, add `item` to drill into one type. A group listing is an index (no per-item params) — drill into an item, or pass `includeParams` for the full set                                               |
 
 ## CLI capabilities command
 

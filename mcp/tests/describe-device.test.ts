@@ -50,6 +50,76 @@ describe("describe_device", () => {
     expect(itemIds).toContain("JC-120");
   });
 
+  it("lists a group as an index — no per-item params, but subtype ids and a drill-down pointer", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", group: "fx" };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const group = JSON.parse(text) as {
+      help: string;
+      items: { id: string; params?: unknown; subTypes?: string[] }[];
+    };
+    const chorus = group.items.find(item => item.id === "CHORUS");
+    expect(group.items.every(item => item.params === undefined), "a listing carries no item params").toBe(true);
+    expect(chorus?.subTypes, "subtypes are listed by id").toContain("STEREO");
+    expect(group.help).toMatch(/includeParams/);
+  });
+
+  // The listing exists to be read in one call. Inlining every item's params put fx past 70k
+  // characters, which some clients refuse outright — this is the ceiling that regression would hit.
+  it("keeps the largest group's listing small enough to consume in one call", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const listing = await client.callTool("describe_device", { device: "gx1", group: "fx" });
+    const full = await client.callTool("describe_device", { device: "gx1", group: "fx", includeParams: true });
+
+    expect(listing.text.length, "an fx listing must stay browsable").toBeLessThan(20_000);
+    expect(full.text.length, "includeParams still returns the full payload").toBeGreaterThan(50_000);
+  });
+
+  it("keeps the block-level controls in a group listing", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", group: "amp" };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const group = JSON.parse(text) as { params: { name: string }[] };
+    expect(group.params.map(param => param.name)).toContain("GAIN");
+  });
+
+  it("returns every item's params when includeParams is set", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", group: "fx", includeParams: true };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const group = JSON.parse(text) as { items: { id: string; params?: { name: string }[] }[] };
+    const chorus = group.items.find(item => item.id === "CHORUS");
+    expect(chorus?.params?.map(param => param.name)).toContain("RATE");
+  });
+
+  it("includes the block's own controls when drilling into an item", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", group: "amp", item: "JC-120" };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const item = JSON.parse(text) as { params: { name: string }[] };
+    const paramNames = item.params.map(param => param.name);
+    expect(paramNames, "amp's controls live on the group, not the item").toContain("GAIN");
+    expect(paramNames).toContain("TREBLE");
+  });
+
   it("returns full detail for a single item", async () => {
     const client = await connectClient();
     close = client.close;

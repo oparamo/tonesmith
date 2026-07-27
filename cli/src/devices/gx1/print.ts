@@ -17,6 +17,7 @@ const printHeader = (patch: gx1.Patch, index?: number): void => {
   console.info("━".repeat(52));
   console.info(`  Chain: ${patch.chain.join(", ")}`);
   console.info(`  Key: ${patch.key}`);
+  if (patch.memo) console.info(`  Memo: ${patch.memo}`);
 };
 
 const printAmp = (amp: gx1.Patch["amp"]): void => {
@@ -26,10 +27,11 @@ const printAmp = (amp: gx1.Patch["amp"]): void => {
   console.info(`    Speaker=${amp.speaker}  Mic=${amp.mic}  Solo=${soloLabel}`);
 };
 
+// Printed even when bypassed, like every other block: the device keeps a bypassed block's settings,
+// so hiding it would conceal the sound parked behind the bypass.
 const printOdds = (odds: gx1.Patch["odds"]): void => {
-  if (!odds.on) return;
   const soloLabel = odds.solo ? `ON(${odds.soloLevel})` : "OFF";
-  console.info(`\n  OD/DS [ON]  ${odds.type}  Drive=${odds.drive}  Tone=${odds.tone}  Level=${odds.level}  Direct=${odds.direct}  Solo=${soloLabel}`);
+  console.info(`\n  OD/DS [${onOff(odds.on)}]  ${odds.type}  Drive=${odds.drive}  Tone=${odds.tone}  Level=${odds.level}  Direct=${odds.direct}  Solo=${soloLabel}`);
 };
 
 const printFxSlot = (slot: "fx1" | "fx2" | "fx3", block: gx1.Patch["fx1"]): void => {

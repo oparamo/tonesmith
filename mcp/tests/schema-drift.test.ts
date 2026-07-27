@@ -137,14 +137,27 @@ describe("generate_gx1_patch chain worked-example drift guard", () => {
   let close: () => Promise<void>;
   afterEach(async () => { await close(); });
 
+  // Mirrors CHAIN_EXAMPLE_INPUT in generate-patch.ts; the first assertion fails if they diverge.
+  const chainExampleInput = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
+
   it("shows the exact resolution normalizeChain produces for the description's example", async () => {
     const client = await connectClient();
     close = client.close;
 
     const toolSchema = await client.getToolSchema("generate_gx1_patch") as { description: string };
-    const resolvedExample = JSON.stringify(gx1.normalizeChain(["OD/DS", "FX1", "AMP"]));
+    const resolvedExample = JSON.stringify(gx1.normalizeChain(chainExampleInput));
 
+    expect(toolSchema.description, "the worked chain example must match the real merge rule").toContain(JSON.stringify(chainExampleInput));
     expect(toolSchema.description, "the worked chain example must match the real merge rule").toContain(resolvedExample);
+  });
+
+  it("uses an example in which an omitted block leaves its default slot", () => {
+    const resolved = gx1.normalizeChain(chainExampleInput);
+    const omittedBlocksThatMoved = gx1.DEFAULT_CHAIN.filter(
+      (block, defaultIndex) => !chainExampleInput.includes(block) && resolved.indexOf(block) !== defaultIndex
+    );
+
+    expect(omittedBlocksThatMoved, "a contiguous example would not show that omitted blocks travel with their default predecessor").not.toHaveLength(0);
   });
 
   it("shows the default order straight from DEFAULT_CHAIN, so it can't drift", async () => {

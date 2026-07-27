@@ -32,7 +32,7 @@ describe("server instructions", () => {
     close = cleanup;
 
     const instructions = client.getInstructions() ?? "";
-    for (const tool of ["list_devices", "describe_device", "generate_<device>_patch", "read_patch", "write_field"]) {
+    for (const tool of ["list_devices", "describe_device", "generate_<device>_patch", "read_patch", "write_fields"]) {
       expect(instructions, `instructions should mention ${tool}`).toContain(tool);
     }
   });
