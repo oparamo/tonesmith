@@ -16,7 +16,11 @@ import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlock
 import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
-import { DEFAULT_CHAIN } from "./builder";
+import { DEFAULT_CHAIN, normalizeChain } from "./builder";
+
+// A non-contiguous reorder — the case where "keeps its default position" would mislead,
+// so the resolved order is spelled out in the chain description rather than left to inference.
+const CHAIN_EXAMPLE_INPUT = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -417,13 +421,19 @@ const gx1Capabilities: DeviceCapabilities = {
       "block below is always part of the chain — you set their order and turn them on or off, but " +
       "blocks are never added to or removed from the chain.\n\n" +
       "Order and on/off are independent controls:\n" +
-      "• Order: when building a patch, list the blocks first-to-last. Any block you leave out of " +
-      "that list keeps its default position — it is not removed or disabled. The default order is " +
-      'the most common starting point, not a required or "correct" one; reorder freely to suit ' +
-      "the tone.\n" +
+      "• Order: when building a patch, list the blocks first-to-last — you need only list the ones " +
+      "you want to move. A block you leave out is never removed or disabled; it is reinserted " +
+      "immediately after whichever block precedes it in the default order, so it travels with that " +
+      `neighbor rather than holding a fixed slot. For example ${JSON.stringify(CHAIN_EXAMPLE_INPUT)} ` +
+      `resolves to ${normalizeChain(CHAIN_EXAMPLE_INPUT).join(", ")} — FX3 follows FX2 and FV ` +
+      "follows NS, so both land away from their default slots. List a block explicitly to place it " +
+      'yourself. The default order is the most common starting point, not a required or "correct" ' +
+      "one; reorder freely to suit the tone.\n" +
       "• On/off: every block can be bypassed by turning it off (on: false), except FV (Foot " +
-      "Volume), which is always active. A block you don't configure when building a patch is left " +
-      "off.\n\n" +
+      "Volume), which is always active. Bypassing keeps whatever params you pass alongside it — the " +
+      "device stores them behind the bypass, so the block can be switched on later with those " +
+      "settings intact. Omitting a block entirely when building a patch also leaves it off, at " +
+      "default settings; both are valid ways to have a block off.\n\n" +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
   },
   groups: [

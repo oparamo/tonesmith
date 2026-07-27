@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import {
   registerListDevices,
   registerReadPatch,
-  registerWriteField,
+  registerWriteFields,
   registerDescribeDevice,
 } from "./tools";
 import { deviceTools } from "./devices";
@@ -21,7 +21,7 @@ const buildServer = (): McpServer => {
 
   registerListDevices(server);
   registerReadPatch(server);
-  registerWriteField(server);
+  registerWriteFields(server);
   registerDescribeDevice(server);
 
   for (const registerTools of deviceTools) {

@@ -1,7 +1,31 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import type { CapabilityGroup } from "@tonesmith/core";
 import { capabilityUtils, registry } from "@tonesmith/core";
 import { ok, err } from "../common";
+
+/**
+ * A group listing is an index, not a data dump: every item's full param specs would run to tens of
+ * thousands of characters for a large group, which is more than some clients will accept in one
+ * response. Items keep their identifying detail and their subtype ids; params come from drilling
+ * into a single item, or from `includeParams` when the whole set really is wanted.
+ */
+const groupIndex = (group: CapabilityGroup): object => ({
+  id: group.id,
+  name: group.name,
+  description: group.description,
+  params: group.params,
+  items: group.items.map(item => ({
+    id: item.id,
+    name: item.name,
+    models: item.models,
+    description: item.description,
+    subTypes: item.subTypes?.map(subType => subType.id),
+  })),
+  help:
+    "Call describe_device with item=<id> for that item's params, " +
+    "or includeParams: true for every item's params at once.",
+});
 
 const registerDescribeDevice = (server: McpServer): void => {
   server.registerTool(
@@ -20,9 +44,13 @@ const registerDescribeDevice = (server: McpServer): void => {
         item: z.string().optional().describe(
           "Item ID within the selected group to return in full detail. Requires 'group'."
         ),
+        includeParams: z.boolean().optional().describe(
+          "Include every item's full param specs in a group listing. Off by default — a listing is " +
+            "an index; drill into one item for its params. Ignored when 'item' is given."
+        ),
       }),
     },
-    ({ device, group, item }) => {
+    ({ device, group, item, includeParams }) => {
       try {
         const { capabilities } = registry.getDriver(device);
 
@@ -49,11 +77,15 @@ const registerDescribeDevice = (server: McpServer): void => {
         const matched = capabilityUtils.findGroup(capabilities, group);
 
         if (!item) {
-          return ok(JSON.stringify(matched, null, 2));
+          const view = includeParams === true ? matched : groupIndex(matched);
+          return ok(JSON.stringify(view, null, 2));
         }
 
+        // The block's own controls apply to whichever item is selected, so an item view that
+        // omitted them would hide amp's gain/bass/middle/treble entirely — they live on the group.
         const foundItem = capabilityUtils.findItem(matched, item);
-        return ok(JSON.stringify(foundItem, null, 2));
+        const itemView = { ...foundItem, params: [...(matched.params ?? []), ...(foundItem.params ?? [])] };
+        return ok(JSON.stringify(itemView, null, 2));
       } catch (error) {
         return err(error);
       }

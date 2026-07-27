@@ -91,8 +91,14 @@ const printItemParams = (params: CapabilityItem["params"]): void => {
   if (!params || params.length === 0) return;
   console.info(`\n${YELLOW}Parameters:${RESET}`);
   for (const param of params) {
-    console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}`);
+    // `key` is the name this param answers to in `write` dot-paths, and `range` is only a summary
+    // for lookup params — without both, the printed param can't actually be set from the CLI.
+    const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
+    console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
     console.info(`  ${"".padEnd(14)} ${param.description}`);
+    if (param.values) {
+      console.info(`  ${"".padEnd(14)} ${DIM}Values: ${param.values.join(", ")}${RESET}`);
+    }
   }
 };
 

@@ -14,13 +14,13 @@ files, covering the full lifecycle:
 1. list_devices — list the supported devices and pick an id.
 2. describe_device <device> chain — learn the signal chain first: the default block order, what can
    be reordered, and how blocks are bypassed.
-3. describe_device <device> [group] — a block's structure and, drilling into a group or item, each
-   parameter's key, range, and allowed values.
+3. describe_device <device> [group] — a block's structure, listed as an index of what it offers;
+   drill into one item for that item's parameters, each with its key, range, and allowed values.
 4. generate_<device>_patch — build a patch and save it. Set the block order, each block's
    parameters, and its on/off state; the response echoes the full patch and the resolved chain, so
    you confirm the result in one step.
 5. read_patch — read a saved patch back to inspect it.
-6. write_field — change a single field of a saved patch by dot-path.
+6. write_fields — change one or more fields of a saved patch by dot-path, applied as one batch.
 
 Everything you need to inspect, build, and edit a patch is here.`;
 

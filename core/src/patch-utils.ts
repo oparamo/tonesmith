@@ -62,7 +62,7 @@ const resolvePatchIndices = (patches: Patch[], ref?: string): number[] =>
 
 /**
  * Apply a batch of dot-path field edits to a patch, coercing each raw string value.
- * Mutates the patch in place. Shared by the CLI `write` command and the MCP `write_field`
+ * Mutates the patch in place. Shared by the CLI `write` command and the MCP `write_fields`
  * tool so both funnel through one mutation pipeline instead of duplicating it.
  */
 const applyFieldEdits = (

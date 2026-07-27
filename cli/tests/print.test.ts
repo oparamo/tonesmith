@@ -19,15 +19,28 @@ describe("printPatch", () => {
     expect(output).not.toMatch(/\[\d+\] Solo Patch/);
   });
 
-  it("skips the OD/DS line entirely when odds is off", () => {
+  // A bypassed block keeps its settings on the device, so the printer shows them rather than
+  // hiding the block — matching every other block, and matching read_patch.
+  it("prints the OD/DS line with its params when odds is off", () => {
     const patch = gx1.basePatch("Test");
-    patch.odds.on = false;
+    gx1.odds(patch, "OVERDRIVE", 50, 0, 50, 0, false, 50, false);
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
 
     const output = capturedOutput(info);
-    expect(output).not.toContain("Drive=");
+    expect(output).toContain("OD/DS [OFF]");
+    expect(output).toContain("Drive=50");
+  });
+
+  it("prints the memo when a patch carries one", () => {
+    const patch = gx1.basePatch("Test");
+    patch.memo = "bridge pickup";
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    printPatch(patch, 0);
+
+    expect(capturedOutput(info)).toContain("Memo: bridge pickup");
   });
 
   it("shows the solo level when odds solo is enabled", () => {

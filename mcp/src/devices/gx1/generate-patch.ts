@@ -3,11 +3,15 @@ import { z } from "zod";
 import { gx1, capabilityUtils, patchUtils, patchView } from "@tonesmith/core";
 const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, normalizeChain, DEFAULT_CHAIN } = gx1;
 import { ok, err } from "../../common";
-import { FxBlockSchema } from "./schemas";
+import { FxBlockSchema, ON_FIELD_DESCRIPTION } from "./schemas";
 import { boundedNumber, boundedInt } from "./bounds";
 import { validateTypeParams } from "./validate-params";
 
 const capabilities = gx1.driver.capabilities;
+
+// A non-contiguous reorder — the case where an omitted block visibly moves with its default
+// predecessor, which is the part of the merge rule agents get wrong when it isn't spelled out.
+const CHAIN_EXAMPLE_INPUT = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
 
 /** Every item id in a capability group, comma-separated — sourced from gx1 capabilities so it can't drift from constants.ts. */
 const capabilityItemIds = (groupId: string): string =>
@@ -47,9 +51,11 @@ const inputSchema = z.object({
   ),
   chain: z.array(z.string()).optional().describe(
     "Block order as an array, first element = first in the chain. Pass just the blocks you want to " +
-    'move; any block you leave out keeps its default position (it is NOT disabled — bypass a block ' +
-    "via its `on` field instead). \"OD\" is an alias for \"OD/DS\". The response states the resolved " +
-    "full order. See `describe_device gx1 chain` for the default order and how ordering/bypass work."
+    "move; a block you leave out is reinserted immediately after whichever block precedes it in the " +
+    "default order, so it can shift along with that neighbor (it is NOT disabled — bypass a block " +
+    "via its `on` field instead). List a block explicitly to place it yourself. \"OD\" is an alias " +
+    "for \"OD/DS\". The response states the resolved full order. See `describe_device gx1 chain` for " +
+    "the default order and how ordering/bypass work."
   ),
   key: z.string().optional().describe(
     "Song key for HARMONIST's diatonic intervals: C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B (default C)"
@@ -66,7 +72,7 @@ const inputSchema = z.object({
     level: boundedInt("amp", "LEVEL").optional().describe("Output level 0–100 (default 100)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: boundedInt("amp", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
-    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
+    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   }).describe("Amplifier block (required)"),
 
   odds: z.object({
@@ -77,7 +83,7 @@ const inputSchema = z.object({
     direct: boundedInt("odds", "DIRECT").optional().describe("Direct mix 0–100 (default 0)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: boundedInt("odds", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
-    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
+    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   }).optional().describe("Overdrive/distortion block. Omit to leave it off."),
 
   pfx: z.object({
@@ -86,7 +92,7 @@ const inputSchema = z.object({
       "Type-specific params (e.g. { wahType: \"CRY WAH\", level: 100, direct: 0, position: 100, min: 0, max: 100 } for WAH; " +
       "{ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 } for PEDAL BEND)"
     ),
-    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
+    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   }).superRefine((pfx, ctx) => {
     validateTypeParams(msg => { ctx.addIssue(msg); }, "pfx", pfx.type, undefined, pfx.params ?? {});
   }).optional().describe("Expression pedal effect block. Omit to leave it off."),
@@ -98,7 +104,7 @@ const inputSchema = z.object({
   ns: z.object({
     threshold: boundedInt("ns", "THRESHOLD").describe("Noise threshold 0–100"),
     release: boundedInt("ns", "RELEASE").describe("Release time 0–100"),
-    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
+    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     detect: z.string().optional().describe("Detection point: INPUT or NS INPUT (default INPUT)"),
   }).optional().describe("Noise suppressor. Omit to leave it off."),
 
@@ -115,7 +121,7 @@ const inputSchema = z.object({
     feedback: boundedInt("delay", "FEEDBACK", "STANDARD").describe("Feedback 0–100"),
     level: boundedInt("delay", "LEVEL", "STANDARD").describe("Effect level 1–120"),
     highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
-    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
+    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. modRate/modDepth for MODULATE, mode/riseTime for TWIST, head for SPACE " +
@@ -139,7 +145,7 @@ const inputSchema = z.object({
     tone: boundedInt("reverb", "TONE", "HALL S").optional().describe("Tone EQ −50–+50 (default 0)"),
     density: boundedInt("reverb", "DENSITY", "HALL S").optional().describe("Density 1–10 (default 5)"),
     direct: boundedInt("reverb", "DIRECT", "HALL S").optional().describe("Direct level 0–100 (default 100)"),
-    on: z.boolean().optional().describe("Active by default; set false to bypass the block"),
+    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
       "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY). Call " +
@@ -219,10 +225,12 @@ const registerGeneratePatch = (server: McpServer): void => {
       description: `Build a BOSS GX-1 patch from structured parameters and save it as a .tsl file.
 
 Signal chain: omit \`chain\` to use the default order (${DEFAULT_CHAIN.join(", ")}), or pass just the
-blocks you want to move, in order — any block you leave out keeps its default position. For example,
-["OD/DS","FX1","AMP"] moves OD/DS ahead of FX1 and resolves to
-${JSON.stringify(normalizeChain(["OD/DS", "FX1", "AMP"]))}. "OD" is shorthand for "OD/DS". See
-describe_device gx1 chain for how ordering and bypass work.
+blocks you want to move, in order — a block you leave out is reinserted immediately after whichever
+block precedes it in the default order, so it can shift along with that neighbor. For example,
+${JSON.stringify(CHAIN_EXAMPLE_INPUT)} moves FX2 ahead of NS and resolves to
+${JSON.stringify(normalizeChain(CHAIN_EXAMPLE_INPUT))} — FX3 and FV travel with FX2 and NS instead of
+staying at their default slots. List a block explicitly to place it yourself. "OD" is shorthand for
+"OD/DS". See describe_device gx1 chain for how ordering and bypass work.
 
 Setting parameters: every block's type-specific params go in its \`params\` record, keyed by
 the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fields, so their

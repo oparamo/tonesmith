@@ -191,7 +191,11 @@ capabilities on top of it — don't hand-write param ranges twice.
    order (derive it from the driver's own default-chain constant so the two can't drift), and its
    `description` explains, for this device, how blocks are reordered and how they're turned on/off
    (which blocks can be bypassed, and any that can't). This is the signal-chain model an agent
-   consults first. Wire capabilities into the driver object from step 3.
+   consults first. If a caller may pass a partial chain, state precisely what becomes of the blocks
+   they leave out, and show it with a worked example built by running the device's own chain-merge
+   function — a **non-contiguous** reorder, since a contiguous one resolves the same way under
+   several different merge rules and so proves nothing about which one the device uses.
+   Wire capabilities into the driver object from step 3.
 
 Add the drift guard as a test. Because capabilities derives from the catalog, `capabilities ↔
 codec` can't drift by construction; the real risk is between the two independently authored
