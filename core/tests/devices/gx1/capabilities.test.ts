@@ -411,8 +411,9 @@ describe("GX-1 chain capability", () => {
     expect(description, "chain description names the FV exception").toContain("FV");
   });
 
-  // Both ways to leave a block off are valid and produce different stored bytes, so the one place
-  // that teaches bypass has to cover both — otherwise consumers pick one by guesswork.
+  // Omitting a block and passing `on: false` both leave it off but store different bytes, so the
+  // one place that teaches bypass names omission as the default choice and says what `on: false`
+  // buys you — otherwise consumers pick one by guesswork.
   it("explains both ways to leave a block off", () => {
     const { description } = gx1Capabilities.chain;
     expect(description, "bypass preserves the params passed with it").toMatch(/behind the bypass/);
