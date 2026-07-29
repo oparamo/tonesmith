@@ -126,4 +126,76 @@ describe("write_fields", () => {
     expect(isError).toBe(true);
     expect(text).toContain('Unknown highCut value: "2.6kHz"');
   });
+
+  it("rejects a field the device doesn't have rather than reporting a phantom success", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.notAField": "9" } };
+
+    const { isError, text } = await client.callTool("write_fields", input);
+
+    expect(isError, "an unwritable path must not report success").toBe(true);
+    expect(text).toContain("notAField");
+  });
+
+  it("lists the valid fields when a path is rejected", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.mid": "50" } };
+
+    const { text } = await client.callTool("write_fields", input);
+
+    expect(text).toContain("middle");
+  });
+
+  it("renames the patch set without needing a ref", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: temp.fixture, setName: "Renamed Set" };
+
+    const { isError, text } = await client.callTool("write_fields", input);
+
+    expect(isError, text).toBe(false);
+    expect(gx1.driver.readFile(temp.fixture).name).toBe("Renamed Set");
+  });
+
+  it("renames the set and edits a patch in one call", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.gain": "55" }, setName: "Both" };
+
+    const { isError, text } = await client.callTool("write_fields", input);
+
+    expect(isError, text).toBe(false);
+    const file = gx1.driver.readFile(temp.fixture);
+    expect(file.name).toBe("Both");
+    expect(file.patches[0].amp.gain).toBe(55);
+  });
+
+  it("errors when neither fields nor setName is given", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+
+    const { isError, text } = await client.callTool("write_fields", { device: "gx1", file: temp.fixture });
+
+    expect(isError).toBe(true);
+    expect(text).toContain("Nothing to change");
+  });
+
+  it("errors when fields is given without a ref", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: temp.fixture, fields: { "amp.gain": "1" } };
+
+    const { isError, text } = await client.callTool("write_fields", input);
+
+    expect(isError).toBe(true);
+    expect(text).toContain("`ref` is required");
+  });
 });

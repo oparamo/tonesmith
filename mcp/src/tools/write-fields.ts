@@ -8,34 +8,64 @@ const registerWriteFields = (server: McpServer): void => {
     "write_fields",
     {
       description:
-        "Edit one or more fields in a patch within a patch file using dot-notation. " +
-        "Examples: 'amp.gain', 'fx1.params.rate', 'ns.threshold', 'delay.time'. " +
-        "The whole set is applied together — if any edit is rejected, the file is left untouched.",
+        "Edit a patch file: one or more fields of a single patch, the name of the patch set, or " +
+        "both. Patch fields use dot-notation — 'amp.gain', 'fx1.params.rate', 'ns.threshold', " +
+        "'delay.time'. A path naming a field the device doesn't have is rejected, listing the " +
+        "valid fields at that level. The whole set is applied together — if any edit is rejected, " +
+        "the file is left untouched.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
         device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
-        ref: z.string().describe("Patch index (0-based integer) or exact patch name"),
-        fields: z.record(z.string(), z.string()).describe(
+        ref: z.string().optional().describe(
+          "Patch index (0-based integer) or exact patch name. Required with `fields`; not needed " +
+            "to rename the set on its own."
+        ),
+        fields: z.record(z.string(), z.string()).optional().describe(
           'Dot-path → new value, e.g. { "amp.gain": "72", "fx1.params.rate": "50", "key": "G" }. ' +
             "Numbers and booleans are coerced from their string form automatically."
         ),
+        setName: z.string().optional().describe(
+          "New name for the patch set — the file's own label, shown as `setName` by read_patch. " +
+            "Applies to the file rather than to any one patch."
+        ),
       }),
     },
-    ({ file, device, ref, fields }) => {
+    ({ file, device, ref, fields, setName }) => {
       try {
+        if (fields === undefined && setName === undefined) {
+          throw new Error(
+            "Nothing to change — pass `fields` (with `ref`) to edit a patch, `setName` to rename " +
+              "the patch set, or both."
+          );
+        }
+        if (fields !== undefined && ref === undefined) {
+          throw new Error("`ref` is required alongside `fields` — it selects which patch to edit.");
+        }
+
         const driver = registry.getDriver(device);
         const patchFile = driver.readFile(file);
-        const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-        const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
-        const edits = Object.entries(fields);
-        // Every edit lands in memory before anything is written, so a rejected edit anywhere in the
-        // set leaves the file exactly as it was rather than half-applied.
-        patchUtils.applyFieldEdits(patch, edits);
+        const changes: string[] = [];
+
+        if (fields !== undefined && ref !== undefined) {
+          const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
+          const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
+          const edits = Object.entries(fields);
+          // Every edit lands in memory before anything is written, so a rejected edit anywhere in
+          // the set leaves the file exactly as it was rather than half-applied.
+          patchUtils.applyFieldEdits(patch, edits);
+          const applied = edits
+            .map(([field, value]) => `${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`)
+            .join(", ");
+          changes.push(`patch ${idx}: ${applied}`);
+        }
+
+        if (setName !== undefined) {
+          patchFile.name = setName;
+          changes.push(`set name = ${JSON.stringify(setName)}`);
+        }
+
         driver.writeFile(patchFile, file);
-        const applied = edits
-          .map(([field, value]) => `${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`)
-          .join(", ");
-        return ok(`Updated ${file} patch ${idx}: ${applied}`);
+        return ok(`Updated ${file} — ${changes.join("; ")}`);
       } catch (error) {
         return err(error);
       }

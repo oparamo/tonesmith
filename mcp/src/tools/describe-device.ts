@@ -24,7 +24,8 @@ const groupIndex = (group: CapabilityGroup): object => ({
   })),
   help:
     "Call describe_device with item=<id> for that item's params, " +
-    "or includeParams: true for every item's params at once.",
+    "or includeParams: true for every item's params at once. An item that lists subTypes needs one " +
+    "of them chosen; an item with no subTypes is selected by its id alone.",
 });
 
 const registerDescribeDevice = (server: McpServer): void => {

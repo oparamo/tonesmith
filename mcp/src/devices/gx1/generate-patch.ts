@@ -238,7 +238,9 @@ the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fi
 controls as named fields (time/feedback/level/…) — set those directly and put only the
 remaining params in \`params\`. amp/odds/ns/fv are single-shape blocks whose params are named
 fields. Rule of thumb: if a describe_device param's \`key\` matches a named field on the block,
-set that field; otherwise put it in \`params[key]\`.
+set that field; otherwise put it in \`params[key]\`. Any param you leave unset takes the device's
+factory default for the chosen type — the patch echoed back is the complete resulting state, so
+nothing is left silently undefined.
 
 ${buildCatalog()}`,
       inputSchema,

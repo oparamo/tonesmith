@@ -67,7 +67,45 @@ const decodeChain = (hexList: string[]): string[] => {
   return order;
 };
 
+/** Rejects a chain entry that isn't one of the device's blocks, or that repeats one already seen. */
+const checkChainEntry = (name: unknown, seen: Set<string>): void => {
+  const valid = CHAIN_BLOCK_ORDER.join(", ");
+  if (typeof name !== "string" || !(name in CHAIN_NAME_TO_VALUE)) {
+    throw new Error(`Unknown chain block ${JSON.stringify(name)} — valid blocks are: ${valid}`);
+  }
+  if (seen.has(name)) {
+    throw new Error(`Chain lists ${name} more than once — each block appears exactly once`);
+  }
+};
+
+/**
+ * A chain is always a permutation of every block, never a subset or a multiset. The firmware stores
+ * it as a linked list in which each block's own slot names its successor, so a repeated block
+ * overwrites its slot and silently drops everything between the two occurrences — the file still
+ * encodes, but blocks vanish. Validating here guards every writer at once (the builder, the CLI's
+ * write, and the MCP tools) rather than leaving each to police its own edits.
+ */
+const validateChain = (names: unknown): void => {
+  if (!Array.isArray(names)) {
+    throw new Error(
+      `Chain must be a list of block names, got ${typeof names} — expected every one of: ${CHAIN_BLOCK_ORDER.join(", ")}`
+    );
+  }
+
+  const seen = new Set<string>();
+  for (const name of names) {
+    checkChainEntry(name, seen);
+    seen.add(name as string);
+  }
+
+  const missing = CHAIN_BLOCK_ORDER.filter(block => !seen.has(block));
+  if (missing.length > 0) {
+    throw new Error(`Chain is missing ${missing.join(", ")} — every block must appear exactly once`);
+  }
+};
+
 const encodeChain = (names: string[], originalHexList: string[]): string[] => {
+  validateChain(names);
   const bytes = bytesFromHex(originalHexList);
   const valueOf = (name: string | undefined): number =>
     name === undefined ? CHAIN_TERMINATOR : lookupIndex(CHAIN_NAME_TO_VALUE, name, "chain block");

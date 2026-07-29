@@ -429,11 +429,11 @@ const gx1Capabilities: DeviceCapabilities = {
       "follows NS, so both land away from their default slots. List a block explicitly to place it " +
       'yourself. The default order is the most common starting point, not a required or "correct" ' +
       "one; reorder freely to suit the tone.\n" +
-      "• On/off: every block can be bypassed by turning it off (on: false), except FV (Foot " +
-      "Volume), which is always active. Bypassing keeps whatever params you pass alongside it — the " +
-      "device stores them behind the bypass, so the block can be switched on later with those " +
-      "settings intact. Omitting a block entirely when building a patch also leaves it off, at " +
-      "default settings; both are valid ways to have a block off.\n\n" +
+      "• On/off: every block can be turned off except FV (Foot Volume), which is always active. " +
+      "There are two ways to turn a block off. Omitting a block entirely is the preferred way — it " +
+      "leaves the block off at default settings. Pass on: false instead when you want the block off " +
+      "but its params kept behind the bypass, so it can be switched on later with those settings " +
+      "intact.\n\n" +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
   },
   groups: [

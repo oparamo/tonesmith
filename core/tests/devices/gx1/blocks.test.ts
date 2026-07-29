@@ -124,6 +124,39 @@ describe("Chain block (real device values)", () => {
 
     expect(trailingBytes).toEqual([99, 42]);
   });
+
+  // The firmware stores the chain as a linked list keyed by block, so a repeat overwrites its own
+  // slot and drops every block between the two occurrences. Encoding such a chain "succeeds" while
+  // silently losing blocks, so it has to be refused outright.
+  it("refuses a chain that repeats a block", () => {
+    const originalHex = hexFromBytes(DEFAULT_BYTES);
+    const duplicated = ["AMP", ...DEFAULT_ORDER];
+
+    expect(() => { encodeChain(duplicated, originalHex); }).toThrow(/AMP more than once/);
+  });
+
+  it("refuses a chain that drops a block", () => {
+    const originalHex = hexFromBytes(DEFAULT_BYTES);
+    const missingNs = DEFAULT_ORDER.filter(name => name !== "NS");
+
+    expect(() => { encodeChain(missingNs, originalHex); }).toThrow(/missing NS/);
+  });
+
+  it("names every valid block when refusing an unknown one", () => {
+    const originalHex = hexFromBytes(DEFAULT_BYTES);
+    const bogus = DEFAULT_ORDER.map(name => (name === "NS" ? "DELAY" : name));
+
+    expect(() => { encodeChain(bogus, originalHex); }).toThrow(/valid blocks are: PFX, FX1/);
+  });
+
+  // write_fields and the CLI both hand through whatever a dot-path edit produced, so a caller who
+  // sets `chain` to a bare string reaches the codec with a non-array.
+  it("refuses a chain that isn't a list", () => {
+    const originalHex = hexFromBytes(DEFAULT_BYTES);
+
+    expect(() => { encodeChain("FX1,AMP" as unknown as string[], originalHex); })
+      .toThrow(/must be a list of block names, got string/);
+  });
 });
 
 
