@@ -33,9 +33,28 @@ const coerceValue = (value: string): string | number | boolean => {
 };
 
 /**
+ * Names what is actually available at the level a dot-path went wrong, so a caller who guessed a
+ * field name is told the real ones rather than left to guess again.
+ */
+const unknownPathError = (
+  dottedPath: string,
+  segment: string,
+  available: Record<string, unknown>,
+): Error => {
+  const valid = Object.keys(available).sort().join(", ");
+  return new Error(
+    `Unknown field path "${dottedPath}" — "${segment}" is not a field here. Valid fields at this level: ${valid}`
+  );
+};
+
+/**
  * Set a nested value on an object using a dot-notation path.
  * Example: setByPath(patch, "amp.gain", 72) sets patch.amp.gain = 72.
- * Intermediate segments must already exist as objects.
+ *
+ * Every segment must already exist: a decoded patch carries the complete set of fields its device
+ * supports, so a path that isn't there names a field the device doesn't have. Writing it anyway
+ * would be silently dropped by the encoder (which only emits known byte indices), leaving the
+ * caller believing an edit landed when nothing changed.
  */
 const setByPath = (
   target: Record<string, unknown>,
@@ -44,10 +63,17 @@ const setByPath = (
 ): void => {
   const parts = dottedPath.split(".");
   let current = target;
-  for (const part of parts.slice(0, -1)) {
-    current = current[part] as Record<string, unknown>;
+  for (const [depth, part] of parts.slice(0, -1).entries()) {
+    const next = current[part];
+    if (next === null || typeof next !== "object") {
+      throw unknownPathError(dottedPath, parts.slice(0, depth + 1).join("."), current);
+    }
+    current = next as Record<string, unknown>;
   }
-  current[parts[parts.length - 1]] = value;
+
+  const leaf = parts[parts.length - 1];
+  if (!(leaf in current)) throw unknownPathError(dottedPath, leaf, current);
+  current[leaf] = value;
 };
 
 /**

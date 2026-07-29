@@ -249,4 +249,39 @@ describe("setByPath", () => {
     const params = fx1.params as Record<string, unknown>;
     expect(params.rate).toBe(50);
   });
+
+  // A decoded patch already carries every field its device supports, so an absent field means the
+  // device has no such control. Accepting the write would strand it — the encoder only emits known
+  // byte indices, so it would vanish while the caller believed it landed.
+  it("rejects an unknown leaf instead of creating it", () => {
+    const obj: Record<string, unknown> = { amp: { gain: 10, level: 100 } };
+
+    expect(() => setByPath(obj, "amp.notAField", 1)).toThrow(/notAField/);
+    expect(obj.amp).toEqual({ gain: 10, level: 100 });
+  });
+
+  it("rejects an unknown top-level field", () => {
+    const obj: Record<string, unknown> = { amp: { gain: 10 } };
+
+    expect(() => setByPath(obj, "setName", "x")).toThrow(/setName/);
+    expect(Object.keys(obj)).toEqual(["amp"]);
+  });
+
+  it("rejects a path that walks through a field the object doesn't have", () => {
+    const obj: Record<string, unknown> = { amp: { gain: 10 } };
+
+    expect(() => setByPath(obj, "nope.nested.path", 1)).toThrow(/nope/);
+  });
+
+  it("rejects a path that walks through a non-object value", () => {
+    const obj: Record<string, unknown> = { amp: { gain: 10 } };
+
+    expect(() => setByPath(obj, "amp.gain.deeper", 1)).toThrow(/amp\.gain/);
+  });
+
+  it("names the available fields when a path is rejected", () => {
+    const obj: Record<string, unknown> = { amp: { gain: 10, level: 100, treble: 50 } };
+
+    expect(() => setByPath(obj, "amp.middle", 1)).toThrow(/gain, level, treble/);
+  });
 });

@@ -7,7 +7,9 @@ const registerReadPatch = (server: McpServer): void => {
   server.registerTool(
     "read_patch",
     {
-      description: "Read one or all decoded patches from a patch file. Returns full patch parameter data as JSON.",
+      description:
+        "Read one or all decoded patches from a patch file. Returns full patch parameter data as " +
+        "JSON, along with `setName` — the name of the patch set the file holds.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
         device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
@@ -23,7 +25,11 @@ const registerReadPatch = (server: McpServer): void => {
         const indices = patchUtils.resolvePatchIndices(patchFile.patches, ref);
         if (ref !== undefined) {
           const idx = indices[0];
-          const patchWithIndex = { index: idx, ...patchView.presentPatch(patchFile.patches[idx]) };
+          const patchWithIndex = {
+            setName: patchFile.name,
+            index: idx,
+            ...patchView.presentPatch(patchFile.patches[idx]),
+          };
           return ok(JSON.stringify(patchWithIndex, null, 2));
         }
         const result = {
