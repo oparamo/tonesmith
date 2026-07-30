@@ -21,7 +21,7 @@
  * `min`/`max` bounds all derive from it.
  */
 import type { ParamSpec } from "../../types";
-import { FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ } from "./common";
+import { FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ, SP_TYPES, MIC_TYPES } from "./common";
 import { def, num, oneOf, lookupOf, bool, text } from "./param-domain";
 
 // ── Shared param fragments (identical across many types — defined once) ────────
@@ -450,6 +450,8 @@ const AMP_PARAMS: ParamSpec[] = [
   def("MIDDLE", num(0, 100), "Midrange balance (50 = flat)."),
   def("TREBLE", num(0, 100), "High-frequency tone (50 = flat)."),
   def("LEVEL", num(0, 100), "Overall preamp output volume."),
+  def("SPEAKER", lookupOf(SP_TYPES, "OFF, ORIGINAL, cabinet sizes, USER1-USER8"), "Speaker cabinet the amp is played through. The cab group describes each one."),
+  def("MIC", lookupOf(MIC_TYPES, "DYN57-BLEND C"), "Microphone the cabinet is recorded with. The mic group describes each one."),
   ...OD_SOLO,
 ];
 

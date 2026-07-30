@@ -37,21 +37,13 @@ const bypassable = <T extends z.ZodType>(block: T): z.ZodType<z.output<T> | unde
 const FxBlockSchema = z.object({
   type: z.string().describe(`Effect type. One of: ${fxTypeIds}. (OVERTONE is FX3-only.)`),
   subType: z.string().optional().describe(
-    "Model variant, only for effects that actually have one — not every effect does. Any effect that " +
-    "lists `subTypes` in describe_device selects its model here (e.g. COMPRESSOR's ORANGE, REVERB's " +
-    "HALL M, DELAY's STANDARD/MODULATE/WARP/TWIST/GLITCH — each delay sub-algorithm has its own param " +
-    "set); this is the only model-selection mechanism. An effect without `subTypes` has no model " +
-    "variant — everything else that shapes its sound (e.g. PHASER's stage, SLICER's pattern) is an " +
-    "ordinary entry in `params`. Use describe_device with items: [\"fx/<id>\"] to see an " +
-    "effect's subTypes, params, and values."
+    "Required for effects whose describe_device entry lists `subTypes`, and unused for those that " +
+    "don't. Anything else shaping the sound is an ordinary entry in `params`."
   ),
   on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
-    "Every effect parameter as key→value pairs (an fx slot has no named param fields, so all of its " +
-    "params live here). The key is each param's `key` from describe_device (items: [\"fx/<id>\"]) " +
-    "— e.g. preDelay, octFeedback — NOT its display name. Most values are numbers, but some select a " +
-    "model or mode by name (e.g. SLICER's pattern, HARMONIST's harmony); describe_device lists each " +
-    "param's key, range, and (for lookups) its exact string values."
+    "Every effect parameter, keyed by each param's `key` from describe_device (e.g. preDelay, " +
+    "octFeedback) — not its display name. An fx slot has no named param fields, so all of them live here."
   ),
 }).superRefine((fx, ctx) => {
   validateTypeParams(msg => { ctx.addIssue(msg); }, "fx", fx.type, fx.subType, fx.params ?? {});

@@ -22,11 +22,7 @@ const groupIndex = (group: CapabilityGroup): object => ({
     description: item.description,
     subTypes: item.subTypes?.map(subType => subType.id),
   })),
-  help:
-    `Name an item as "${group.id}/<id>" in \`items\` for that item's params — list every item you ` +
-    "need in one call rather than one call each. `includeParams: true` returns every item's params " +
-    "at once. An item that lists subTypes needs one of them chosen; an item with no subTypes is " +
-    "selected by its id alone.",
+  help: `Name an item as "${group.id}/<id>" in \`items\` for its params, or pass includeParams: true for every item's at once.`,
 });
 
 /**
@@ -94,9 +90,7 @@ const deviceSummary = (capabilities: DeviceCapabilities): object => ({
     description: capGroup.description,
     itemCount: capGroup.items.length,
   })),
-  help:
-    "Pass every group and item you need in one `items` call — e.g. " +
-    'items: ["chain", "amp", "fx/CHORUS", "reverb/HALL M"].',
+  help: 'e.g. items: ["chain", "amp", "fx/CHORUS", "reverb/HALL M"].',
 });
 
 const registerDescribeDevice = (server: McpServer): void => {
@@ -105,9 +99,7 @@ const registerDescribeDevice = (server: McpServer): void => {
     {
       description:
         "Return capability metadata for a device — signal chain, effect types, amp models, cabs, " +
-        "mics, and every param with its key, range, and allowed values. Ask for everything you " +
-        "need in one call: `items` takes a list, so a whole patch's worth of lookups is one " +
-        "round trip rather than one per type.",
+        "mics, and every param with its key, range, and allowed values.",
       inputSchema: z.object({
         device: z.string().describe("Device ID (e.g. 'gx1'). Use list_devices to enumerate IDs."),
         items: z.array(z.string()).optional().describe(

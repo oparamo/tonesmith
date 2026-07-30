@@ -15,26 +15,6 @@ const { CHAIN_EXAMPLE } = gx1;
 const capabilityItemIds = (groupId: string): string =>
   capabilityUtils.findGroup(capabilities, groupId).items.map(item => item.id).join(", ");
 
-const capabilityParamRange = (groupId: string, paramName: string): string =>
-  capabilityUtils.findGroup(capabilities, groupId).params?.find(param => param.name === paramName)?.range ?? "";
-
-/** Builds the type-catalog block of the tool description straight from gx1 capabilities, so it can't drift from constants.ts. */
-const buildCatalog = (): string => {
-  const pfxGroup = capabilityUtils.findGroup(capabilities, "pfx");
-  const wahItem = capabilityUtils.findItem(pfxGroup, "WAH");
-  const wahSubTypeIds = wahItem.subTypes?.map(subType => subType.id).join(", ") ?? "";
-
-  return `Amp types: ${capabilityItemIds("amp")}
-Speaker: ${capabilityItemIds("cab")}
-Mic: ${capabilityItemIds("mic")}
-Delay types: ${capabilityItemIds("delay")}
-Reverb types: ${capabilityItemIds("reverb")}
-Pedal FX types: ${capabilityItemIds("pfx")}
-Wah types: ${wahSubTypeIds}
-NS detect points: ${capabilityParamRange("ns", "DETECT")}
-FV curves: ${capabilityParamRange("fv", "CURVE")}`;
-};
-
 const patchSpecSchema = z.object({
   name: z.string().max(13).describe("Patch name (max 13 characters)"),
   chain: z.array(z.string()).optional().describe(
@@ -72,7 +52,7 @@ const patchSpecSchema = z.object({
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: boundedInt("odds", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
-  })).describe("Overdrive/distortion block. Omit it — or pass just { on: false } — to leave it off."),
+  })).describe("Overdrive/distortion block."),
 
   pfx: bypassable(z.object({
     type: z.string().describe(`Pedal FX type: ${capabilityItemIds("pfx")}`),
@@ -83,7 +63,7 @@ const patchSpecSchema = z.object({
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   }).superRefine((pfxBlock, ctx) => {
     validateTypeParams(msg => { ctx.addIssue(msg); }, "pfx", pfxBlock.type, undefined, pfxBlock.params ?? {});
-  })).describe("Expression pedal effect block. Omit it — or pass just { on: false } — to leave it off."),
+  })).describe("Expression pedal effect block."),
 
   fx1: bypassable(FxBlockSchema).describe("FX1 slot (pre-amp or first in chain). Omit to leave empty."),
   fx2: bypassable(FxBlockSchema).describe("FX2 slot. Omit to leave empty."),
@@ -94,7 +74,7 @@ const patchSpecSchema = z.object({
     release: boundedInt("ns", "RELEASE").describe("Release time 0–100"),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     detect: z.string().optional().describe("Detection point: INPUT or NS INPUT (default INPUT)"),
-  })).describe("Noise suppressor. Omit it — or pass just { on: false } — to leave it off."),
+  })).describe("Noise suppressor."),
 
   fv: z.object({
     position: boundedInt("fv", "POSITION").describe("Pedal position 0–100"),
@@ -112,10 +92,7 @@ const patchSpecSchema = z.object({
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
-      "describe_device (e.g. modRate/modDepth for MODULATE, mode/riseTime for TWIST, head for SPACE " +
-      "ECHO). Call describe_device with items: [\"delay/<type>\"] for the keys, ranges, and " +
-      "values. The common controls (time/feedback/level/highCut) are the named fields above — set " +
-      "them there, not here."
+      "describe_device (e.g. modRate/modDepth for MODULATE, head for SPACE ECHO)."
     ),
   }).superRefine((delayBlock, ctx) => {
     const values = {
@@ -123,7 +100,7 @@ const patchSpecSchema = z.object({
       highCut: delayBlock.highCut, ...(delayBlock.params ?? {}),
     };
     validateTypeParams(msg => { ctx.addIssue(msg); }, "delay", delayBlock.type, undefined, values);
-  })).describe("Delay block. Omit it — or pass just { on: false } — to leave it off."),
+  })).describe("Delay block."),
 
   reverb: bypassable(z.object({
     type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
@@ -136,10 +113,7 @@ const patchSpecSchema = z.object({
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
-      "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY). Call " +
-      "describe_device with items: [\"reverb/<type>\"] for the keys, ranges, and values. The " +
-      "common controls (time/level/preDelay/tone/density/direct) are the named fields above — set " +
-      "them there, not here."
+      "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY)."
     ),
   }).superRefine((reverbBlock, ctx) => {
     const values = {
@@ -148,7 +122,7 @@ const patchSpecSchema = z.object({
       ...(reverbBlock.params ?? {}),
     };
     validateTypeParams(msg => { ctx.addIssue(msg); }, "reverb", reverbBlock.type, undefined, values);
-  })).describe("Reverb block. Omit it — or pass just { on: false } — to leave it off."),
+  })).describe("Reverb block."),
 });
 
 const inputSchema = z.object({
@@ -250,26 +224,18 @@ const registerGeneratePatch = (server: McpServer): void => {
 save rather than calling this once per patch. The array's order is the order they sit in the file,
 and the file is written once.
 
-Signal chain: omit \`chain\` to use the default order (${DEFAULT_CHAIN.join(", ")}), or pass just the
-blocks you want to move, in order — a block you leave out is reinserted immediately after whichever
-block precedes it in the default order, so it can shift along with that neighbor. Ordering never
-turns a block off — that is the block's own \`on\` field. Worked example: order
-${JSON.stringify(CHAIN_EXAMPLE.input)} with ns: { on: false } resolves to:
+Signal chain: omit \`chain\` for the default order (${DEFAULT_CHAIN.join(", ")}), or list just the
+blocks you want to move. Worked example: order ${JSON.stringify(CHAIN_EXAMPLE.input)} with
+ns: { on: false } resolves to:
 ${CHAIN_EXAMPLE.resolution}
-List a block explicitly to place it yourself. "OD" is shorthand for "OD/DS".
-See describe_device items: ["chain"] for how ordering and bypass work.
+"OD" is shorthand for "OD/DS". See describe_device items: ["chain"] for the full rule.
 
-Setting parameters: every block's type-specific params go in its \`params\` record, keyed by
-the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fields, so their
-\`params\` record holds every effect param. delay and reverb additionally expose their common
-controls as named fields (time/feedback/level/…) — set those directly and put only the
-remaining params in \`params\`. amp/odds/ns/fv are single-shape blocks whose params are named
-fields. Rule of thumb: if a describe_device param's \`key\` matches a named field on the block,
-set that field; otherwise put it in \`params[key]\`. Any param you leave unset takes the device's
-factory default for the chosen type — the patch echoed back is the complete resulting state, so
-nothing is left silently undefined.
+Setting parameters: if a describe_device param's \`key\` matches a named field on the block, set
+that field; otherwise put it in the block's \`params\` record under that key. Unset params take the
+device's factory default for the chosen type, and the patch echoed back is the complete resulting
+state.
 
-${buildCatalog()}`,
+Type ids and value ranges for every block come from describe_device.`,
       inputSchema,
     },
     (params) => {

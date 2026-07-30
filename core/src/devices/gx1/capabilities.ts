@@ -58,6 +58,19 @@ const withKeys = (block: PerTypeBlockId, type: string, params: readonly ParamSpe
   });
 };
 
+/**
+ * Stamps `key` on a single-shape block's params. These blocks are hand-decoded rather than built
+ * from a FieldCodec map, so there is no field list to match against: the decoded field name is the
+ * catalog label lower-cased and camel-cased ("SOLO LEVEL" → soloLevel). The catalog-completeness
+ * guard checks every stamped key against a real decoded block, so this stays derived, not assumed.
+ */
+const withBlockKeys = (params: readonly ParamSpec[]): ParamSpec[] =>
+  params.map(param => {
+    const [head, ...rest] = param.name.toLowerCase().split(" ");
+    const key = head + rest.map(word => word[0].toUpperCase() + word.slice(1)).join("");
+    return { ...param, key };
+  });
+
 /** Attaches each item's params (with `key` stamped on) from the catalog for a per-type block. */
 const withTypeParams = (block: PerTypeBlockId, items: readonly CapabilityItem[]): CapabilityItem[] =>
   items.map(item => ({ ...item, params: withKeys(block, item.id, PARAMS_BY_TYPE[block][item.id] ?? []) }));
@@ -426,21 +439,14 @@ const gx1Capabilities: DeviceCapabilities = {
   chain: {
     defaultOrder: [...DEFAULT_CHAIN],
     description:
-      "The signal chain is the ordered list of blocks the guitar signal passes through. Every " +
-      "block below is always part of the chain — you set their order and turn them on or off, but " +
-      "blocks are never added to or removed from the chain.\n\n" +
-      "Order and on/off are independent controls:\n" +
-      "• Order: when building a patch, list the blocks first-to-last — you need only list the ones " +
-      "you want to move. A block you leave out is never removed or disabled; it is reinserted " +
-      "immediately after whichever block precedes it in the default order, so it travels with that " +
-      "neighbor rather than holding a fixed slot. List a block explicitly to place it " +
-      'yourself. The default order is the most common starting point, not a required or "correct" ' +
-      "one; reorder freely to suit the tone.\n" +
+      "The signal chain is the ordered list of blocks the guitar signal passes through. Every block " +
+      "is always in the chain, with a position and an on/off state, set independently.\n\n" +
+      "• Order: list the blocks first-to-last, naming only the ones you want to move. A block you " +
+      "leave out is reinserted immediately after whichever block precedes it in the default order, " +
+      "so it travels with that neighbor rather than holding a fixed slot.\n" +
       "• On/off: every block can be turned off except FV (Foot Volume), which is always active. " +
-      "There are two ways to turn a block off. Omitting a block entirely is the preferred way — it " +
-      "leaves the block off at default settings. Pass on: false instead when you want the block off " +
-      "but its params kept behind the bypass, so it can be switched on later with those settings " +
-      "intact.\n\n" +
+      "Omitting a block leaves it off at default settings; pass on: false to keep its params behind " +
+      "the bypass, so it can be switched on later with those settings intact.\n\n" +
       `Worked example — order ${JSON.stringify(CHAIN_EXAMPLE.input)} with ns: { on: false } ` +
       `resolves to: ${CHAIN_EXAMPLE.resolution}\n\n` +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
@@ -457,14 +463,14 @@ const gx1Capabilities: DeviceCapabilities = {
       name: "OD/DS",
       description: "Dedicated overdrive/distortion block with 35 classic pedal models.",
       items: ODDS_ITEMS,
-      params: PARAMS_BY_BLOCK.odds,
+      params: withBlockKeys(PARAMS_BY_BLOCK.odds),
     },
     {
       id: "amp",
       name: "AMP/CAB",
-      description: "AIRD (Augmented Impulse Response Dynamics) amplifier simulation. Models the full amp circuit including preamp, power section, and speaker interaction. The block also carries a speaker cabinet and a microphone, whose models are listed in the separate cab and mic groups — look those up too when setting up an amp.",
+      description: "AIRD (Augmented Impulse Response Dynamics) amplifier simulation. Models the full amp circuit including preamp, power section, and speaker interaction.",
       items: AMP_ITEMS,
-      params: PARAMS_BY_BLOCK.amp,
+      params: withBlockKeys(PARAMS_BY_BLOCK.amp),
     },
     {
       id: "cab",
@@ -489,14 +495,14 @@ const gx1Capabilities: DeviceCapabilities = {
       name: "NS (Noise Suppressor)",
       description: "Reduces noise and hum picked up by guitar pickups. Responds to the guitar signal envelope so it doesn't cut sustain unnaturally.",
       items: [],
-      params: PARAMS_BY_BLOCK.ns,
+      params: withBlockKeys(PARAMS_BY_BLOCK.ns),
     },
     {
       id: "fv",
       name: "FV (Foot Volume)",
       description: "Expression-pedal volume control. Typically assigned to the CTL 2/EXP 2 jack. The one chain block that's always active — it can't be bypassed.",
       items: [],
-      params: PARAMS_BY_BLOCK.fv,
+      params: withBlockKeys(PARAMS_BY_BLOCK.fv),
     },
     {
       id: "delay",
