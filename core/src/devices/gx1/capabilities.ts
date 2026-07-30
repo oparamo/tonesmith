@@ -18,9 +18,18 @@ import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
 import { DEFAULT_CHAIN, normalizeChain } from "./builder";
 
-// A non-contiguous reorder — the case where "keeps its default position" would mislead,
-// so the resolved order is spelled out in the chain description rather than left to inference.
+// The chain description's worked example, covering both inputs at once: a non-contiguous reorder
+// (FX3 and FV travel with their default predecessors) and a block that is ordered but switched off
+// via its block spec (NS), which keeps its slot while off.
 const CHAIN_EXAMPLE_INPUT = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
+/** The example's resolved order, marking the off block so the result shows bypass keeps its slot. */
+const chainExampleResolution = (): string =>
+  normalizeChain(CHAIN_EXAMPLE_INPUT)
+    .map(block => (block === "NS" ? `${block} (off)` : block))
+    .join(", ");
+
+/** The worked chain example, shared so the generate tool and the chain view can't tell it differently. */
+const CHAIN_EXAMPLE = { input: CHAIN_EXAMPLE_INPUT, resolution: chainExampleResolution() };
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -424,9 +433,7 @@ const gx1Capabilities: DeviceCapabilities = {
       "• Order: when building a patch, list the blocks first-to-last — you need only list the ones " +
       "you want to move. A block you leave out is never removed or disabled; it is reinserted " +
       "immediately after whichever block precedes it in the default order, so it travels with that " +
-      `neighbor rather than holding a fixed slot. For example ${JSON.stringify(CHAIN_EXAMPLE_INPUT)} ` +
-      `resolves to ${normalizeChain(CHAIN_EXAMPLE_INPUT).join(", ")} — FX3 follows FX2 and FV ` +
-      "follows NS, so both land away from their default slots. List a block explicitly to place it " +
+      "neighbor rather than holding a fixed slot. List a block explicitly to place it " +
       'yourself. The default order is the most common starting point, not a required or "correct" ' +
       "one; reorder freely to suit the tone.\n" +
       "• On/off: every block can be turned off except FV (Foot Volume), which is always active. " +
@@ -434,6 +441,8 @@ const gx1Capabilities: DeviceCapabilities = {
       "leaves the block off at default settings. Pass on: false instead when you want the block off " +
       "but its params kept behind the bypass, so it can be switched on later with those settings " +
       "intact.\n\n" +
+      `Worked example — order ${JSON.stringify(CHAIN_EXAMPLE.input)} with ns: { on: false } ` +
+      `resolves to: ${CHAIN_EXAMPLE.resolution}\n\n` +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
   },
   groups: [
@@ -453,7 +462,7 @@ const gx1Capabilities: DeviceCapabilities = {
     {
       id: "amp",
       name: "AMP/CAB",
-      description: "AIRD (Augmented Impulse Response Dynamics) amplifier simulation. Models the full amp circuit including preamp, power section, and speaker interaction.",
+      description: "AIRD (Augmented Impulse Response Dynamics) amplifier simulation. Models the full amp circuit including preamp, power section, and speaker interaction. The block also carries a speaker cabinet and a microphone, whose models are listed in the separate cab and mic groups — look those up too when setting up an amp.",
       items: AMP_ITEMS,
       params: PARAMS_BY_BLOCK.amp,
     },
@@ -504,4 +513,4 @@ const gx1Capabilities: DeviceCapabilities = {
   ],
 };
 
-export { gx1Capabilities };
+export { gx1Capabilities, CHAIN_EXAMPLE };

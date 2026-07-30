@@ -9,9 +9,7 @@ import { validateTypeParams } from "./validate-params";
 
 const capabilities = gx1.driver.capabilities;
 
-// A non-contiguous reorder — the case where an omitted block visibly moves with its default
-// predecessor, which is the part of the merge rule agents get wrong when it isn't spelled out.
-const CHAIN_EXAMPLE_INPUT = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
+const { CHAIN_EXAMPLE } = gx1;
 
 /** Every item id in a capability group, comma-separated — sourced from gx1 capabilities so it can't drift from constants.ts. */
 const capabilityItemIds = (groupId: string): string =>
@@ -254,11 +252,12 @@ and the file is written once.
 
 Signal chain: omit \`chain\` to use the default order (${DEFAULT_CHAIN.join(", ")}), or pass just the
 blocks you want to move, in order — a block you leave out is reinserted immediately after whichever
-block precedes it in the default order, so it can shift along with that neighbor. For example,
-${JSON.stringify(CHAIN_EXAMPLE_INPUT)} moves FX2 ahead of NS and resolves to
-${JSON.stringify(normalizeChain(CHAIN_EXAMPLE_INPUT))} — FX3 and FV travel with FX2 and NS instead of
-staying at their default slots. List a block explicitly to place it yourself. "OD" is shorthand for
-"OD/DS". See describe_device items: ["chain"] for how ordering and bypass work.
+block precedes it in the default order, so it can shift along with that neighbor. Ordering never
+turns a block off — that is the block's own \`on\` field. Worked example: order
+${JSON.stringify(CHAIN_EXAMPLE.input)} with ns: { on: false } resolves to:
+${CHAIN_EXAMPLE.resolution}
+List a block explicitly to place it yourself. "OD" is shorthand for "OD/DS".
+See describe_device items: ["chain"] for how ordering and bypass work.
 
 Setting parameters: every block's type-specific params go in its \`params\` record, keyed by
 the \`key\` shown by describe_device. fx1/fx2/fx3 and pfx have no named param fields, so their
