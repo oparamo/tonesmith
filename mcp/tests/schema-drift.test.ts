@@ -81,7 +81,18 @@ interface JsonSchemaNode {
   minimum?: number;
   maximum?: number;
   properties?: Record<string, JsonSchemaNode>;
+  items?: JsonSchemaNode;
 }
+
+/**
+ * The per-patch spec node: every block lives inside the `patches` array's item schema. Asserting the
+ * hop exists doubles as a check that the array shape reaches the client at all.
+ */
+const patchSpecNode = (root: JsonSchemaNode): JsonSchemaNode => {
+  const patches = root.properties?.patches;
+  if (!patches?.items) throw new Error("generate_gx1_patch should advertise a `patches` array of patch specs");
+  return patches.items;
+};
 
 /** Walks a dot-path through a JSON-schema object's nested `properties` to the leaf node. */
 const nodeAt = (root: JsonSchemaNode, path: string): JsonSchemaNode => {
@@ -103,7 +114,7 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
     close = client.close;
     const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
 
-    const node = nodeAt(tool.inputSchema, field.path);
+    const node = nodeAt(patchSpecNode(tool.inputSchema), field.path);
     const { min, max } = rangeFor(field);
 
     expect(node.minimum, `${field.path} should carry a finite min`).toBe(min);

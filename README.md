@@ -96,8 +96,8 @@ MCP tools:
 | `list_devices`        | List supported devices                                                                              |
 | `read_patch`          | Read one or all patches from a patch file                                                           |
 | `write_fields`        | Edit one or more fields in an existing patch, applied as one batch                                  |
-| `describe_device`     | Browse a device's capability metadata (groups, types, params)                                       |
-| `generate_<id>_patch` | Build a new patch from structured parameters — one tool per device (currently `generate_gx1_patch`) |
+| `describe_device`     | Look up a device's capability metadata (chain, groups, types, params) — `items` takes a list, so one call covers many lookups |
+| `generate_<id>_patch` | Build one or more patches from structured parameters and save them in one write — one tool per device (currently `generate_gx1_patch`) |
 
 ## Converting documentation to Markdown
 
