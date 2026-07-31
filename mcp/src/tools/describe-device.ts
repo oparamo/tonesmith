@@ -1,14 +1,14 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import type { CapabilityGroup } from "@tonesmith/core";
+import type { CapabilityGroup, DeviceCapabilities } from "@tonesmith/core";
 import { capabilityUtils, registry } from "@tonesmith/core";
 import { ok, err } from "../common";
 
 /**
  * A group listing is an index, not a data dump: every item's full param specs would run to tens of
  * thousands of characters for a large group, which is more than some clients will accept in one
- * response. Items keep their identifying detail and their subtype ids; params come from drilling
- * into a single item, or from `includeParams` when the whole set really is wanted.
+ * response. Items keep their identifying detail and their subtype ids; params come from naming a
+ * single item, or from `includeParams` when the whole set really is wanted.
  */
 const groupIndex = (group: CapabilityGroup): object => ({
   id: group.id,
@@ -22,10 +22,75 @@ const groupIndex = (group: CapabilityGroup): object => ({
     description: item.description,
     subTypes: item.subTypes?.map(subType => subType.id),
   })),
-  help:
-    "Call describe_device with item=<id> for that item's params, " +
-    "or includeParams: true for every item's params at once. An item that lists subTypes needs one " +
-    "of them chosen; an item with no subTypes is selected by its id alone.",
+  help: `Name an item as "${group.id}/<id>" in \`items\` for its params, or pass includeParams: true for every item's at once.`,
+});
+
+/**
+ * Splits an `items` entry into its group and optional item id, on the FIRST slash only: item ids can
+ * themselves contain a slash (the fx effect type "OD/DS"), so "fx/OD/DS" must resolve to group "fx",
+ * item "OD/DS" rather than being torn apart.
+ */
+const splitEntry = (entry: string): { group: string; item?: string } => {
+  const slash = entry.indexOf("/");
+  if (slash < 0) return { group: entry };
+  return { group: entry.slice(0, slash), item: entry.slice(slash + 1) };
+};
+
+/** Resolves one `items` entry to the view it names: the chain model, a group index/full group, or one item. */
+const viewForEntry = (
+  capabilities: DeviceCapabilities,
+  entry: string,
+  includeParams: boolean | undefined,
+): object => {
+  if (entry === "chain") return capabilities.chain;
+
+  const { group, item } = splitEntry(entry);
+  const matched = capabilityUtils.findGroup(capabilities, group);
+
+  if (item === undefined) {
+    const view = includeParams === true ? matched : groupIndex(matched);
+    return view;
+  }
+
+  // The block's own controls apply to whichever item is selected, so an item view that omitted them
+  // would hide amp's gain/bass/middle/treble entirely — they live on the group.
+  const foundItem = capabilityUtils.findItem(matched, item);
+  return { ...foundItem, params: [...(matched.params ?? []), ...(foundItem.params ?? [])] };
+};
+
+/**
+ * Resolves every requested entry, keyed by the entry string the caller asked for so a batch of
+ * twenty reads the same way as a batch of one. A single bad entry fails the whole call — a partially
+ * resolved response would leave the caller to notice the hole themselves.
+ */
+const viewsForEntries = (
+  capabilities: DeviceCapabilities,
+  entries: string[],
+  includeParams: boolean | undefined,
+): Record<string, object> => {
+  const views: Record<string, object> = {};
+  for (const entry of entries) {
+    try {
+      views[entry] = viewForEntry(capabilities, entry, includeParams);
+    } catch (error) {
+      throw new Error(`items entry "${entry}" — ${(error as Error).message}`);
+    }
+  }
+  return views;
+};
+
+const deviceSummary = (capabilities: DeviceCapabilities): object => ({
+  chain: {
+    defaultOrder: capabilities.chain.defaultOrder,
+    help: 'Pass items: ["chain"] for how block order and on/off bypass work.',
+  },
+  groups: capabilities.groups.map(capGroup => ({
+    id: capGroup.id,
+    name: capGroup.name,
+    description: capGroup.description,
+    itemCount: capGroup.items.length,
+  })),
+  help: 'e.g. items: ["chain", "amp", "fx/CHORUS", "reverb/HALL M"].',
 });
 
 const registerDescribeDevice = (server: McpServer): void => {
@@ -33,60 +98,34 @@ const registerDescribeDevice = (server: McpServer): void => {
     "describe_device",
     {
       description:
-        "Return capability metadata for a device — effect types, amp models, cabs, mics, etc. " +
-        "Optionally filter to a single group (e.g. 'amp', 'fx', 'delay') or a single item within a group.",
+        "Return capability metadata for a device — signal chain, effect types, amp models, cabs, " +
+        "mics, and every param with its key, range, and allowed values.",
       inputSchema: z.object({
         device: z.string().describe("Device ID (e.g. 'gx1'). Use list_devices to enumerate IDs."),
-        group: z.string().optional().describe(
-          "Group ID to filter to (e.g. 'amp', 'fx', 'odds', 'delay', 'reverb', 'cab', 'mic', 'ns', 'fv'), " +
-            "or 'chain' for the signal-chain model (default block order and how blocks are reordered/" +
-            "bypassed). Omit to list all groups plus a chain summary."
-        ),
-        item: z.string().optional().describe(
-          "Item ID within the selected group to return in full detail. Requires 'group'."
+        items: z.array(z.string()).optional().describe(
+          "What to look up, as a list. Each entry is one of: \"chain\" for the signal-chain model " +
+            "(default block order, reordering, and how blocks are bypassed); a group id such as " +
+            '"amp", "fx", "odds", "delay", "reverb", "cab", "mic", "ns", "fv" for that group\'s ' +
+            'index; or "<group>/<item>" such as "fx/CHORUS", "amp/JC-120", "reverb/HALL M" for one ' +
+            "item's full params. List every entry you need in a single call — that is what this " +
+            "input is for. Omit to list all groups plus a chain summary. An unknown entry fails " +
+            "the whole call and names itself."
         ),
         includeParams: z.boolean().optional().describe(
-          "Include every item's full param specs in a group listing. Off by default — a listing is " +
-            "an index; drill into one item for its params. Ignored when 'item' is given."
+          "Include every item's full param specs for bare-group entries. Off by default — a group " +
+            "listing is an index; name the items you want instead. Ignored for \"<group>/<item>\" entries."
         ),
       }),
     },
-    ({ device, group, item, includeParams }) => {
+    ({ device, items, includeParams }) => {
       try {
         const { capabilities } = registry.getDriver(device);
 
-        if (!group) {
-          const summary = {
-            chain: {
-              defaultOrder: capabilities.chain.defaultOrder,
-              help: 'Call describe_device with group "chain" for how block order and on/off bypass work.',
-            },
-            groups: capabilities.groups.map(capGroup => ({
-              id: capGroup.id,
-              name: capGroup.name,
-              description: capGroup.description,
-              itemCount: capGroup.items.length,
-            })),
-          };
-          return ok(JSON.stringify(summary, null, 2));
+        if (!items || items.length === 0) {
+          return ok(JSON.stringify(deviceSummary(capabilities), null, 2));
         }
 
-        if (group === "chain") {
-          return ok(JSON.stringify(capabilities.chain, null, 2));
-        }
-
-        const matched = capabilityUtils.findGroup(capabilities, group);
-
-        if (!item) {
-          const view = includeParams === true ? matched : groupIndex(matched);
-          return ok(JSON.stringify(view, null, 2));
-        }
-
-        // The block's own controls apply to whichever item is selected, so an item view that
-        // omitted them would hide amp's gain/bass/middle/treble entirely — they live on the group.
-        const foundItem = capabilityUtils.findItem(matched, item);
-        const itemView = { ...foundItem, params: [...(matched.params ?? []), ...(foundItem.params ?? [])] };
-        return ok(JSON.stringify(itemView, null, 2));
+        return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams), null, 2));
       } catch (error) {
         return err(error);
       }

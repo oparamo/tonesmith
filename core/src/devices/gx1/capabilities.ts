@@ -18,9 +18,18 @@ import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
 import { DEFAULT_CHAIN, normalizeChain } from "./builder";
 
-// A non-contiguous reorder — the case where "keeps its default position" would mislead,
-// so the resolved order is spelled out in the chain description rather than left to inference.
+// The chain description's worked example, covering both inputs at once: a non-contiguous reorder
+// (FX3 and FV travel with their default predecessors) and a block that is ordered but switched off
+// via its block spec (NS), which keeps its slot while off.
 const CHAIN_EXAMPLE_INPUT = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
+/** The example's resolved order, marking the off block so the result shows bypass keeps its slot. */
+const chainExampleResolution = (): string =>
+  normalizeChain(CHAIN_EXAMPLE_INPUT)
+    .map(block => (block === "NS" ? `${block} (off)` : block))
+    .join(", ");
+
+/** The worked chain example, shared so the generate tool and the chain view can't tell it differently. */
+const CHAIN_EXAMPLE = { input: CHAIN_EXAMPLE_INPUT, resolution: chainExampleResolution() };
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -48,6 +57,19 @@ const withKeys = (block: PerTypeBlockId, type: string, params: readonly ParamSpe
     return stamped;
   });
 };
+
+/**
+ * Stamps `key` on a single-shape block's params. These blocks are hand-decoded rather than built
+ * from a FieldCodec map, so there is no field list to match against: the decoded field name is the
+ * catalog label lower-cased and camel-cased ("SOLO LEVEL" → soloLevel). The catalog-completeness
+ * guard checks every stamped key against a real decoded block, so this stays derived, not assumed.
+ */
+const withBlockKeys = (params: readonly ParamSpec[]): ParamSpec[] =>
+  params.map(param => {
+    const [head, ...rest] = param.name.toLowerCase().split(" ");
+    const key = head + rest.map(word => word[0].toUpperCase() + word.slice(1)).join("");
+    return { ...param, key };
+  });
 
 /** Attaches each item's params (with `key` stamped on) from the catalog for a per-type block. */
 const withTypeParams = (block: PerTypeBlockId, items: readonly CapabilityItem[]): CapabilityItem[] =>
@@ -417,23 +439,18 @@ const gx1Capabilities: DeviceCapabilities = {
   chain: {
     defaultOrder: [...DEFAULT_CHAIN],
     description:
-      "The signal chain is the ordered list of blocks the guitar signal passes through. Every " +
-      "block below is always part of the chain — you set their order and turn them on or off, but " +
-      "blocks are never added to or removed from the chain.\n\n" +
-      "Order and on/off are independent controls:\n" +
-      "• Order: when building a patch, list the blocks first-to-last — you need only list the ones " +
-      "you want to move. A block you leave out is never removed or disabled; it is reinserted " +
-      "immediately after whichever block precedes it in the default order, so it travels with that " +
-      `neighbor rather than holding a fixed slot. For example ${JSON.stringify(CHAIN_EXAMPLE_INPUT)} ` +
-      `resolves to ${normalizeChain(CHAIN_EXAMPLE_INPUT).join(", ")} — FX3 follows FX2 and FV ` +
-      "follows NS, so both land away from their default slots. List a block explicitly to place it " +
-      'yourself. The default order is the most common starting point, not a required or "correct" ' +
-      "one; reorder freely to suit the tone.\n" +
+      "The signal chain is the ordered list of blocks the guitar signal passes through. Every block " +
+      "is always in the chain, with a position and an on/off state, set independently.\n\n" +
+      "• Order: list the blocks first-to-last, naming only the ones you want to move. A block you " +
+      "leave out is reinserted immediately after whichever block precedes it in the default order, " +
+      "so it travels with that neighbor rather than holding a fixed slot.\n" +
       "• On/off: every block can be turned off except FV (Foot Volume), which is always active. " +
-      "There are two ways to turn a block off. Omitting a block entirely is the preferred way — it " +
-      "leaves the block off at default settings. Pass on: false instead when you want the block off " +
+      "Omitting a block is the preferred way to leave it off — it takes no params, so you never have " +
+      "to invent values for a block that isn't sounding. Pass on: false when you want the block off " +
       "but its params kept behind the bypass, so it can be switched on later with those settings " +
       "intact.\n\n" +
+      `Worked example — order ${JSON.stringify(CHAIN_EXAMPLE.input)} with ns: { on: false } ` +
+      `resolves to: ${CHAIN_EXAMPLE.resolution}\n\n` +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
   },
   groups: [
@@ -448,14 +465,14 @@ const gx1Capabilities: DeviceCapabilities = {
       name: "OD/DS",
       description: "Dedicated overdrive/distortion block with 35 classic pedal models.",
       items: ODDS_ITEMS,
-      params: PARAMS_BY_BLOCK.odds,
+      params: withBlockKeys(PARAMS_BY_BLOCK.odds),
     },
     {
       id: "amp",
       name: "AMP/CAB",
       description: "AIRD (Augmented Impulse Response Dynamics) amplifier simulation. Models the full amp circuit including preamp, power section, and speaker interaction.",
       items: AMP_ITEMS,
-      params: PARAMS_BY_BLOCK.amp,
+      params: withBlockKeys(PARAMS_BY_BLOCK.amp),
     },
     {
       id: "cab",
@@ -480,14 +497,14 @@ const gx1Capabilities: DeviceCapabilities = {
       name: "NS (Noise Suppressor)",
       description: "Reduces noise and hum picked up by guitar pickups. Responds to the guitar signal envelope so it doesn't cut sustain unnaturally.",
       items: [],
-      params: PARAMS_BY_BLOCK.ns,
+      params: withBlockKeys(PARAMS_BY_BLOCK.ns),
     },
     {
       id: "fv",
       name: "FV (Foot Volume)",
       description: "Expression-pedal volume control. Typically assigned to the CTL 2/EXP 2 jack. The one chain block that's always active — it can't be bypassed.",
       items: [],
-      params: PARAMS_BY_BLOCK.fv,
+      params: withBlockKeys(PARAMS_BY_BLOCK.fv),
     },
     {
       id: "delay",
@@ -504,4 +521,4 @@ const gx1Capabilities: DeviceCapabilities = {
   ],
 };
 
-export { gx1Capabilities };
+export { gx1Capabilities, CHAIN_EXAMPLE };

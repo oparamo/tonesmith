@@ -214,11 +214,16 @@ Verifying the catalog against the vendor's ground-truth data stays a manual auth
   shared `configureDeviceCommands` from `cli/src/common` — read / write / copy / new /
   capabilities all come from that shared wiring; write no per-device command code. Add one
   roster line in `cli/src/devices/index.ts`.
-- **MCP**: the generic tools (`list_devices`, `read_patch`, `write_field`, `describe_device`)
+- **MCP**: the generic tools (`list_devices`, `read_patch`, `write_fields`, `describe_device`)
   pick the new device up automatically once its driver is in the core roster. Only patch
   generation is per-device: `mcp/src/devices/<id>/` with a `generate_<id>_patch` tool plus the
   zod schemas it needs (derive the tool description's type catalog from the driver's
   capabilities so it can't drift), and one roster line in `mcp/src/devices/index.ts`.
+  The generate tool takes `{ outPath, setName?, patches: [ …perPatchSpec ] }` — a whole set in one
+  call, saved with one `patchUtils.upsertPatches` write, in array order. Every bypassable block must
+  accept a bare `{ on: false }`: wrap it with the `bypassable` helper so a bypass folds into the
+  omitted case and writes identical bytes. The response must echo each built patch plus its resolved
+  chain, so a caller never needs a follow-up read to confirm a write.
 - **Tests**: behavior tests in `cli/tests/` and `mcp/tests/` — exercise every CLI command and
   MCP tool against the fixture from step 4, including error paths (bad ref, bad field path,
   unknown device).

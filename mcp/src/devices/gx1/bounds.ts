@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { gx1, capabilityUtils } from "@tonesmith/core";
+import type { ParamSpec } from "@tonesmith/core";
 
 const capabilities = gx1.driver.capabilities;
 
 /** Looks up a param's ParamSpec, from a group's shared params or a per-type item's params. */
-const paramFor = (groupId: string, paramName: string, typeId?: string): { min?: number; max?: number } => {
+const paramFor = (groupId: string, paramName: string, typeId?: string): ParamSpec => {
   const group = capabilityUtils.findGroup(capabilities, groupId);
   const params = typeId === undefined ? group.params : capabilityUtils.findItem(group, typeId).params;
   const param = params?.find(spec => spec.name === paramName);
@@ -48,4 +49,4 @@ const boundedNumber = (groupId: string, paramName: string, typeId?: string): z.Z
 const boundedInt = (groupId: string, paramName: string, typeId?: string): z.ZodNumber =>
   applyBounds(z.number().int(), groupId, paramName, typeId);
 
-export { boundedNumber, boundedInt, boundsFor };
+export { boundedNumber, boundedInt, boundsFor, paramFor };

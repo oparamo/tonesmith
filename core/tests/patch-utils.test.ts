@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
   resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch,
+  upsertPatches,
 } from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
@@ -101,6 +102,92 @@ describe("upsertPatch", () => {
 
     const renamed = upsertPatch(driver, "set.tsl", makePatch("Solo"), "New Name");
     expect(renamed.name).toBe("New Name");
+  });
+});
+
+/** Wraps a fake driver to count how many times the file is actually read and written. */
+const makeCountingDriver = (files: Map<string, PatchFile>): { driver: PatchDriver; counts: { reads: number; writes: number } } => {
+  const base = makeFakeDriver(files);
+  const counts = { reads: 0, writes: 0 };
+  const driver: PatchDriver = {
+    ...base,
+    readFile: (path) => {
+      counts.reads += 1;
+      return base.readFile(path);
+    },
+    writeFile: (file, path) => {
+      counts.writes += 1;
+      base.writeFile(file, path);
+    },
+  };
+  return { driver, counts };
+};
+
+describe("upsertPatches", () => {
+  it("saves every patch in array order", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const patches = [makePatch("First"), makePatch("Second"), makePatch("Third")];
+
+    const file = upsertPatches(driver, "set.tsl", patches);
+    const patchNames = file.patches.map(patch => patch.name);
+
+    expect(patchNames).toEqual(["First", "Second", "Third"]);
+  });
+
+  it("replaces same-named patches and appends the rest, in one pass", () => {
+    const existing = { name: "Set", device: "FAKE", patches: [makePatch("Lead"), makePatch("Rhythm")] };
+    const files = new Map<string, PatchFile>([["set.tsl", existing]]);
+    const driver = makeFakeDriver(files);
+    const patches = [makePatch("Rhythm"), makePatch("Solo")];
+
+    const file = upsertPatches(driver, "set.tsl", patches);
+    const patchNames = file.patches.map(patch => patch.name);
+
+    expect(patchNames, "Rhythm replaced in place, Solo appended").toEqual(["Lead", "Rhythm", "Solo"]);
+  });
+
+  // The whole point of the batch form: a set lands as one atomic write, not one cycle per patch.
+  it("reads and writes the file exactly once however many patches are saved", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Set", device: "FAKE", patches: [] }],
+    ]);
+    const { driver, counts } = makeCountingDriver(files);
+    const patches = [makePatch("One"), makePatch("Two"), makePatch("Three"), makePatch("Four")];
+
+    upsertPatches(driver, "set.tsl", patches);
+
+    expect(counts.reads).toBe(1);
+    expect(counts.writes).toBe(1);
+  });
+
+  it("names a freshly created file after the first patch when setName is omitted", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const patches = [makePatch("First"), makePatch("Second")];
+
+    const file = upsertPatches(driver, "new.tsl", patches);
+
+    expect(file.name).toBe("First");
+  });
+
+  it("rejects an empty batch rather than writing an unnamed file", () => {
+    const driver = makeFakeDriver(new Map());
+
+    const upsertNothing = () => upsertPatches(driver, "set.tsl", []);
+
+    expect(upsertNothing).toThrow("at least one patch");
+  });
+
+  it("routes the single-patch upsertPatch through the same batch path", () => {
+    const files = new Map<string, PatchFile>();
+    const { driver, counts } = makeCountingDriver(files);
+
+    const file = upsertPatch(driver, "new.tsl", makePatch("Lead"), "My Library");
+
+    expect(file.patches.map(patch => patch.name)).toEqual(["Lead"]);
+    expect(file.name).toBe("My Library");
+    expect(counts.writes).toBe(1);
   });
 });
 

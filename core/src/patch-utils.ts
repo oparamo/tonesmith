@@ -115,23 +115,36 @@ const readExistingOrNew = <T extends Patch>(
 };
 
 /**
- * Saves `patch` into the patch file at `path`, keyed by name: replaces the existing
- * patch of the same name if one is found, otherwise appends. Creates the file (and,
- * via the driver's writeFile, any missing parent directories) if `path` doesn't exist
- * yet. Device-agnostic — works for any PatchDriver, not just gx1.
+ * Saves every patch in `patches` into the patch file at `path`, keyed by name: a patch whose name
+ * already exists replaces it, otherwise it is appended — applied in array order, so the caller's
+ * ordering is what lands on disk. Creates the file (and, via the driver's writeFile, any missing
+ * parent directories) if `path` doesn't exist yet. Device-agnostic — works for any PatchDriver.
  *
- * `setName` names the patch set/library itself: when provided it names a freshly created
- * file and renames an existing one; when omitted a new file is named after `patch`, and an
- * existing file keeps its current name.
+ * The file is read once and written once however many patches are saved: writing a whole set is a
+ * single atomic write rather than one read/write cycle per patch.
+ *
+ * `setName` names the patch set/library itself: when provided it names a freshly created file and
+ * renames an existing one; when omitted a new file is named after the first patch, and an existing
+ * file keeps its current name.
  */
-const upsertPatch = <T extends Patch>(driver: PatchDriver<T>, path: string, patch: T, setName?: string): PatchFile<T> => {
-  const file = readExistingOrNew(driver, path, setName ?? patch.name);
+const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, path: string, patches: T[], setName?: string): PatchFile<T> => {
+  if (patches.length === 0) throw new Error("No patches to save — `patches` must hold at least one patch.");
+
+  const file = readExistingOrNew(driver, path, setName ?? patches[0].name);
   if (setName !== undefined) file.name = setName;
-  const index = file.patches.findIndex(existing => existing.name === patch.name);
-  if (index >= 0) file.patches[index] = patch;
-  else file.patches.push(patch);
+
+  for (const patch of patches) {
+    const index = file.patches.findIndex(existing => existing.name === patch.name);
+    if (index >= 0) file.patches[index] = patch;
+    else file.patches.push(patch);
+  }
+
   driver.writeFile(file, path);
   return file;
 };
 
-export { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch };
+/** Single-patch {@link upsertPatches} — same name-keyed replace-or-append behavior for one patch. */
+const upsertPatch = <T extends Patch>(driver: PatchDriver<T>, path: string, patch: T, setName?: string): PatchFile<T> =>
+  upsertPatches(driver, path, [patch], setName);
+
+export { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch, upsertPatches };

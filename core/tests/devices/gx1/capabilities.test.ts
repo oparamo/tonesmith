@@ -217,10 +217,13 @@ const assertBlockParity = (block: "amp" | "odds" | "ns" | "fv", codecNames: Set<
 };
 
 describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
-  it("amp (excluding type/speaker/mic, covered by their own groups)", () => {
+  // speaker/mic were once excepted here as "covered by their own groups" — having a cab group does
+  // not make the amp block's own speaker field discoverable from an amp lookup, and leaving them out
+  // of the catalog hid them from describe_device and the CLI alike. They are ordinary amp params.
+  it("amp (excluding on/type)", () => {
     const decoded = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
 
-    assertBlockParity("amp", decodedFieldNames(decoded, new Set(["on", "type", "speaker", "mic"])));
+    assertBlockParity("amp", decodedFieldNames(decoded, new Set(["on", "type"])));
   });
 
   it("odds (excluding on/type, covered elsewhere)", () => {
@@ -239,6 +242,28 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
     const decoded = decodeFv(hexFromBytes(new Array<number>(4).fill(0)));
 
     assertBlockParity("fv", decodedFieldNames(decoded, new Set()));
+  });
+});
+
+// Single-shape blocks are hand-decoded, so capabilities derives their param `key` from the catalog
+// label rather than reading it off a codec field map. That derivation is only safe if every key it
+// produces is a field the decoder actually emits — which is what this checks.
+describe("GX-1 single-shape block param keys name a real decoded field", () => {
+  const decodedBlocks = {
+    amp: decodeAmp(hexFromBytes(new Array<number>(13).fill(0))),
+    odds: decodeOdDs(hexFromBytes(new Array<number>(8).fill(0))),
+    ns: decodeNs(hexFromBytes(new Array<number>(4).fill(0))),
+    fv: decodeFv(hexFromBytes(new Array<number>(4).fill(0))),
+  };
+
+  it.each(Object.keys(decodedBlocks))("%s", (blockId) => {
+    const group = gx1Capabilities.groups.find(candidate => candidate.id === blockId);
+    const fields = Object.keys(decodedBlocks[blockId as keyof typeof decodedBlocks]);
+
+    expect(group?.params, `"${blockId}" should expose block params`).toBeDefined();
+    for (const param of group?.params ?? []) {
+      expect(fields, `"${blockId}" param "${param.name}" stamped key "${param.key}"`).toContain(param.key);
+    }
   });
 });
 

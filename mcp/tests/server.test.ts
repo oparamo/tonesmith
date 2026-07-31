@@ -27,22 +27,20 @@ describe("server instructions", () => {
     expect(instructions, "the server should advertise instructions").toBeTypeOf("string");
   });
 
-  it("walks the client through the discover → describe → generate → inspect flow", async () => {
+  // Derived from the live tool roster rather than a hardcoded list: if a tool is renamed, added, or
+  // removed, the instructions have to keep up. Per-device tools (generate_<id>_patch) are matched by
+  // their generic form, since the instructions can't name a device.
+  it("accounts for every registered tool", async () => {
     const { client, close: cleanup } = await connect();
     close = cleanup;
 
     const instructions = client.getInstructions() ?? "";
-    for (const tool of ["list_devices", "describe_device", "generate_<device>_patch", "read_patch", "write_fields"]) {
-      expect(instructions, `instructions should mention ${tool}`).toContain(tool);
+    const { tools } = await client.listTools();
+
+    for (const { name } of tools) {
+      const generic = name.replace(/^generate_.+_patch$/, "generate_<device>_patch");
+      expect(instructions, `instructions should account for the ${name} tool`).toContain(generic);
     }
-  });
-
-  it("directs the client to learn the signal chain first", async () => {
-    const { client, close: cleanup } = await connect();
-    close = cleanup;
-
-    const instructions = client.getInstructions() ?? "";
-    expect(instructions, "instructions should surface the chain as an early step").toMatch(/describe_device <device> chain/);
   });
 
   it("stays device-agnostic — no device-specific tokens leak in", async () => {

@@ -81,7 +81,18 @@ interface JsonSchemaNode {
   minimum?: number;
   maximum?: number;
   properties?: Record<string, JsonSchemaNode>;
+  items?: JsonSchemaNode;
 }
+
+/**
+ * The per-patch spec node: every block lives inside the `patches` array's item schema. Asserting the
+ * hop exists doubles as a check that the array shape reaches the client at all.
+ */
+const patchSpecNode = (root: JsonSchemaNode): JsonSchemaNode => {
+  const patches = root.properties?.patches;
+  if (!patches?.items) throw new Error("generate_gx1_patch should advertise a `patches` array of patch specs");
+  return patches.items;
+};
 
 /** Walks a dot-path through a JSON-schema object's nested `properties` to the leaf node. */
 const nodeAt = (root: JsonSchemaNode, path: string): JsonSchemaNode => {
@@ -103,7 +114,7 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
     close = client.close;
     const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
 
-    const node = nodeAt(tool.inputSchema, field.path);
+    const node = nodeAt(patchSpecNode(tool.inputSchema), field.path);
     const { min, max } = rangeFor(field);
 
     expect(node.minimum, `${field.path} should carry a finite min`).toBe(min);
@@ -115,20 +126,45 @@ describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () =
   let close: () => Promise<void>;
   afterEach(async () => { await close(); });
 
-  it("mentions every current delay/reverb/pfx type id in the tool's client-visible schema", async () => {
+  // Every block whose `type`-ish fields take a fixed, type-independent set names that set in its
+  // own description. Dropping one costs a describe_device round trip per patch — measured, not
+  // theoretical: removing the amp/cab/mic lists sent arms back for a second lookup to rediscover
+  // ids they had previously been handed.
+  const ID_LIST_GROUPS = ["amp", "cab", "mic", "odds", "fx", "delay", "reverb", "pfx"];
+
+  it("mentions every current type id of every id-listing group in the tool's client-visible schema", async () => {
     const client = await connectClient();
     close = client.close;
 
     const toolSchema = await client.getToolSchema("generate_gx1_patch");
     const toolSchemaText = JSON.stringify(toolSchema);
 
-    const delayTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "delay").items.map(item => item.id);
-    const reverbTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "reverb").items.map(item => item.id);
-    const pfxTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "pfx").items.map(item => item.id);
-    const allTypeIds = [...delayTypeIds, ...reverbTypeIds, ...pfxTypeIds];
+    for (const groupId of ID_LIST_GROUPS) {
+      const typeIds = capabilityUtils.findGroup(gx1.driver.capabilities, groupId).items.map(item => item.id);
+      for (const typeId of typeIds) {
+        // Cab ids carry a literal inch mark (1x8"), which JSON-escapes inside the serialized schema —
+        // so the needle has to be escaped the same way the haystack was.
+        const escaped = JSON.stringify(typeId).slice(1, -1);
+        expect(toolSchemaText, `expected the tool schema to mention ${groupId} type "${typeId}"`).toContain(escaped);
+      }
+    }
+  });
 
-    for (const typeId of allTypeIds) {
-      expect(toolSchemaText, `expected the tool schema to mention delay/reverb/pfx type "${typeId}"`).toContain(typeId);
+  // delay's flat `highCut` field names one representative type's values, which is only sound while
+  // every delay type shares the same table.
+  it("gives every delay type the same HIGH CUT values, so one representative type can speak for all", () => {
+    const delayGroup = capabilityUtils.findGroup(gx1.driver.capabilities, "delay");
+    const valuesFor = (typeId: string): string | undefined => {
+      const param = capabilityUtils.findItem(delayGroup, typeId).params?.find(spec => spec.name === "HIGH CUT");
+      return param?.values?.join(", ");
+    };
+    const representative = valuesFor("STANDARD");
+
+    expect(representative, "STANDARD should declare HIGH CUT values").toBeDefined();
+    for (const item of delayGroup.items) {
+      const values = valuesFor(item.id);
+      if (values === undefined) continue;
+      expect(values, `delay type "${item.id}" HIGH CUT values differ from STANDARD's`).toBe(representative);
     }
   });
 });
@@ -137,18 +173,22 @@ describe("generate_gx1_patch chain worked-example drift guard", () => {
   let close: () => Promise<void>;
   afterEach(async () => { await close(); });
 
-  // Mirrors CHAIN_EXAMPLE_INPUT in generate-patch.ts; the first assertion fails if they diverge.
-  const chainExampleInput = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
+  const chainExampleInput = gx1.CHAIN_EXAMPLE.input;
 
   it("shows the exact resolution normalizeChain produces for the description's example", async () => {
     const client = await connectClient();
     close = client.close;
 
     const toolSchema = await client.getToolSchema("generate_gx1_patch") as { description: string };
-    const resolvedExample = JSON.stringify(gx1.normalizeChain(chainExampleInput));
 
     expect(toolSchema.description, "the worked chain example must match the real merge rule").toContain(JSON.stringify(chainExampleInput));
-    expect(toolSchema.description, "the worked chain example must match the real merge rule").toContain(resolvedExample);
+    expect(toolSchema.description, "the worked chain example must match the real merge rule").toContain(gx1.CHAIN_EXAMPLE.resolution);
+  });
+
+  it("resolves every block of the example, in normalizeChain's order", () => {
+    const shown = gx1.CHAIN_EXAMPLE.resolution.split(", ").map(block => block.replace(" (off)", ""));
+
+    expect(shown, "the rendered resolution must be exactly what normalizeChain produces").toEqual(gx1.normalizeChain(chainExampleInput));
   });
 
   it("uses an example in which an omitted block leaves its default slot", () => {
@@ -158,6 +198,18 @@ describe("generate_gx1_patch chain worked-example drift guard", () => {
     );
 
     expect(omittedBlocksThatMoved, "a contiguous example would not show that omitted blocks travel with their default predecessor").not.toHaveLength(0);
+  });
+
+  it("switches off a block the example orders explicitly, so bypass reads as independent of position", () => {
+    const offBlocks = gx1.CHAIN_EXAMPLE.resolution
+      .split(", ")
+      .filter(block => block.endsWith(" (off)"))
+      .map(block => block.replace(" (off)", ""));
+
+    expect(offBlocks, "the example must switch some block off, or it only demonstrates ordering").not.toHaveLength(0);
+    for (const block of offBlocks) {
+      expect(chainExampleInput, `"${block}" must be ordered explicitly, otherwise the example shows omission and bypass together`).toContain(block);
+    }
   });
 
   it("shows the default order straight from DEFAULT_CHAIN, so it can't drift", async () => {
