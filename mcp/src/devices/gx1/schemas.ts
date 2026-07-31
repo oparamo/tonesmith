@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { gx1, capabilityUtils } from "@tonesmith/core";
 import { validateTypeParams } from "./validate-params";
+import { capabilityItemIds } from "./capability-text";
 
 /** Every selectable FX1/FX2/FX3 effect type, sourced from gx1 capabilities so this can't drift from constants.ts. */
-const fxTypeIds = capabilityUtils.findGroup(gx1.driver.capabilities, "fx").items.map(item => item.id).join(", ");
+const fxTypeIds = capabilityItemIds("fx");
 
 /**
  * The `on` field description shared by every bypassable block. Deliberately terse: this string is

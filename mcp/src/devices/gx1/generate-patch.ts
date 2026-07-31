@@ -1,19 +1,14 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { gx1, capabilityUtils, patchUtils, patchView } from "@tonesmith/core";
+import { gx1, patchUtils, patchView } from "@tonesmith/core";
 const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, normalizeChain, DEFAULT_CHAIN } = gx1;
 import { ok, err } from "../../common";
 import { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable } from "./schemas";
 import { boundedNumber, boundedInt } from "./bounds";
+import { capabilityItemIds, capabilityParamValues } from "./capability-text";
 import { validateTypeParams } from "./validate-params";
 
-const capabilities = gx1.driver.capabilities;
-
 const { CHAIN_EXAMPLE } = gx1;
-
-/** Every item id in a capability group, comma-separated — sourced from gx1 capabilities so it can't drift from constants.ts. */
-const capabilityItemIds = (groupId: string): string =>
-  capabilityUtils.findGroup(capabilities, groupId).items.map(item => item.id).join(", ");
 
 const patchSpecSchema = z.object({
   name: z.string().max(13).describe("Patch name (max 13 characters)"),
@@ -30,13 +25,13 @@ const patchSpecSchema = z.object({
   ),
 
   amp: z.object({
-    type: z.string().describe("Amplifier model"),
+    type: z.string().describe(`Amplifier model: ${capabilityItemIds("amp")}`),
     gain: boundedInt("amp", "GAIN").describe("Gain 0–120"),
     bass: boundedInt("amp", "BASS").describe("Bass EQ 0–100 (50=flat)"),
     middle: boundedInt("amp", "MIDDLE").describe("Mid EQ 0–100 (50=flat)"),
     treble: boundedInt("amp", "TREBLE").describe("Treble EQ 0–100 (50=flat)"),
-    speaker: z.string().optional().describe("Cabinet model (default ORIGINAL)"),
-    mic: z.string().optional().describe("Microphone model (default DYN57)"),
+    speaker: z.string().optional().describe(`Cabinet model (default ORIGINAL): ${capabilityItemIds("cab")}`),
+    mic: z.string().optional().describe(`Microphone model (default DYN57): ${capabilityItemIds("mic")}`),
     level: boundedInt("amp", "LEVEL").optional().describe("Output level 0–100 (default 100)"),
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: boundedInt("amp", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
@@ -44,7 +39,7 @@ const patchSpecSchema = z.object({
   }).describe("Amplifier block (required)"),
 
   odds: bypassable(z.object({
-    type: z.string().describe("OD/DS pedal type (e.g. BLUES OD, CRUNCH, METAL, DIST, FUZZ)"),
+    type: z.string().describe(`OD/DS pedal type: ${capabilityItemIds("odds")}`),
     drive: boundedInt("odds", "DRIVE").describe("Drive 1–120"),
     tone: boundedInt("odds", "TONE").describe("Tone −50–+50"),
     level: boundedInt("odds", "LEVEL").describe("Level 0–100"),
@@ -52,7 +47,7 @@ const patchSpecSchema = z.object({
     solo: z.boolean().optional().describe("Enable the solo level boost (default false)"),
     soloLevel: boundedInt("odds", "SOLO LEVEL").optional().describe("Output level while solo is engaged, 0–100 (default 50)"),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
-  })).describe("Overdrive/distortion block."),
+  })).describe("Overdrive/distortion block. Omit to leave it off."),
 
   pfx: bypassable(z.object({
     type: z.string().describe(`Pedal FX type: ${capabilityItemIds("pfx")}`),
@@ -63,7 +58,7 @@ const patchSpecSchema = z.object({
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   }).superRefine((pfxBlock, ctx) => {
     validateTypeParams(msg => { ctx.addIssue(msg); }, "pfx", pfxBlock.type, undefined, pfxBlock.params ?? {});
-  })).describe("Expression pedal effect block."),
+  })).describe("Expression pedal effect block. Omit to leave it off."),
 
   fx1: bypassable(FxBlockSchema).describe("FX1 slot (pre-amp or first in chain). Omit to leave empty."),
   fx2: bypassable(FxBlockSchema).describe("FX2 slot. Omit to leave empty."),
@@ -73,14 +68,14 @@ const patchSpecSchema = z.object({
     threshold: boundedInt("ns", "THRESHOLD").describe("Noise threshold 0–100"),
     release: boundedInt("ns", "RELEASE").describe("Release time 0–100"),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
-    detect: z.string().optional().describe("Detection point: INPUT or NS INPUT (default INPUT)"),
-  })).describe("Noise suppressor."),
+    detect: z.string().optional().describe(`Detection point (default INPUT): ${capabilityParamValues("ns", "DETECT")}`),
+  })).describe("Noise suppressor. Omit to leave it off."),
 
   fv: z.object({
     position: boundedInt("fv", "POSITION").describe("Pedal position 0–100"),
     min: boundedInt("fv", "MIN").describe("Minimum volume 0–100"),
     max: boundedInt("fv", "MAX").describe("Maximum volume 0–100"),
-    curve: z.string().optional().describe("Response curve: SLOW1, SLOW2, NORMAL, FAST (default NORMAL)"),
+    curve: z.string().optional().describe(`Response curve (default NORMAL): ${capabilityParamValues("fv", "CURVE")}`),
   }).optional().describe("Foot volume block. Omit to use defaults."),
 
   delay: bypassable(z.object({
@@ -88,7 +83,7 @@ const patchSpecSchema = z.object({
     time: boundedNumber("delay", "TIME", "STANDARD").describe("Delay time in milliseconds, 1–2000."),
     feedback: boundedInt("delay", "FEEDBACK", "STANDARD").describe("Feedback 0–100"),
     level: boundedInt("delay", "LEVEL", "STANDARD").describe("Effect level 1–120"),
-    highCut: z.string().optional().describe('High-cut freq (e.g. "2.5kHz", "FLAT")'),
+    highCut: z.string().optional().describe(`High-cut freq, exact string: ${capabilityParamValues("delay", "HIGH CUT", "STANDARD")}`),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
@@ -100,7 +95,7 @@ const patchSpecSchema = z.object({
       highCut: delayBlock.highCut, ...(delayBlock.params ?? {}),
     };
     validateTypeParams(msg => { ctx.addIssue(msg); }, "delay", delayBlock.type, undefined, values);
-  })).describe("Delay block."),
+  })).describe("Delay block. Omit to leave it off."),
 
   reverb: bypassable(z.object({
     type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
@@ -122,7 +117,7 @@ const patchSpecSchema = z.object({
       ...(reverbBlock.params ?? {}),
     };
     validateTypeParams(msg => { ctx.addIssue(msg); }, "reverb", reverbBlock.type, undefined, values);
-  })).describe("Reverb block."),
+  })).describe("Reverb block. Omit to leave it off."),
 });
 
 const inputSchema = z.object({

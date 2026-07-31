@@ -121,6 +121,19 @@ describe("gx1 capabilities", () => {
     expect(output).toContain("no selectable types for this block");
   });
 
+  // Most params carry a `key` naming the field they write to, and it prints beside the range.
+  // HARMONIST's KEY is the exception the ParamSpec docs call out — it reads the patch-level key
+  // rather than a codec field of its own, so it has no key to print.
+  it("prints a param that has no key without a key tag", async () => {
+    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx", "HARMONIST"]);
+
+    const errorOutput = error.join("\n");
+    expect(exitCode, errorOutput).toBeUndefined();
+    const keyLine = info.join("\n").split("\n").find(line => line.trim().startsWith("KEY "));
+    expect(keyLine, "HARMONIST should list a KEY param").toBeDefined();
+    expect(keyLine).toContain("Am-Ab major/minor");
+  });
+
   it("exits with an error listing available groups for an unknown group", async () => {
     const { error, exitCode } = await runCli(["gx1", "capabilities", "nonexistent"]);
 

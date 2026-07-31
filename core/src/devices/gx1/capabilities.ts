@@ -445,8 +445,10 @@ const gx1Capabilities: DeviceCapabilities = {
       "leave out is reinserted immediately after whichever block precedes it in the default order, " +
       "so it travels with that neighbor rather than holding a fixed slot.\n" +
       "• On/off: every block can be turned off except FV (Foot Volume), which is always active. " +
-      "Omitting a block leaves it off at default settings; pass on: false to keep its params behind " +
-      "the bypass, so it can be switched on later with those settings intact.\n\n" +
+      "Omitting a block is the preferred way to leave it off — it takes no params, so you never have " +
+      "to invent values for a block that isn't sounding. Pass on: false when you want the block off " +
+      "but its params kept behind the bypass, so it can be switched on later with those settings " +
+      "intact.\n\n" +
       `Worked example — order ${JSON.stringify(CHAIN_EXAMPLE.input)} with ns: { on: false } ` +
       `resolves to: ${CHAIN_EXAMPLE.resolution}\n\n` +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
