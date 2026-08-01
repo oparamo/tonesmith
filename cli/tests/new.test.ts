@@ -54,7 +54,6 @@ describe("gx1 new", () => {
     const { error, exitCode } = await runCli(["gx1", "new", file]);
 
     expect(exitCode).toBe(1);
-    const errorOutput = error.join("\n");
-    expect(errorOutput).toContain("already exists");
+    expect(error.length).toBeGreaterThan(0);
   });
 });

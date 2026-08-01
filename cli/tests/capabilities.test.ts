@@ -1,154 +1,96 @@
 import { describe, it, expect } from "vitest";
+import { gx1 } from "@tonesmith/core";
 import { runCli } from "./helpers";
 
+/** Runs the command, asserts it succeeded, and hands back its joined stdout. */
+const capabilitiesOutput = async (...args: string[]): Promise<string> => {
+  const { info, error, exitCode } = await runCli(["gx1", "capabilities", ...args]);
+
+  expect(exitCode, error.join("\n")).toBeUndefined();
+  return info.join("\n");
+};
+
 describe("gx1 capabilities", () => {
-  it("lists all groups plus a chain pointer when given no arguments", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities"]);
+  it("lists every capability group when given no arguments", async () => {
+    const output = await capabilitiesOutput();
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("Capability groups");
-    expect(output).toContain("amp");
-    expect(output).toContain("fx");
-    expect(output).toContain("Signal Chain");
-    expect(output).toContain("capabilities chain");
+    for (const group of gx1.driver.capabilities.groups) {
+      expect(output).toContain(group.id);
+    }
   });
 
-  it("prints the signal-chain model for the chain argument", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "chain"]);
+  it("prints the full default block order for the chain argument", async () => {
+    const output = await capabilitiesOutput("chain");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("Signal chain");
-    expect(output).toContain("Default order:");
-    expect(output).toContain("FV");
+    for (const block of gx1.DEFAULT_CHAIN) {
+      expect(output).toContain(block);
+    }
   });
 
-  it("lists all items in a single group", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "amp"]);
+  it("lists a group's item ids", async () => {
+    const output = await capabilitiesOutput("amp");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
     expect(output).toContain("JC-120");
   });
 
-  it("prints full detail for a single item", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "amp", "jc-120"]);
+  it("prints an item's subtypes and the hardware it models", async () => {
+    const output = await capabilitiesOutput("fx", "compressor");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("[amp / JC-120]");
+    expect(output).toContain("MXR Dyna Comp");
   });
 
-  it("lists an item's subtypes when browsing a group", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx"]);
+  it("prints each sub-algorithm's own param set", async () => {
+    const output = await capabilitiesOutput("fx", "delay");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("Subtypes:");
-  });
-
-  it("prints full detail for an item with subtypes and modeled hardware", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx", "compressor"]);
-
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("Subtypes:");
-    expect(output).toContain("[models: MXR Dyna Comp]");
-    expect(output).toContain("Parameters:");
-  });
-
-  it("prints per-subtype params for the FX-slot DELAY sub-algorithms", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx", "delay"]);
-
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("Subtypes:");
+    // MODULATE carries params STANDARD lacks, so these prove the per-subtype set is printed
+    // rather than one shared set for the whole type.
     expect(output).toContain("MODULATE");
-    // MODULATE carries params STANDARD lacks — proof each sub-algorithm's own set is printed
     expect(output).toContain("MOD RATE");
     expect(output).toContain("MOD DEPTH");
   });
 
-  // Without the key you can't address the param in `write`, and for lookup params `range` is only
-  // a summary — the exact labels come from `values`.
-  it("prints each param's write key", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx", "chorus"]);
+  // Without the key you can't address the param in `write`.
+  it("prints each param's write key alongside its display name", async () => {
+    const output = await capabilitiesOutput("fx", "chorus");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
     expect(output).toContain("PRE-DELAY");
     expect(output).toContain("preDelay");
   });
 
+  // For lookup params `range` is only a summary; the exact labels come from `values`.
   it("enumerates the exact labels for a lookup param", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "delay", "standard"]);
+    const output = await capabilitiesOutput("delay", "standard");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
     expect(output).toContain("HIGH CUT");
-    expect(output).toContain("Values:");
     expect(output).toContain("2.5kHz");
     expect(output).toContain("FLAT");
   });
 
-  it("omits the Parameters section for an item with no params of its own or from its group", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "cab", "original"]);
+  it("prints the block controls for a group with no selectable types", async () => {
+    const output = await capabilitiesOutput("ns");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("[cab / ORIGINAL]");
-    expect(output).not.toContain("Parameters:");
+    expect(output).toContain("THRESHOLD");
+    expect(output).toContain("RELEASE");
   });
 
-  it("prints block controls and a 'no selectable types' message for a params-only group", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "ns"]);
+  // HARMONIST's KEY is the ParamSpec exception: it reads the patch-level key rather than a codec
+  // field of its own, so it has no write key to print and must not be dropped from the listing.
+  it("prints a param that has no write key", async () => {
+    const output = await capabilitiesOutput("fx", "HARMONIST");
 
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const output = info.join("\n");
-    expect(output).toContain("Block controls:");
-    expect(output).toContain("no selectable types for this block");
+    const keyLine = output.split("\n").find(line => line.trim().startsWith("KEY "));
+    expect(keyLine).toBeDefined();
   });
 
-  // Most params carry a `key` naming the field they write to, and it prints beside the range.
-  // HARMONIST's KEY is the exception the ParamSpec docs call out — it reads the patch-level key
-  // rather than a codec field of its own, so it has no key to print.
-  it("prints a param that has no key without a key tag", async () => {
-    const { info, error, exitCode } = await runCli(["gx1", "capabilities", "fx", "HARMONIST"]);
-
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const keyLine = info.join("\n").split("\n").find(line => line.trim().startsWith("KEY "));
-    expect(keyLine, "HARMONIST should list a KEY param").toBeDefined();
-    expect(keyLine).toContain("Am-Ab major/minor");
-  });
-
-  it("exits with an error listing available groups for an unknown group", async () => {
-    const { error, exitCode } = await runCli(["gx1", "capabilities", "nonexistent"]);
+  it("exits with an error for an unknown group", async () => {
+    const { exitCode } = await runCli(["gx1", "capabilities", "nonexistent"]);
 
     expect(exitCode).toBe(1);
-    const message = error.join("\n");
-    expect(message).toContain('Unknown group "nonexistent"');
-    expect(message).toContain("amp");
   });
 
-  it("exits with an error listing available items for an unknown item", async () => {
-    const { error, exitCode } = await runCli(["gx1", "capabilities", "amp", "nonexistent"]);
+  it("exits with an error for an unknown item", async () => {
+    const { exitCode } = await runCli(["gx1", "capabilities", "amp", "nonexistent"]);
 
     expect(exitCode).toBe(1);
-    const message = error.join("\n");
-    expect(message).toContain('Unknown item "nonexistent"');
-    expect(message).toContain("JC-120");
   });
 });

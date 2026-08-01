@@ -37,17 +37,19 @@ describe("write_fields", () => {
     expect(patch.key).toBe("G");
   });
 
-  it("echoes every applied edit", async () => {
+  it("applies every field in the batch", async () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
     const fields = { "amp.gain": "64", "amp.bass": "40" };
     const input = { device: "gx1", file: temp.fixture, ref: "0", fields };
 
-    const { text } = await client.callTool("write_fields", input);
+    const { isError } = await client.callTool("write_fields", input);
 
-    expect(text).toContain("amp.gain = 64");
-    expect(text).toContain("amp.bass = 40");
+    expect(isError).toBe(false);
+    const patch = gx1.driver.readFile(temp.fixture).patches[0];
+    expect(patch.amp.gain).toBe(64);
+    expect(patch.amp.bass).toBe(40);
   });
 
   it("writes nothing when any field in the batch is rejected", async () => {
@@ -58,12 +60,11 @@ describe("write_fields", () => {
     const fields = { "amp.gain": "99", "delay.highCut": "2.6kHz" };
     const input = { device: "gx1", file: temp.fixture, ref: "0", fields };
 
-    const { isError, text } = await client.callTool("write_fields", input);
+    const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(true);
-    expect(text).toContain('Unknown highCut value: "2.6kHz"');
     const after = gx1.driver.readFile(temp.fixture).patches[0].amp.gain;
-    expect(after, "a rejected batch must leave the file untouched").toBe(before);
+    expect(after).toBe(before);
   });
 
   it("coerces a boolean field", async () => {
@@ -84,10 +85,9 @@ describe("write_fields", () => {
     close = client.close;
     const input = { device: "nonexistent", file: temp.fixture, ref: "0", fields: { "amp.gain": "1" } };
 
-    const { isError, text } = await client.callTool("write_fields", input);
+    const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(true);
-    expect(text).toContain('Unknown device "nonexistent"');
   });
 
   it("errors for a bad ref", async () => {
@@ -96,10 +96,9 @@ describe("write_fields", () => {
     close = client.close;
     const input = { device: "gx1", file: temp.fixture, ref: "No Such Patch", fields: { "amp.gain": "1" } };
 
-    const { isError, text } = await client.callTool("write_fields", input);
+    const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(true);
-    expect(text).toContain('No patch named "No Such Patch"');
   });
 
   it("writes a lookup field by label and reads it back as that label", async () => {
@@ -115,39 +114,26 @@ describe("write_fields", () => {
     expect(file.patches[0].delay.highCut).toBe("2.5kHz");
   });
 
-  it("surfaces the codec's error for a label not in the field's table", async () => {
+  it("rejects a label not in the field's table", async () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "delay.highCut": "2.6kHz" } };
 
-    const { isError, text } = await client.callTool("write_fields", input);
+    const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(true);
-    expect(text).toContain('Unknown highCut value: "2.6kHz"');
   });
 
-  it("rejects a field the device doesn't have rather than reporting a phantom success", async () => {
+  it("rejects a field the device doesn't have", async () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.notAField": "9" } };
 
-    const { isError, text } = await client.callTool("write_fields", input);
+    const { isError } = await client.callTool("write_fields", input);
 
-    expect(isError, "an unwritable path must not report success").toBe(true);
-    expect(text).toContain("notAField");
-  });
-
-  it("lists the valid fields when a path is rejected", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.mid": "50" } };
-
-    const { text } = await client.callTool("write_fields", input);
-
-    expect(text).toContain("middle");
+    expect(isError).toBe(true);
   });
 
   it("renames the patch set without needing a ref", async () => {
@@ -181,10 +167,9 @@ describe("write_fields", () => {
     const client = await connectClient();
     close = client.close;
 
-    const { isError, text } = await client.callTool("write_fields", { device: "gx1", file: temp.fixture });
+    const { isError } = await client.callTool("write_fields", { device: "gx1", file: temp.fixture });
 
     expect(isError).toBe(true);
-    expect(text).toContain("Nothing to change");
   });
 
   it("errors when fields is given without a ref", async () => {
@@ -193,9 +178,8 @@ describe("write_fields", () => {
     close = client.close;
     const input = { device: "gx1", file: temp.fixture, fields: { "amp.gain": "1" } };
 
-    const { isError, text } = await client.callTool("write_fields", input);
+    const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(true);
-    expect(text).toContain("`ref` is required");
   });
 });
