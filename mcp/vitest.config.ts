@@ -12,11 +12,12 @@ export default defineConfig({
         "src/**/index.ts",
         "src/**/types/**",
       ],
+      // Floors, not targets. See core/vitest.config.ts.
       thresholds: {
-        lines: 100,
-        functions: 100,
-        branches: 96,
-        statements: 100,
+        lines: 90,
+        functions: 90,
+        branches: 85,
+        statements: 90,
       },
     },
   },

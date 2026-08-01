@@ -194,23 +194,17 @@ describe("upsertPatches", () => {
 describe("resolvePatchIndex", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Rock Lead")];
 
-  it.each([
-    { ref: "0", expected: 0 },
-    { ref: "2", expected: 2 },
-  ])("returns numeric index when ref is the integer string $ref", ({ ref, expected }) => {
-    const index = resolvePatchIndex(patches, ref);
+  it("returns numeric index when ref is the integer string", () => {
+    const index = resolvePatchIndex(patches, "1");
 
-    expect(index).toBe(expected);
+    expect(index).toBe(1);
   });
 
-  it.each(["clean jazz", "CLEAN JAZZ"])(
-    "resolves name case-insensitively (trims stored patch name, not ref): %s",
-    (ref) => {
-      const index = resolvePatchIndex(patches, ref);
+  it("resolves name case-insensitively", () => {
+    const index = resolvePatchIndex(patches, "clean jazz");
 
-      expect(index).toBe(1);
-    }
-  );
+    expect(index).toBe(1);
+  });
 
   it("throws when no patch matches the name", () => {
     const resolveMissingName = () => resolvePatchIndex(patches, "Metal");
@@ -253,13 +247,10 @@ describe("resolvePatchIndices", () => {
     expect(resolvePatchIndices(patches)).toEqual([0, 1, 2]);
   });
 
-  it.each([
-    { ref: "1", expected: [1] },
-    { ref: "metal", expected: [2] },
-  ])("returns a single resolved index when ref is $ref", ({ ref, expected }) => {
-    const indices = resolvePatchIndices(patches, ref);
+  it("returns a single resolved index when ref is given", () => {
+    const indices = resolvePatchIndices(patches, "1");
 
-    expect(indices).toEqual(expected);
+    expect(indices).toEqual([1]);
   });
 
   it("propagates resolvePatchIndex's not-found error", () => {

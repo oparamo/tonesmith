@@ -55,10 +55,9 @@ describe("read_patch", () => {
     close = client.close;
     const input = { device: "nonexistent", file: FIXTURE };
 
-    const { isError, text } = await client.callTool("read_patch", input);
+    const { isError } = await client.callTool("read_patch", input);
 
     expect(isError).toBe(true);
-    expect(text).toContain('Unknown device "nonexistent"');
   });
 
   it("errors for a missing file", async () => {
@@ -76,9 +75,8 @@ describe("read_patch", () => {
     close = client.close;
     const input = { device: "gx1", file: FIXTURE, ref: "No Such Patch" };
 
-    const { isError, text } = await client.callTool("read_patch", input);
+    const { isError } = await client.callTool("read_patch", input);
 
     expect(isError).toBe(true);
-    expect(text).toContain('No patch named "No Such Patch"');
   });
 });

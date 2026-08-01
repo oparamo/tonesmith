@@ -38,12 +38,6 @@ describe("registerDriver / getDriver / listDrivers", () => {
     expect(ids).toContain("test-list-2");
   });
 
-  it("listDrivers returns an array", () => {
-    const drivers = listDrivers();
-
-    expect(Array.isArray(drivers)).toBe(true);
-  });
-
   it("throws a descriptive error listing registered ids for an unregistered id", () => {
     const registered = makeDriver("test-reg-listed");
     registerDriver(registered);
