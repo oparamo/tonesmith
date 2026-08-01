@@ -1,8 +1,6 @@
 import type { Command } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
-import { basename, extname } from "node:path";
-import { existsSync } from "node:fs";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
 const run = (action: () => void): void => {
@@ -57,13 +55,8 @@ const configureDeviceCommands = <T extends Patch>(
     .description("copy a patch from one patch file to another")
     .action((src: string, srcRef: string, dst: string, dstRef: string) => {
       run(() => {
-        const srcFile = driver.readFile(src);
-        const dstFile = driver.readFile(dst);
-        const srcIdx = patchUtils.resolvePatchIndex(srcFile.patches, srcRef);
-        const dstIdx = patchUtils.resolvePatchIndex(dstFile.patches, dstRef);
-        dstFile.patches[dstIdx] = srcFile.patches[srcIdx];
-        driver.writeFile(dstFile, dst);
-        console.info(`Copied '${srcFile.patches[srcIdx].name}' → ${dst} patch ${dstIdx}`);
+        const copied = patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
+        console.info(`Copied '${copied.name}' → ${dst} patch ${copied.toIndex}`);
       });
     });
 
@@ -72,15 +65,11 @@ const configureDeviceCommands = <T extends Patch>(
     .description("create a blank patch file")
     .action((file: string, setName?: string, patchCountStr?: string) => {
       run(() => {
-        if (existsSync(file)) {
-          console.error(`${file} already exists — refusing to overwrite`);
-          process.exit(1);
-        }
-        const name = setName ?? basename(file, extname(file));
-        const patchCount = patchCountStr !== undefined ? parseInt(patchCountStr, 10) : 1;
-        const patchFile = driver.newFile(name, patchCount);
-        driver.writeFile(patchFile, file);
-        console.info(`Created ${file} — ${patchCount} blank patch(es), set name '${name}'`);
+        const patchCount = patchCountStr !== undefined ? parseInt(patchCountStr, 10) : undefined;
+        const patchFile = patchUtils.createPatchFile(driver, file, { setName, patchCount });
+        console.info(
+          `Created ${file} with ${patchFile.patches.length} blank patch(es), set name '${patchFile.name}'`
+        );
       });
     });
 

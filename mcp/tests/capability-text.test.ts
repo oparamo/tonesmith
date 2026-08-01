@@ -13,25 +13,25 @@ describe("capabilityItemIds", () => {
 
 describe("capabilityParamValues", () => {
   it("reads a group-level param's discrete values off its ParamSpec", () => {
-    expect(capabilityParamValues("ns", "DETECT")).toBe("INPUT, NS INPUT");
-    expect(capabilityParamValues("fv", "CURVE")).toBe("SLOW1, SLOW2, NORMAL, FAST");
+    expect(capabilityParamValues({ group: "ns", param: "DETECT" })).toBe("INPUT, NS INPUT");
+    expect(capabilityParamValues({ group: "fv", param: "CURVE" })).toBe("SLOW1, SLOW2, NORMAL, FAST");
   });
 
   it("reads a per-type param's values via the representative type", () => {
-    const values = capabilityParamValues("delay", "HIGH CUT", "STANDARD");
+    const values = capabilityParamValues({ group: "delay", param: "HIGH CUT", type: "STANDARD" });
 
     expect(values).toContain("FLAT");
     expect(values).toContain("3.15kHz");
   });
 
   it("throws for a numeric group-level param rather than describing it as a value list", () => {
-    const lookup = (): string => capabilityParamValues("amp", "GAIN");
+    const lookup = (): string => capabilityParamValues({ group: "amp", param: "GAIN" });
 
     expect(lookup).toThrow();
   });
 
   it("throws for a numeric per-type param", () => {
-    const lookup = (): string => capabilityParamValues("delay", "FEEDBACK", "STANDARD");
+    const lookup = (): string => capabilityParamValues({ group: "delay", param: "FEEDBACK", type: "STANDARD" });
 
     expect(lookup).toThrow();
   });

@@ -1,8 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
   resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch,
-  upsertPatches,
+  upsertPatches, copyPatch, createPatchFile,
 } from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
@@ -212,6 +215,20 @@ describe("resolvePatchIndex", () => {
     expect(resolveMissingName).toThrow('No patch named "Metal"');
   });
 
+  // Callers index straight into the array with what this returns, so an unchecked index reads as
+  // undefined, or on a write leaves a hole that encodes as a corrupt file.
+  it("throws for an index past the last patch", () => {
+    const resolvePastEnd = () => resolvePatchIndex(patches, "3");
+
+    expect(resolvePastEnd).toThrow(/No patch at index 3/);
+  });
+
+  it("throws for a negative index", () => {
+    const resolveNegative = () => resolvePatchIndex(patches, "-1");
+
+    expect(resolveNegative).toThrow(/No patch at index -1/);
+  });
+
   it("throws when multiple patches share the same name", () => {
     const resolveAmbiguousName = () => resolvePatchIndex(patches, "rock lead");
 
@@ -361,5 +378,83 @@ describe("setByPath", () => {
     const obj: Record<string, unknown> = { amp: { gain: 10, level: 100, treble: 50 } };
 
     expect(() => { setByPath(obj, "amp.middle", 1); }).toThrow(/gain, level, treble/);
+  });
+});
+
+describe("copyPatch", () => {
+  it("replaces the destination patch and leaves the file length unchanged", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const source = makePatch("Lead");
+    files.set("src.tsl", { name: "Src", device: "FAKE", patches: [source] });
+    files.set("dst.tsl", { name: "Dst", device: "FAKE", patches: [makePatch("Old"), makePatch("Keep")] });
+
+    const copied = copyPatch(driver, { src: "src.tsl", srcRef: "0", dst: "dst.tsl", dstRef: "0" });
+
+    expect(copied).toEqual({ name: "Lead", fromIndex: 0, toIndex: 0 });
+    expect(files.get("dst.tsl")?.patches).toEqual([source, makePatch("Keep")]);
+  });
+
+  it("resolves both ends by patch name", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    files.set("src.tsl", { name: "Src", device: "FAKE", patches: [makePatch("Clean"), makePatch("Lead")] });
+    files.set("dst.tsl", { name: "Dst", device: "FAKE", patches: [makePatch("Target")] });
+
+    const copied = copyPatch(driver, { src: "src.tsl", srcRef: "Lead", dst: "dst.tsl", dstRef: "Target" });
+
+    expect(copied).toEqual({ name: "Lead", fromIndex: 1, toIndex: 0 });
+  });
+
+  it("rejects a destination index past the end rather than leaving a hole in the array", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    files.set("src.tsl", { name: "Src", device: "FAKE", patches: [makePatch("Lead")] });
+    files.set("dst.tsl", { name: "Dst", device: "FAKE", patches: [makePatch("Only")] });
+
+    const copyPastEnd = () => copyPatch(driver, { src: "src.tsl", srcRef: "0", dst: "dst.tsl", dstRef: "5" });
+
+    expect(copyPastEnd).toThrow(/No patch at index 5/);
+    expect(files.get("dst.tsl")?.patches).toHaveLength(1);
+  });
+});
+
+describe("createPatchFile", () => {
+  let dir = "";
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it("names the set after the file and opens with one blank patch by default", () => {
+    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const path = join(dir, "my-tones.tsl");
+
+    const file = createPatchFile(driver, path);
+
+    expect(file.name).toBe("my-tones");
+    expect(file.patches).toHaveLength(1);
+    expect(files.get(path)).toBe(file);
+  });
+
+  it("takes the given set name and patch count", () => {
+    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
+    const driver = makeFakeDriver(new Map<string, PatchFile>());
+    const path = join(dir, "my-tones.tsl");
+
+    const file = createPatchFile(driver, path, { setName: "Live Set", patchCount: 4 });
+
+    expect(file.name).toBe("Live Set");
+    expect(file.patches).toHaveLength(4);
+  });
+
+  it("refuses to overwrite an existing file, so a mistyped path can't cost a library", () => {
+    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
+    const driver = makeFakeDriver(new Map<string, PatchFile>());
+    const path = join(dir, "taken.tsl");
+    writeFileSync(path, "{}");
+
+    const overwrite = () => createPatchFile(driver, path);
+
+    expect(overwrite).toThrow(/already exists/);
   });
 });

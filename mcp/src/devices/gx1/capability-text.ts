@@ -1,5 +1,6 @@
 import { gx1, capabilityUtils } from "@tonesmith/core";
-import { paramFor } from "./bounds";
+import { paramFor, refLabel } from "./param-ref";
+import type { ParamRef } from "./param-ref";
 
 const capabilities = gx1.driver.capabilities;
 
@@ -15,14 +16,15 @@ const capabilityItemIds = (groupId: string): string =>
   capabilityUtils.findGroup(capabilities, groupId).items.map(item => item.id).join(", ");
 
 /**
- * A param's allowed values, comma-separated. `typeId` picks a representative type for per-type
- * blocks whose flat schema field can't express per-type value sets — sound only where every type
- * shares the same set, which the schema-drift guard pins.
+ * A param's allowed values, comma-separated. A ref naming a `type` picks a representative type for
+ * per-type blocks whose flat schema field can't express per-type value sets, which is sound only
+ * where every type shares the same set, and that is what the schema-drift guard pins.
  */
-const capabilityParamValues = (groupId: string, paramName: string, typeId?: string): string => {
-  const param = paramFor(groupId, paramName, typeId);
-  const where = typeId === undefined ? `group "${groupId}"` : `${groupId} type "${typeId}"`;
-  if (param.values === undefined) throw new Error(`ParamSpec "${paramName}" in ${where} has no discrete values`);
+const capabilityParamValues = (ref: ParamRef): string => {
+  const param = paramFor(ref);
+  if (param.values === undefined) {
+    throw new Error(`ParamSpec "${ref.param}" in ${refLabel(ref)} has no discrete values`);
+  }
   return param.values.join(", ");
 };
 

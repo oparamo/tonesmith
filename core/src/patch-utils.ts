@@ -1,12 +1,23 @@
+import { existsSync } from "node:fs";
+import { basename, extname } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "./types";
 
 /**
  * Resolve a patch reference (numeric index string or exact name) to an array index.
  * Throws with a descriptive message when the ref is ambiguous or not found.
+ *
+ * An index past the end is rejected rather than passed through: callers index straight into
+ * `patches` with the result, so an unchecked one reads as `undefined` or, on a write, leaves a hole
+ * in the array that encodes as a corrupt file.
  */
 const resolvePatchIndex = (patches: Patch[], ref: string): number => {
   const asNumber = Number(ref);
-  if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) return asNumber;
+  if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) {
+    if (asNumber < 0 || asNumber >= patches.length) {
+      throw new Error(`No patch at index ${asNumber}: the file holds ${patches.length} patch(es).`);
+    }
+    return asNumber;
+  }
 
   const needle = ref.toLowerCase();
   const matches = patches.flatMap((patch, index) =>
@@ -147,4 +158,73 @@ const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, path: string, pa
 const upsertPatch = <T extends Patch>(driver: PatchDriver<T>, path: string, patch: T, setName?: string): PatchFile<T> =>
   upsertPatches(driver, path, [patch], setName);
 
-export { resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch, upsertPatches };
+/** Which patch a copy moved, and where, so each surface can word its own confirmation. */
+interface CopiedPatch {
+  name: string;
+  fromIndex: number;
+  toIndex: number;
+}
+
+/** The two ends of a copy. `src` and `dst` may name the same file. */
+interface CopyRequest {
+  src: string;
+  srcRef: string;
+  dst: string;
+  dstRef: string;
+}
+
+/**
+ * Copies one patch between patch files, replacing the patch at `dstRef` rather than appending
+ * (that is `upsertPatch`). Both paths are read separately, so a copy within one file takes its
+ * source from an independent decode instead of from the object it is about to overwrite.
+ */
+const copyPatch = <T extends Patch>(driver: PatchDriver<T>, request: CopyRequest): CopiedPatch => {
+  const srcFile = driver.readFile(request.src);
+  const dstFile = driver.readFile(request.dst);
+  const fromIndex = resolvePatchIndex(srcFile.patches, request.srcRef);
+  const toIndex = resolvePatchIndex(dstFile.patches, request.dstRef);
+  const patch = srcFile.patches[fromIndex];
+
+  dstFile.patches[toIndex] = patch;
+  driver.writeFile(dstFile, request.dst);
+  return { name: patch.name, fromIndex, toIndex };
+};
+
+/** How to start a fresh patch file: what to call the set, and how many blank patches it opens with. */
+interface NewFileOptions {
+  setName?: string;
+  patchCount?: number;
+}
+
+const DEFAULT_NEW_PATCH_COUNT = 1;
+
+/**
+ * Creates a patch file at `path` and returns it. Refuses to overwrite an existing file, since the
+ * whole point is a blank start and the caller would lose a library to a mistyped path.
+ * The set takes the filename when `setName` is omitted.
+ */
+const createPatchFile = <T extends Patch>(
+  driver: PatchDriver<T>,
+  path: string,
+  options: NewFileOptions = {},
+): PatchFile<T> => {
+  if (existsSync(path)) throw new Error(`${path} already exists, refusing to overwrite it.`);
+
+  const setName = options.setName ?? basename(path, extname(path));
+  const file = driver.newFile(setName, options.patchCount ?? DEFAULT_NEW_PATCH_COUNT);
+  driver.writeFile(file, path);
+  return file;
+};
+
+export {
+  resolvePatchIndex,
+  coerceValue,
+  setByPath,
+  resolvePatchIndices,
+  applyFieldEdits,
+  upsertPatch,
+  upsertPatches,
+  copyPatch,
+  createPatchFile,
+};
+export type { CopiedPatch, CopyRequest, NewFileOptions };
