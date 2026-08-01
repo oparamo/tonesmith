@@ -84,7 +84,7 @@ const writeFile = (file: PatchFile, path: string): void => {
     ],
   };
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(envelope, null, 4));
+  writeFileSync(path, JSON.stringify(envelope));
 };
 
 export { blankPatch, newFile, readFile, writeFile };
