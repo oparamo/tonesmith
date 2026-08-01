@@ -8,3 +8,6 @@ export {
   DEFAULT_CHAIN, moveBefore, normalizeChain, defaultFxParams,
   basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, saveTsl,
 } from "./builder";
+export type {
+  AmpOptions, OddsOptions, FxOptions, NsOptions, FvOptions, PfxOptions, DelayOptions, ReverbOptions,
+} from "./builder";

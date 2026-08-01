@@ -141,40 +141,14 @@ const inputSchema = z.object({
 type PatchSpec = z.infer<typeof patchSpecSchema>;
 type Patch = gx1.Patch;
 
-// Every block is off in the base patch, so an omitted block needs no explicit disabling — just
-// return. A block that IS provided is configured through its builder, which now sets `on` itself
-// (default true); pass `on: false` to bypass it.
-const applyOdds = (patch: Patch, oddsParams: PatchSpec["odds"]): void => {
-  if (!oddsParams) return;
-  odds(patch, oddsParams.type, oddsParams.drive, oddsParams.tone, oddsParams.level, oddsParams.direct, oddsParams.solo, oddsParams.soloLevel, oddsParams.on ?? true);
-};
-
-const applyPfx = (patch: Patch, pfxParams: PatchSpec["pfx"]): void => {
-  if (!pfxParams) return;
-  pfx(patch, pfxParams.type, pfxParams.params ?? {}, pfxParams.on ?? true);
-};
-
+// Each block schema is shaped to match its builder's options, so a spec block passes straight
+// through. An empty slot is skipped rather than disabled: every block starts off in the base patch.
 const applyFxSlots = (patch: Patch, spec: PatchSpec): void => {
   for (const slot of ["fx1", "fx2", "fx3"] as const) {
     const block = spec[slot];
     if (!block?.type || block.type === "NONE") continue;
-    fx(patch, slot, block.type, block.subType ?? null, block.params ?? {}, block.on ?? true);
+    fx(patch, { slot, ...block });
   }
-};
-
-const applyFv = (patch: Patch, fvParams: PatchSpec["fv"]): void => {
-  if (!fvParams) return;
-  fv(patch, fvParams.position, fvParams.min, fvParams.max, fvParams.curve);
-};
-
-const applyDelay = (patch: Patch, delayParams: PatchSpec["delay"]): void => {
-  if (!delayParams) return;
-  delay(patch, delayParams.type, delayParams.time, delayParams.feedback, delayParams.level, delayParams.highCut, delayParams.on ?? true, delayParams.params ?? {});
-};
-
-const applyReverb = (patch: Patch, reverbParams: PatchSpec["reverb"]): void => {
-  if (!reverbParams) return;
-  reverb(patch, reverbParams.type, reverbParams.time, reverbParams.level, reverbParams.preDelay, reverbParams.tone, reverbParams.density, reverbParams.direct, reverbParams.on ?? true, reverbParams.params ?? {});
 };
 
 /** Builds one decoded patch from its spec — every block the spec omits stays off at factory defaults. */
@@ -182,20 +156,14 @@ const buildPatch = (spec: PatchSpec): Patch => {
   const chain = spec.chain === undefined ? undefined : normalizeChain(spec.chain);
   const patch = basePatch(spec.name, chain, spec.key);
 
-  const ampParams = spec.amp;
-  amp(patch, ampParams.type, ampParams.gain, ampParams.bass, ampParams.middle, ampParams.treble, ampParams.speaker, ampParams.mic, ampParams.level, ampParams.solo, ampParams.soloLevel, ampParams.on ?? true);
-
-  applyOdds(patch, spec.odds);
-  applyPfx(patch, spec.pfx);
+  amp(patch, spec.amp);
+  if (spec.odds) odds(patch, spec.odds);
+  if (spec.pfx) pfx(patch, spec.pfx);
   applyFxSlots(patch, spec);
-
-  if (spec.ns) {
-    ns(patch, spec.ns.threshold, spec.ns.release, spec.ns.on ?? true, spec.ns.detect);
-  }
-
-  applyFv(patch, spec.fv);
-  applyDelay(patch, spec.delay);
-  applyReverb(patch, spec.reverb);
+  if (spec.ns) ns(patch, spec.ns);
+  if (spec.fv) fv(patch, spec.fv);
+  if (spec.delay) delay(patch, spec.delay);
+  if (spec.reverb) reverb(patch, spec.reverb);
   return patch;
 };
 
