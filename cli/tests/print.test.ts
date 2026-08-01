@@ -23,7 +23,7 @@ describe("printPatch", () => {
   // hiding the block — matching every other block, and matching read_patch.
   it("prints the OD/DS line with its params when odds is off", () => {
     const patch = gx1.basePatch("Test");
-    gx1.odds(patch, "OVERDRIVE", 50, 0, 50, 0, false, 50, false);
+    gx1.odds(patch, { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, on: false });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
@@ -45,7 +45,7 @@ describe("printPatch", () => {
 
   it("shows the solo level when odds solo is enabled", () => {
     const patch = gx1.basePatch("Test");
-    gx1.odds(patch, "OVERDRIVE", 50, 0, 50, 0, true, 75);
+    gx1.odds(patch, { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, solo: true, soloLevel: 75 });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
@@ -56,7 +56,7 @@ describe("printPatch", () => {
 
   it("shows the type's default params for an FX slot the caller didn't configure", () => {
     const patch = gx1.basePatch("Test");
-    gx1.fx(patch, "fx1", "TREMOLO");
+    gx1.fx(patch, { slot: "fx1", type: "TREMOLO" });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
@@ -82,7 +82,7 @@ describe("printPatch", () => {
 
   it("omits the params line for an FX slot whose type has no known fields", () => {
     const patch = gx1.basePatch("Test");
-    gx1.fx(patch, "fx1", "BOGUS EFFECT");
+    gx1.fx(patch, { slot: "fx1", type: "BOGUS EFFECT" });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
