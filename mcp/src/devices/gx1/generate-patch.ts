@@ -207,7 +207,8 @@ Type ids and value ranges for every block come from describe_device.`,
 
         const namesBefore = existingPatchNames(params.outPath);
         const alreadySaved = new Set(namesBefore ?? []);
-        const file = patchUtils.upsertPatches(gx1.driver, params.outPath, built, params.setName);
+        const request = { path: params.outPath, patches: built, setName: params.setName };
+        const file = patchUtils.upsertPatches(gx1.driver, request);
 
         const results = built.map(patch => {
           const action = alreadySaved.has(patch.name) ? "replaced" : "appended";

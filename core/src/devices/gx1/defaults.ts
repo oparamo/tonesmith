@@ -1,6 +1,6 @@
 /**
  * Real per-type factory defaults for every GX-1 block/type, lifted from `default-init.tsl`'s
- * shadow bytes (the union byte region where every type of a block coexists — see FORMAT.md).
+ * shadow bytes (the union byte region where every type of a block coexists; see FORMAT.md).
  * This is the single source of default field values: the builder fills any param the caller
  * doesn't set from here, so a fresh block gets the device's own factory value instead of a
  * generic guess. Kept honest by the drift guard in `tests/devices/gx1/defaults.test.ts`, which
@@ -10,7 +10,7 @@
  * `on`/`type` selectors are omitted (set separately by the builder). fx type param windows don't
  * overlap, so every fx/fxDelay default is exactly the device's factory value; delay/reverb types
  * share some byte offsets, but those shared fields are exactly the builder's positional "covered"
- * fields — the harvest is only consulted for each type's own (unshared) fields, where it's correct.
+ * fields, so the harvest is only consulted for each type's own (unshared) fields, where it holds.
  *
  * Regenerate after a fixture change: see `tests/devices/gx1/defaults.test.ts`.
  */

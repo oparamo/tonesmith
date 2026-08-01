@@ -2,8 +2,8 @@
 interface ParamSpec {
   name: string;
   /**
-   * The exact property key for this param in machine surfaces — the field name in decoded
-   * patches (`read_patch` output) and the key to use inside a block's `params` record when
+   * The exact property key for this param in machine surfaces: the field name in decoded
+   * patches (`read_patch` output), and the key to use inside a block's `params` record when
    * building a patch. Distinct from `name`, which is the human display label
    * ("PRE-DELAY" vs `preDelay`, "OCT F-BACK" vs `octFeedback`). Absent only for params with
    * no backing codec field (e.g. HARMONIST's KEY, which is the patch-level key).
@@ -20,7 +20,7 @@ interface ParamSpec {
   description: string;
   /**
    * For discrete lookup-valued params whose `range` is only a compact summary (e.g. the
-   * 1/3-octave frequency tables), the full ordered list of exact valid labels — the
+   * 1/3-octave frequency tables), the full ordered list of exact valid labels. It is the
    * machine-readable companion to `range`, so a consumer can enumerate the valid values
    * instead of guessing their spelling. Omitted for plain numeric params and for short
    * enums that already spell their values out in `range`.
@@ -29,7 +29,7 @@ interface ParamSpec {
 }
 
 /**
- * A selectable option within a capability group — an amp model, effect type, drive pedal,
+ * A selectable option within a capability group: an amp model, effect type, drive pedal,
  * reverb type, cab, mic, etc.
  */
 interface CapabilityItem {
@@ -37,7 +37,7 @@ interface CapabilityItem {
   id: string;
   /** Human-readable display name. */
   name: string;
-  /** Sonic description — what the item sounds like or does. */
+  /** Sonic description: what the item sounds like or does. */
   description: string;
   /** Real-world gear this item emulates, where applicable. */
   models?: string;
@@ -48,7 +48,7 @@ interface CapabilityItem {
 }
 
 /**
- * A top-level block in the device's signal chain — amp, fx slot, delay, reverb, etc.
+ * A top-level block in the device's signal chain: amp, fx slot, delay, reverb, etc.
  * The `items` array lists selectable models/types within the block.
  * The `params` array lists controls that are always present regardless of the selected item.
  */
@@ -66,11 +66,11 @@ interface CapabilityGroup {
 
 /**
  * The device's signal-chain model: how blocks are ordered and how they're turned on/off. Every
- * device has one; it's the first thing to consult before building a patch. Device-agnostic — the
- * block names and specifics live in each device's own `ChainSpec`.
+ * device has one; it's the first thing to consult before building a patch. The block names and
+ * specifics stay device-side, in each device's own `ChainSpec`.
  */
 interface ChainSpec {
-  /** How the chain works — ordering, bypass, and the default arrangement — in prose. */
+  /** Prose account of how the chain works: ordering, bypass, and the default arrangement. */
   description: string;
   /** The canonical block order used when a patch doesn't specify one. */
   defaultOrder: string[];
@@ -78,7 +78,7 @@ interface ChainSpec {
 
 /** All capability metadata for a device. */
 interface DeviceCapabilities {
-  /** The device's signal chain — block order and how blocks are reordered/bypassed. */
+  /** The device's signal chain: block order and how blocks are reordered/bypassed. */
   chain: ChainSpec;
   groups: CapabilityGroup[];
 }

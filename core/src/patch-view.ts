@@ -4,7 +4,6 @@
  */
 interface MirrorBlock { subType: string; params: Record<string, unknown> }
 
-/** True when `value` is a block that mirrors its `params.type` onto `subType` (same value). */
 const isMirrorBlock = (value: unknown): value is MirrorBlock => {
   if (typeof value !== "object" || value === null) return false;
   const block = value as Record<string, unknown>;
@@ -15,12 +14,10 @@ const isMirrorBlock = (value: unknown): value is MirrorBlock => {
 };
 
 /**
- * Produces a consumer-facing view of a decoded patch for display or serialization: drops the
- * redundant `params.type` from every block that mirrors it onto `subType`. The model selector
- * lives in `params.type` internally (canonical storage) and is surfaced as `subType` for display,
- * so emitting both just confuses a consumer about which to set. Device-agnostic — it keys on the
- * mirror relationship itself, never on any device's block names. Returns a shallow copy; the
- * input patch is left untouched.
+ * Consumer-facing view of a decoded patch: drops the redundant `params.type` from every block
+ * that mirrors it onto `subType`. The model selector is stored in `params.type` and surfaced as
+ * `subType`, so emitting both would leave a consumer guessing which one to set. Keys on the
+ * mirror relationship itself rather than on any device's block names. Returns a shallow copy.
  */
 const presentPatch = <T extends object>(patch: T): T => {
   const view: Record<string, unknown> = { ...(patch as Record<string, unknown>) };

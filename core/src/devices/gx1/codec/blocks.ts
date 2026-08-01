@@ -8,7 +8,7 @@ import {
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   NS_DETECT, FV_CURVE, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
-  FREQ_HIGH_CUT,
+  FREQ_HIGH_CUT, NAME_BYTES,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
 import { RAW } from "../common";
@@ -21,14 +21,28 @@ import { decodeFxType, encodeFxType } from "./fx-params";
 const decodeName = (hexList: string[]): string =>
   Buffer.from(hexList.join(""), "hex").toString("ascii").trimEnd();
 
-const encodeName = (name: string, length = 16): string[] => {
-  const buffer = Buffer.alloc(length, 0x20);
-  buffer.write(name.slice(0, length), "ascii");
+const encodeName = (name: string): string[] => {
+  const buffer = Buffer.alloc(NAME_BYTES, 0x20);
+  buffer.write(name.slice(0, NAME_BYTES), "ascii");
   return hexFromBytes(Array.from(buffer));
 };
 
 
-// ── Key (MEMORY%OTHER byte 4 only — the rest of that block is out of scope) ───────
+/**
+ * Delay, reverb, and pfx blocks keep their type-specific params as fields on the block itself,
+ * so they extend Record<string, unknown>, which isn't assignable to FxParams because of the
+ * `on: boolean` field. Encoding only reads the named param fields, so the cast is safe here.
+ */
+const encodeBlockFields = (
+  fields: FieldCodec[],
+  block: Record<string, unknown>,
+  bytes: number[],
+): void => {
+  encodeFields(fields, block as unknown as FxParams, bytes);
+};
+
+
+// ── Key (MEMORY%OTHER byte 4 only, the rest of that block is out of scope) ───────
 //
 // memoryLevel/bpm/carryover/tempoHold aren't tied to any modeled effect's output, but
 // key is: HARMONIST_HR's scale-degree entries are diatonic, so this is what the device
@@ -71,24 +85,24 @@ const decodeChain = (hexList: string[]): string[] => {
 const checkChainEntry = (name: unknown, seen: Set<string>): void => {
   const valid = CHAIN_BLOCK_ORDER.join(", ");
   if (typeof name !== "string" || !(name in CHAIN_NAME_TO_VALUE)) {
-    throw new Error(`Unknown chain block ${JSON.stringify(name)} — valid blocks are: ${valid}`);
+    throw new Error(`Unknown chain block ${JSON.stringify(name)}: valid blocks are ${valid}`);
   }
   if (seen.has(name)) {
-    throw new Error(`Chain lists ${name} more than once — each block appears exactly once`);
+    throw new Error(`Chain lists ${name} more than once: each block appears exactly once`);
   }
 };
 
 /**
  * A chain is always a permutation of every block, never a subset or a multiset. The firmware stores
  * it as a linked list in which each block's own slot names its successor, so a repeated block
- * overwrites its slot and silently drops everything between the two occurrences — the file still
+ * overwrites its slot and silently drops everything between the two occurrences. The file still
  * encodes, but blocks vanish. Validating here guards every writer at once (the builder, the CLI's
  * write, and the MCP tools) rather than leaving each to police its own edits.
  */
 const validateChain = (names: unknown): void => {
   if (!Array.isArray(names)) {
     throw new Error(
-      `Chain must be a list of block names, got ${typeof names} — expected every one of: ${CHAIN_BLOCK_ORDER.join(", ")}`
+      `Chain must be a list of block names, got ${typeof names}: expected every one of ${CHAIN_BLOCK_ORDER.join(", ")}`
     );
   }
 
@@ -100,7 +114,7 @@ const validateChain = (names: unknown): void => {
 
   const missing = CHAIN_BLOCK_ORDER.filter(block => !seen.has(block));
   if (missing.length > 0) {
-    throw new Error(`Chain is missing ${missing.join(", ")} — every block must appear exactly once`);
+    throw new Error(`Chain is missing ${missing.join(", ")}: every block must appear exactly once`);
   }
 };
 
@@ -122,8 +136,8 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
 //
 // Layout: [on, type, type_bass, gain, level, bass, middle, treble, speaker,
 //          sp_type_bass, mic, solo, soloLevel]
-// Bytes 2 and 9 are the bass-mode mirrors of type/speaker — guitar-mode
-// out-of-scope, same pattern as FX_COM's byte 2 (see decodeFxCom below).
+// Bytes 2 and 9 are the bass-mode mirrors of type/speaker, out of scope in guitar
+// mode, same pattern as FX_COM's byte 2 (see decodeFxCom below).
 
 const decodeAmp = (hexList: string[]): AmpBlock => {
   const bytes = bytesFromHex(hexList);
@@ -246,11 +260,11 @@ const encodeFv = (block: FvBlock): string[] => {
 
 // ── FX_COM block (on/type header + bass-mode type mirror, 3 bytes) ────────────
 //
-// Byte 2 is the bass-mode mirror of byte 1's type selector (used when the device is
-// in bass mode) — it never carries a subtype for any effect. Effects that have their
-// own sub-model (COMPRESSOR, LIMITER, AC RESO, CHORUS, CLASSIC-VIBE, HUMANIZER, OD/DS)
-// store it in the FX param block itself (see PARAM_SUBTYPE_EFFECTS in common/constants.ts),
-// not here. Byte 2 is guitar-mode-out-of-scope and always passed through untouched.
+// Byte 2 is the bass-mode mirror of byte 1's type selector and never carries a subtype for any
+// effect. Effects that have their own sub-model (COMPRESSOR, LIMITER, AC RESO, CHORUS,
+// CLASSIC-VIBE, HUMANIZER, OD/DS) store it in the FX param block itself (see
+// PARAM_SUBTYPE_EFFECTS in common/constants.ts), not here. Out of scope in guitar mode, so
+// byte 2 is always passed through untouched.
 
 const decodeFxCom = (hexList: string[]): Omit<FxBlock, "params"> => {
   const bytes = bytesFromHex(hexList);
@@ -268,7 +282,7 @@ const encodeFxCom = (block: FxBlock): string[] => {
 
 // ── Delay block field maps (keyed by delay type) ──────────────────────────────
 //
-// Bytes 0–1 of the full block are [on, type] — handled in decodeDelay/encodeDelay.
+// Bytes 0–1 of the full block are [on, type], handled in decodeDelay/encodeDelay.
 // All other offsets below are absolute byte positions within the full block.
 //
 // Many fields are shared across types at the same address (e.g. feedback/level/highCut
@@ -334,12 +348,7 @@ const encodeDelay = (block: DelayBlock): string[] => {
   bytes[1] = lookupIndex(DLY_TYPE_IDX, block.type, "DLY type");
 
   const fields = DELAY_TYPE_MAPS[block.type];
-  if (fields) {
-    // Double-assertion needed: DelayBlock extends Record<string, unknown> which isn't
-    // directly assignable to FxParams (Record<string, string|number|number[]>) due to
-    // the 'on: boolean' field; at runtime we only read the named param fields.
-    encodeFields(fields, block as unknown as FxParams, bytes);
-  }
+  if (fields) encodeBlockFields(fields, block, bytes);
   return hexFromBytes(bytes);
 };
 
@@ -352,6 +361,12 @@ const encodeDelay = (block: DelayBlock): string[] => {
 // getting its own compact layout.
 
 const STANDARD_REVERB_TYPES = ["HALL S", "HALL M", "PLATE", "ROOM S", "ROOM L", "AMBIENCE", "SPRING"] as const;
+
+/** The seven standard types share one layout; the rest each have their own. */
+const reverbFields = (type: string): FieldCodec[] | undefined => {
+  if ((STANDARD_REVERB_TYPES as readonly string[]).includes(type)) return REV_TYPE_MAPS.STANDARD;
+  return REV_TYPE_MAPS[type];
+};
 
 const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
@@ -376,9 +391,7 @@ const decodeReverb = (hexList: string[]): ReverbBlock => {
   const reverbType = lookupName(REV_TYPES, bytes[1]);
   const block: ReverbBlock = { on: Boolean(bytes[0]), type: reverbType, [RAW]: bytes };
 
-  const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(reverbType)
-    ? REV_TYPE_MAPS.STANDARD
-    : REV_TYPE_MAPS[reverbType];
+  const fields = reverbFields(reverbType);
   if (fields) Object.assign(block, decodeFields(fields, bytes));
   return block;
 };
@@ -388,24 +401,17 @@ const encodeReverb = (block: ReverbBlock): string[] => {
   bytes[0] = Number(block.on);
   bytes[1] = lookupIndex(REV_TYPE_IDX, block.type, "REV type");
 
-  const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(block.type)
-    ? REV_TYPE_MAPS.STANDARD
-    : REV_TYPE_MAPS[block.type];
-  if (fields) {
-    // Double-assertion needed: ReverbBlock extends Record<string, unknown> which isn't
-    // directly assignable to FxParams (Record<string, string|number|number[]>) due to
-    // the 'on: boolean' field; at runtime we only read the named param fields.
-    encodeFields(fields, block as unknown as FxParams, bytes);
-  }
+  const fields = reverbFields(block.type);
+  if (fields) encodeBlockFields(fields, block, bytes);
   return hexFromBytes(bytes);
 };
 
 // ── PFX (expression pedal effect: WAH / PEDAL BEND) block (14 bytes) ──────────
 //
-// Byte 3 (wah_type_bass) is the bass-mode mirror of byte 2's wah type — guitar-mode
-// out-of-scope, same pattern as AMP/FX_COM's other bass-mode mirror bytes. Both
-// WAH's and PEDAL BEND's fields always occupy their fixed byte ranges regardless of
-// which is currently selected (the same "shadow bytes" union layout as delay/reverb).
+// Byte 3 (wah_type_bass) is the bass-mode mirror of byte 2's wah type, out of scope in
+// guitar mode, same pattern as AMP/FX_COM's other bass-mode mirror bytes. Both WAH's and
+// PEDAL BEND's fields always occupy their fixed byte ranges regardless of which is
+// currently selected (the same "shadow bytes" union layout as delay/reverb).
 
 const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "WAH": [
@@ -434,12 +440,7 @@ const encodePfx = (block: PfxBlock): string[] => {
   bytes[1] = lookupIndex(PFX_TYPE_IDX, block.type, "PFX type");
 
   const fields = PFX_TYPE_MAPS[block.type];
-  if (fields) {
-    // Double-assertion needed: PfxBlock extends Record<string, unknown> which isn't
-    // directly assignable to FxParams (Record<string, string|number|number[]>) due to
-    // the 'on: boolean' field; at runtime we only read the named param fields.
-    encodeFields(fields, block as unknown as FxParams, bytes);
-  }
+  if (fields) encodeBlockFields(fields, block, bytes);
   return hexFromBytes(bytes);
 };
 

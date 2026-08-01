@@ -12,8 +12,8 @@ interface TslEnvelope {
 /**
  * FX parameter values. String fields are lookup names (e.g. "SLOW" for rotary speed);
  * boolean fields are on/off toggles (e.g. a delay `trigger`). The special key "unknownBytes"
- * appears only when the effect type is unrecognised — its value is the raw 32-byte param
- * block, preserved for round-trip safety.
+ * appears only when the effect type is unrecognized; its value is the raw 32-byte param block,
+ * preserved for round-trip safety.
  */
 type FxParams = Record<string, string | number | boolean | number[]>;
 

@@ -1,15 +1,9 @@
 /**
- * Module-level Symbol used to carry raw binary bytes on decoded GX-1 patch objects.
+ * Carries the original raw bytes on decoded GX-1 objects: block bytes on each block, the full
+ * param set on a Patch, the JSON envelope on a PatchFile.
  *
- * Symbol-keyed properties are omitted by JSON.stringify and Object.entries, so
- * raw bytes never appear in CLI display output or MCP JSON responses — no explicit
- * filtering needed and no underscore-prefixed field names required.
- *
- * Usage across types:
- *   FxBlock / OdDsBlock / AmpBlock / NsBlock / FvBlock  →  [RAW]: number[]  (block bytes)
- *   DelayBlock / ReverbBlock                            →  [RAW]: number[]  (block bytes)
- *   gx1.Patch                                          →  [RAW]: RawParamSet (full param set)
- *   gx1.PatchFile                                      →  [RAW]: TslEnvelope (JSON envelope)
+ * A symbol rather than a field name because JSON.stringify and Object.entries skip symbol keys,
+ * so raw bytes stay out of CLI display output and MCP responses without any filtering.
  */
 const RAW: unique symbol = Symbol("gx1.raw");
 

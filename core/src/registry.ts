@@ -8,10 +8,7 @@ const registerDriver = (driver: PatchDriver): void => {
 
 const listDrivers = (): PatchDriver[] => Array.from(drivers.values());
 
-/**
- * Look up a driver by id, throwing a descriptive error listing the registered ids if none
- * matches. Shared by the CLI (device dispatch) and the MCP server (per-call device validation).
- */
+/** Throws when `id` is not registered, rather than returning undefined. */
 const getDriver = (id: string): PatchDriver => {
   const driver = drivers.get(id);
   if (!driver) {

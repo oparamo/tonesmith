@@ -1,9 +1,6 @@
 import type { DeviceCapabilities, CapabilityGroup, CapabilityItem } from "./types";
 
-/**
- * Find a capability group by id (case-insensitive).
- * Throws with a descriptive message listing available group ids when not found.
- */
+/** Case-insensitive lookup; throws when no group matches. */
 const findGroup = (caps: DeviceCapabilities, id: string): CapabilityGroup => {
   const needle = id.toLowerCase();
   const found = caps.groups.find(group => group.id.toLowerCase() === needle);
@@ -15,8 +12,8 @@ const findGroup = (caps: DeviceCapabilities, id: string): CapabilityGroup => {
 };
 
 /**
- * Find a capability item within a group by id (case-insensitive) or by name prefix.
- * Throws with a descriptive message listing available item ids when not found.
+ * Case-insensitive lookup by id, falling back to a name prefix so a caller can pass the leading
+ * words of a display name. Throws when nothing matches.
  */
 const findItem = (group: CapabilityGroup, id: string): CapabilityItem => {
   const needle = id.toUpperCase();
