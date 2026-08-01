@@ -29,6 +29,12 @@ list_devices enumerates device ids when you don't already have one. read_patch a
 for files that already exist — inspecting a patch you did not just create, or amending one by
 dot-path.
 
+Two tools cover the rest of the file handling. copy_patch moves a patch into a slot in another file,
+replacing what was there. create_patch_file starts an empty file of blank patches at the device's
+factory defaults. Neither is part of building a patch from parameters: generate_<device>_patch
+creates and appends to its own output file, so reach for these only when the goal really is
+duplicating an existing patch or opening an empty file.
+
 These tools are the complete interface. Everything you need — device knowledge, patch building,
 saving, and editing — is here, and no shell, file editing, or outside tooling is involved at any
 step.`;

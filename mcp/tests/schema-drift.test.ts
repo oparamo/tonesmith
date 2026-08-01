@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1, capabilityUtils } from "@tonesmith/core";
 import { connectClient } from "./helpers";
+import { describeParam } from "../src/devices/gx1/param-ref";
 
 /**
  * Two drift guards for generate_gx1_patch:
@@ -80,6 +81,7 @@ const rangeFor = ({ groupId, paramName, typeId }: BoundedField): { min: number; 
 interface JsonSchemaNode {
   minimum?: number;
   maximum?: number;
+  description?: string;
   properties?: Record<string, JsonSchemaNode>;
   items?: JsonSchemaNode;
 }
@@ -119,6 +121,22 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
 
     expect(node.minimum, `${field.path} should carry a finite min`).toBe(min);
     expect(node.maximum, `${field.path} should carry a finite max`).toBe(max);
+  });
+
+  // The bound and the sentence beside it used to be able to disagree: zod enforced the catalog
+  // while the text quoted whatever range someone last typed. Both now come from the ParamSpec, and
+  // this is what keeps it that way. Field notes ("Defaults to 100.") are appended after the
+  // catalog text, so this checks containment rather than equality.
+  it.each(BOUNDED_FIELDS)("$path describes itself from the catalog, not from hand-typed text", async (field) => {
+    const client = await connectClient();
+    close = client.close;
+    const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
+
+    const node = nodeAt(patchSpecNode(tool.inputSchema), field.path);
+    const fromCatalog = describeParam({ group: field.groupId, param: field.paramName, type: field.typeId });
+
+    expect(node.description, `${field.path} should reach the client described`).toBeDefined();
+    expect(node.description).toContain(fromCatalog);
   });
 });
 

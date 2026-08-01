@@ -4,6 +4,8 @@ import {
   registerReadPatch,
   registerWriteFields,
   registerDescribeDevice,
+  registerCopyPatch,
+  registerCreatePatchFile,
 } from "./tools";
 import { deviceTools } from "./devices";
 import { instructions } from "./instructions";
@@ -23,6 +25,8 @@ const buildServer = (): McpServer => {
   registerReadPatch(server);
   registerWriteFields(server);
   registerDescribeDevice(server);
+  registerCopyPatch(server);
+  registerCreatePatchFile(server);
 
   for (const registerTools of deviceTools) {
     registerTools(server);
