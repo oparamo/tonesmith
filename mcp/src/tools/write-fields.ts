@@ -9,10 +9,10 @@ const registerWriteFields = (server: McpServer): void => {
     {
       description:
         "Edit a patch file: one or more fields of a single patch, the name of the patch set, or " +
-        "both. Patch fields use dot-notation — 'amp.gain', 'fx1.params.rate', 'ns.threshold', " +
-        "'delay.time'. A path naming a field the device doesn't have is rejected, listing the " +
-        "valid fields at that level. The whole set is applied together — if any edit is rejected, " +
-        "the file is left untouched.",
+        "both. Patch fields use dot-notation, as in 'amp.gain', 'fx1.params.rate', " +
+        "'ns.threshold', 'delay.time'. A path naming a field the device doesn't have is rejected, " +
+        "listing the valid fields at that level. The whole set is applied together, so if any " +
+        "edit is rejected the file is left untouched.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
         device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
@@ -25,7 +25,7 @@ const registerWriteFields = (server: McpServer): void => {
             "Numbers and booleans are coerced from their string form automatically."
         ),
         setName: z.string().optional().describe(
-          "New name for the patch set — the file's own label, shown as `setName` by read_patch. " +
+          "New name for the patch set: the file's own label, shown as `setName` by read_patch. " +
             "Applies to the file rather than to any one patch."
         ),
       }),
@@ -34,12 +34,12 @@ const registerWriteFields = (server: McpServer): void => {
       try {
         if (fields === undefined && setName === undefined) {
           throw new Error(
-            "Nothing to change — pass `fields` (with `ref`) to edit a patch, `setName` to rename " +
+            "Nothing to change: pass `fields` (with `ref`) to edit a patch, `setName` to rename " +
               "the patch set, or both."
           );
         }
         if (fields !== undefined && ref === undefined) {
-          throw new Error("`ref` is required alongside `fields` — it selects which patch to edit.");
+          throw new Error("`ref` is required alongside `fields`, since it selects which patch to edit.");
         }
 
         const driver = registry.getDriver(device);
@@ -47,8 +47,8 @@ const registerWriteFields = (server: McpServer): void => {
         const changes: string[] = [];
 
         if (fields !== undefined && ref !== undefined) {
-          const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-          const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
+          const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
+          const patch = patchFile.patches[index] as unknown as Record<string, unknown>;
           const edits = Object.entries(fields);
           // Every edit lands in memory before anything is written, so a rejected edit anywhere in
           // the set leaves the file exactly as it was rather than half-applied.
@@ -56,7 +56,7 @@ const registerWriteFields = (server: McpServer): void => {
           const applied = edits
             .map(([field, value]) => `${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`)
             .join(", ");
-          changes.push(`patch ${idx}: ${applied}`);
+          changes.push(`patch ${index}: ${applied}`);
         }
 
         if (setName !== undefined) {
@@ -65,7 +65,7 @@ const registerWriteFields = (server: McpServer): void => {
         }
 
         driver.writeFile(patchFile, file);
-        return ok(`Updated ${file} — ${changes.join("; ")}`);
+        return ok(`Updated ${file}: ${changes.join("; ")}`);
       } catch (error) {
         return err(error);
       }

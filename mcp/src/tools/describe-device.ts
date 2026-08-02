@@ -52,16 +52,16 @@ const viewForEntry = (
     return view;
   }
 
-  // The block's own controls apply to whichever item is selected, so an item view that omitted them
-  // would hide amp's gain/bass/middle/treble entirely — they live on the group.
+  // The block's own controls apply to whichever item is selected, and they live on the group, so
+  // an item view that omitted them would hide amp's gain/bass/middle/treble entirely.
   const foundItem = capabilityUtils.findItem(matched, item);
   return { ...foundItem, params: [...(matched.params ?? []), ...(foundItem.params ?? [])] };
 };
 
 /**
  * Resolves every requested entry, keyed by the entry string the caller asked for so a batch of
- * twenty reads the same way as a batch of one. A single bad entry fails the whole call — a partially
- * resolved response would leave the caller to notice the hole themselves.
+ * twenty reads the same way as a batch of one. A single bad entry fails the whole call, since a
+ * partially resolved response would leave the caller to notice the hole themselves.
  */
 const viewsForEntries = (
   capabilities: DeviceCapabilities,
@@ -73,7 +73,7 @@ const viewsForEntries = (
     try {
       views[entry] = viewForEntry(capabilities, entry, includeParams);
     } catch (error) {
-      throw new Error(`items entry "${entry}" — ${(error as Error).message}`);
+      throw new Error(`items entry "${entry}": ${(error as Error).message}`);
     }
   }
   return views;
@@ -98,7 +98,7 @@ const registerDescribeDevice = (server: McpServer): void => {
     "describe_device",
     {
       description:
-        "Return capability metadata for a device — signal chain, effect types, amp models, cabs, " +
+        "Return capability metadata for a device: signal chain, effect types, amp models, cabs, " +
         "mics, and every param with its key, range, and allowed values.",
       inputSchema: z.object({
         device: z.string().describe("Device ID (e.g. 'gx1'). Use list_devices to enumerate IDs."),
@@ -107,13 +107,14 @@ const registerDescribeDevice = (server: McpServer): void => {
             "(default block order, reordering, and how blocks are bypassed); a group id such as " +
             '"amp", "fx", "odds", "delay", "reverb", "cab", "mic", "ns", "fv" for that group\'s ' +
             'index; or "<group>/<item>" such as "fx/CHORUS", "amp/JC-120", "reverb/HALL M" for one ' +
-            "item's full params. List every entry you need in a single call — that is what this " +
+            "item's full params. List every entry you need in a single call, which is what this " +
             "input is for. Omit to list all groups plus a chain summary. An unknown entry fails " +
             "the whole call and names itself."
         ),
         includeParams: z.boolean().optional().describe(
-          "Include every item's full param specs for bare-group entries. Off by default — a group " +
-            "listing is an index; name the items you want instead. Ignored for \"<group>/<item>\" entries."
+          "Include every item's full param specs for bare-group entries. Off by default, since a " +
+            "group listing is an index; name the items you want instead. Ignored for " +
+            "\"<group>/<item>\" entries."
         ),
       }),
     },

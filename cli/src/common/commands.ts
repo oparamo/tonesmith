@@ -3,6 +3,12 @@ import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
+/** Splits "amp.gain=72" at the first "=", so a value containing one survives intact. */
+const parseFieldAssignment = (assignment: string): [string, string] => {
+  const separatorIndex = assignment.indexOf("=");
+  return [assignment.slice(0, separatorIndex), assignment.slice(separatorIndex + 1)];
+};
+
 const run = (action: () => void): void => {
   try {
     action();
@@ -25,8 +31,8 @@ const configureDeviceCommands = <T extends Patch>(
       run(() => {
         const patchFile = driver.readFile(file);
         console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
-        for (const i of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
-          printPatch(patchView.presentPatch(patchFile.patches[i]), i);
+        for (const index of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
+          printPatch(patchView.presentPatch(patchFile.patches[index]), index);
         }
         console.info();
       });
@@ -38,15 +44,11 @@ const configureDeviceCommands = <T extends Patch>(
     .action((file: string, ref: string, fields: string[]) => {
       run(() => {
         const patchFile = driver.readFile(file);
-        const idx = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-        const patch = patchFile.patches[idx] as unknown as Record<string, unknown>;
-        const edits = fields.map((fieldAssignment): [string, string] => {
-          const separatorIndex = fieldAssignment.indexOf("=");
-          return [fieldAssignment.slice(0, separatorIndex), fieldAssignment.slice(separatorIndex + 1)];
-        });
-        patchUtils.applyFieldEdits(patch, edits);
+        const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
+        const patch = patchFile.patches[index] as unknown as Record<string, unknown>;
+        patchUtils.applyFieldEdits(patch, fields.map(parseFieldAssignment));
         driver.writeFile(patchFile, file);
-        console.info(`Wrote ${file} — patch ${idx} updated: ${fields.join(", ")}`);
+        console.info(`Wrote ${file}, patch ${index} updated: ${fields.join(", ")}`);
       });
     });
 

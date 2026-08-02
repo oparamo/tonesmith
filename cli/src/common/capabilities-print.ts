@@ -7,7 +7,7 @@ const CYAN   = "\x1b[36m";
 const YELLOW = "\x1b[33m";
 const GREEN  = "\x1b[32m";
 
-/** Print the device's signal-chain model — default order + how ordering and bypass work. */
+/** Print the device's signal-chain model: default order, plus how ordering and bypass work. */
 const printChain = (chain: ChainSpec): void => {
   console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
   console.info(`${YELLOW}Default order:${RESET} ${chain.defaultOrder.join(" → ")}\n`);
@@ -19,10 +19,10 @@ const printChain = (chain: ChainSpec): void => {
 const printGroups = (caps: DeviceCapabilities): void => {
   console.info(`\n${BOLD}Capability groups${RESET}\n`);
   console.info(`  ${CYAN}${"chain".padEnd(10)}${RESET}  ${BOLD}Signal Chain${RESET}  ${DIM}(block order + bypass)${RESET}`);
-  console.info(`  ${"".padEnd(10)}  Default: ${caps.chain.defaultOrder.join(" → ")}  ${DIM}— run \`capabilities chain\` for details${RESET}`);
+  console.info(`  ${"".padEnd(10)}  Default: ${caps.chain.defaultOrder.join(" → ")}  ${DIM}(run \`capabilities chain\` for details)${RESET}`);
   console.info();
   for (const group of caps.groups) {
-    const count = group.items.length > 0 ? `${group.items.length} types` : "—";
+    const count = group.items.length > 0 ? `${group.items.length} types` : "no types";
     console.info(`  ${CYAN}${group.id.padEnd(10)}${RESET}  ${BOLD}${group.name}${RESET}  ${DIM}(${count})${RESET}`);
     console.info(`  ${"".padEnd(10)}  ${group.description}`);
     console.info();
@@ -67,8 +67,8 @@ const printGroup = (group: CapabilityGroup): void => {
   printGroupItems(group.items);
 };
 
-// Most subtypes are pure model variants with no params of their own; FX-slot DELAY is the
-// exception — each sub-algorithm carries a distinct param set, so print those inline.
+// Most subtypes are pure model variants with no params of their own. FX-slot DELAY is the
+// exception, since each sub-algorithm carries a distinct param set, so print those inline.
 const printSubTypeParams = (params: CapabilityItem["params"]): void => {
   if (!params || params.length === 0) return;
   for (const param of params) {
@@ -92,7 +92,7 @@ const printItemParams = (params: CapabilityItem["params"]): void => {
   console.info(`\n${YELLOW}Parameters:${RESET}`);
   for (const param of params) {
     // `key` is the name this param answers to in `write` dot-paths, and `range` is only a summary
-    // for lookup params — without both, the printed param can't actually be set from the CLI.
+    // for lookup params. Without both, the printed param can't actually be set from the CLI.
     const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
     console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
     console.info(`  ${"".padEnd(14)} ${param.description}`);
@@ -102,7 +102,7 @@ const printItemParams = (params: CapabilityItem["params"]): void => {
   }
 };
 
-/** Print full detail for a single item — description, models, subTypes, params. */
+/** Print full detail for a single item: description, models, subTypes, params. */
 const printItem = (group: CapabilityGroup, item: CapabilityItem): void => {
   console.info(`\n${BOLD}${item.name}${RESET}  ${DIM}[${group.id} / ${item.id}]${RESET}\n`);
   console.info(item.description);

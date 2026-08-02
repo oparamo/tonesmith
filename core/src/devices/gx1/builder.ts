@@ -4,7 +4,7 @@ import { PARAM_SUBTYPE_EFFECTS, NS_DETECT } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
 import { DEFAULTS_BY_TYPE, type ParamDefaults } from "./defaults";
 
-// The 10 reorderable blocks — OUTPUT is a fixed endpoint, not part of the chain array
+// The 10 reorderable blocks. OUTPUT is a fixed endpoint, not part of the chain array
 // (see CHAIN_BLOCK_ORDER in common/constants.ts for the underlying byte encoding).
 const DEFAULT_CHAIN: string[] =
   ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"];
@@ -34,7 +34,7 @@ const validateChainNames = (names: string[]): void => {
  * the caller's relative ordering. Blocks the caller omits are inserted immediately
  * after their DEFAULT_CHAIN predecessor (or at the front, for DEFAULT_CHAIN's first
  * block). Walking DEFAULT_CHAIN start to end guarantees that predecessor is already
- * in `result` by the time we look for it — either the caller included it, or an
+ * in `result` by the time we look for it: either the caller included it, or an
  * earlier pass of this same loop just inserted it. "OD" is accepted as an alias
  * for "OD/DS".
  */
@@ -123,10 +123,10 @@ const fxFieldMap = (fxType: string, subType: string | null): FieldCodec[] | unde
 };
 
 /**
- * The FX param defaults for switching a slot to `fxType` — the device's own factory values from
+ * The FX param defaults for switching a slot to `fxType`: the device's own factory values from
  * DEFAULTS_BY_TYPE, so any field the caller doesn't set gets a real default instead of inheriting
  * whatever stale raw byte was in the slot before (the class of bug that left unset GEQ bands
- * decoding to −20 dB instead of 0 dB). DELAY is per-sub-algorithm (its defaults live under fxDelay).
+ * decoding to -20 dB instead of 0 dB). DELAY is per-sub-algorithm (its defaults live under fxDelay).
  */
 const defaultFxParams = (fxType: string, subType: string | null = null): Record<string, string | number | boolean> => {
   if (fxType === "DELAY") {

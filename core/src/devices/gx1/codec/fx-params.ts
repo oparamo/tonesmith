@@ -122,7 +122,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     lookup("midFreq", 3, FREQ_STEPS), signed("midGain", 4, 20),
     lookup("lowCut", 5, FREQ_LOW_CUT), lookup("highCut", 6, FREQ_HIGH_CUT),
   ],
-  // GEQ band gains use signed(center=20) — each band covers ±20 dB.
+  // GEQ band gains use signed(center=20), so each band covers ±20 dB.
   "GEQ": [
     signed("125Hz", 0, 20), signed("250Hz", 1, 20), signed("500Hz", 2, 20),
     signed("1kHz",  3, 20), signed("2kHz",  4, 20), signed("4kHz",  5, 20),
@@ -151,7 +151,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("sens", 0), u8("attack", 1), u8("depth", 2), u8("reso", 3),
     signed("tone", 4), u8("level", 5), u8("direct", 6),
   ],
-  // FIXED WAH: byte +1 is the bass-mode wah type — not used in guitar mode.
+  // FIXED WAH: byte +1 is the bass-mode wah type, not used in guitar mode.
   "FIXED WAH": [
     lookup("type", 0, WAH_TYPES), u8("level", 2), u8("direct", 3), u8("manual", 4),
   ],
