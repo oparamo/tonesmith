@@ -56,6 +56,9 @@ export default tseslint.config(
       'max-params': ['error', 3],
       // G5: two functions with identical bodies are one function and a caller.
       'sonarjs/no-identical-functions': 'error',
+      // Deliberately absent: 'no-duplicate-imports'. It fires on the type/value import split
+      // (`import type { Patch }` beside `import { patchUtils }` from the same module), which is
+      // the shape this codebase wants, so enabling it would trade a real convention for noise.
       'tonesmith/no-em-dash': 'error',
       '@typescript-eslint/no-unused-vars': ['error', {
         vars: 'all',
