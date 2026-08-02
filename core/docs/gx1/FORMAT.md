@@ -1,8 +1,8 @@
 # GX-1 TSL File Format
 
-Reverse-engineered format for BOSS GX-1 `.tsl` patch files, built by studying real `.tsl` exports from the device alongside the BOSS Tone Studio app. All byte values are stored as hex strings in a JSON array (e.g. `["01","2A","FF"]`).
+Reverse-engineered format for BOSS GX-1 `.tsl` patch files, built by studying real `.tsl` exports from the device alongside the vendor's own editor software. All byte values are stored as hex strings in a JSON array (e.g. `["01","2A","FF"]`).
 
-This document is the **byte-layout narrative** only — offsets, encoding families, and how each block maps to raw bytes. The **parameter surface** (every block/type's param names, value ranges, and descriptions) lives in `core/src/devices/gx1/param-catalog.ts`, the in-repo source of truth that `capabilities.ts` derives from and the `codec ↔ catalog` drift guard checks against. Field names here are guarded against that catalog; ranges/descriptions are not duplicated here.
+This document is the **byte-layout narrative** only: offsets, encoding families, and how each block maps to raw bytes. The **parameter surface** (every block/type's param names, value ranges, and descriptions) lives in `core/src/devices/gx1/param-catalog.ts`, the in-repo source of truth that `capabilities.ts` derives from and the codec-to-catalog drift guard checks against. Field names here are guarded against that catalog; ranges and descriptions are not duplicated here.
 
 ## TSL JSON Envelope
 
@@ -40,30 +40,30 @@ Each patch:
 | `MEMORY%FX3_COM`   |   3 | FX3 on/off + type header                                   |
 | `MEMORY%FX3`       | 251 | FX3 parameter block                                        |
 | `MEMORY%FX3A`      |   5 | FX3 OVERTONE parameters                                    |
-| `MEMORY%ODDS`      |   8 | OD/DS block (drive, tone, level…)                          |
+| `MEMORY%ODDS`      |   8 | OD/DS block (drive, tone, level, ...)                      |
 | `MEMORY%AMP`       |  13 | Amp/cab settings                                           |
 | `MEMORY%DLY`       |  29 | Delay settings                                             |
 | `MEMORY%REV`       |  20 | Reverb settings                                            |
 | `MEMORY%PFX`       |  14 | Pedal FX (WAH / PEDAL BEND)                                |
 | `MEMORY%FV`        |   4 | Foot volume                                                |
 | `MEMORY%NS`        |   4 | Noise suppressor                                           |
-| `MEMORY%OTHER`     |   7 | Master (BPM, key, carryover, etc.) — only `key` is decoded |
+| `MEMORY%OTHER`     |   7 | Master (BPM, key, carryover, etc.); only `key` is decoded  |
 | `MEMORY%CTL`       |  32 | CTL footswitch assignments                                 |
 | `MEMORY%ASGN1`–`8` |  15 | Expression/assign slots                                    |
 
-## MEMORY%COM — Patch Name (16 bytes)
+## MEMORY%COM: Patch Name (16 bytes)
 
 ASCII bytes, right-padded with spaces (0x20).
 
-## MEMORY%CHAIN — Signal Chain (13 bytes, 11 used)
+## MEMORY%CHAIN: Signal Chain (13 bytes, 11 used)
 
-Not a positional array — a linked list. Each block below has a fixed **slot** (1–10):
-byte `slot` holds the firmware value of whatever comes immediately *after* that block
-— not by chain position. Byte 0 is the one exception: it holds `item_top`, the firmware
-value of whichever block comes first. A firmware value of 0 always means "connects to
-OUTPUT", a fixed endpoint that has no slot of its own and never appears as a byte's
-*index* — only ever as a byte's *value*. Bytes 11–12 are unused by this scheme (always
-11, 12 on a real device; preserved on encode, not written).
+Not a positional array but a linked list. Each block below has a fixed **slot** (1–10): byte
+`slot` holds the firmware value of whatever comes immediately *after* that block, not the block
+at that chain position. Byte 0 is the one exception: it holds `item_top`, the firmware value of
+whichever block comes first. A firmware value of 0 always means "connects to OUTPUT", a fixed
+endpoint that has no slot of its own and never appears as a byte's *index*, only ever as a byte's
+*value*. Bytes 11–12 are unused by this scheme (always 11, 12 on a real device; preserved on
+encode, not written).
 
 | Slot / value | Block                                                |
 |-------------:|------------------------------------------------------|
@@ -80,27 +80,31 @@ OUTPUT", a fixed endpoint that has no slot of its own and never appears as a byt
 |           10 | REV                                                  |
 
 Example (untouched default order `PFX→FX1→OD/DS→AMP→NS→FV→FX2→FX3→DLY→REV`):
-`[1,2,3,4,7,6,9,8,5,10,0,11,12]` — byte 0 (`item_top`) is 1 (PFX); byte 1 (PFX's next) is
+`[1,2,3,4,7,6,9,8,5,10,0,11,12]`. Byte 0 (`item_top`) is 1 (PFX); byte 1 (PFX's next) is
 2 (FX1); byte 4 (AMP's next) is 7 (NS); byte 10 (REV's next) is 0 (OUTPUT, end of chain).
 
 ## MEMORY%FX1_COM / FX2_COM / FX3_COM (3 bytes)
 
-| Byte | Field     | Notes                                                                  |
-|------|-----------|------------------------------------------------------------------------|
-| 0    | on        | 0=OFF, 1=ON                                                            |
-| 1    | type      | Index into FX_TYPES list (see below)                                   |
-| 2    | type_bass | Bass-mode mirror of byte 1 — not used in guitar mode, always preserved |
+| Byte | Field     | Notes                                                                    |
+|------|-----------|--------------------------------------------------------------------------|
+| 0    | on        | 0=OFF, 1=ON                                                              |
+| 1    | type      | Index into FX_TYPES list (see below)                                     |
+| 2    | type_bass | Bass-mode mirror of byte 1. Not used in guitar mode, always preserved    |
 
-Byte 2 is never a subtype for any effect type. COMPRESSOR, LIMITER, AC RESO, CHORUS,
-CLASSIC-VIBE, HUMANIZER, and OD/DS each store their own sub-model selector as the
-first byte of their own region in the FX parameter block below (see PARAM_SUBTYPE_EFFECTS
-in `common/constants.ts`), not in FX_COM. This codec normalizes all seven to one internal
-field key, `type`, decoded/encoded via the same `lookup("type", 0, ...)` mechanism and
-promoted to `block.subType` on decode — see each effect's own entry below for its value
-table (two of the seven are labeled `MODE` rather than `TYPE` in Roland's own manual; noted
-where that applies).
+Byte 2 is never a subtype for any effect type. COMPRESSOR, LIMITER, AC RESO, FIXED WAH, CHORUS,
+CLASSIC-VIBE, HUMANIZER, and OD/DS each store their own sub-model selector as the first byte of
+their own region in the FX parameter block below, not in FX_COM. This codec normalizes all eight
+to one internal field key, `type`, decoded and encoded via the same `lookup("type", 0, ...)`
+mechanism and promoted to `block.subType` on decode. See each effect's own entry below for its
+value table; two of the eight (CLASSIC-VIBE and HUMANIZER) are labeled `MODE` rather than `TYPE`
+in Roland's own manual, noted where that applies.
 
-**FX_TYPES index table** (byte 1 value → effect name):
+DELAY and REVERB use the same p[0] mechanism, but their selector picks a whole sub-algorithm
+rather than a variation on one param set, so each is documented in its own entry below. All ten
+effects are listed in `PARAM_SUBTYPE_EFFECTS` (`common/constants.ts`), which is what the decoder
+and the `fx()` builder both key on.
+
+**FX_TYPES index table** (byte 1 value to effect name):
 
 | Idx | Name        | Idx | Name         | Idx | Name        |
 |-----|-------------|-----|--------------|-----|-------------|
@@ -120,7 +124,7 @@ where that applies).
 
 *OVERTONE (38) is FX3 only. Its parameters are in `MEMORY%FX3A`, not `MEMORY%FX3`.
 
-## MEMORY%FX1 / FX2 / FX3 — FX Parameter Block (251 bytes)
+## MEMORY%FX1 / FX2 / FX3: FX Parameter Block (251 bytes)
 
 Only the first N bytes are used per effect type; the rest are preserved verbatim. Fields with
 no annotation below are plain unsigned bytes (`u8`, range 0–255 unless the field's own value
@@ -128,83 +132,83 @@ list says otherwise); see the conventions table for every other encoding used in
 
 ### Encoding conventions
 
-| Convention             | Formula                                                                                                                                                                                                                                                                             |
-|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Signed (center C)      | `display = raw - C` — the default center is 50 (range -50..+50) when not noted. Other centers seen in this format: 20 (EQ gains, range -20..+20), 24 (pitch semitones, range -24..+24), 12 (TUNE DOWN, range -12..0), -1 (SLICER `duty`, range -1..+254 but only 0..100 meaningful) |
-| Scaled (×factor)       | `display = raw × factor`, rounded to 1 decimal — used for CHORUS `preDelay` (factor 0.5, in ms) and REVERB `time` (factor 0.1, in seconds), both the dedicated REV block and REVERB-as-FX-slot                                                                                      |
-| 16-bit time (4-nibble) | one hex digit per byte across 4 consecutive bytes, MSB first                                                                                                                                                                                                                        |
-| 8-bit value (2-nibble) | one hex digit per byte across 2 consecutive bytes, MSB first (reverb pre-delay)                                                                                                                                                                                                     |
+| Convention             | Formula                                                                                                                                                                                                                                                                        |
+|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Signed (center C)      | `display = raw - C`. The default center is 50 (range -50..+50) when not noted. Other centers seen in this format: 20 (EQ gains, range -20..+20), 24 (pitch semitones, range -24..+24), 12 (TUNE DOWN, range -12..0), -1 (SLICER `duty`, range -1..+254 but only 0..100 meaningful) |
+| Scaled (×factor)       | `display = raw × factor`, rounded to 1 decimal. Used for CHORUS `preDelay` (factor 0.5, in ms) and REVERB `time` (factor 0.1, in seconds), in both the dedicated REV block and REVERB-as-FX-slot                                                                                 |
+| 16-bit time (4-nibble) | one hex digit per byte across 4 consecutive bytes, MSB first                                                                                                                                                                                                                    |
+| 8-bit value (2-nibble) | one hex digit per byte across 2 consecutive bytes, MSB first (reverb pre-delay)                                                                                                                                                                                                 |
 
 ### Per-effect byte maps
 
 Each entry below gives the **absolute byte offset within the 251-byte block** where
-that effect type's own parameters start (not an offset relative to 0). Effects are
-laid out back-to-back in a fixed order — there is no padding between them beyond
-what's noted. **This physical layout order is not the same as the FX_TYPES index
-order above** — e.g. LIMITER is index 1 but starts at byte 10, after SLOW GEAR
-(index 7, byte 16) and ENHANCER (index 2, byte 19) come later still. Use the index
-table above only to decode/encode the type selector byte; use this section to find
-where a given type's own parameters live.
+that effect type's own parameters start, not an offset relative to 0. Effects are
+laid out back-to-back in a fixed order, with no padding between them beyond what's
+noted. **This physical layout order is not the same as the FX_TYPES index order
+above**: LIMITER is index 1 but starts at byte 10, while SLOW GEAR (index 7) starts
+at byte 16 and ENHANCER (index 2) at byte 19. Use the index table above only to
+decode and encode the type selector byte; use this section to find where a given
+type's own parameters live.
 
-**COMPRESSOR** — starts at byte 0; p[0..3]
+**COMPRESSOR**, starts at byte 0; p[0..3]
 `p[0]`=type (0=BOSS COMP,1=D-COMP,2=ORANGE,3=X-COMP,4=STEREO) `p[1]`=sustain `p[2]`=attack `p[3]`=level
 
-**LIMITER** — starts at byte 10; p[0..5]
+**LIMITER**, starts at byte 10; p[0..5]
 `p[0]`=type (0=BOSS,1=RACK 160D,2=VTG RACK U) `p[1]`=threshold `p[2]`=ratio `p[3]`=level `p[4]`=attack `p[5]`=release
 
-**SLOW GEAR** — starts at byte 16; p[0..2]
+**SLOW GEAR**, starts at byte 16; p[0..2]
 `p[0]`=sens `p[1]`=riseTime `p[2]`=level
 
-**ENHANCER** — starts at byte 19; p[0..5]
+**ENHANCER**, starts at byte 19; p[0..5]
 `p[0]`=sens `p[1]`=low `p[2]`=high `p[3]`=lowFreq (index into `ENHANCER_LOW_FREQ`, `common/constants.ts`) `p[4]`=highFreq (index into `ENHANCER_HIGH_FREQ`) `p[5]`=level
 
-**SLICER** — starts at byte 25; p[0..5]
+**SLICER**, starts at byte 25; p[0..5]
 `p[0]`=pattern (0–19 = PATTERN 1–20) `p[1]`=rate `p[2]`=level `p[3]`=attack `p[4]`=duty (signed, center=-1: display=raw+1) `p[5]`=direct
 
-**PARA. EQ** — starts at byte 31; p[0..6]  *(EQ gains use center=20)*
+**PARA. EQ**, starts at byte 31; p[0..6]  *(EQ gains use center=20)*
 `p[0]`=lowGain (signed20) `p[1]`=highGain (signed20) `p[2]`=level (signed20) `p[3]`=midFreq (index into `FREQ_STEPS`, `common/constants.ts`) `p[4]`=midGain (signed20) `p[5]`=lowCut (index into `FREQ_LOW_CUT`) `p[6]`=highCut (index into `FREQ_HIGH_CUT`)
 
-**GEQ** — starts at byte 38; p[0..6]
+**GEQ**, starts at byte 38; p[0..6]
 `p[0..5]`=bands 125Hz/250Hz/500Hz/1kHz/2kHz/4kHz (signed20) `p[6]`=level (signed20)
 
-**LOW GEQ** — starts at byte 45; p[0..6]
+**LOW GEQ**, starts at byte 45; p[0..6]
 `p[0..5]`=bands 63Hz/125Hz/250Hz/500Hz/1kHz/2kHz (signed20) `p[6]`=level (signed20)
 
-**HIGH GEQ** — starts at byte 52; p[0..6]
+**HIGH GEQ**, starts at byte 52; p[0..6]
 `p[0..5]`=bands 250Hz/500Hz/1kHz/2kHz/4kHz/8kHz (signed20) `p[6]`=level (signed20)
 
-**TOUCH WAH** — starts at byte 59; p[0..7]
+**TOUCH WAH**, starts at byte 59; p[0..7]
 `p[0]`=filter (0=LPF,1=BPF,2=HPF) `p[1]`=polarity (0=DOWN,1=UP) `p[2]`=sens `p[3]`=freq `p[4]`=reso `p[5]`=decay `p[6]`=level `p[7]`=direct
 
-**AUTO WAH** — starts at byte 67; p[0..5]
+**AUTO WAH**, starts at byte 67; p[0..5]
 `p[0]`=filter (0=LPF,1=BPF,2=HPF) `p[1]`=freq `p[2]`=rate `p[3]`=depth `p[4]`=reso `p[5]`=level
 
-**DEFRETTER** — starts at byte 73; p[0..6]
+**DEFRETTER**, starts at byte 73; p[0..6]
 `p[0]`=sens `p[1]`=attack `p[2]`=depth `p[3]`=reso `p[4]`=tone (signed50) `p[5]`=level `p[6]`=direct
 
-**FIXED WAH** — starts at byte 85; p[0], p[2..4]  *(p[1] is the bass-mode wah type — not used in guitar mode)*
+**FIXED WAH**, starts at byte 85; p[0], p[2..4]  *(p[1] is the bass-mode wah type, not used in guitar mode)*
 `p[0]`=type (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) `p[2]`=level `p[3]`=direct `p[4]`=manual
 
-**AC. GTR SIM** — starts at byte 93; p[0..3]
+**AC. GTR SIM**, starts at byte 93; p[0..3]
 `p[0]`=high (signed50) `p[1]`=body `p[2]`=low (signed50) `p[3]`=level
 
-**AC RESO** — starts at byte 97; p[0..3]
+**AC RESO**, starts at byte 97; p[0..3]
 `p[0]`=type (0=NATURAL,1=WIDE,2=BRIGHT) `p[1]`=reso `p[2]`=tone (signed50) `p[3]`=level
 
-**FEEDBACKER** — starts at byte 101; p[0..6]
+**FEEDBACKER**, starts at byte 101; p[0..6]
 `p[0]`=mode (0=NORMAL,1=OSC) `p[1]`=trigger `p[2]`=depth `p[3]`=riseTime `p[4]`=octRiseTm `p[5]`=feedback `p[6]`=octFeedback
 
-**SITAR SIM** — starts at byte 108; p[0..6]
+**SITAR SIM**, starts at byte 108; p[0..6]
 `p[0]`=sens `p[1]`=depth `p[2]`=tone (signed50) `p[3]`=level `p[4]`=reso `p[5]`=buzz `p[6]`=direct
 
-**OD/DS** — starts at byte 115; p[0..6]  *(p[0]=type, stored here like COMPRESSOR/LIMITER/etc. — not in FX_COM byte 2)*
+**OD/DS**, starts at byte 115; p[0..6]  *(p[0]=type, stored here like COMPRESSOR and LIMITER, not in FX_COM byte 2)*
 `p[0]`=type (pedal model, table below) `p[1]`=drive `p[2]`=tone (signed50) `p[3]`=level `p[4]`=direct
-`p[5]`=solo `p[6]`=soloLevel — this FX-slot instance's own solo boost, distinct from the
-dedicated `MEMORY%ODDS` block's solo (the device exposes "FX1 SOLO"/"FX2 SOLO"/"FX3 SOLO" as
-separate footswitch functions from "OD/DS SOLO")
+`p[5]`=solo `p[6]`=soloLevel. Those last two are this FX-slot instance's own solo boost, distinct
+from the dedicated `MEMORY%ODDS` block's solo: the device exposes "FX1 SOLO", "FX2 SOLO", and
+"FX3 SOLO" as separate footswitch functions from "OD/DS SOLO".
 
-OD/DS pedal-model table (`p[0]` value → name — also used by the dedicated `MEMORY%ODDS`
-block's own `type` byte below, `ODDS_TYPES`):
+OD/DS pedal-model table (`p[0]` value to name). The dedicated `MEMORY%ODDS` block's own `type`
+byte below uses this same table, `ODDS_TYPES`:
 
 | Idx | Name      | Idx | Name        | Idx | Name        | Idx | Name       | Idx | Name      |
 |-----|-----------|-----|-------------|-----|-------------|-----|------------|-----|-----------|
@@ -216,97 +220,97 @@ block's own `type` byte below, `ODDS_TYPES`):
 | 25  | 60S FUZZ  | 26  | MUFF FUZZ   | 27  | BASS OD     | 28  | X-BASS OD  | 29  | BASS DS   |
 | 30  | BASS DI   | 31  | SA DI DRIVE | 32  | HI BAND DRV | 33  | BASS MT    | 34  | BASS FUZZ |
 
-**CHORUS** — starts at byte 122; p[0..5]
+**CHORUS**, starts at byte 122; p[0..5]
 `p[0]`=type (0=MONO,1=DIR/EFX,2=STEREO) `p[1]`=rate `p[2]`=depth `p[3]`=level `p[4]`=preDelay (raw × 0.5ms) `p[5]`=direct
 
-**FLANGER** — starts at byte 128; p[0..5]
+**FLANGER**, starts at byte 128; p[0..5]
 `p[0]`=rate `p[1]`=depth `p[2]`=reso `p[3]`=manual `p[4]`=level `p[5]`=direct
 
-**PHASER** — starts at byte 134; p[0..6]
+**PHASER**, starts at byte 134; p[0..6]
 `p[0]`=stage (enum select: raw 0=4 STAGE, 1=8 STAGE, 2=12 STAGE) `p[1]`=rate `p[2]`=depth `p[3]`=reso `p[4]`=manual `p[5]`=level `p[6]`=direct
 
-**SCRIPT PH** — starts at byte 141; p[0..2]
+**SCRIPT PH**, starts at byte 141; p[0..2]
 `p[0]`=rate `p[1]`=depth `p[2]`=level
 
-**CLASSIC-VIBE** — starts at byte 144; p[0..3]  *(Roland's manual labels p[0] `MODE`, not `TYPE`
-as with the other sub-model-selector effects — this codec still uses `type` for consistency)*
+**CLASSIC-VIBE**, starts at byte 144; p[0..3]  *(Roland's manual labels p[0] `MODE` rather than
+`TYPE` as with the other sub-model selectors; this codec still uses `type` for consistency)*
 `p[0]`=type (0=CHORUS,1=VIBRATO) `p[1]`=rate `p[2]`=depth `p[3]`=level
 
-**ROTARY** — starts at byte 148; p[0..6]
+**ROTARY**, starts at byte 148; p[0..6]
 `p[0]`=speed (0=SLOW,1=FAST) `p[1]`=slowRate `p[2]`=fastRate `p[3]`=level `p[4]`=balance `p[5]`=drive `p[6]`=direct
 
-**VIBRATO** — starts at byte 155; p[0..4]
+**VIBRATO**, starts at byte 155; p[0..4]
 `p[0]`=rate `p[1]`=depth `p[2]`=riseTime `p[3]`=trigger `p[4]`=level
 
-**TREMOLO** — starts at byte 160; p[0..2]
+**TREMOLO**, starts at byte 160; p[0..2]
 `p[0]`=rate `p[1]`=depth `p[2]`=level
 
-**PAN** — starts at byte 163; p[0..2]
+**PAN**, starts at byte 163; p[0..2]
 `p[0]`=rate `p[1]`=depth `p[2]`=level
 
-**RING MOD** — starts at byte 166; p[0..5]
+**RING MOD**, starts at byte 166; p[0..5]
 `p[0]`=intelligent (0=OFF,1=ON) `p[1]`=freq `p[2]`=modRate `p[3]`=modDepth `p[4]`=level `p[5]`=direct
 
-**HUMANIZER** — starts at byte 172; p[0..6]  *(Roland's manual labels p[0] `MODE`, not `TYPE`
-as with the other sub-model-selector effects — this codec still uses `type` for consistency)*
+**HUMANIZER**, starts at byte 172; p[0..6]  *(Roland's manual labels p[0] `MODE` rather than
+`TYPE` as with the other sub-model selectors; this codec still uses `type` for consistency)*
 `p[0]`=type (0=PICKING,1=AUTO) `p[1]`=vowel1 `p[2]`=vowel2 (0–4 = a,e,i,o,u) `p[3]`=sens `p[4]`=rate `p[5]`=manual `p[6]`=level
 
-**PITCH SHIFT** — starts at byte 179; p[0..8]  *(preDelay is 16-bit, not a plain byte)*
-`p[0]`=mode (0=FAST,1=MEDIUM,2=SLOW,3=MONO) `p[1]`=pitch — index into a 51-entry table: 0="+7&-5", 1–49 → semitones -24..+24 (index-25), 50="+12&-5" `p[2..5]`=preDelay (16-bit) `p[6]`=level `p[7]`=feedback `p[8]`=direct
+**PITCH SHIFT**, starts at byte 179; p[0..8]  *(preDelay is 16-bit, not a plain byte)*
+`p[0]`=mode (0=FAST,1=MEDIUM,2=SLOW,3=MONO) `p[1]`=pitch, an index into a 51-entry table where 0="+7&-5", 1–49 are semitones -24..+24 (index-25), and 50="+12&-5" `p[2..5]`=preDelay (16-bit) `p[6]`=level `p[7]`=feedback `p[8]`=direct
 
-**HARMONIST** — starts at byte 188; p[0..7]  *(preDelay is 16-bit; the musical key these
-diatonic intervals resolve against isn't stored here — it's the patch-level `key` byte in
-`MEMORY%OTHER`, documented further below)*
-`p[0]`=harmony — raw index (0–32) into the 33-entry `HARMONIST_HR` table (`common/constants.ts`): 0="+1oct&-1oct", 1="-4th&-6th", 2="-2oct", 3–8="-14th".."-9th", 9="-1oct", 10–15="-7th".."-2nd", 16="UNISON", 17–22="+2nd".."+7th", 23="+1oct", 24–29="+9th".."+14th", 30="+2oct", 31="+3rd&+5th", 32="+3rd&-4th" `p[1..4]`=preDelay (16-bit) `p[5]`=level `p[6]`=feedback `p[7]`=direct
+**HARMONIST**, starts at byte 188; p[0..7]  *(preDelay is 16-bit. The musical key these diatonic
+intervals resolve against isn't stored here: it is the patch-level `key` byte in `MEMORY%OTHER`,
+documented further below)*
+`p[0]`=harmony, a raw index (0–32) into the 33-entry `HARMONIST_HR` table (`common/constants.ts`): 0="+1oct&-1oct", 1="-4th&-6th", 2="-2oct", 3–8="-14th".."-9th", 9="-1oct", 10–15="-7th".."-2nd", 16="UNISON", 17–22="+2nd".."+7th", 23="+1oct", 24–29="+9th".."+14th", 30="+2oct", 31="+3rd&+5th", 32="+3rd&-4th" `p[1..4]`=preDelay (16-bit) `p[5]`=level `p[6]`=feedback `p[7]`=direct
 
-**OCTAVE** — starts at byte 196; p[0..2]
+**OCTAVE**, starts at byte 196; p[0..2]
 `p[0]`=minus1Oct `p[1]`=minus2Oct `p[2]`=direct
 
-**HEAVY OCT** — starts at byte 199; p[0..2]  *(same layout as OCTAVE)*
+**HEAVY OCT**, starts at byte 199; p[0..2]  *(same layout as OCTAVE)*
 `p[0]`=minus1Oct `p[1]`=minus2Oct `p[2]`=direct
 
-**S-BEND** — starts at byte 202; p[0..3]
+**S-BEND**, starts at byte 202; p[0..3]
 `p[0]`=trigger `p[1]`=pitch (0–6 = -3oct..-1oct,+1oct..+4oct) `p[2]`=riseTime `p[3]`=fallTime
 
-**PEDAL BEND** — starts at byte 206; p[0..4]
+**PEDAL BEND**, starts at byte 206; p[0..4]
 `p[0]`=pitchMin (signed24) `p[1]`=pitchMax (signed24) `p[2]`=pdlPos `p[3]`=level `p[4]`=direct
 
-**TUNE DOWN** — starts at byte 211; p[0]
+**TUNE DOWN**, starts at byte 211; p[0]
 `p[0]`=pitch (signed12: raw-12, range -12..0 semitones)
 
-**DELAY** *(when FX slot type=DELAY)* — starts at byte 212; p[0..18]. This is the one FX-slot
-type modeled **per sub-algorithm** (like the dedicated DLY block): p[0] selects the
-sub-algorithm from `FX_DLY_TYPES` (0=STANDARD, 1=MODULATE, 2=WARP, 3=TWIST, 4=GLITCH — its own
-set, **not** the dedicated block's `DLY_TYPES`), and each one uses a different subset of the
-19-byte block. p[0] is promoted to `block.subType` (via `PARAM_SUBTYPE_EFFECTS`); the codec's
-field map lives in `FX_DELAY_TYPE_MAPS` (`codec/fx-params.ts`). Byte homes are distinct across
-sub-algorithms (no offset reuse):
-- **STANDARD** — `p[0]`=type `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut (index into `FREQ_HIGH_CUT`, `common/constants.ts`)
-- **MODULATE** — STANDARD's fields plus `p[8]`=modRate `p[9]`=modDepth
-- **WARP** — `p[0]`=type `p[1..4]`=time (16-bit) `p[11]`=trigger (0=OFF,1=ON) `p[12]`=level
-- **TWIST** — `p[0]`=type `p[10]`=mode (`TWIST_MODES`: 0=RISE-FALL, 1=RISE-FADE) `p[11]`=trigger `p[12]`=level `p[13]`=riseTime `p[14]`=fallTime `p[15]`=fadeTime
-- **GLITCH** — `p[0]`=type `p[11]`=trigger `p[16]`=time `p[17]`=glitch `p[18]`=balance
+**DELAY** *(when FX slot type=DELAY)*, starts at byte 212; p[0..18]. This is the one FX-slot
+type modeled **per sub-algorithm**, like the dedicated DLY block: p[0] selects the sub-algorithm
+from `FX_DLY_TYPES` (0=STANDARD, 1=MODULATE, 2=WARP, 3=TWIST, 4=GLITCH, its own set and **not**
+the dedicated block's `DLY_TYPES`), and each one uses a different subset of the 19-byte block.
+p[0] is promoted to `block.subType` (via `PARAM_SUBTYPE_EFFECTS`); the codec's field map lives in
+`FX_DELAY_TYPE_MAPS` (`codec/fx-params.ts`). Byte homes are distinct across sub-algorithms, with
+no offset reuse:
+- **STANDARD**: `p[0]`=type `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut (index into `FREQ_HIGH_CUT`, `common/constants.ts`)
+- **MODULATE**: STANDARD's fields plus `p[8]`=modRate `p[9]`=modDepth
+- **WARP**: `p[0]`=type `p[1..4]`=time (16-bit) `p[11]`=trigger (0=OFF,1=ON) `p[12]`=level
+- **TWIST**: `p[0]`=type `p[10]`=mode (`TWIST_MODES`: 0=RISE-FALL, 1=RISE-FADE) `p[11]`=trigger `p[12]`=level `p[13]`=riseTime `p[14]`=fallTime `p[15]`=fadeTime
+- **GLITCH**: `p[0]`=type `p[11]`=trigger `p[16]`=time `p[17]`=glitch `p[18]`=balance
 
-**REVERB** *(when FX slot type=REVERB)* — starts at byte 231; p[0..5]. Its 5 types are its own
-set (`FX_REV_TYPES`: 0=HALL S, 1=HALL M, 2=PLATE, 3=ROOM, 4=STUDIO — **not** the dedicated REV
+**REVERB** *(when FX slot type=REVERB)*, starts at byte 231; p[0..5]. Its 5 types are its own
+set (`FX_REV_TYPES`: 0=HALL S, 1=HALL M, 2=PLATE, 3=ROOM, 4=STUDIO, **not** the dedicated REV
 block's `REV_TYPES`), and all 5 share one field set:
 `p[0]`=type index `p[1]`=time (raw × 0.1) `p[2..3]`=preDelay (8-bit) `p[4]`=level `p[5]`=direct
 
-**OVERTONE** *(FX3 only — stored in MEMORY%FX3A, not MEMORY%FX3)* — p[0..4]
+**OVERTONE** *(FX3 only, stored in MEMORY%FX3A rather than MEMORY%FX3)*, p[0..4]
 `p[0]`=lower `p[1]`=upper `p[2]`=unison `p[3]`=direct `p[4]`=detune
 
-## MEMORY%ODDS — Overdrive/Distortion (8 bytes)
+## MEMORY%ODDS: Overdrive/Distortion (8 bytes)
 
-| Byte | Field     | Notes                                         |
-|------|-----------|-----------------------------------------------|
-| 0    | on        | 0=OFF, 1=ON                                   |
-| 1    | type      | ODDS_TYPES index (0–34)                       |
-| 2    | drive     | 0–100                                         |
-| 3    | tone      | signed, center=50                             |
-| 4    | level     | 0–100                                         |
-| 5    | direct    | 0–100                                         |
-| 6    | solo      | 0=OFF, 1=ON — temporary level boost for solos |
-| 7    | soloLevel | 0–100                                         |
+| Byte | Field     | Notes                                          |
+|------|-----------|------------------------------------------------|
+| 0    | on        | 0=OFF, 1=ON                                    |
+| 1    | type      | ODDS_TYPES index (0–34)                        |
+| 2    | drive     | 0–100                                          |
+| 3    | tone      | signed, center=50                              |
+| 4    | level     | 0–100                                          |
+| 5    | direct    | 0–100                                          |
+| 6    | solo      | 0=OFF, 1=ON. Temporary level boost for solos   |
+| 7    | soloLevel | 0–100                                          |
 
 ## MEMORY%AMP (13 bytes)
 
@@ -314,33 +318,32 @@ block's `REV_TYPES`), and all 5 share one field set:
 |------|--------------|------------------------------------------------------------------|
 | 0    | on           | 0=OFF, 1=ON                                                      |
 | 1    | type         | AMP_TYPES index (0–22)                                           |
-| 2    | type_bass    | bass-mode amp type — not used in guitar mode, preserved          |
+| 2    | type_bass    | bass-mode amp type. Not used in guitar mode, preserved           |
 | 3    | gain         | 0–120                                                            |
 | 4    | level        | 0–100                                                            |
 | 5    | bass         | 0–100                                                            |
 | 6    | middle       | 0–100                                                            |
 | 7    | treble       | 0–100                                                            |
 | 8    | speaker      | SP_TYPES index (0=OFF,1=ORIGINAL,2–8=cabinet sizes,9–16=USER1–8) |
-| 9    | sp_type_bass | bass-mode speaker type — not used in guitar mode, preserved      |
+| 9    | sp_type_bass | bass-mode speaker type. Not used in guitar mode, preserved       |
 | 10   | mic          | MIC_TYPES index (0=DYN57…8=BLEND C)                              |
-| 11   | solo         | 0=OFF, 1=ON — temporary level boost for solos                    |
+| 11   | solo         | 0=OFF, 1=ON. Temporary level boost for solos                     |
 | 12   | soloLevel    | 0–100                                                            |
 
-## MEMORY%DLY — Delay (29 bytes)
+## MEMORY%DLY: Delay (29 bytes)
 
 | Byte | Field  | Notes                                                                |
 |------|--------|----------------------------------------------------------------------|
 | 0    | on     | 0=OFF, 1=ON                                                          |
 | 1    | type   | DLY_TYPES index (see below)                                          |
-| 2+   | params | See table below — absolute byte offsets, several shared across types |
+| 2+   | params | See table below: absolute byte offsets, several shared across types  |
 
 DLY_TYPES: 0=STANDARD, 1=MODULATE, 2=PAN, 3=REVERSE, 4=ANALOG, 5=ANLG MOD, 6=SPACE ECHO, 7=SHIMMER, 8=WARP, 9=TWIST, 10=GLITCH
 
-Byte offsets are absolute (not relative to a per-type sub-block). Several fields are
+Byte offsets are absolute, not relative to a per-type sub-block. Several fields are
 shared across types at the same address rather than each type getting its own
-compact layout — e.g. `feedback`/`level`/`highCut` at 6/7/8 are used by every
-"clean" delay type, and `trigger`/`level` at 21/25 are shared by WARP, TWIST, and
-GLITCH.
+compact layout: `feedback`/`level`/`highCut` at 6/7/8 are used by every "clean"
+delay type, and `trigger`/`level` at 21/25 are shared by WARP, TWIST, and GLITCH.
 
 | Byte(s) | Field                                         | Used by                                                                 |
 |---------|-----------------------------------------------|-------------------------------------------------------------------------|
@@ -366,15 +369,15 @@ GLITCH.
 | 27      | glitch                                        | GLITCH                                                                  |
 | 28      | balance                                       | GLITCH                                                                  |
 
-*head: 0="1", 1="1+2", 2="1+3", 3="2+3", 4="1+2+3" — which tape heads are engaged.
+*head: 0="1", 1="1+2", 2="1+3", 3="2+3", 4="1+2+3", which tape heads are engaged.
 
-## MEMORY%REV — Reverb (20 bytes)
+## MEMORY%REV: Reverb (20 bytes)
 
 | Byte | Field  | Notes                                                                |
 |------|--------|----------------------------------------------------------------------|
 | 0    | on     | 0=OFF, 1=ON                                                          |
 | 1    | type   | REV_TYPES index (see below)                                          |
-| 2+   | params | See table below — absolute byte offsets, several shared across types |
+| 2+   | params | See table below: absolute byte offsets, several shared across types  |
 
 REV_TYPES: 0=HALL S, 1=HALL M, 2=PLATE, 3=ROOM S, 4=ROOM L, 5=AMBIENCE, 6=SPRING, 7=SHIMMER, 8=SUB DELAY, 9=TERA ECHO
 
@@ -398,39 +401,40 @@ As with MEMORY%DLY, several fields are shared across types at the same address
 | 18      | spreadTime ("S-TIME")                     | TERA ECHO                                                       |
 | 19      | trigger                                   | TERA ECHO                                                       |
 
-## MEMORY%PFX — Expression Pedal Effect (14 bytes)
+## MEMORY%PFX: Expression Pedal Effect (14 bytes)
 
 The effect assigned to the expression pedal input: WAH or PEDAL BEND. Both effects'
-fields always occupy their fixed byte ranges regardless of which is selected (the
-same "shadow bytes" union layout as MEMORY%DLY/MEMORY%REV).
+fields always occupy their fixed byte ranges regardless of which is selected, the
+same "shadow bytes" union layout as MEMORY%DLY and MEMORY%REV.
 
 > **Shadow bytes = factory defaults.** Because every type's fields have a permanent home in the
 > union layout (this holds for FX1/2/3, DLY, REV, and PFX), a factory-default patch export carries
-> the device's real factory default for *every* type at once, not just the selected one — decode a
+> the device's real factory default for *every* type at once, not just the selected one: decode a
 > non-active type's window and you get genuine device data. `core/src/devices/gx1/defaults.ts`
 > (`DEFAULTS_BY_TYPE`) is harvested exactly this way from `tests/fixtures/gx1/default-init.tsl`, so
-> the builder fills unset params with real per-type defaults instead of guesses. (fx windows don't
-> overlap → always correct; DLY/REV share some offsets, but those are the builder's positional
-> "covered" fields, so only each type's own unshared fields are read from the harvest.)
+> the builder fills unset params with real per-type defaults instead of guesses. FX windows don't
+> overlap, so those are always correct; DLY and REV share some offsets, but the shared ones are
+> exactly the builder's positional "covered" fields, so only each type's own unshared fields are
+> read from the harvest.
 
 | Byte | Field        | Notes                                                                            |
 |------|--------------|----------------------------------------------------------------------------------|
 | 0    | on           | 0=OFF, 1=ON                                                                      |
 | 1    | type         | 0=WAH, 1=PEDAL BEND                                                              |
 | 2    | wahType      | WAH_TYPES index (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) |
-| 3    | wahType_bass | Bass-mode mirror of byte 2 — not used in guitar mode, always preserved           |
-| 4    | level        | WAH — 0–100                                                                      |
-| 5    | direct       | WAH — 0–100                                                                      |
-| 6    | position     | WAH — 0–100                                                                      |
-| 7    | min          | WAH — 0–100                                                                      |
-| 8    | max          | WAH — 0–100                                                                      |
-| 9    | pitchMin     | PEDAL BEND — signed24, −24..+24 semitones                                        |
-| 10   | pitchMax     | PEDAL BEND — signed24, −24..+24 semitones                                        |
-| 11   | position     | PEDAL BEND — 0–100                                                               |
-| 12   | level        | PEDAL BEND — 0–100                                                               |
-| 13   | direct       | PEDAL BEND — 0–100                                                               |
+| 3    | wahType_bass | Bass-mode mirror of byte 2. Not used in guitar mode, always preserved            |
+| 4    | level        | WAH: 0–100                                                                       |
+| 5    | direct       | WAH: 0–100                                                                       |
+| 6    | position     | WAH: 0–100                                                                       |
+| 7    | min          | WAH: 0–100                                                                       |
+| 8    | max          | WAH: 0–100                                                                       |
+| 9    | pitchMin     | PEDAL BEND: signed24, -24..+24 semitones                                         |
+| 10   | pitchMax     | PEDAL BEND: signed24, -24..+24 semitones                                         |
+| 11   | position     | PEDAL BEND: 0–100                                                                |
+| 12   | level        | PEDAL BEND: 0–100                                                                |
+| 13   | direct       | PEDAL BEND: 0–100                                                                |
 
-## MEMORY%FV — Foot Volume (4 bytes)
+## MEMORY%FV: Foot Volume (4 bytes)
 
 | Byte | Field    | Notes                           |
 |------|----------|---------------------------------|
@@ -439,7 +443,7 @@ same "shadow bytes" union layout as MEMORY%DLY/MEMORY%REV).
 | 2    | max      | 0–100                           |
 | 3    | curve    | 0=SLOW1,1=SLOW2,2=NORMAL,3=FAST |
 
-## MEMORY%NS — Noise Suppressor (4 bytes)
+## MEMORY%NS: Noise Suppressor (4 bytes)
 
 | Byte | Field     | Notes               |
 |------|-----------|---------------------|
@@ -448,31 +452,31 @@ same "shadow bytes" union layout as MEMORY%DLY/MEMORY%REV).
 | 2    | release   | 0–100               |
 | 3    | detect    | 0=INPUT, 1=NS INPUT |
 
-## MEMORY%OTHER — Patch Metadata (7 bytes)
+## MEMORY%OTHER: Patch Metadata (7 bytes)
 
 Only `key` is decoded (`patch.key`); the rest is preserved verbatim (see rationale below).
 
-| Byte(s) | Field       | Notes                                                                                                                                                                                                                      |
-|---------|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 0–1     | memoryLevel | 8-bit, 2 hex-digit nibbles — overall patch output trim, 0–200. Not decoded.                                                                                                                                                |
-| 2–3     | bpm         | 8-bit, 2 hex-digit nibbles — reference tempo, 40–250; not consumed by any tone parameter (delay/reverb times are stored directly in ms, not derived from this). Not decoded.                                               |
-| 4       | key         | 0–11, one of `KEY_NAMES` (C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B). This is the song key used to resolve `HARMONIST`'s diatonic `harmony` intervals (+2nd, +3rd, +6th, etc.) to actual semitones — decoded as `patch.key`. |
-| 5       | carryover   | 0=OFF, 1=ON — whether the current tone keeps sounding through a patch change. Not decoded.                                                                                                                                 |
-| 6       | tempoHold   | 0=OFF, 1=ON — whether tempo persists across a patch change. Not decoded.                                                                                                                                                   |
+| Byte(s) | Field       | Notes                                                                                                                                                                                                                    |
+|---------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0–1     | memoryLevel | 8-bit, 2 hex-digit nibbles. Overall patch output trim, 0–200. Not decoded.                                                                                                                                                |
+| 2–3     | bpm         | 8-bit, 2 hex-digit nibbles. Reference tempo, 40–250; not consumed by any tone parameter (delay and reverb times are stored directly in ms, not derived from this). Not decoded.                                            |
+| 4       | key         | 0–11, one of `KEY_NAMES` (C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B). This is the song key that resolves `HARMONIST`'s diatonic `harmony` intervals (+2nd, +3rd, +6th, etc.) to actual semitones. Decoded as `patch.key`.    |
+| 5       | carryover   | 0=OFF, 1=ON. Whether the current tone keeps sounding through a patch change. Not decoded.                                                                                                                                 |
+| 6       | tempoHold   | 0=OFF, 1=ON. Whether tempo persists across a patch change. Not decoded.                                                                                                                                                   |
 
 ## Blocks documented but out of scope
 
 These blocks' byte layouts are fully known (cross-checked against a real factory-default
-patch export) but aren't decoded into `Patch` — they're device/footswitch routing
+patch export) but aren't decoded into `Patch`. They are device and footswitch routing
 metadata rather than tone-shaping parameters, so the codec preserves them verbatim.
 
-### MEMORY%CTL — CTL Footswitch Assignments (32 bytes)
+### MEMORY%CTL: CTL Footswitch Assignments (32 bytes)
 
-Per-patch overrides for what each footswitch (DOWN, UP, CTL1–3, and others) does —
-function index + latch/momentary mode, repeated per switch. Same field shape as the
+Per-patch overrides for what each footswitch (DOWN, UP, CTL1–3, and others) does:
+function index plus latch/momentary mode, repeated per switch. Same field shape as the
 device-global `SYSTEM_CTL` block. Footswitch routing, not a tone parameter.
 
-### MEMORY%ASGN1–8 — Expression/Assign Slots (15 bytes each)
+### MEMORY%ASGN1–8: Expression/Assign Slots (15 bytes each)
 
 Expression pedal and assignable-controller mappings (source, destination parameter,
 range). Controller routing, not a tone parameter.
