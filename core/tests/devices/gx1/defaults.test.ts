@@ -33,17 +33,21 @@ type BlockDefaults = Record<string, ParamDefaults>;
 const omit = (obj: object, keys: string[]): ParamDefaults =>
   Object.fromEntries(Object.entries(obj).filter(([key]) => !keys.includes(key)));
 
-// Blocks whose type selector is byte 1 (DLY/REV/PFX): swap it to each type and decode the shadow.
-const harvestByTypeByte = (
-  bytes: number[],
-  types: readonly string[],
-  idxMap: Record<string, number>,
-  decode: (hex: string[]) => object,
-): BlockDefaults => {
+/** One block whose type selector is byte 1 (DLY/REV/PFX), and how to read it. */
+interface TypeByteBlock {
+  bytes: number[];
+  types: readonly string[];
+  typeIndex: Record<string, number>;
+  decode: (hex: string[]) => object;
+}
+
+// Swap byte 1 to each type in turn and decode the shadow bytes behind it.
+const harvestByTypeByte = (block: TypeByteBlock): BlockDefaults => {
+  const { bytes, types, typeIndex, decode } = block;
   const out: BlockDefaults = {};
   for (const type of types) {
     const swapped = [...bytes];
-    swapped[1] = idxMap[type];
+    swapped[1] = typeIndex[type];
     out[type] = omit(decode(hexFromBytes(swapped)), ["on", "type"]);
   }
   return out;
@@ -76,9 +80,18 @@ const harvestDefaults = (patch: Patch): Record<string, BlockDefaults> => {
   return {
     fx: harvestFx(fx1, bytesFromHex(patch[RAW]["MEMORY%FX3A"])),
     fxDelay: harvestFxDelay(fx1),
-    delay: harvestByTypeByte(bytesFromHex(patch[RAW]["MEMORY%DLY"]), DLY_TYPES, DLY_TYPE_IDX, decodeDelay),
-    reverb: harvestByTypeByte(bytesFromHex(patch[RAW]["MEMORY%REV"]), REV_TYPES, REV_TYPE_IDX, decodeReverb),
-    pfx: harvestByTypeByte(bytesFromHex(patch[RAW]["MEMORY%PFX"]), PFX_TYPES, PFX_TYPE_IDX, decodePfx),
+    delay: harvestByTypeByte({
+      bytes: bytesFromHex(patch[RAW]["MEMORY%DLY"]),
+      types: DLY_TYPES, typeIndex: DLY_TYPE_IDX, decode: decodeDelay,
+    }),
+    reverb: harvestByTypeByte({
+      bytes: bytesFromHex(patch[RAW]["MEMORY%REV"]),
+      types: REV_TYPES, typeIndex: REV_TYPE_IDX, decode: decodeReverb,
+    }),
+    pfx: harvestByTypeByte({
+      bytes: bytesFromHex(patch[RAW]["MEMORY%PFX"]),
+      types: PFX_TYPES, typeIndex: PFX_TYPE_IDX, decode: decodePfx,
+    }),
   };
 };
 

@@ -19,11 +19,10 @@ const run = (action: () => void): void => {
   }
 };
 
-const configureDeviceCommands = <T extends Patch>(
-  cmd: Command,
-  driver: PatchDriver<T>,
-  printPatch: (patch: T, index: number) => void,
-): void => {
+/** Printing a patch is the one command that needs the device's own formatter. */
+type PrintPatch<T extends Patch> = (patch: T, index: number) => void;
+
+const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPatch: PrintPatch<T>): void => {
   cmd
     .command("read <file> [ref]")
     .description("display one or all patches from a patch file")
@@ -37,7 +36,9 @@ const configureDeviceCommands = <T extends Patch>(
         console.info();
       });
     });
+};
 
+const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("write <file> <ref> <fields...>")
     .description("update patch fields by dot-path (e.g. amp.gain=72, key=G)")
@@ -51,30 +52,37 @@ const configureDeviceCommands = <T extends Patch>(
         console.info(`Wrote ${file}, patch ${index} updated: ${fields.join(", ")}`);
       });
     });
+};
 
+const addCopy = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("copy <src> <srcRef> <dst> <dstRef>")
     .description("copy a patch from one patch file to another")
+    // eslint-disable-next-line max-params -- commander passes one argument per declared operand
     .action((src: string, srcRef: string, dst: string, dstRef: string) => {
       run(() => {
         const copied = patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
         console.info(`Copied '${copied.name}' → ${dst} patch ${copied.toIndex}`);
       });
     });
+};
 
+const addNew = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("new <file> [setName] [nPatches]")
     .description("create a blank patch file")
     .action((file: string, setName?: string, patchCountStr?: string) => {
       run(() => {
-        const patchCount = patchCountStr !== undefined ? parseInt(patchCountStr, 10) : undefined;
+        const patchCount = patchCountStr === undefined ? undefined : parseInt(patchCountStr, 10);
         const patchFile = patchUtils.createPatchFile(driver, file, { setName, patchCount });
         console.info(
           `Created ${file} with ${patchFile.patches.length} blank patch(es), set name '${patchFile.name}'`
         );
       });
     });
+};
 
+const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("capabilities [group] [item]")
     .description("browse supported effects, amp models, and other device capabilities")
@@ -103,6 +111,19 @@ const configureDeviceCommands = <T extends Patch>(
         printItem(group, foundItem);
       });
     });
+};
+
+/** Every command a device gets for free, in the order they appear in `--help`. */
+const configureDeviceCommands = <T extends Patch>(
+  cmd: Command,
+  driver: PatchDriver<T>,
+  printPatch: PrintPatch<T>,
+): void => {
+  addRead(cmd, driver, printPatch);
+  addWrite(cmd, driver);
+  addCopy(cmd, driver);
+  addNew(cmd, driver);
+  addCapabilities(cmd, driver);
 };
 
 export { configureDeviceCommands };

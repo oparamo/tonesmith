@@ -8,10 +8,9 @@ import {
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   NS_DETECT, FV_CURVE, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
-  FREQ_HIGH_CUT, NAME_BYTES,
+  FREQ_HIGH_CUT, NAME_BYTES, RAW,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
-import { RAW } from "../common";
 import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
 import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";

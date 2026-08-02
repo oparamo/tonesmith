@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, unlinkSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
 import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
 

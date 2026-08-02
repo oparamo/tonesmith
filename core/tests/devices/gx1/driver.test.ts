@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
 import { driver } from "../../../src/devices/gx1/driver";
 
 const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tones.tsl");

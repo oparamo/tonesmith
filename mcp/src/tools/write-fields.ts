@@ -3,6 +3,32 @@ import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
 import { ok, err } from "../common";
 
+/** Rejects an input that asks for no change at all, or for a patch edit without naming the patch. */
+const requireSomethingToChange = (ref?: string, fields?: object, setName?: string): void => {
+  if (fields === undefined && setName === undefined) {
+    throw new Error(
+      "Nothing to change: pass `fields` (with `ref`) to edit a patch, `setName` to rename " +
+        "the patch set, or both."
+    );
+  }
+  if (fields !== undefined && ref === undefined) {
+    throw new Error("`ref` is required alongside `fields`, since it selects which patch to edit.");
+  }
+};
+
+/**
+ * Applies a batch of dot-path edits to one patch and reports what landed. Every edit lands in
+ * memory before anything is written, so a rejected edit anywhere in the set leaves the file
+ * exactly as it was rather than half-applied.
+ */
+const editPatch = (patch: Record<string, unknown>, fields: Record<string, string>): string => {
+  const edits = Object.entries(fields);
+  patchUtils.applyFieldEdits(patch, edits);
+  return edits
+    .map(([field, value]) => `${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`)
+    .join(", ");
+};
+
 const registerWriteFields = (server: McpServer): void => {
   server.registerTool(
     "write_fields",
@@ -32,15 +58,7 @@ const registerWriteFields = (server: McpServer): void => {
     },
     ({ file, device, ref, fields, setName }) => {
       try {
-        if (fields === undefined && setName === undefined) {
-          throw new Error(
-            "Nothing to change: pass `fields` (with `ref`) to edit a patch, `setName` to rename " +
-              "the patch set, or both."
-          );
-        }
-        if (fields !== undefined && ref === undefined) {
-          throw new Error("`ref` is required alongside `fields`, since it selects which patch to edit.");
-        }
+        requireSomethingToChange(ref, fields, setName);
 
         const driver = registry.getDriver(device);
         const patchFile = driver.readFile(file);
@@ -49,14 +67,7 @@ const registerWriteFields = (server: McpServer): void => {
         if (fields !== undefined && ref !== undefined) {
           const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
           const patch = patchFile.patches[index] as unknown as Record<string, unknown>;
-          const edits = Object.entries(fields);
-          // Every edit lands in memory before anything is written, so a rejected edit anywhere in
-          // the set leaves the file exactly as it was rather than half-applied.
-          patchUtils.applyFieldEdits(patch, edits);
-          const applied = edits
-            .map(([field, value]) => `${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`)
-            .join(", ");
-          changes.push(`patch ${index}: ${applied}`);
+          changes.push(`patch ${index}: ${editPatch(patch, fields)}`);
         }
 
         if (setName !== undefined) {
