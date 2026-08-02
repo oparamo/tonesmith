@@ -79,7 +79,7 @@ describe("describe_device", () => {
     expect(itemIds).toContain("JC-120");
   });
 
-  it("lists a group as an index — no per-item params, but subtype ids", async () => {
+  it("lists a group as an index: no per-item params, but subtype ids", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", items: ["fx"] };
@@ -94,7 +94,7 @@ describe("describe_device", () => {
   });
 
   // The listing exists to be read in one call. Inlining every item's params put fx past 70k
-  // characters, which some clients refuse outright — this is the ceiling that regression would hit.
+  // characters, which some clients refuse outright. This is the ceiling that regression would hit.
   it("keeps the largest group's listing small enough to consume in one call", async () => {
     const client = await connectClient();
     close = client.close;

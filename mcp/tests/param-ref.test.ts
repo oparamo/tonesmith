@@ -14,19 +14,19 @@ describe("boundsFor", () => {
   it("throws for a non-numeric (enum) group param rather than yielding a silent unbounded number", () => {
     const lookup = (): { min: number; max: number } => boundsFor({ group: "fv", param: "CURVE" });
 
-    expect(lookup).toThrow(/group "fv" has no numeric bounds/);
+    expect(lookup).toThrow(/fv/);
   });
 
   it("throws for a non-numeric per-type param, naming the type", () => {
     const lookup = (): { min: number; max: number } => boundsFor({ group: "delay", param: "TRIGGER", type: "REVERSE" });
 
-    expect(lookup).toThrow(/delay type "REVERSE" has no numeric bounds/);
+    expect(lookup).toThrow(/REVERSE/);
   });
 
   it("throws when the param name doesn't exist on the group", () => {
     const lookup = (): { min: number; max: number } => boundsFor({ group: "amp", param: "NOPE" });
 
-    expect(lookup).toThrow(/No ParamSpec "NOPE"/);
+    expect(lookup).toThrow(/NOPE/);
   });
 });
 

@@ -697,7 +697,7 @@ describe("generate_gx1_patch", () => {
     expect(text).toContain("pfx LEVEL for WAH");
   });
 
-  // Bare { on: false } and omitting a block both mean "off at factory defaults" — the bytes must
+  // Bare { on: false } and omitting a block both mean "off at factory defaults", so the bytes must
   // agree, so an agent's choice between the two can never change the file.
   it.each(["odds", "fx1", "delay", "reverb", "ns", "pfx"])(
     "writes bare { on: false } on %s byte-identically to omitting it",

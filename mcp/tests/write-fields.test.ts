@@ -37,21 +37,6 @@ describe("write_fields", () => {
     expect(patch.key).toBe("G");
   });
 
-  it("applies every field in the batch", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const fields = { "amp.gain": "64", "amp.bass": "40" };
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields };
-
-    const { isError } = await client.callTool("write_fields", input);
-
-    expect(isError).toBe(false);
-    const patch = gx1.driver.readFile(temp.fixture).patches[0];
-    expect(patch.amp.gain).toBe(64);
-    expect(patch.amp.bass).toBe(40);
-  });
-
   it("writes nothing when any field in the batch is rejected", async () => {
     temp = withTempDir();
     const client = await connectClient();

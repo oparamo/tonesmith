@@ -3,7 +3,7 @@
  *
  * DEFAULTS_BY_TYPE (src/devices/gx1/defaults.ts) is a committed snapshot of every type's real
  * factory-default field values, lifted from default-init.tsl's shadow bytes (the union byte
- * region where every type of a block coexists — see FORMAT.md). This guard re-harvests the same
+ * region where every type of a block coexists; see FORMAT.md). This guard re-harvests the same
  * data from the fixture and asserts the committed const still matches it, so the two can't drift.
  *
  * To regenerate the const after a fixture change: temporarily log `harvestDefaults(patch)` (JSON)
@@ -52,7 +52,7 @@ const harvestByTypeByte = (
 const harvestFx = (fx1: number[], fx3a: number[]): BlockDefaults => {
   const out: BlockDefaults = {};
   for (const type of FX_TYPES) {
-    if (type === "DELAY") continue; // per-sub-algorithm — harvested under fxDelay
+    if (type === "DELAY") continue; // per-sub-algorithm, harvested under fxDelay
     const bytes = type === "OVERTONE" ? fx3a : fx1;
     const decoded = decodeFxParams(type, bytes);
     if ("unknownBytes" in decoded) continue; // not modeled yet

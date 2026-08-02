@@ -20,7 +20,7 @@ describe("printPatch", () => {
   });
 
   // A bypassed block keeps its settings on the device, so the printer shows them rather than
-  // hiding the block — matching every other block, and matching read_patch.
+  // hiding the block, matching every other block and matching read_patch.
   it("prints the OD/DS line with its params when odds is off", () => {
     const patch = gx1.basePatch("Test");
     gx1.odds(patch, { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, on: false });
@@ -68,7 +68,7 @@ describe("printPatch", () => {
 
   it("omits the params line for a block whose type has no known fields", () => {
     const patch = gx1.basePatch("Test");
-    // A pfx type outside PFX_TYPE_MAPS decodes to a bare { on, type } block —
+    // A pfx type outside PFX_TYPE_MAPS decodes to a bare { on, type } block, so
     // printParams should print nothing beyond the PFX header line for it.
     patch.pfx = { on: true, type: "BOGUS TYPE" } as unknown as gx1.Patch["pfx"];
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);

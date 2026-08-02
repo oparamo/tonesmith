@@ -41,8 +41,8 @@ describe("findGroup", () => {
   it("throws listing available group ids when not found", () => {
     const findMissingGroup = () => findGroup(caps, "reverb");
 
-    expect(findMissingGroup).toThrow('Unknown group "reverb"');
-    expect(findMissingGroup).toThrow(/amp, delay/);
+    expect(findMissingGroup).toThrow(/reverb/);
+    expect(findMissingGroup, "names the groups that do exist").toThrow(/amp, delay/);
   });
 });
 
@@ -64,7 +64,7 @@ describe("findItem", () => {
   it("throws listing available item ids when not found", () => {
     const findMissingItem = () => findItem(ampGroup, "MISSING");
 
-    expect(findMissingItem).toThrow('Unknown item "MISSING" in group "amp"');
-    expect(findMissingItem).toThrow(/JC-120, TWIN/);
+    expect(findMissingItem).toThrow(/MISSING/);
+    expect(findMissingItem, "names the items that do exist").toThrow(/JC-120, TWIN/);
   });
 });

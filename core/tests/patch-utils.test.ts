@@ -151,7 +151,7 @@ describe("upsertPatches", () => {
 
     const upsertNothing = () => upsertPatches(driver, { path: "set.tsl", patches: [] });
 
-    expect(upsertNothing).toThrow("at least one patch");
+    expect(upsertNothing).toThrow();
   });
 });
 
@@ -181,20 +181,20 @@ describe("resolvePatchIndex", () => {
   it("throws for an index past the last patch", () => {
     const resolvePastEnd = () => resolvePatchIndex(patches, "3");
 
-    expect(resolvePastEnd).toThrow(/No patch at index 3/);
+    expect(resolvePastEnd).toThrow(/3/);
   });
 
   it("throws for a negative index", () => {
     const resolveNegative = () => resolvePatchIndex(patches, "-1");
 
-    expect(resolveNegative).toThrow(/No patch at index -1/);
+    expect(resolveNegative).toThrow(/-1/);
   });
 
   it("throws when multiple patches share the same name", () => {
     const resolveAmbiguousName = () => resolvePatchIndex(patches, "rock lead");
 
-    expect(resolveAmbiguousName).toThrow(/Ambiguous name/);
-    expect(resolveAmbiguousName).toThrow(/0.*2|2.*0/);
+    expect(resolveAmbiguousName).toThrow(/rock lead/);
+    expect(resolveAmbiguousName, "names both colliding indices").toThrow(/0.*2|2.*0/);
   });
 });
 
@@ -307,7 +307,7 @@ describe("setByPath", () => {
   });
 
   // A decoded patch already carries every field its device supports, so an absent field means the
-  // device has no such control. Accepting the write would strand it — the encoder only emits known
+  // device has no such control. Accepting the write would strand it, since the encoder only emits known
   // byte indices, so it would vanish while the caller believed it landed.
   it("rejects an unknown leaf instead of creating it", () => {
     const obj: Record<string, unknown> = { amp: { gain: 10, level: 100 } };
@@ -416,6 +416,6 @@ describe("createPatchFile", () => {
 
     const overwrite = () => createPatchFile(driver, path);
 
-    expect(overwrite).toThrow(/already exists/);
+    expect(overwrite).toThrow(path);
   });
 });

@@ -8,7 +8,7 @@ import { describeParam } from "../src/devices/gx1/param-ref";
  *
  * 1. Bounds: every numeric schema field derives its min/max from the capabilities
  *    ParamSpec range via boundedNumber(), so the two can no longer hold divergent
- *    numbers — the schema doesn't restate the range, it reads it. What can still go
+ *    numbers, since the schema doesn't restate the range, it reads it. What can still go
  *    wrong is the *wiring*: a field left unbounded (boundedNumber not applied), or
  *    pointed at the wrong / a non-numeric param. This guard introspects the actually-
  *    wired tool inputSchema and asserts each field carries a finite bound equal to the
@@ -145,7 +145,7 @@ describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () =
   afterEach(async () => { await close(); });
 
   // Every block whose `type`-ish fields take a fixed, type-independent set names that set in its
-  // own description. Dropping one costs a describe_device round trip per patch — measured, not
+  // own description. Dropping one costs a describe_device round trip per patch, measured, not
   // theoretical: removing the amp/cab/mic lists sent arms back for a second lookup to rediscover
   // ids they had previously been handed.
   const ID_LIST_GROUPS = ["amp", "cab", "mic", "odds", "fx", "delay", "reverb", "pfx"];
@@ -160,7 +160,7 @@ describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () =
     for (const groupId of ID_LIST_GROUPS) {
       const typeIds = capabilityUtils.findGroup(gx1.driver.capabilities, groupId).items.map(item => item.id);
       for (const typeId of typeIds) {
-        // Cab ids carry a literal inch mark (1x8"), which JSON-escapes inside the serialized schema —
+        // Cab ids carry a literal inch mark (1x8"), which JSON-escapes inside the serialized schema, so
         // so the needle has to be escaped the same way the haystack was.
         const escaped = JSON.stringify(typeId).slice(1, -1);
         expect(toolSchemaText, `expected the tool schema to mention ${groupId} type "${typeId}"`).toContain(escaped);

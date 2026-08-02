@@ -59,7 +59,7 @@ describe("gx1 read", () => {
     expect(output).not.toContain("→");
   });
 
-  it("hides the redundant params.type mirror — the model shows once, as the subType label", async () => {
+  it("hides the redundant params.type mirror, so the model shows once as the subType label", async () => {
     const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, "0"]);
 
     const errorOutput = error.join("\n");

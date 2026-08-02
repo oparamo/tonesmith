@@ -36,17 +36,17 @@ const runCli = async (argv: string[]): Promise<CliResult> => {
   let errorMessage: string | undefined;
   try {
     await program.parseAsync(argv, { from: "user" });
-  } catch (err) {
-    const exitMatch = err instanceof Error ? /^process\.exit\((\d+)\)$/.exec(err.message) : null;
+  } catch (caught) {
+    const exitMatch = caught instanceof Error ? /^process\.exit\((\d+)\)$/.exec(caught.message) : null;
     if (exitMatch) {
       exitCode = Number(exitMatch[1]);
-    } else if (err && typeof err === "object" && "exitCode" in err) {
-      const commanderError = err as { exitCode: number; message: string };
+    } else if (caught && typeof caught === "object" && "exitCode" in caught) {
+      const commanderError = caught as { exitCode: number; message: string };
       exitCode = commanderError.exitCode;
       errorMessage = commanderError.message;
     } else {
       vi.restoreAllMocks();
-      throw err;
+      throw caught;
     }
   } finally {
     vi.restoreAllMocks();

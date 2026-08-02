@@ -43,7 +43,7 @@ describe("server instructions", () => {
     }
   });
 
-  it("stays device-agnostic — no device-specific tokens leak in", async () => {
+  it("stays device-agnostic, with no device-specific tokens leaking in", async () => {
     const { client, close: cleanup } = await connect();
     close = cleanup;
 
