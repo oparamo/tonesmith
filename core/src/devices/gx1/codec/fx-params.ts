@@ -12,32 +12,29 @@ import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields,
 
 // ── FX type encode / decode ───────────────────────────────────────────────────
 //
-// FX_COM byte 2 is always the bass-mode type mirror, never a subtype — see
+// FX_COM byte 2 is always the bass-mode type mirror, never a subtype. See
 // PARAM_SUBTYPE_EFFECTS in common/constants.ts for where each effect's own
 // sub-model selector actually lives (the FX param block itself).
 
-/** Decode the FX_COM type byte into a name. Falls back to "UNKNOWN_N" if out of range. */
 const decodeFxType = (hi: number): string => lookupName(FX_TYPES, hi, "FX");
 
-/** Encode an FX type name back to its FX_COM type byte. */
 const encodeFxType = (fxName: string): number => lookupIndex(FX_TYPE_IDX, fxName, "FX type");
 
 
 // ── FX parameter field maps ───────────────────────────────────────────────────
 //
-// Each key maps an FX type name to an ordered list of FieldCodec descriptors.
-// The same table drives both decode (bytes → params) and encode (params → bytes),
-// replacing the previous two parallel ~40-branch if-chains with one source of truth.
+// Each key maps an FX type name to an ordered list of FieldCodec descriptors. One table
+// drives both decode (bytes → params) and encode (params → bytes).
 //
 // Byte offsets are 0-based within the per-slot FX param block (the 251-byte block
-// stored under MEMORY%FX1 / FX2 / FX3). Unmapped byte positions pass through
-// unchanged — they come from the original bytes and are preserved on round-trip.
+// stored under MEMORY%FX1 / FX2 / FX3). Unmapped byte positions come from the original
+// bytes and pass through unchanged on round-trip.
 
 const WAH_FILTER   = ["LPF", "BPF", "HPF"] as const;
 const WAH_POLARITY = ["DOWN", "UP"] as const;
 const PITCH_SHIFT_MODES = ["FAST", "MEDIUM", "SLOW", "MONO"] as const;
 
-// PITCH SHIFT's "pitch" byte: raw index into a 51-entry table — index 0 and 50 are
+// PITCH SHIFT's "pitch" byte is a raw index into a 51-entry table: indices 0 and 50 are
 // named dual-voice presets, indices 1-49 are semitones -24..+24 (index-25).
 const PITCH_SHIFT_PITCH_TABLE: readonly (string | number)[] = [
   "+7&-5", ...Array.from({ length: 49 }, (_, i) => i - 24), "+12&-5",
@@ -125,7 +122,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     lookup("midFreq", 3, FREQ_STEPS), signed("midGain", 4, 20),
     lookup("lowCut", 5, FREQ_LOW_CUT), lookup("highCut", 6, FREQ_HIGH_CUT),
   ],
-  // GEQ band gains use signed(center=20) — each band covers ±20 dB.
+  // GEQ band gains use signed(center=20), so each band covers ±20 dB.
   "GEQ": [
     signed("125Hz", 0, 20), signed("250Hz", 1, 20), signed("500Hz", 2, 20),
     signed("1kHz",  3, 20), signed("2kHz",  4, 20), signed("4kHz",  5, 20),
@@ -154,7 +151,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("sens", 0), u8("attack", 1), u8("depth", 2), u8("reso", 3),
     signed("tone", 4), u8("level", 5), u8("direct", 6),
   ],
-  // FIXED WAH: byte +1 is the bass-mode wah type — not used in guitar mode.
+  // FIXED WAH: byte +1 is the bass-mode wah type, not used in guitar mode.
   "FIXED WAH": [
     lookup("type", 0, WAH_TYPES), u8("level", 2), u8("direct", 3), u8("manual", 4),
   ],
@@ -175,7 +172,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("reso", 4), u8("buzz", 5), u8("direct", 6),
   ],
   // OD/DS: p[0]=type (stored in param block, like COMPRESSOR/LIMITER/etc.), then params
-  // shifted by one. solo/soloLevel are this FX-slot instance's own solo boost — distinct
+  // shifted by one. solo/soloLevel are this FX-slot instance's own solo boost, distinct
   // from the dedicated MEMORY%ODDS block's solo (the device exposes "FX1 SOLO"/"FX2
   // SOLO"/"FX3 SOLO" as separate footswitch functions from "OD/DS SOLO").
   "OD/DS": [
@@ -184,7 +181,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     bool("solo", 5), u8("soloLevel", 6),
   ],
   // OVERTONE: FX3-only, stored in the separate 5-byte MEMORY%FX3A block rather than
-  // the 251-byte FX3 block — see the FX3A handling in patch.ts. Offset 0 here refers
+  // the 251-byte FX3 block (see the FX3A handling in patch.ts). Offset 0 here refers
   // to FX3A's own byte 0, not the shared FX param block.
   "OVERTONE": [
     u8("lower", 0), u8("upper", 1), u8("unison", 2), u8("direct", 3), u8("detune", 4),
@@ -254,18 +251,18 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "S-BEND": [
     bool("trigger", 0), lookup("pitch", 1, SBEND_PITCH), u8("riseTime", 2), u8("fallTime", 3),
   ],
-  // PEDAL BEND: pitchMin/pitchMax stored as (value + 24), range −24..+24 semitones.
+  // PEDAL BEND: pitchMin/pitchMax stored as (value + 24), range -24..+24 semitones.
   "PEDAL BEND": [
     signed("pitchMin", 0, 24), signed("pitchMax", 1, 24),
     u8("pdlPos", 2), u8("level", 3), u8("direct", 4),
   ],
-  // TUNE DOWN: pitch stored as (pitch + 12), range −12..0 semitones.
+  // TUNE DOWN: pitch stored as (pitch + 12), range -12..0 semitones.
   "TUNE DOWN": [
     signed("pitch", 0, 12),
   ],
-  // DELAY as an FX slot type is per-sub-algorithm — see FX_DELAY_TYPE_MAPS below.
+  // DELAY as an FX slot type is per-sub-algorithm; see FX_DELAY_TYPE_MAPS below.
   // REVERB as an FX slot type (separate from the dedicated REV block). Its 5 types are
-  // its own set (HALL S/HALL M/PLATE/ROOM/STUDIO — NOT the dedicated block's REV_TYPES),
+  // its own set (HALL S/HALL M/PLATE/ROOM/STUDIO, NOT the dedicated block's REV_TYPES),
   // and all 5 share this one field set, so it stays a single flat map.
   "REVERB": [
     lookup("type", 0, FX_REV_TYPES), scaled("time", 1, 0.1),
@@ -273,8 +270,8 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
 };
 
-// FX-slot DELAY is the one FX type whose param set depends on the selected sub-algorithm,
-// so — like the dedicated DLY block — it is modeled per-subtype rather than with one flat
+// FX-slot DELAY is the one FX type whose param set depends on the selected sub-algorithm, so
+// like the dedicated DLY block it is modeled per-subtype rather than with one flat
 // map. Offsets are 0-based within the DELAY param block (FX_PARAM_OFFSETS["DELAY"]); every
 // sub-algorithm's byte homes are distinct (no offset reuse), verified against the device's
 // address table. `type` (p[0]) is promoted to block.subType via PARAM_SUBTYPE_EFFECTS.
@@ -305,29 +302,31 @@ const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
 
 // ── Public decode / encode ────────────────────────────────────────────────────
 
+/** DELAY selects its field map by sub-algorithm; every other type has one flat map. */
+const fieldMapFor = (fxType: string, delaySubType: string): FieldCodec[] | undefined => {
+  if (fxType === "DELAY") return FX_DELAY_TYPE_MAPS[delaySubType];
+  return FX_PARAM_MAPS[fxType];
+};
+
+/** How many bytes of an unrecognized type's block to stash for the round trip. */
+const UNKNOWN_BYTES_KEPT = 32;
+
 /**
- * Decode the 251-byte FX parameter block for a given effect type.
- *
- * Returns a typed params object for known types. For unrecognised types, returns
- * `{ unknownBytes: rawBytes }` so the round-trip encoder can preserve the original
- * bytes unchanged without data loss.
+ * Decodes the 251-byte FX parameter block for a given effect type. An unrecognized type yields
+ * `{ unknownBytes: rawBytes }`, which the encoder writes back untouched rather than losing.
  */
 const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
-  const paramBytes = offset > 0 ? bytes.slice(offset) : bytes;
-  // DELAY selects its field map by the sub-algorithm byte (p[0]); every other type is flat.
-  const fields = fxType === "DELAY"
-    ? FX_DELAY_TYPE_MAPS[lookupName(FX_DLY_TYPES, paramBytes[0])]
-    : FX_PARAM_MAPS[fxType];
-  if (!fields) return { unknownBytes: bytes.slice(0, 32) };
+  const paramBytes = bytes.slice(offset);
+  const fields = fieldMapFor(fxType, lookupName(FX_DLY_TYPES, paramBytes[0]));
+  if (!fields) return { unknownBytes: bytes.slice(0, UNKNOWN_BYTES_KEPT) };
 
   return decodeFields(fields, paramBytes);
 };
 
 /**
- * Encode FX params back into the 251-byte hex block.
- * Always starts from `originalBytes` so unmapped positions are preserved.
- * When params contains `unknownBytes`, the original bytes are returned unchanged.
+ * Encodes FX params back into the 251-byte hex block, always starting from `originalBytes` so
+ * unmapped positions survive. Params carrying `unknownBytes` return those bytes unchanged.
  */
 const encodeFxParams = (
   fxType: string,
@@ -337,18 +336,13 @@ const encodeFxParams = (
   if ("unknownBytes" in params) return hexFromBytes(originalBytes);
 
   const bytes = [...originalBytes];
-  // DELAY's field map is chosen by the target sub-algorithm (params.type); others are flat.
   const delaySubType = typeof params.type === "string" ? params.type : "";
-  const fields = fxType === "DELAY" ? FX_DELAY_TYPE_MAPS[delaySubType] : FX_PARAM_MAPS[fxType];
+  const fields = fieldMapFor(fxType, delaySubType);
   if (fields) {
     const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
-    if (offset > 0) {
-      const slice = bytes.slice(offset);
-      encodeFields(fields, params, slice);
-      bytes.splice(offset, slice.length, ...slice);
-    } else {
-      encodeFields(fields, params, bytes);
-    }
+    const paramBytes = bytes.slice(offset);
+    encodeFields(fields, params, paramBytes);
+    bytes.splice(offset, paramBytes.length, ...paramBytes);
   }
   return hexFromBytes(bytes);
 };

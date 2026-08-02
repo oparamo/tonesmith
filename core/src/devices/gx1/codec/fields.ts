@@ -4,15 +4,12 @@ import type { FxParams } from "../types";
 // ── FieldCodec interface ───────────────────────────────────────────────────────
 
 /**
- * A FieldCodec describes one named parameter within a binary block.
- * The decode/encode pair are strict inverses: encode(decode(bytes)) restores the
- * original bytes at the mapped offset, which is the invariant checked by the
- * per-type round-trip tests.
+ * One named parameter within a binary block. The decode/encode pair are strict inverses:
+ * encode(decode(bytes)) restores the original bytes at the mapped offset, the invariant the
+ * per-type round-trip tests check.
  *
- * Both methods operate on a mutable byte array so callers can build up a complete
- * encoding by applying a list of codecs in sequence. The byte array is assumed to
- * have been pre-populated with the original (unknown-field-preserving) bytes before
- * any encodeFields call.
+ * Both methods work on a mutable byte array, so a caller builds a complete encoding by applying
+ * a list of codecs in sequence over the original bytes.
  */
 interface FieldCodec {
   readonly name: string;
@@ -56,8 +53,8 @@ const signed = (name: string, offset: number, center = 50): FieldCodec => ({
 /**
  * A lookup field: the byte is an index into a string table.
  * Decoding an out-of-range index produces an "UNKNOWN_N" sentinel.
- * Encoding an unknown sentinel throws — callers should only write values that
- * were decoded from the same table.
+ * Encoding an unknown sentinel throws: callers should only write values that were
+ * decoded from the same table.
  */
 const lookup = (name: string, offset: number, table: readonly string[]): FieldCodec => ({
   name,
@@ -134,17 +131,12 @@ const nibbleQuad = (name: string, offset: number): FieldCodec => ({
 
 // ── Generic walkers ───────────────────────────────────────────────────────────
 
-/**
- * Decode a list of fields from a byte array.
- * Returns a plain object mapping field names to decoded values.
- */
 const decodeFields = (fields: FieldCodec[], bytes: number[]): FxParams =>
   Object.fromEntries(fields.map(field => [field.name, field.decode(bytes)]));
 
 /**
- * Encode a list of fields into a mutable byte array.
- * The array should already contain the original bytes (unknown fields are preserved).
- * Only positions covered by the field list are modified.
+ * Writes into a byte array that already holds the original bytes, touching only the positions
+ * the field list covers, so unknown fields survive untouched.
  */
 const encodeFields = (fields: FieldCodec[], params: FxParams, bytes: number[]): void => {
   for (const field of fields) {

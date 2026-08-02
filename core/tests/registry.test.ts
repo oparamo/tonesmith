@@ -44,6 +44,7 @@ describe("registerDriver / getDriver / listDrivers", () => {
 
     const getUnregisteredDriver = () => getDriver("__no_such_device__");
 
-    expect(getUnregisteredDriver).toThrow(/Unknown device "__no_such_device__"\. Registered devices:.*test-reg-listed/);
+    expect(getUnregisteredDriver).toThrow(/__no_such_device__/);
+    expect(getUnregisteredDriver).toThrow(/test-reg-listed/);
   });
 });

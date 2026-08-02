@@ -44,7 +44,7 @@ const REV_TYPES = [
 ] as const;
 
 // The FX-slot DELAY / REVERB (an effect selectable in an FX1/2/3 slot) expose their OWN,
-// smaller type sets — NOT the dedicated DLY/REV block's tables above. Each is a distinct
+// smaller type sets, NOT the dedicated DLY/REV block's tables above. Each is a distinct
 // enum indexed by the FX-slot's own type byte (0-4); reusing DLY_TYPES/REV_TYPES here would
 // mislabel types 2-4 (e.g. FX-slot delay type 2 is WARP, not the dedicated block's PAN).
 const FX_DLY_TYPES = ["STANDARD", "MODULATE", "WARP", "TWIST", "GLITCH"] as const;
@@ -53,10 +53,13 @@ const FX_REV_TYPES = ["HALL S", "HALL M", "PLATE", "ROOM", "STUDIO"] as const;
 // The pedal-controlled effect assigned to the expression pedal input (MEMORY%PFX).
 const PFX_TYPES = ["WAH", "PEDAL BEND"] as const;
 
+// MEMORY%COM holds the patch name as space-padded ASCII across its whole width.
+const NAME_BYTES = 16;
+
 // MEMORY%CHAIN is a linked list, not a positional array: byte 0 holds the firmware
 // value of whichever block comes first, and byte (1 + CHAIN_BLOCK_ORDER.indexOf(name))
 // holds the firmware value of whatever comes immediately after that block. A firmware
-// value of 0 (CHAIN_TERMINATOR) means "connects to OUTPUT" — OUTPUT is a fixed endpoint,
+// value of 0 (CHAIN_TERMINATOR) means "connects to OUTPUT". OUTPUT is a fixed endpoint,
 // not itself a reorderable block, so it has no entry in CHAIN_BLOCK_ORDER.
 const CHAIN_BLOCK_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"] as const;
 
@@ -67,7 +70,7 @@ const CHAIN_VALUE_TO_NAME: Record<number, string | undefined> = {
 const CHAIN_TERMINATOR = 0;
 
 const indexMap = (list: readonly string[]): Record<string, number> =>
-  Object.fromEntries(list.map((v, i) => [v, i]));
+  Object.fromEntries(list.map((name, index) => [name, index]));
 
 const FX_TYPE_IDX  = indexMap(FX_TYPES);
 const ODDS_IDX     = indexMap(ODDS_TYPES);
@@ -122,10 +125,10 @@ const FREQ_STEPS = [
   "5kHz", "6.3kHz", "8kHz", "10kHz", "12.5kHz",
 ] as const;
 
-// FREQ_STEPS plus a trailing FLAT (index 29) — used by delay/PARA. EQ highCut.
+// FREQ_STEPS plus a trailing FLAT (index 29), used by delay/PARA. EQ highCut.
 const FREQ_HIGH_CUT = [...FREQ_STEPS, "FLAT"] as const;
 
-// FLAT first (index 0), then FREQ_STEPS ascending — used by PARA. EQ lowCut.
+// FLAT first (index 0), then FREQ_STEPS ascending, used by PARA. EQ lowCut.
 const FREQ_LOW_CUT = ["FLAT", ...FREQ_STEPS] as const;
 
 // ENHANCER's LOW FREQ / HIGH FREQ bands. The manual (gx1_parameter_guide.md) only
@@ -138,34 +141,32 @@ const ENHANCER_HIGH_FREQ = [
   "2.5kHz", "3.15kHz", "4kHz", "5kHz", "6.3kHz", "8kHz",
 ] as const;
 
-// The patch's song key (MEMORY%OTHER byte 4) — HARMONIST_HR's scale-degree entries
+// The patch's song key (MEMORY%OTHER byte 4). HARMONIST_HR's scale-degree entries
 // (+2nd, +3rd, +6th, etc.) are diatonic, so the actual semitone shift HARMONIST applies
 // depends on this key.
 const KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
 const KEY_IDX = indexMap(KEY_NAMES);
 
-// FX_COM byte[2] is always the bass-mode mirror of the type selector (byte[1] for guitar
-// mode) — never a subtype, for any effect. COMPRESSOR, LIMITER, AC RESO, CHORUS,
-// CLASSIC-VIBE, HUMANIZER, and OD/DS instead store their own sub-model selector in
-// param-block byte p[0] — handled in codec/fx-params.ts.
-
-// Effects whose sub-model selector lives in param-block byte p[0] (read/written via
-// FX_PARAM_MAPS' lookup("type", 0, ...) field). Used by both the decoder (to promote
-// params.type back to block.subType for display) and the fx() builder (to thread a
-// subType argument into params.type so it actually encodes).
+// Effects whose sub-model selector lives in param-block byte p[0], read and written via
+// FX_PARAM_MAPS' lookup("type", 0, ...) field. Used by the decoder (to promote params.type back
+// to block.subType for display) and by the fx() builder (to thread a subType argument into
+// params.type so it actually encodes).
+//
+// FX_COM byte[2] is never the subtype for any effect: it is always the bass-mode mirror of the
+// type selector in byte[1], which is the guitar-mode one.
 const PARAM_SUBTYPE_EFFECTS = new Set([
   "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER", "OD/DS", "FIXED WAH",
   // DELAY's p[0] selector is its sub-algorithm (STANDARD/MODULATE/WARP/TWIST/GLITCH), each with
-  // its own param set — modeled per-subtype in FX_DELAY_TYPE_MAPS and surfaced as subTypes.
+  // its own param set, modeled per-subtype in FX_DELAY_TYPE_MAPS and surfaced as subTypes.
   "DELAY",
-  // REVERB's p[0] selects its algorithm (FX_REV_TYPES) the same way — one shared param set,
+  // REVERB's p[0] selects its algorithm (FX_REV_TYPES) the same way: one shared param set,
   // surfaced as subTypes like CHORUS.
   "REVERB",
 ]);
 
 export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
-  FX_DLY_TYPES, FX_REV_TYPES,
+  FX_DLY_TYPES, FX_REV_TYPES, NAME_BYTES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,

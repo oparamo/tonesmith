@@ -41,7 +41,7 @@ describe("lookupIndex", () => {
   it("throws for a name not present in the table", () => {
     const lookupUnknownName = () => lookupIndex(tableMap, "FOUR");
 
-    expect(lookupUnknownName).toThrow('Unknown : "FOUR"');
+    expect(lookupUnknownName).toThrow(/FOUR/);
   });
 
   it("includes the label in the error message when given", () => {

@@ -19,7 +19,7 @@ describe("FX param map symmetry (all types)", () => {
   it.each(FX_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (fxType) => {
     const decoded = decodeFxParams(fxType, zeroBytes);
 
-    // Types not yet in FX_PARAM_MAPS return { unknownBytes: [...] } — skip them
+    // Types not yet in FX_PARAM_MAPS return { unknownBytes: [...] }, so skip them
     if ("unknownBytes" in decoded) return;
 
     const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
@@ -64,7 +64,7 @@ describe("FX-slot DELAY per-sub-algorithm round-trip", () => {
 
 // ── Unknown/invalid type handling ─────────────────────────────────────────────
 //
-// FX_PARAM_MAPS is a Partial<Record<string, FieldCodec[]>> — types outside the known
+// FX_PARAM_MAPS is a Partial<Record<string, FieldCodec[]>>, so types outside the known
 // FX_TYPES list (or not-yet-mapped ones) fall through gracefully rather than throwing,
 // so a corrupt or newer-firmware byte doesn't crash the whole decode.
 
@@ -142,7 +142,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   // The following decode the SAME real device bytes above, but under a different
   // type selector, to reach fields the default patch's active type doesn't cover.
-  // Every byte read is still a genuine device default — only the type string passed
+  // Every byte read is still a genuine device default. Only the type string passed
   // to decodeFxParams is synthetic.
 
   it("decodes FX1 shadow bytes for LIMITER (byte offset 10)", () => {
@@ -209,7 +209,7 @@ describe("Real device values (default-init.tsl)", () => {
     });
   });
 
-  it("decodes FX1 shadow bytes for OD/DS (byte offset 115 — type read from the param block, not FX_COM byte 2)", () => {
+  it("decodes FX1 shadow bytes for OD/DS (byte offset 115, type read from the param block, not FX_COM byte 2)", () => {
     const decoded = decodeFxParams("OD/DS", fx1Bytes);
 
     expect(decoded).toEqual({
@@ -283,7 +283,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("DELAY", fx1Bytes);
 
     // The FX-slot DELAY is per-sub-algorithm; the shadow bytes select STANDARD (type byte 0),
-    // whose fields are TIME/FEEDBACK/LEVEL/HIGH CUT (no MOD RATE/DEPTH — those are MODULATE's).
+    // whose fields are TIME/FEEDBACK/LEVEL/HIGH CUT (no MOD RATE/DEPTH, which are MODULATE's).
     expect(decoded).toEqual({
       type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz",
     });

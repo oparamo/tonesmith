@@ -5,16 +5,20 @@ import { capabilityItemIds } from "./capability-text";
 /** Every selectable FX1/FX2/FX3 effect type, sourced from gx1 capabilities so this can't drift from constants.ts. */
 const fxTypeIds = capabilityItemIds("fx");
 
+/** Adapts a zod refinement context to the zod-free AddIssue callback validate-params takes. */
+const issueReporter = (ctx: z.RefinementCtx): ((message: string) => void) =>
+  message => { ctx.addIssue(message); };
+
 /**
  * The `on` field description shared by every bypassable block. Deliberately terse: this string is
  * serialized into the generate schema once per block on every call, so what bypassing actually
- * means — that it preserves the params passed with it, and that omitting a block is the other way
- * to leave it off — is explained once in the chain view rather than repeated here.
+ * means (that it preserves the params passed with it, and that omitting a block is the other way
+ * to leave it off) is explained once in the chain view rather than repeated here.
  */
 const ON_FIELD_DESCRIPTION =
   "Active by default; set false to bypass the block. See describe_device chain for what bypass keeps.";
 
-/** True when a block spec carries nothing but `on: false` — "this block is off", with no settings for it. */
+/** True when a block spec carries nothing but `on: false`: this block is off, with no settings. */
 const isBareBypass = (value: unknown): boolean => {
   if (typeof value !== "object" || value === null) return false;
   const entries = Object.entries(value as Record<string, unknown>);
@@ -22,11 +26,11 @@ const isBareBypass = (value: unknown): boolean => {
 };
 
 /**
- * Makes a block accept a bare `{ on: false }` in addition to being omitted. Both say the same thing
- * — leave this block off at its factory defaults — and the builder writes identical bytes for them,
- * so a bare bypass is folded into the omitted case before validation rather than being a second code
- * path that could drift from the first. Every other input still goes through `block` untouched, so
- * its own required fields stay required.
+ * Makes a block accept a bare `{ on: false }` in addition to being omitted. Both say the same
+ * thing, leave this block off at its factory defaults, and the builder writes identical bytes for
+ * them, so a bare bypass is folded into the omitted case before validation rather than being a
+ * second code path that could drift from the first. Every other input still goes through `block`
+ * untouched, so its own required fields stay required.
  */
 const bypassable = <T extends z.ZodType>(block: T): z.ZodType<z.output<T> | undefined> =>
   z.preprocess(
@@ -43,10 +47,13 @@ const FxBlockSchema = z.object({
   on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
     "Every effect parameter, keyed by each param's `key` from describe_device (e.g. preDelay, " +
-    "octFeedback) — not its display name. An fx slot has no named param fields, so all of them live here."
+    "octFeedback) rather than its display name. An fx slot has no named param fields, so all of " +
+    "them live here."
   ),
 }).superRefine((fx, ctx) => {
-  validateTypeParams(msg => { ctx.addIssue(msg); }, "fx", fx.type, fx.subType, fx.params ?? {});
+  validateTypeParams(issueReporter(ctx), {
+    group: "fx", type: fx.type, subType: fx.subType, values: fx.params ?? {},
+  });
 });
 
-export { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable, isBareBypass };
+export { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable, isBareBypass, issueReporter };

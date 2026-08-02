@@ -1,9 +1,9 @@
 /**
- * Drift guards — codec ↔ catalog.
+ * Drift guards for codec ↔ catalog.
  *
  * capabilities.ts now derives every params list from param-catalog.ts, so the meaningful
  * axis to guard is the catalog (authored from the parameter guide) against the codec field
- * maps (authored from byte reverse-engineering) — two independently-authored sources that
+ * maps (authored from byte reverse-engineering), two independently-authored sources that
  * can drift. These tests assert, for every type of every block:
  *   - id coverage: the codec's type list, the catalog's keys, and capabilities' item ids
  *     all agree;
@@ -34,7 +34,7 @@ const groupItems = (groupId: string): CapabilityItem[] =>
   gx1Capabilities.groups.find(group => group.id === groupId)?.items ?? [];
 
 // Normalizes a param/field name for comparison: lowercase, strip anything that isn't a
-// letter or digit — so "PRE-DELAY" (catalog) and "preDelay" (codec) match.
+// letter or digit, so "PRE-DELAY" (catalog) and "preDelay" (codec) match.
 const normalize = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const codecFieldNames = (fields: readonly FieldCodec[] | undefined): Set<string> =>
@@ -52,7 +52,7 @@ interface PerTypeBlock {
   types: readonly string[];
   /** the type's codec field map (undefined = not yet modeled). */
   codecFields: (type: string) => readonly FieldCodec[] | undefined;
-  /** codec field names to skip in the reverse (codec → catalog) check — sub-model selectors. */
+  /** codec field names to skip in the reverse (codec → catalog) check: sub-model selectors. */
   reverseSkip: ReadonlySet<string>;
   /** per-type alias map: codec field name → the catalog param label it corresponds to. */
   aliases: Record<string, Record<string, string>>;
@@ -105,8 +105,8 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
 ];
 
 // The FX-slot DELAY is the one fx type modeled per-sub-algorithm (like the dedicated delay
-// block). It isn't a top-level capability group — it lives as the subTypes of the fx DELAY
-// item — so it gets its own coverage check below rather than joining PER_TYPE_BLOCKS.
+// block). It isn't a top-level capability group; it lives as the subTypes of the fx DELAY
+// item, so it gets its own coverage check below rather than joining PER_TYPE_BLOCKS.
 const FX_DELAY_BLOCK: PerTypeBlock = {
   block: "fxDelay",
   types: FX_DLY_TYPES,
@@ -217,7 +217,7 @@ const assertBlockParity = (block: "amp" | "odds" | "ns" | "fv", codecNames: Set<
 };
 
 describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
-  // speaker/mic were once excepted here as "covered by their own groups" — having a cab group does
+  // speaker/mic were once excepted here as "covered by their own groups", but having a cab group does
   // not make the amp block's own speaker field discoverable from an amp lookup, and leaving them out
   // of the catalog hid them from describe_device and the CLI alike. They are ordinary amp params.
   it("amp (excluding on/type)", () => {
@@ -247,7 +247,7 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
 
 // Single-shape blocks are hand-decoded, so capabilities derives their param `key` from the catalog
 // label rather than reading it off a codec field map. That derivation is only safe if every key it
-// produces is a field the decoder actually emits — which is what this checks.
+// produces is a field the decoder actually emits, which is what this checks.
 describe("GX-1 single-shape block param keys name a real decoded field", () => {
   const decodedBlocks = {
     amp: decodeAmp(hexFromBytes(new Array<number>(13).fill(0))),
@@ -274,7 +274,7 @@ describe("GX-1 single-shape block param keys name a real decoded field", () => {
 // domain: a boolean toggle is a `bool` field; an enum/lookup is a `lookup`/`indexTable` whose
 // table equals the catalog `values` verbatim; a numeric range is a numeric field. It catches a
 // catalog enum backed by a hand-rolled numeric codec (how PHASER `stage` shipped a raw index) and
-// the trigger/solo drift between strings, numbers, and booleans — without a hand-maintained list,
+// the trigger/solo drift between strings, numbers, and booleans. Without a hand-maintained list,
 // so a new effect/field can't silently reintroduce the class. Catalog `text` domains (compact
 // displays like SLICER "P01-P20", HARMONIST harmony) are opaque by design, so their representation
 // is intentionally not pinned. (amp/odds/ns/fv are hand-decoded, not FieldCodec maps, so they're
@@ -287,7 +287,7 @@ type ReprClass = "numeric" | "discrete" | "boolean" | "text" | "unknown";
 const codecClass = (field: FieldCodec): ReprClass => {
   if (field.kind === "bool") return "boolean";
   if (field.kind === "lookup") return "discrete";
-  // indexTable holds a mixed string/number table (PITCH SHIFT's pitch presets) — opaque like a
+  // indexTable holds a mixed string/number table (PITCH SHIFT's pitch presets), opaque like a
   // catalog `text` domain, so its representation isn't strictly pinned.
   if (field.kind === "indexTable") return "text";
   const numeric = field.kind !== undefined && NUMERIC_KINDS.has(field.kind);
@@ -319,7 +319,7 @@ const assertRepresentationParity = (block: PerTypeBlock, type: string, field: Fi
 
   const catClass = catalogClass(param);
   const codClass = codecClass(field);
-  // Opaque on either side (catalog `text` display, or a mixed indexTable) — not strictly pinned.
+  // Opaque on either side (catalog `text` display, or a mixed indexTable), so not strictly pinned.
   if (catClass === "text" || codClass === "text") return;
 
   expect(
@@ -344,7 +344,7 @@ describe("GX-1 codec ↔ catalog representation parity", () => {
 // ── param key stamping: describe_device param.key === the codec/decoded field name ──
 //
 // Each per-type param carries `key` = the field name used in decoded patches (read_patch) and
-// in an effect's params record when building — stamped automatically from the codec map,
+// in an effect's params record when building, stamped automatically from the codec map,
 // so an agent never has to guess "PRE-DELAY" → preDelay or "OCT F-BACK" → octFeedback.
 
 const paramKey = (groupId: string, itemId: string, paramName: string): string | undefined =>
@@ -370,7 +370,7 @@ describe("GX-1 param key stamping", () => {
   const keyedParams = (groupId: string): { item: string; param: ParamSpec }[] =>
     groupItems(groupId).flatMap(item => itemParams(item).map(param => ({ item: item.id, param })));
 
-  // HARMONIST's KEY is the patch-level key, not a codec field — the one param without a `key`.
+  // HARMONIST's KEY is the patch-level key, not a codec field, so it is the one param without a `key`.
   const isParamOnly = (groupId: string, item: string, name: string): boolean =>
     groupId === "fx" && item === "HARMONIST" && name === "KEY";
 
@@ -438,7 +438,7 @@ describe("GX-1 chain capability", () => {
 
   // Omitting a block and passing `on: false` both leave it off but store different bytes, so the
   // one place that teaches bypass names omission as the default choice and says what `on: false`
-  // buys you — otherwise consumers pick one by guesswork.
+  // buys you, since otherwise consumers pick one by guesswork.
   it("explains both ways to leave a block off", () => {
     const { description } = gx1Capabilities.chain;
     expect(description, "bypass preserves the params passed with it").toMatch(/behind the bypass/);

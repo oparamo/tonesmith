@@ -3,7 +3,7 @@
  *
  * DEFAULTS_BY_TYPE (src/devices/gx1/defaults.ts) is a committed snapshot of every type's real
  * factory-default field values, lifted from default-init.tsl's shadow bytes (the union byte
- * region where every type of a block coexists — see FORMAT.md). This guard re-harvests the same
+ * region where every type of a block coexists; see FORMAT.md). This guard re-harvests the same
  * data from the fixture and asserts the committed const still matches it, so the two can't drift.
  *
  * To regenerate the const after a fixture change: temporarily log `harvestDefaults(patch)` (JSON)
@@ -33,17 +33,21 @@ type BlockDefaults = Record<string, ParamDefaults>;
 const omit = (obj: object, keys: string[]): ParamDefaults =>
   Object.fromEntries(Object.entries(obj).filter(([key]) => !keys.includes(key)));
 
-// Blocks whose type selector is byte 1 (DLY/REV/PFX): swap it to each type and decode the shadow.
-const harvestByTypeByte = (
-  bytes: number[],
-  types: readonly string[],
-  idxMap: Record<string, number>,
-  decode: (hex: string[]) => object,
-): BlockDefaults => {
+/** One block whose type selector is byte 1 (DLY/REV/PFX), and how to read it. */
+interface TypeByteBlock {
+  bytes: number[];
+  types: readonly string[];
+  typeIndex: Record<string, number>;
+  decode: (hex: string[]) => object;
+}
+
+// Swap byte 1 to each type in turn and decode the shadow bytes behind it.
+const harvestByTypeByte = (block: TypeByteBlock): BlockDefaults => {
+  const { bytes, types, typeIndex, decode } = block;
   const out: BlockDefaults = {};
   for (const type of types) {
     const swapped = [...bytes];
-    swapped[1] = idxMap[type];
+    swapped[1] = typeIndex[type];
     out[type] = omit(decode(hexFromBytes(swapped)), ["on", "type"]);
   }
   return out;
@@ -52,7 +56,7 @@ const harvestByTypeByte = (
 const harvestFx = (fx1: number[], fx3a: number[]): BlockDefaults => {
   const out: BlockDefaults = {};
   for (const type of FX_TYPES) {
-    if (type === "DELAY") continue; // per-sub-algorithm — harvested under fxDelay
+    if (type === "DELAY") continue; // per-sub-algorithm, harvested under fxDelay
     const bytes = type === "OVERTONE" ? fx3a : fx1;
     const decoded = decodeFxParams(type, bytes);
     if ("unknownBytes" in decoded) continue; // not modeled yet
@@ -76,9 +80,18 @@ const harvestDefaults = (patch: Patch): Record<string, BlockDefaults> => {
   return {
     fx: harvestFx(fx1, bytesFromHex(patch[RAW]["MEMORY%FX3A"])),
     fxDelay: harvestFxDelay(fx1),
-    delay: harvestByTypeByte(bytesFromHex(patch[RAW]["MEMORY%DLY"]), DLY_TYPES, DLY_TYPE_IDX, decodeDelay),
-    reverb: harvestByTypeByte(bytesFromHex(patch[RAW]["MEMORY%REV"]), REV_TYPES, REV_TYPE_IDX, decodeReverb),
-    pfx: harvestByTypeByte(bytesFromHex(patch[RAW]["MEMORY%PFX"]), PFX_TYPES, PFX_TYPE_IDX, decodePfx),
+    delay: harvestByTypeByte({
+      bytes: bytesFromHex(patch[RAW]["MEMORY%DLY"]),
+      types: DLY_TYPES, typeIndex: DLY_TYPE_IDX, decode: decodeDelay,
+    }),
+    reverb: harvestByTypeByte({
+      bytes: bytesFromHex(patch[RAW]["MEMORY%REV"]),
+      types: REV_TYPES, typeIndex: REV_TYPE_IDX, decode: decodeReverb,
+    }),
+    pfx: harvestByTypeByte({
+      bytes: bytesFromHex(patch[RAW]["MEMORY%PFX"]),
+      types: PFX_TYPES, typeIndex: PFX_TYPE_IDX, decode: decodePfx,
+    }),
   };
 };
 

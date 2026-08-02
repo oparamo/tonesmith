@@ -1,22 +1,22 @@
-/**
- * A param's value **domain** — the single authored source of its range. The human `range` string,
- * the machine-readable `values` list, and the numeric `min`/`max` bounds all derive from it via
- * `def()`, so they can't drift from each other. This is what lets the MCP generate schema read
- * bounds structurally (no parsing an English range string) and describe_device surface exact enum
- * values, from one declaration.
- *
- * Kinds:
- *  - `range`   — a numeric interval (the only kind that yields machine `min`/`max` bounds).
- *  - `enum`    — a small fixed set of string values; the `range` display is the joined list.
- *  - `lookup`  — a discrete quantized table (the frequency steps) whose full value list comes from a
- *                codec constant but whose `range` display is a compact human summary.
- *  - `boolean` — an on/off toggle carried as a real boolean (`true`/`false`); no `values`/bounds.
- *  - `text`    — an opaque/compact range with no enumerable value list (e.g. "-2oct-+2oct").
- */
 import type { ParamSpec } from "../../types";
 
 interface RangeOpts { unit?: string; decimals?: number; bpm?: boolean; percent?: boolean }
 
+/**
+ * A param's value domain, the single authored source of its range. The human `range` string, the
+ * machine-readable `values` list, and the numeric `min`/`max` bounds all derive from it via
+ * `def()`, so they can't drift from each other. That is what lets the MCP generate schema read
+ * bounds structurally, with no parsing of an English range string, and lets describe_device
+ * surface exact enum values, all from one declaration.
+ *
+ * Kinds:
+ *  - `range`:   a numeric interval, the only kind that yields machine `min`/`max` bounds.
+ *  - `enum`:    a small fixed set of string values; the `range` display is the joined list.
+ *  - `lookup`:  a discrete quantized table (the frequency steps) whose full value list comes from
+ *               a codec constant but whose `range` display is a compact human summary.
+ *  - `boolean`: an on/off toggle carried as a real boolean (`true`/`false`); no `values`/bounds.
+ *  - `text`:    an opaque/compact range with no enumerable value list (e.g. "-2oct-+2oct").
+ */
 type Domain =
   | ({ kind: "range"; min: number; max: number } & RangeOpts)
   | { kind: "enum"; values: readonly string[] }

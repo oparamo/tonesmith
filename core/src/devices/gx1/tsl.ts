@@ -2,48 +2,73 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { decodePatch, encodePatch, hexFromBytes } from "./codec";
 import { encodeName } from "./codec/blocks";
-import { RAW } from "./common";
+import { RAW, NAME_BYTES } from "./common";
 import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types";
 
-// A fresh zero-filled array per call -- RAW is a public escape hatch, and callers
-// are free to mutate patch[RAW]["MEMORY%FXn"] in place (e.g. to probe undecoded byte
-// offsets). A single shared array here would let a mutation on one FX slot silently
-// corrupt the "blank" template for every other slot and every later blankPatch() call.
-const zeros251 = (): string[] => hexFromBytes(new Array<number>(251).fill(0));
+/** Byte length of each block that opens zero-filled. */
+const BLOCK_BYTES = {
+  fxCom: 3,
+  fxParams: 251,
+  fx3a: 5,
+  odds: 8,
+  delay: 29,
+  reverb: 20,
+  pfx: 14,
+  other: 7,
+  ctl: 32,
+  assign: 15,
+} as const;
+
+const ASSIGN_SLOTS = 8;
+
+/** Patch names sit space-padded to the full block. */
+const NAME_PAD = 0x20;
+
+/**
+ * PFX, FX1, OD/DS, AMP, NS, FV, FX2, FX3, DLY, REV, OUTPUT as a MEMORY%CHAIN linked list (see
+ * CHAIN_BLOCK_ORDER in common/constants.ts): byte 0 is PFX, the first block; each later byte is
+ * the firmware value of whatever follows that fixed block.
+ */
+const DEFAULT_CHAIN_BYTES = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
+
+/** on, TRNSPRNT, gain 50, level 100, bass/mid/treble 50, ORIGINAL speaker, DYN57 mic, solo off. */
+const AMP_DEFAULT_BYTES = [1, 0, 0, 50, 100, 50, 50, 50, 1, 0, 0, 0, 0];
+
+/** Position 100, min 0, max 100, NORMAL curve. */
+const FV_DEFAULT_BYTES = [100, 0, 100, 2];
+
+/** Off, threshold 20, release 20, INPUT detect. */
+const NS_DEFAULT_BYTES = [0, 20, 20, 0];
+
+// A fresh array per call: RAW is a public escape hatch, and callers are free to mutate
+// patch[RAW]["MEMORY%FXn"] in place (e.g. to probe undecoded byte offsets). A shared array would
+// let a mutation on one FX slot silently corrupt the blank template for every other slot and
+// every later blankPatch() call.
+const zeroBytes = (count: number): string[] => hexFromBytes(new Array<number>(count).fill(0));
 
 const blankParamSet = (): RawParamSet => {
-  // PFX->FX1->OD/DS->AMP->NS->FV->FX2->FX3->DLY->REV->OUTPUT as a MEMORY%CHAIN linked
-  // list (see CHAIN_BLOCK_ORDER in common/constants.ts): byte 0 is PFX (first block);
-  // each subsequent byte is the firmware value of what follows that fixed block.
-  const defaultChain = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
   const paramSet: RawParamSet = {
-    "MEMORY%COM":     hexFromBytes(new Array<number>(16).fill(0x20)),
-    "MEMORY%CHAIN":   hexFromBytes(defaultChain),
-    "MEMORY%FX1_COM": hexFromBytes([0, 0, 0]),
-    "MEMORY%FX1":     zeros251(),
-    "MEMORY%FX2_COM": hexFromBytes([0, 0, 0]),
-    "MEMORY%FX2":     zeros251(),
-    "MEMORY%FX3_COM": hexFromBytes([0, 0, 0]),
-    "MEMORY%FX3":     zeros251(),
-    "MEMORY%FX3A":    hexFromBytes(new Array<number>(5).fill(0)),
-    "MEMORY%ODDS":    hexFromBytes(new Array<number>(8).fill(0)),
-    // on=1, type=TRNSPRNT(0), type_bass=0, gain=50, level=100, bass=50, mid=50, treble=50,
-    // speaker=ORIGINAL(1), sp_type_bass=0, mic=DYN57(0), solo=0, soloLevel=0
-    "MEMORY%AMP":     hexFromBytes([1, 0, 0, 50, 100, 50, 50, 50, 1, 0, 0, 0, 0]),
-    "MEMORY%DLY":     hexFromBytes(new Array<number>(29).fill(0)),
-    "MEMORY%REV":     hexFromBytes(new Array<number>(20).fill(0)),
-    // off, type=WAH(0)
-    "MEMORY%PFX":     hexFromBytes(new Array<number>(14).fill(0)),
-    // position=100, min=0, max=100, curve=NORMAL(2)
-    "MEMORY%FV":      hexFromBytes([100, 0, 100, 2]),
-    // off, threshold=20, release=20, detect=INPUT(0)
-    "MEMORY%NS":      hexFromBytes([0, 20, 20, 0]),
-    // key=C(0); memoryLevel/bpm/carryover/tempoHold out of scope
-    "MEMORY%OTHER":   hexFromBytes(new Array<number>(7).fill(0)),
-    "MEMORY%CTL":     hexFromBytes(new Array<number>(32).fill(0)),
+    "MEMORY%COM":     hexFromBytes(new Array<number>(NAME_BYTES).fill(NAME_PAD)),
+    "MEMORY%CHAIN":   hexFromBytes(DEFAULT_CHAIN_BYTES),
+    "MEMORY%FX1_COM": zeroBytes(BLOCK_BYTES.fxCom),
+    "MEMORY%FX1":     zeroBytes(BLOCK_BYTES.fxParams),
+    "MEMORY%FX2_COM": zeroBytes(BLOCK_BYTES.fxCom),
+    "MEMORY%FX2":     zeroBytes(BLOCK_BYTES.fxParams),
+    "MEMORY%FX3_COM": zeroBytes(BLOCK_BYTES.fxCom),
+    "MEMORY%FX3":     zeroBytes(BLOCK_BYTES.fxParams),
+    "MEMORY%FX3A":    zeroBytes(BLOCK_BYTES.fx3a),
+    "MEMORY%ODDS":    zeroBytes(BLOCK_BYTES.odds),
+    "MEMORY%AMP":     hexFromBytes(AMP_DEFAULT_BYTES),
+    "MEMORY%DLY":     zeroBytes(BLOCK_BYTES.delay),
+    "MEMORY%REV":     zeroBytes(BLOCK_BYTES.reverb),
+    "MEMORY%PFX":     zeroBytes(BLOCK_BYTES.pfx),
+    "MEMORY%FV":      hexFromBytes(FV_DEFAULT_BYTES),
+    "MEMORY%NS":      hexFromBytes(NS_DEFAULT_BYTES),
+    "MEMORY%OTHER":   zeroBytes(BLOCK_BYTES.other),
+    "MEMORY%CTL":     zeroBytes(BLOCK_BYTES.ctl),
   };
-  for (let i = 1; i <= 8; i++) {
-    paramSet[`MEMORY%ASGN${i}`] = hexFromBytes(new Array<number>(15).fill(0));
+  for (let slot = 1; slot <= ASSIGN_SLOTS; slot++) {
+    paramSet[`MEMORY%ASGN${slot}`] = zeroBytes(BLOCK_BYTES.assign);
   }
   return paramSet;
 };

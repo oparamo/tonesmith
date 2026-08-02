@@ -3,7 +3,7 @@ import { z } from "zod";
 import { gx1, patchUtils, patchView } from "@tonesmith/core";
 const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, normalizeChain, DEFAULT_CHAIN } = gx1;
 import { ok, err } from "../../common";
-import { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable } from "./schemas";
+import { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable, issueReporter } from "./schemas";
 import { boundedNumber, boundedInt, describeParam } from "./param-ref";
 import { capabilityItemIds, capabilityParamValues } from "./capability-text";
 import { validateTypeParams } from "./validate-params";
@@ -15,7 +15,7 @@ const patchSpecSchema = z.object({
   chain: z.array(z.string()).optional().describe(
     "Block order as an array, first element = first in the chain. Pass just the blocks you want to " +
     "move; a block you leave out is reinserted immediately after whichever block precedes it in the " +
-    "default order, so it can shift along with that neighbor (it is NOT disabled — bypass a block " +
+    "default order, so it can shift along with that neighbor (it is NOT disabled; bypass a block " +
     "via its `on` field instead). List a block explicitly to place it yourself. \"OD\" is an alias " +
     "for \"OD/DS\". The response states the resolved full order. See `describe_device` items: [\"chain\"] for " +
     "the default order and how ordering/bypass work."
@@ -57,7 +57,9 @@ const patchSpecSchema = z.object({
     ),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   }).superRefine((pfxBlock, ctx) => {
-    validateTypeParams(msg => { ctx.addIssue(msg); }, "pfx", pfxBlock.type, undefined, pfxBlock.params ?? {});
+    validateTypeParams(issueReporter(ctx), {
+      group: "pfx", type: pfxBlock.type, values: pfxBlock.params ?? {},
+    });
   })).describe("Expression pedal effect block. Omit to leave it off."),
 
   fx1: bypassable(FxBlockSchema).describe("FX1 slot (pre-amp or first in chain). Omit to leave empty."),
@@ -94,7 +96,7 @@ const patchSpecSchema = z.object({
       time: delayBlock.time, feedback: delayBlock.feedback, level: delayBlock.level,
       highCut: delayBlock.highCut, ...(delayBlock.params ?? {}),
     };
-    validateTypeParams(msg => { ctx.addIssue(msg); }, "delay", delayBlock.type, undefined, values);
+    validateTypeParams(issueReporter(ctx), { group: "delay", type: delayBlock.type, values });
   })).describe("Delay block. Omit to leave it off."),
 
   reverb: bypassable(z.object({
@@ -116,7 +118,7 @@ const patchSpecSchema = z.object({
       tone: reverbBlock.tone, density: reverbBlock.density, direct: reverbBlock.direct,
       ...(reverbBlock.params ?? {}),
     };
-    validateTypeParams(msg => { ctx.addIssue(msg); }, "reverb", reverbBlock.type, undefined, values);
+    validateTypeParams(issueReporter(ctx), { group: "reverb", type: reverbBlock.type, values });
   })).describe("Reverb block. Omit to leave it off."),
 });
 
@@ -127,13 +129,13 @@ const inputSchema = z.object({
     "and a missing file is created."
   ),
   setName: z.string().optional().describe(
-    "Name for the patch set/library stored in the file. Defaults to the first patch's name — " +
+    "Name for the patch set/library stored in the file. Defaults to the first patch's name, so " +
     "provide it to name the set yourself. `outPath` still controls the filename on disk; this is " +
     "the internal set label."
   ),
   patches: z.array(patchSpecSchema).min(1).describe(
     "Every patch to save, in the order they should sit in the file. Pass a whole set in one call " +
-    "rather than one call per patch — the file is written once, and this array's order is the " +
+    "rather than one call per patch: the file is written once, and this array's order is the " +
     "order on the device."
   ),
 });
@@ -151,7 +153,7 @@ const applyFxSlots = (patch: Patch, spec: PatchSpec): void => {
   }
 };
 
-/** Builds one decoded patch from its spec — every block the spec omits stays off at factory defaults. */
+/** Builds one decoded patch from its spec. Every block the spec omits stays off at factory defaults. */
 const buildPatch = (spec: PatchSpec): Patch => {
   const chain = spec.chain === undefined ? undefined : normalizeChain(spec.chain);
   const patch = basePatch(spec.name, chain, spec.key);
@@ -183,7 +185,7 @@ const registerGeneratePatch = (server: McpServer): void => {
     {
       description: `Build BOSS GX-1 patches from structured parameters and save them as a .tsl file.
 
-\`patches\` takes an array, so a whole set goes out in ONE call — pass every patch you intend to
+\`patches\` takes an array, so a whole set goes out in ONE call. Pass every patch you intend to
 save rather than calling this once per patch. The array's order is the order they sit in the file,
 and the file is written once.
 
@@ -207,14 +209,15 @@ Type ids and value ranges for every block come from describe_device.`,
 
         const namesBefore = existingPatchNames(params.outPath);
         const alreadySaved = new Set(namesBefore ?? []);
-        const file = patchUtils.upsertPatches(gx1.driver, params.outPath, built, params.setName);
+        const request = { path: params.outPath, patches: built, setName: params.setName };
+        const file = patchUtils.upsertPatches(gx1.driver, request);
 
         const results = built.map(patch => {
           const action = alreadySaved.has(patch.name) ? "replaced" : "appended";
           return {
             name: patch.name,
             action,
-            // Confirm the resolved chain explicitly — a partial `chain` input expands to the full
+            // Confirm the resolved chain explicitly: a partial `chain` input expands to the full
             // block order, and without this a caller can't tell its reorder was honored.
             chain: patch.chain,
             // Echo back the built patch so the caller can confirm every field the builder defaulted,
@@ -225,7 +228,7 @@ Type ids and value ranges for every block come from describe_device.`,
 
         const fileVerb = namesBefore === undefined ? "Created" : "Updated";
         const summary =
-          `${fileVerb} ${params.outPath} — saved ${built.length} patch(es), ` +
+          `${fileVerb} ${params.outPath}: saved ${built.length} patch(es), ` +
           `${file.patches.length} total in set "${file.name}"`;
         return ok(`${summary}\n\n${JSON.stringify(results, null, 2)}`);
       } catch (error) {

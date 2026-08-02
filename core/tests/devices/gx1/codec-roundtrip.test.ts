@@ -35,13 +35,6 @@ describe("GX-1 round-trip", () => {
       expect(reencoded.paramSet[key], `patch ${index} key ${key}`).toEqual(original.paramSet[key]);
     }
   });
-
-  it("patch names round-trip cleanly", () => {
-    for (const patch of file.patches) {
-      expect(typeof patch.name).toBe("string");
-      expect(patch.name.length).toBeGreaterThanOrEqual(0);
-    }
-  });
 });
 
 describe("decodePatch", () => {

@@ -10,14 +10,19 @@ const collect = (run: (add: (message: string) => void) => void): string[] => {
 
 describe("validateTypeParams", () => {
   it("reports nothing for an unknown group or type (defers to the builder/codec)", () => {
-    const messages = collect(add => { validateTypeParams(add, "fx", "NOPE", undefined, { sustain: 200 }); });
+    const messages = collect(add => {
+      validateTypeParams(add, { group: "fx", type: "NOPE", values: { sustain: 200 } });
+    });
 
     expect(messages).toEqual([]);
   });
 
   it("range-checks numeric params and ignores keys with no matching spec", () => {
     const messages = collect(add => {
-      validateTypeParams(add, "fx", "COMPRESSOR", "ORANGE", { sustain: 200, attack: 50, bogus: 5 });
+      validateTypeParams(add, {
+        group: "fx", type: "COMPRESSOR", subType: "ORANGE",
+        values: { sustain: 200, attack: 50, bogus: 5 },
+      });
     });
 
     expect(messages).toHaveLength(1);
@@ -26,7 +31,9 @@ describe("validateTypeParams", () => {
 
   it("merges a subType's own params (delay sub-algorithm) into the checked set", () => {
     const messages = collect(add => {
-      validateTypeParams(add, "fx", "DELAY", "MODULATE", { modRate: 500 });
+      validateTypeParams(add, {
+        group: "fx", type: "DELAY", subType: "MODULATE", values: { modRate: 500 },
+      });
     });
 
     expect(messages).toHaveLength(1);
@@ -35,7 +42,9 @@ describe("validateTypeParams", () => {
 
   it("passes valid numeric and discrete values", () => {
     const messages = collect(add => {
-      validateTypeParams(add, "delay", "ANALOG", undefined, { time: 360, highCut: "2kHz" });
+      validateTypeParams(add, {
+        group: "delay", type: "ANALOG", values: { time: 360, highCut: "2kHz" },
+      });
     });
 
     expect(messages).toEqual([]);
@@ -43,7 +52,9 @@ describe("validateTypeParams", () => {
 
   it("checks discrete-value membership", () => {
     const messages = collect(add => {
-      validateTypeParams(add, "delay", "ANALOG", undefined, { highCut: "9kHz" });
+      validateTypeParams(add, {
+        group: "delay", type: "ANALOG", values: { highCut: "9kHz" },
+      });
     });
 
     expect(messages).toHaveLength(1);

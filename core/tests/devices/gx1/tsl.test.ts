@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, unlinkSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
 import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
 
@@ -36,36 +35,20 @@ describe("blankPatch", () => {
     expect(patch).toHaveProperty("reverb");
   });
 
-  it("amp is on with TRNSPRNT type by default", () => {
+  it("opens with the amp on at TRNSPRNT and every other block off", () => {
     const patch = blankPatch();
 
-    expect(patch.amp.on).toBe(true);
-    expect(patch.amp.type).toBe("TRNSPRNT");
-  });
-
-  it("ns is off by default", () => {
-    const patch = blankPatch();
-
+    expect(patch.amp).toMatchObject({ on: true, type: "TRNSPRNT" });
     expect(patch.ns.on).toBe(false);
-  });
-
-  it("odds is off by default", () => {
-    const patch = blankPatch();
-
     expect(patch.odds.on).toBe(false);
   });
 });
 
 describe("newFile", () => {
-  it("creates a file with the given set name", () => {
+  it("takes the given set name and opens with one blank patch", () => {
     const file = newFile("My Set");
 
     expect(file.name).toBe("My Set");
-  });
-
-  it("defaults to 1 blank patch", () => {
-    const file = newFile("My Set");
-
     expect(file.patches).toHaveLength(1);
   });
 
@@ -84,12 +67,6 @@ describe("newFile", () => {
 });
 
 describe("readFile", () => {
-  it("reads the fixture without throwing", () => {
-    const readFixture = () => readFile(FIXTURE);
-
-    expect(readFixture).not.toThrow();
-  });
-
   it("returns a file with patches", () => {
     const file = readFile(FIXTURE);
 
@@ -142,11 +119,10 @@ describe("writeFile + readFile round-trip", () => {
     const writtenFileContents = readFileSync(tmpPath, "utf8");
     const writtenRaw = JSON.parse(writtenFileContents) as typeof origRaw;
 
-    for (let i = 0; i < origRaw.data[0].length; i++) {
-      const origPs  = origRaw.data[0][i].paramSet;
-      const writPs  = writtenRaw.data[0][i].paramSet;
-      for (const key of Object.keys(origPs)) {
-        expect(writPs[key], `patch ${i} key ${key}`).toEqual(origPs[key]);
+    for (const [index, originalPatch] of origRaw.data[0].entries()) {
+      const writtenParamSet = writtenRaw.data[0][index].paramSet;
+      for (const key of Object.keys(originalPatch.paramSet)) {
+        expect(writtenParamSet[key], `patch ${index} key ${key}`).toEqual(originalPatch.paramSet[key]);
       }
     }
   });

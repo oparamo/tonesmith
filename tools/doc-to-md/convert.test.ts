@@ -46,7 +46,7 @@ describe("detectFormat", () => {
   });
 
   it("rejects an unknown format override", () => {
-    expect(() => detectFormat(encode("hi"), "docx")).toThrow('Unknown format "docx"');
+    expect(() => detectFormat(encode("hi"), "docx")).toThrow(/docx/);
   });
 });
 

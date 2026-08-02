@@ -3,8 +3,7 @@ import { basename, extname } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "./types";
 
 /**
- * Resolve a patch reference (numeric index string or exact name) to an array index.
- * Throws with a descriptive message when the ref is ambiguous or not found.
+ * Resolves a numeric index string or an exact patch name to an array index.
  *
  * An index past the end is rejected rather than passed through: callers index straight into
  * `patches` with the result, so an unchecked one reads as `undefined` or, on a write, leaves a hole
@@ -26,15 +25,12 @@ const resolvePatchIndex = (patches: Patch[], ref: string): number => {
 
   if (matches.length === 0) throw new Error(`No patch named "${ref}"`);
   if (matches.length > 1) {
-    throw new Error(`Ambiguous name "${ref}" — matches indices ${matches.join(", ")}`);
+    throw new Error(`Ambiguous name "${ref}": matches indices ${matches.join(", ")}`);
   }
   return matches[0];
 };
 
-/**
- * Coerce a string to a number or boolean if it parses as one, otherwise return it as-is.
- * Used to interpret CLI/MCP field values like "72" as the number 72, or "true"/"false" as booleans.
- */
+/** Interprets a CLI/MCP field value: "72" becomes the number 72, "true"/"false" become booleans. */
 const coerceValue = (value: string): string | number | boolean => {
   if (value === "true") return true;
   if (value === "false") return false;
@@ -54,13 +50,12 @@ const unknownPathError = (
 ): Error => {
   const valid = Object.keys(available).sort().join(", ");
   return new Error(
-    `Unknown field path "${dottedPath}" — "${segment}" is not a field here. Valid fields at this level: ${valid}`
+    `Unknown field path "${dottedPath}": "${segment}" is not a field here. Valid fields at this level: ${valid}`
   );
 };
 
 /**
- * Set a nested value on an object using a dot-notation path.
- * Example: setByPath(patch, "amp.gain", 72) sets patch.amp.gain = 72.
+ * Sets a nested value by dot-notation path: setByPath(patch, "amp.gain", 72) sets patch.amp.gain.
  *
  * Every segment must already exist: a decoded patch carries the complete set of fields its device
  * supports, so a path that isn't there names a field the device doesn't have. Writing it anyway
@@ -87,21 +82,13 @@ const setByPath = (
   current[leaf] = value;
 };
 
-/**
- * Resolve a patch reference to the indices it selects: a single index when ref is given,
- * or every index in file order when ref is omitted. Shared by "read one or all patches"
- * commands/tools.
- */
+/** A single index when `ref` is given, every index in file order when it is omitted. */
 const resolvePatchIndices = (patches: Patch[], ref?: string): number[] =>
   ref !== undefined
     ? [resolvePatchIndex(patches, ref)]
     : patches.map((_, index) => index);
 
-/**
- * Apply a batch of dot-path field edits to a patch, coercing each raw string value.
- * Mutates the patch in place. Shared by the CLI `write` command and the MCP `write_fields`
- * tool so both funnel through one mutation pipeline instead of duplicating it.
- */
+/** Applies dot-path edits to a patch in place, coercing each raw string value. */
 const applyFieldEdits = (
   patch: Record<string, unknown>,
   edits: readonly (readonly [path: string, rawValue: string])[],
@@ -111,7 +98,7 @@ const applyFieldEdits = (
   }
 };
 
-/** Reads `path` via the driver, or starts a fresh empty file (named after the patch) if it doesn't exist yet. */
+/** Reads `path`, or starts a fresh empty file named `setName` when it doesn't exist yet. */
 const readExistingOrNew = <T extends Patch>(
   driver: PatchDriver<T>,
   path: string,
@@ -125,21 +112,27 @@ const readExistingOrNew = <T extends Patch>(
   }
 };
 
+/** What to save and where. `setName` names the patch set itself, not the file. */
+interface UpsertRequest<T extends Patch> {
+  path: string;
+  patches: T[];
+  setName?: string;
+}
+
 /**
- * Saves every patch in `patches` into the patch file at `path`, keyed by name: a patch whose name
- * already exists replaces it, otherwise it is appended — applied in array order, so the caller's
- * ordering is what lands on disk. Creates the file (and, via the driver's writeFile, any missing
- * parent directories) if `path` doesn't exist yet. Device-agnostic — works for any PatchDriver.
+ * Saves every patch into the file at `path`, keyed by name: a patch whose name already exists
+ * replaces it, otherwise it is appended, in array order. Creates the file (and, via the driver's
+ * writeFile, any missing parent directories) when `path` doesn't exist yet.
  *
- * The file is read once and written once however many patches are saved: writing a whole set is a
- * single atomic write rather than one read/write cycle per patch.
+ * The file is read once and written once however many patches are saved, so a whole set lands in
+ * one write rather than a read/write cycle per patch.
  *
- * `setName` names the patch set/library itself: when provided it names a freshly created file and
- * renames an existing one; when omitted a new file is named after the first patch, and an existing
- * file keeps its current name.
+ * A `setName` names a freshly created file and renames an existing one. Omitted, a new file takes
+ * the first patch's name and an existing file keeps its own.
  */
-const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, path: string, patches: T[], setName?: string): PatchFile<T> => {
-  if (patches.length === 0) throw new Error("No patches to save — `patches` must hold at least one patch.");
+const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, request: UpsertRequest<T>): PatchFile<T> => {
+  const { path, patches, setName } = request;
+  if (patches.length === 0) throw new Error("No patches to save: `patches` must hold at least one patch.");
 
   const file = readExistingOrNew(driver, path, setName ?? patches[0].name);
   if (setName !== undefined) file.name = setName;
@@ -153,10 +146,6 @@ const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, path: string, pa
   driver.writeFile(file, path);
   return file;
 };
-
-/** Single-patch {@link upsertPatches} — same name-keyed replace-or-append behavior for one patch. */
-const upsertPatch = <T extends Patch>(driver: PatchDriver<T>, path: string, patch: T, setName?: string): PatchFile<T> =>
-  upsertPatches(driver, path, [patch], setName);
 
 /** Which patch a copy moved, and where, so each surface can word its own confirmation. */
 interface CopiedPatch {
@@ -175,7 +164,7 @@ interface CopyRequest {
 
 /**
  * Copies one patch between patch files, replacing the patch at `dstRef` rather than appending
- * (that is `upsertPatch`). Both paths are read separately, so a copy within one file takes its
+ * (that is `upsertPatches`). Both paths are read separately, so a copy within one file takes its
  * source from an independent decode instead of from the object it is about to overwrite.
  */
 const copyPatch = <T extends Patch>(driver: PatchDriver<T>, request: CopyRequest): CopiedPatch => {
@@ -222,9 +211,8 @@ export {
   setByPath,
   resolvePatchIndices,
   applyFieldEdits,
-  upsertPatch,
   upsertPatches,
   copyPatch,
   createPatchFile,
 };
-export type { CopiedPatch, CopyRequest, NewFileOptions };
+export type { UpsertRequest, CopiedPatch, CopyRequest, NewFileOptions };

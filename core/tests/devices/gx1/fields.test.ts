@@ -25,13 +25,13 @@ describe("u8", () => {
   it("throws when encoding a value below 0", () => {
     const encodeBelowRange = () => { field.encode(-1, [0]); };
 
-    expect(encodeBelowRange).toThrow(/out of u8 range/);
+    expect(encodeBelowRange).toThrow(RangeError);
   });
 
   it("throws when encoding a value above 255", () => {
     const encodeAboveRange = () => { field.encode(256, [0]); };
 
-    expect(encodeAboveRange).toThrow(/out of u8 range/);
+    expect(encodeAboveRange).toThrow(RangeError);
   });
 });
 

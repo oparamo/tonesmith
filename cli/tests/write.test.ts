@@ -6,7 +6,7 @@ describe("gx1 write", () => {
   let temp: ReturnType<typeof withTempDir>;
   afterEach(() => { temp.cleanup(); });
 
-  it("writes a single numeric field", async () => {
+  it("writes a single numeric field, coercing it from its string form", async () => {
     temp = withTempDir();
 
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain=99"]);
@@ -39,18 +39,6 @@ describe("gx1 write", () => {
     expect(written.exitCode, writeErrorOutput).toBeUndefined();
     const file = gx1.driver.readFile(temp.fixture);
     expect(file.patches[0].amp.solo).toBe(true);
-  });
-
-  it("coerces numeric field writes", async () => {
-    temp = withTempDir();
-
-    const written = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain=77"]);
-
-    const writeErrorOutput = written.error.join("\n");
-    expect(written.exitCode, writeErrorOutput).toBeUndefined();
-
-    const file = gx1.driver.readFile(temp.fixture);
-    expect(file.patches[0].amp.gain).toBe(77);
   });
 
   it("writes multiple block states in one call", async () => {

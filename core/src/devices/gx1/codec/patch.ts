@@ -16,7 +16,17 @@ import {
   decodePfx, encodePfx,
 } from "./blocks";
 
-// ── Patch decode / encode ─────────────────────────────────────────────────────
+const FX_SLOTS = ["fx1", "fx2", "fx3"] as const;
+type FxSlot = typeof FX_SLOTS[number];
+
+/**
+ * Which raw block holds an FX slot's params. OVERTONE (FX3 only) keeps its in the separate
+ * 5-byte MEMORY%FX3A block rather than the shared 251-byte FX param block.
+ */
+const paramBlockKey = (slot: FxSlot, type: string): string => {
+  if (slot === "fx3" && type === "OVERTONE") return "MEMORY%FX3A";
+  return `MEMORY%${slot.toUpperCase()}`;
+};
 
 /**
  * Decode a raw GX-1 param set (the map of hex-array fields from the TSL JSON
@@ -47,13 +57,9 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
   // Effects in this set store their type/mode in param-block byte p[0] rather than
   // in FX_COM byte[2]. After decoding, promote params["type"] back to block.subType
   // so the display layer can show e.g. "COMPRESSOR (D-COMP)".
-  for (const slot of ["FX1", "FX2", "FX3"] as const) {
-    const fxKey = slot.toLowerCase() as "fx1" | "fx2" | "fx3";
-    const block = patch[fxKey];
-    // OVERTONE (FX3-only) stores its params in the separate 5-byte MEMORY%FX3A
-    // block rather than the shared 251-byte FX param block.
-    const paramBlockKey = slot === "FX3" && block.type === "OVERTONE" ? "MEMORY%FX3A" : `MEMORY%${slot}`;
-    const paramBlockBytes = bytesFromHex(paramSet[paramBlockKey]);
+  for (const slot of FX_SLOTS) {
+    const block = patch[slot];
+    const paramBlockBytes = bytesFromHex(paramSet[paramBlockKey(slot, block.type)]);
     const params = decodeFxParams(block.type, paramBlockBytes);
     if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params.type === "string") {
       block.subType = params.type;
@@ -65,9 +71,8 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
 };
 
 /**
- * Encode a Patch back to a raw param set.
- * Starts from the original param set (stored under RAW) and overwrites only the
- * fields this codec knows about — unknown/unreversed bytes are preserved exactly.
+ * Encode a Patch back to a raw param set. Starts from the original param set (stored under RAW)
+ * and overwrites only the fields this codec knows about, so unreversed bytes survive exactly.
  */
 const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
   const paramSet: RawParamSet = { ...patch[RAW] };
@@ -83,15 +88,12 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
   paramSet["MEMORY%DLY"]   = encodeDelay(patch.delay);
   paramSet["MEMORY%REV"]   = encodeReverb(patch.reverb);
 
-  for (const slot of ["FX1", "FX2", "FX3"] as const) {
-    const fxKey = slot.toLowerCase() as "fx1" | "fx2" | "fx3";
-    const block = patch[fxKey];
-    paramSet[`MEMORY%${slot}_COM`] = encodeFxCom(block);
-    // OVERTONE (FX3-only) stores its params in the separate 5-byte MEMORY%FX3A
-    // block rather than the shared 251-byte FX param block.
-    const paramBlockKey = slot === "FX3" && block.type === "OVERTONE" ? "MEMORY%FX3A" : `MEMORY%${slot}`;
-    const originalParamBytes = bytesFromHex(patch[RAW][paramBlockKey]);
-    paramSet[paramBlockKey] = encodeFxParams(block.type, block.params, originalParamBytes);
+  for (const slot of FX_SLOTS) {
+    const block = patch[slot];
+    paramSet[`MEMORY%${slot.toUpperCase()}_COM`] = encodeFxCom(block);
+    const blockKey = paramBlockKey(slot, block.type);
+    const originalParamBytes = bytesFromHex(patch[RAW][blockKey]);
+    paramSet[blockKey] = encodeFxParams(block.type, block.params, originalParamBytes);
   }
 
   return { memo: patch.memo, paramSet };

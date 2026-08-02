@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
-  resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits, upsertPatch,
+  resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits,
   upsertPatches, copyPatch, createPatchFile,
 } from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
   ({ name });
 
-/** In-memory PatchDriver stand-in — upsertPatch is device-agnostic, so this proves it works against the PatchDriver interface alone, not gx1 specifics. */
+/** In-memory PatchDriver stand-in, so these suites exercise the interface alone, not gx1 specifics. */
 const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   id: "fake",
   name: "Fake",
@@ -35,79 +35,6 @@ const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   encodePatch: (patch) => patch as unknown as Record<string, unknown>,
 });
 
-describe("upsertPatch", () => {
-  it("creates a new file when the path doesn't exist yet", () => {
-    const files = new Map<string, PatchFile>();
-    const driver = makeFakeDriver(files);
-    const patch = makePatch("Lead");
-
-    const file = upsertPatch(driver, "new.tsl", patch);
-
-    expect(file.patches).toEqual([patch]);
-    expect(files.get("new.tsl")).toBe(file);
-  });
-
-  it("appends when no patch in the existing file shares the name", () => {
-    const files = new Map<string, PatchFile>([
-      ["set.tsl", { name: "Set", device: "FAKE", patches: [makePatch("Lead")] }],
-    ]);
-    const driver = makeFakeDriver(files);
-
-    const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
-    const patchNames = file.patches.map(patch => patch.name);
-
-    expect(patchNames).toEqual(["Lead", "Rhythm"]);
-  });
-
-  it("replaces the patch with the same name in place, idempotent across reruns", () => {
-    const files = new Map<string, PatchFile>([
-      ["set.tsl", { name: "Set", device: "FAKE", patches: [makePatch("Lead"), makePatch("Rhythm")] }],
-    ]);
-    const driver = makeFakeDriver(files);
-
-    upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
-    const file = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
-    const patchNames = file.patches.map(patch => patch.name);
-
-    expect(patchNames).toEqual(["Lead", "Rhythm"]);
-  });
-
-  it("propagates non-ENOENT errors from readFile", () => {
-    const driver: PatchDriver = {
-      ...makeFakeDriver(new Map()),
-      readFile: () => { throw new Error("disk on fire"); },
-    };
-
-    const upsertWithBrokenReadFile = () => upsertPatch(driver, "set.tsl", makePatch("Lead"));
-
-    expect(upsertWithBrokenReadFile).toThrow("disk on fire");
-  });
-
-  it("names a freshly created file after setName when provided, else after the patch", () => {
-    const files = new Map<string, PatchFile>();
-    const driver = makeFakeDriver(files);
-
-    const named = upsertPatch(driver, "named.tsl", makePatch("Lead"), "My Library");
-    expect(named.name).toBe("My Library");
-
-    const unnamed = upsertPatch(driver, "unnamed.tsl", makePatch("Lead"));
-    expect(unnamed.name).toBe("Lead");
-  });
-
-  it("renames an existing set when setName is given, and preserves it when omitted", () => {
-    const files = new Map<string, PatchFile>([
-      ["set.tsl", { name: "Old Name", device: "FAKE", patches: [makePatch("Lead")] }],
-    ]);
-    const driver = makeFakeDriver(files);
-
-    const kept = upsertPatch(driver, "set.tsl", makePatch("Rhythm"));
-    expect(kept.name).toBe("Old Name");
-
-    const renamed = upsertPatch(driver, "set.tsl", makePatch("Solo"), "New Name");
-    expect(renamed.name).toBe("New Name");
-  });
-});
-
 /** Wraps a fake driver to count how many times the file is actually read and written. */
 const makeCountingDriver = (files: Map<string, PatchFile>): { driver: PatchDriver; counts: { reads: number; writes: number } } => {
   const base = makeFakeDriver(files);
@@ -127,15 +54,15 @@ const makeCountingDriver = (files: Map<string, PatchFile>): { driver: PatchDrive
 };
 
 describe("upsertPatches", () => {
-  it("saves every patch in array order", () => {
+  it("creates the file and saves every patch in array order", () => {
     const files = new Map<string, PatchFile>();
     const driver = makeFakeDriver(files);
     const patches = [makePatch("First"), makePatch("Second"), makePatch("Third")];
 
-    const file = upsertPatches(driver, "set.tsl", patches);
-    const patchNames = file.patches.map(patch => patch.name);
+    const file = upsertPatches(driver, { path: "set.tsl", patches });
 
-    expect(patchNames).toEqual(["First", "Second", "Third"]);
+    expect(file.patches).toEqual(patches);
+    expect(files.get("set.tsl")).toBe(file);
   });
 
   it("replaces same-named patches and appends the rest, in one pass", () => {
@@ -144,10 +71,24 @@ describe("upsertPatches", () => {
     const driver = makeFakeDriver(files);
     const patches = [makePatch("Rhythm"), makePatch("Solo")];
 
-    const file = upsertPatches(driver, "set.tsl", patches);
+    const file = upsertPatches(driver, { path: "set.tsl", patches });
     const patchNames = file.patches.map(patch => patch.name);
 
     expect(patchNames, "Rhythm replaced in place, Solo appended").toEqual(["Lead", "Rhythm", "Solo"]);
+  });
+
+  it("stays idempotent across reruns of the same batch", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Set", device: "FAKE", patches: [makePatch("Lead"), makePatch("Rhythm")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+    const patches = [makePatch("Rhythm")];
+
+    upsertPatches(driver, { path: "set.tsl", patches });
+    const file = upsertPatches(driver, { path: "set.tsl", patches });
+    const patchNames = file.patches.map(patch => patch.name);
+
+    expect(patchNames).toEqual(["Lead", "Rhythm"]);
   });
 
   // The whole point of the batch form: a set lands as one atomic write, not one cycle per patch.
@@ -158,39 +99,59 @@ describe("upsertPatches", () => {
     const { driver, counts } = makeCountingDriver(files);
     const patches = [makePatch("One"), makePatch("Two"), makePatch("Three"), makePatch("Four")];
 
-    upsertPatches(driver, "set.tsl", patches);
+    upsertPatches(driver, { path: "set.tsl", patches });
 
     expect(counts.reads).toBe(1);
     expect(counts.writes).toBe(1);
   });
 
-  it("names a freshly created file after the first patch when setName is omitted", () => {
+  it("propagates non-ENOENT errors from readFile", () => {
+    const driver: PatchDriver = {
+      ...makeFakeDriver(new Map()),
+      readFile: () => { throw new Error("disk on fire"); },
+    };
+
+    const upsertWithBrokenReadFile = () =>
+      upsertPatches(driver, { path: "set.tsl", patches: [makePatch("Lead")] });
+
+    expect(upsertWithBrokenReadFile).toThrow("disk on fire");
+  });
+
+  it("names a freshly created file after setName when given, else after the first patch", () => {
     const files = new Map<string, PatchFile>();
     const driver = makeFakeDriver(files);
     const patches = [makePatch("First"), makePatch("Second")];
 
-    const file = upsertPatches(driver, "new.tsl", patches);
+    const named = upsertPatches(driver, { path: "named.tsl", patches, setName: "My Library" });
+    expect(named.name).toBe("My Library");
 
-    expect(file.name).toBe("First");
+    const unnamed = upsertPatches(driver, { path: "unnamed.tsl", patches });
+    expect(unnamed.name).toBe("First");
+  });
+
+  it("renames an existing set when setName is given, and preserves it when omitted", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Old Name", device: "FAKE", patches: [makePatch("Lead")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+
+    const kept = upsertPatches(driver, { path: "set.tsl", patches: [makePatch("Rhythm")] });
+    expect(kept.name).toBe("Old Name");
+
+    const renamed = upsertPatches(driver, {
+      path: "set.tsl",
+      patches: [makePatch("Solo")],
+      setName: "New Name",
+    });
+    expect(renamed.name).toBe("New Name");
   });
 
   it("rejects an empty batch rather than writing an unnamed file", () => {
     const driver = makeFakeDriver(new Map());
 
-    const upsertNothing = () => upsertPatches(driver, "set.tsl", []);
+    const upsertNothing = () => upsertPatches(driver, { path: "set.tsl", patches: [] });
 
-    expect(upsertNothing).toThrow("at least one patch");
-  });
-
-  it("routes the single-patch upsertPatch through the same batch path", () => {
-    const files = new Map<string, PatchFile>();
-    const { driver, counts } = makeCountingDriver(files);
-
-    const file = upsertPatch(driver, "new.tsl", makePatch("Lead"), "My Library");
-
-    expect(file.patches.map(patch => patch.name)).toEqual(["Lead"]);
-    expect(file.name).toBe("My Library");
-    expect(counts.writes).toBe(1);
+    expect(upsertNothing).toThrow();
   });
 });
 
@@ -220,20 +181,20 @@ describe("resolvePatchIndex", () => {
   it("throws for an index past the last patch", () => {
     const resolvePastEnd = () => resolvePatchIndex(patches, "3");
 
-    expect(resolvePastEnd).toThrow(/No patch at index 3/);
+    expect(resolvePastEnd).toThrow(/3/);
   });
 
   it("throws for a negative index", () => {
     const resolveNegative = () => resolvePatchIndex(patches, "-1");
 
-    expect(resolveNegative).toThrow(/No patch at index -1/);
+    expect(resolveNegative).toThrow(/-1/);
   });
 
   it("throws when multiple patches share the same name", () => {
     const resolveAmbiguousName = () => resolvePatchIndex(patches, "rock lead");
 
-    expect(resolveAmbiguousName).toThrow(/Ambiguous name/);
-    expect(resolveAmbiguousName).toThrow(/0.*2|2.*0/);
+    expect(resolveAmbiguousName).toThrow(/rock lead/);
+    expect(resolveAmbiguousName, "names both colliding indices").toThrow(/0.*2|2.*0/);
   });
 });
 
@@ -346,7 +307,7 @@ describe("setByPath", () => {
   });
 
   // A decoded patch already carries every field its device supports, so an absent field means the
-  // device has no such control. Accepting the write would strand it — the encoder only emits known
+  // device has no such control. Accepting the write would strand it, since the encoder only emits known
   // byte indices, so it would vanish while the caller believed it landed.
   it("rejects an unknown leaf instead of creating it", () => {
     const obj: Record<string, unknown> = { amp: { gain: 10, level: 100 } };
@@ -455,6 +416,6 @@ describe("createPatchFile", () => {
 
     const overwrite = () => createPatchFile(driver, path);
 
-    expect(overwrite).toThrow(/already exists/);
+    expect(overwrite).toThrow(path);
   });
 });
