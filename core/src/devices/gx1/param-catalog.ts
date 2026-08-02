@@ -1,18 +1,18 @@
 /**
- * GX-1 parameter catalog — the single source of truth for the device's *param surface*.
+ * GX-1 parameter catalog, the single source of truth for the device's *param surface*.
  *
  * Authored from `core/docs/gx1/gx1_parameter_guide.md` and verified against the device's
  * ground-truth address table. Two consumers lean on it:
  *  - `capabilities.ts` derives every item/group `params` list from here (it owns only the
  *    structural + sonic metadata: names, descriptions, models, subtypes);
  *  - the codec drift guard asserts every codec field maps to a catalog param and vice versa,
- *    for every type of every block — so neither the codec nor the described surface can drift
+ *    for every type of every block, so neither the codec nor the described surface can drift
  *    from the documented device.
  *
  * Two shapes, mirroring how the codec models each block:
- *  - `PARAMS_BY_TYPE[block][type]` — blocks whose params vary by the selected type
+ *  - `PARAMS_BY_TYPE[block][type]` for blocks whose params vary by the selected type
  *    (`fx`, `pfx`, `delay`, `reverb`). Keys are the type ids used in the codec/constants.
- *  - `PARAMS_BY_BLOCK[block]` — single-shape blocks (`amp`, `odds`, `ns`, `fv`).
+ *  - `PARAMS_BY_BLOCK[block]` for single-shape blocks (`amp`, `odds`, `ns`, `fv`).
  *
  * Selection-only blocks (`cab`, `mic`) have no params and don't appear here.
  *
@@ -24,7 +24,7 @@ import type { ParamSpec } from "../../types";
 import { FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ, SP_TYPES, MIC_TYPES } from "./common";
 import { def, num, oneOf, lookupOf, bool, text } from "./param-domain";
 
-// ── Shared param fragments (identical across many types — defined once) ────────
+// ── Shared param fragments (identical across many types, defined once) ────────
 
 const LEVEL_0_100: ParamSpec = def("LEVEL", num(0, 100), "Output volume.");
 const DIRECT: ParamSpec = def("DIRECT", num(0, 100), "Volume of the direct (unaffected) signal.");
@@ -33,7 +33,7 @@ const OD_SOLO: ParamSpec[] = [
   def("SOLO LEVEL", num(0, 100), "Output volume while SOLO is engaged."),
 ];
 
-// ── FX1/FX2/FX3 — per effect type ─────────────────────────────────────────────
+// ── FX1/FX2/FX3, per effect type ──────────────────────────────────────────────
 
 const FX_PARAMS: Record<string, ParamSpec[]> = {
   "COMPRESSOR": [
@@ -49,7 +49,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     LEVEL_0_100,
   ],
   "ENHANCER": [
-    def("SENS", num(0, 100), "Sensitivity — how readily the effect activates on softer playing."),
+    def("SENS", num(0, 100), "Sensitivity: how readily the effect activates on softer playing."),
     def("LOW", num(0, 100), "Volume of the low-band enhanced signal."),
     def("LOW FREQ", lookupOf(ENHANCER_LOW_FREQ, "31.5 Hz-125 Hz"), "Center frequency of the low-band enhancer."),
     def("HIGH", num(0, 100), "Volume of the high-band enhanced signal."),
@@ -89,7 +89,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     def("DIRECT", num(0, 100), "Volume of the direct signal."),
   ],
   "SLOW GEAR": [
-    def("SENS", num(0, 100), "Picking sensitivity — lower values require harder picking to trigger the swell."),
+    def("SENS", num(0, 100), "Picking sensitivity: lower values require harder picking to trigger the swell."),
     def("RISE TIME", num(0, 100), "Time for the volume to reach its maximum from the moment of picking."),
     LEVEL_0_100,
   ],
@@ -105,9 +105,9 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     LEVEL_0_100,
   ],
   "SITAR SIM": [
-    def("SENS", num(0, 100), "Sensitivity — higher values trigger the sitar effect even with weak picking."),
+    def("SENS", num(0, 100), "Sensitivity: higher values trigger the sitar effect even with weak picking."),
     def("DEPTH", num(0, 100), "Amount of effect applied."),
-    def("TONE", num(-50, 50), "Tonal character — higher boosts the high end."),
+    def("TONE", num(-50, 50), "Tonal character: higher boosts the high end."),
     def("RESO", num(0, 100), "Amount of resonance undulation."),
     def("BUZZ", num(0, 100), "Amount of buzz from the characteristic 'buzz bridge'."),
     def("LEVEL", num(0, 100), "Volume of the sitar sound."),
@@ -176,7 +176,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     def("RATE", num(0, 100, { bpm: true }), "Speed of the flanging sweep."),
     def("DEPTH", num(0, 100), "Depth of the flanging effect."),
     def("MANUAL", num(0, 100), "Center frequency of the effect."),
-    def("RESO", num(0, 100), "Resonance (feedback) — higher values create a more extreme effect."),
+    def("RESO", num(0, 100), "Resonance (feedback): higher values create a more extreme effect."),
     LEVEL_0_100,
     DIRECT,
   ],
@@ -251,7 +251,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   ],
   "PITCH SHIFT": [
     def("PITCH", num(-24, 24, { unit: "semitones" }), "Amount of pitch shift."),
-    def("MODE", oneOf("FAST", "MEDIUM", "SLOW", "MONO"), "Tracking response — FAST has more modulation; SLOW is cleaner."),
+    def("MODE", oneOf("FAST", "MEDIUM", "SLOW", "MONO"), "Tracking response: FAST has more modulation, SLOW is cleaner."),
     def("PRE-DELAY", num(0, 300, { unit: "ms", bpm: true }), "Delay before the shifted sound appears."),
     def("FEEDBACK", num(0, 100), "Feedback of the shifted signal."),
     def("LEVEL", num(0, 100), "Volume of the pitch-shifted sound."),
@@ -291,7 +291,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   "TUNE DOWN": [
     def("PITCH", num(-12, 0, { unit: "semitones" }), "Amount to tune the guitar down."),
   ],
-  // FX-slot DELAY has no params shared across all sub-algorithms — its param set depends on
+  // FX-slot DELAY has no params shared across all sub-algorithms: its param set depends on
   // the selected type, so the real params live per-subtype in FX_DELAY_PARAMS (block "fxDelay").
   // This empty entry keeps DELAY present as an fx type for id-coverage, with no flat params.
   "DELAY": [],
@@ -310,7 +310,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   ],
 };
 
-// ── PFX (expression pedal effect) — per type ──────────────────────────────────
+// ── PFX (expression pedal effect), per type ───────────────────────────────────
 
 const PFX_PARAMS: Record<string, ParamSpec[]> = {
   "WAH": [
@@ -329,7 +329,7 @@ const PFX_PARAMS: Record<string, ParamSpec[]> = {
   ],
 };
 
-// ── Delay (dedicated block) — per type ────────────────────────────────────────
+// ── Delay (dedicated block), per type ─────────────────────────────────────────
 //
 // Sourced from gx1_parameter_guide.md; every field matches DELAY_TYPE_MAPS in codec/blocks.ts.
 
@@ -381,7 +381,7 @@ const DELAY_PARAMS: Record<string, ParamSpec[]> = {
   "GLITCH": DLY_GLITCH_PARAMS,
 };
 
-// ── FX-slot DELAY (an FX1/2/3 effect) — per sub-algorithm ─────────────────────
+// ── FX-slot DELAY (an FX1/2/3 effect), per sub-algorithm ──────────────────────
 //
 // Distinct from the dedicated DLY block above: only 5 sub-algorithms, and STANDARD/MODULATE/
 // WARP/TWIST/GLITCH share their param sets with the dedicated block's same-named types.
@@ -395,7 +395,7 @@ const FX_DELAY_PARAMS: Record<string, ParamSpec[]> = {
   "GLITCH": DLY_GLITCH_PARAMS,
 };
 
-// ── Reverb (dedicated block) — per type ───────────────────────────────────────
+// ── Reverb (dedicated block), per type ────────────────────────────────────────
 //
 // Sourced from gx1_parameter_guide.md; matches REV_TYPE_MAPS in codec/blocks.ts. The 7
 // standard spaces share one field set; SHIMMER/SUB DELAY/TERA ECHO each differ. TERA ECHO's
@@ -466,14 +466,14 @@ const ODDS_PARAMS: ParamSpec[] = [
 const NS_PARAMS: ParamSpec[] = [
   def("THRESHOLD", num(0, 100), "Level above which noise suppression activates."),
   def("RELEASE", num(0, 100), "Time for noise to reach silence after suppression begins."),
-  def("DETECT", oneOf("INPUT", "NS INPUT"), "Which signal point drives the detector — INPUT for normal use; NS INPUT when you want delay/reverb tails to survive the NS."),
+  def("DETECT", oneOf("INPUT", "NS INPUT"), "Which signal point drives the detector: INPUT for normal use, NS INPUT when you want delay/reverb tails to survive the NS."),
 ];
 
 const FV_PARAMS: ParamSpec[] = [
   def("POSITION", num(0, 100), "Current volume position."),
   def("MIN", num(0, 100), "Volume at heel position (pedal fully raised)."),
   def("MAX", num(0, 100), "Volume at toe position (pedal fully depressed)."),
-  def("CURVE", oneOf("SLOW1", "SLOW2", "NORMAL", "FAST"), "Volume response curve — how volume changes relative to pedal movement."),
+  def("CURVE", oneOf("SLOW1", "SLOW2", "NORMAL", "FAST"), "Volume response curve: how volume changes relative to pedal movement."),
 ];
 
 // ── Assembled catalog ─────────────────────────────────────────────────────────
@@ -501,30 +501,25 @@ type PerTypeBlockId = keyof typeof PARAMS_BY_TYPE;
 type SingleShapeBlockId = keyof typeof PARAMS_BY_BLOCK;
 
 /**
- * Codec field name → its human display label, per block and type, for the few fields whose
- * label diverges from the field name (e.g. codec `octFeedback` ↔ catalog "OCT F-BACK", codec
- * `stage` ↔ catalog "TYPE"). Single source of truth for these aliases, consumed by two places
- * that must agree: `capabilities.ts` uses it to stamp each param's `key`, and the codec↔catalog
- * drift guard uses it to line codec fields up with their catalog params.
+ * Codec field name → its human display label, per block and type, for the few fields whose label
+ * diverges from the field name. The labels are the hardware's own knob text, which is where the
+ * divergence comes from. Single source of truth for these aliases, consumed by two places that
+ * must agree: `capabilities.ts` uses it to stamp each param's `key`, and the codec↔catalog drift
+ * guard uses it to line codec fields up with their catalog params.
  */
 const FIELD_LABEL_ALIASES: Record<PerTypeBlockId, Record<string, Record<string, string>>> = {
   fx: {
-    // codec field is "octFeedback"; catalog label matches the hardware's own knob text.
     "FEEDBACKER": { octFeedback: "OCT F-BACK" },
-    // stage count (4/8/12) is the codec's numeric "stage" field; catalog labels it TYPE.
+    // The stage count (4/8/12) is the codec's numeric "stage" field, but the device labels it TYPE.
     "PHASER": { stage: "TYPE" },
-    // codec field is "speed"; catalog matches the hardware's own knob text.
     "ROTARY": { speed: "SPEED SELECT" },
-    // codec fields are "minus1Oct"/"minus2Oct"; catalog matches the hardware's own knob text.
     "OCTAVE": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
     "HEAVY OCT": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
   },
   pfx: {},
   delay: {},
   reverb: {
-    // codec field is "spreadTime"; the device labels it S-TIME.
     "TERA ECHO": { spreadTime: "S-TIME" },
-    // codec field is "pitchLevel"; the device labels it PITCH LVL.
     "SHIMMER": { pitchLevel: "PITCH LVL" },
   },
   fxDelay: {},
