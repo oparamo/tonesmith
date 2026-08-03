@@ -7,13 +7,15 @@ import { describeParam } from "../src/devices/gx1/param-ref";
  * Two drift guards for generate_gx1_patch:
  *
  * 1. Bounds: every numeric schema field derives its min/max from the capabilities
- *    ParamSpec range via boundedNumber(), so the two can no longer hold divergent
- *    numbers, since the schema doesn't restate the range, it reads it. What can still go
- *    wrong is the *wiring*: a field left unbounded (boundedNumber not applied), or
- *    pointed at the wrong / a non-numeric param. This guard introspects the actually-
- *    wired tool inputSchema and asserts each field carries a finite bound equal to the
- *    catalog range for the param it's supposed to mirror (a non-numeric range can't
- *    parse, so a mis-mapped enum field would throw at load rather than go unbounded).
+ *    ParamSpec range, so the two can no longer hold divergent numbers, since the schema
+ *    doesn't restate the range, it reads it. What can still go wrong is the *wiring*: a
+ *    field left unbounded, or pointed at the wrong / a non-numeric param. This guard
+ *    introspects the actually-wired tool inputSchema and asserts each field carries a
+ *    finite bound equal to the catalog range for the param it's supposed to mirror (a
+ *    non-numeric range can't parse, so a mis-mapped enum field would throw at load rather
+ *    than go unbounded). Which range that is depends on where the param lives: a
+ *    single-shape block's field mirrors its group's range, while a per-type block's flat
+ *    field has to admit every type's, so it carries their union.
  *
  * 2. Type catalog: delay/reverb/pfx `type` fields are plain z.string() (core, not zod,
  *    validates the actual value), so their .describe() text is the only place the valid
@@ -28,15 +30,10 @@ interface BoundedField {
   path: string;
   groupId: string;
   paramName: string;
-  /**
-   * For per-type blocks (delay/reverb) whose params live on each type item rather than the
-   * group, the representative type whose params the flat generate schema mirrors. Omit for
-   * single-shape blocks (amp/odds/ns/fv) that carry their params at the group level.
-   */
-  typeId?: string;
 }
 
-const BOUNDED_FIELDS: BoundedField[] = [
+/** Fields on single-shape blocks, whose params live on the group and so have one range. */
+const GROUP_FIELDS: BoundedField[] = [
   { path: "amp.gain", groupId: "amp", paramName: "GAIN" },
   { path: "amp.bass", groupId: "amp", paramName: "BASS" },
   { path: "amp.middle", groupId: "amp", paramName: "MIDDLE" },
@@ -53,29 +50,49 @@ const BOUNDED_FIELDS: BoundedField[] = [
   { path: "fv.position", groupId: "fv", paramName: "POSITION" },
   { path: "fv.min", groupId: "fv", paramName: "MIN" },
   { path: "fv.max", groupId: "fv", paramName: "MAX" },
-  { path: "delay.time", groupId: "delay", paramName: "TIME", typeId: "STANDARD" },
-  { path: "delay.feedback", groupId: "delay", paramName: "FEEDBACK", typeId: "STANDARD" },
-  { path: "delay.level", groupId: "delay", paramName: "LEVEL", typeId: "STANDARD" },
-  { path: "reverb.time", groupId: "reverb", paramName: "TIME", typeId: "HALL S" },
-  { path: "reverb.level", groupId: "reverb", paramName: "LEVEL", typeId: "HALL S" },
-  { path: "reverb.preDelay", groupId: "reverb", paramName: "PRE-DELAY", typeId: "HALL S" },
-  { path: "reverb.tone", groupId: "reverb", paramName: "TONE", typeId: "HALL S" },
-  { path: "reverb.density", groupId: "reverb", paramName: "DENSITY", typeId: "HALL S" },
-  { path: "reverb.direct", groupId: "reverb", paramName: "DIRECT", typeId: "HALL S" },
 ];
 
-const rangeFor = ({ groupId, paramName, typeId }: BoundedField): { min: number; max: number } => {
+/**
+ * Fields on per-type blocks, where one flat schema field serves every type and each type declares
+ * its own range. These carry the union of those ranges, never one type's.
+ */
+const SPANNING_FIELDS: BoundedField[] = [
+  { path: "delay.time", groupId: "delay", paramName: "TIME" },
+  { path: "delay.feedback", groupId: "delay", paramName: "FEEDBACK" },
+  { path: "delay.level", groupId: "delay", paramName: "LEVEL" },
+  { path: "reverb.time", groupId: "reverb", paramName: "TIME" },
+  { path: "reverb.level", groupId: "reverb", paramName: "LEVEL" },
+  { path: "reverb.preDelay", groupId: "reverb", paramName: "PRE-DELAY" },
+  { path: "reverb.tone", groupId: "reverb", paramName: "TONE" },
+  { path: "reverb.density", groupId: "reverb", paramName: "DENSITY" },
+  { path: "reverb.direct", groupId: "reverb", paramName: "DIRECT" },
+];
+
+const rangeFor = ({ groupId, paramName }: BoundedField): { min: number; max: number } => {
   const group = capabilityUtils.findGroup(gx1.driver.capabilities, groupId);
-  const params = typeId === undefined
-    ? group.params
-    : capabilityUtils.findItem(group, typeId).params;
-  const param = params?.find(p => p.name === paramName);
-  const where = typeId === undefined ? `group "${groupId}"` : `${groupId} type "${typeId}"`;
-  if (!param) throw new Error(`No ParamSpec "${paramName}" in capabilities ${where}`);
+  const param = group.params?.find(p => p.name === paramName);
+  if (!param) throw new Error(`No ParamSpec "${paramName}" in capabilities group "${groupId}"`);
   if (param.min === undefined || param.max === undefined) {
-    throw new Error(`ParamSpec "${paramName}" in ${where} has no numeric bounds`);
+    throw new Error(`ParamSpec "${paramName}" in group "${groupId}" has no numeric bounds`);
   }
   return { min: param.min, max: param.max };
+};
+
+/** Each declaring type's range for a spanning field's param. Types not declaring it are absent. */
+const typeRangesFor = ({ groupId, paramName }: BoundedField): { min: number; max: number }[] =>
+  capabilityUtils.findGroup(gx1.driver.capabilities, groupId).items.flatMap(item => {
+    const param = item.params?.find(p => p.name === paramName);
+    if (param?.min === undefined || param.max === undefined) return [];
+    return [{ min: param.min, max: param.max }];
+  });
+
+const unionRangeFor = (field: BoundedField): { min: number; max: number } => {
+  const ranges = typeRangesFor(field);
+  if (ranges.length === 0) throw new Error(`No type declares a numeric "${field.paramName}" in "${field.groupId}"`);
+  return {
+    min: Math.min(...ranges.map(range => range.min)),
+    max: Math.max(...ranges.map(range => range.max)),
+  };
 };
 
 interface JsonSchemaNode {
@@ -111,7 +128,7 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
   let close: () => Promise<void> = async () => { /* set per test */ };
   afterEach(async () => { await close(); });
 
-  it.each(BOUNDED_FIELDS)("$path derives a finite bound matching its catalog range", async (field) => {
+  it.each(GROUP_FIELDS)("$path derives a finite bound matching its catalog range", async (field) => {
     const client = await connectClient();
     close = client.close;
     const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
@@ -123,17 +140,48 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
     expect(node.maximum, `${field.path} should carry a finite max`).toBe(max);
   });
 
-  // The bound and the sentence beside it used to be able to disagree: zod enforced the catalog
-  // while the text quoted whatever range someone last typed. Both now come from the ParamSpec, and
-  // this is what keeps it that way. Field notes ("Defaults to 100.") are appended after the
-  // catalog text, so this checks containment rather than equality.
-  it.each(BOUNDED_FIELDS)("$path describes itself from the catalog, not from hand-typed text", async (field) => {
+  // A group-level range only speaks for the whole block while no type narrows or widens it. If a
+  // type ever declares its own version of one of these params, the field belongs in SPANNING_FIELDS
+  // instead, and until it moves, that type's range is the one nobody is enforcing.
+  it.each(GROUP_FIELDS)("$path stays a group-level param, with no type declaring its own", (field) => {
+    const overriding = capabilityUtils.findGroup(gx1.driver.capabilities, field.groupId).items
+      .filter(item => item.params?.some(param => param.name === field.paramName))
+      .map(item => item.id);
+
+    expect(overriding, `${field.groupId} types redeclare "${field.paramName}"`).toEqual([]);
+  });
+
+  /**
+   * Bounding a flat field by one representative type rejected other types' valid values before the
+   * per-type check ever ran: reverb LEVEL 0 (SHIMMER, TERA ECHO), reverb TIME above 10 (SUB DELAY,
+   * whose range is 1-2000 ms), delay LEVEL 0 (SPACE ECHO, SHIMMER, WARP, TWIST) and delay TIME 0
+   * (GLITCH) were all unreachable. The union is the only bound that leaves every type's range
+   * reachable, and validateTypeParams still enforces the exact one.
+   */
+  it.each(SPANNING_FIELDS)("$path spans every type's range, not one representative type's", async (field) => {
     const client = await connectClient();
     close = client.close;
     const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
 
     const node = nodeAt(patchSpecNode(tool.inputSchema), field.path);
-    const fromCatalog = describeParam({ group: field.groupId, param: field.paramName, type: field.typeId });
+    const { min, max } = unionRangeFor(field);
+
+    expect(node.minimum, `${field.path} should admit the lowest min any type declares`).toBe(min);
+    expect(node.maximum, `${field.path} should admit the highest max any type declares`).toBe(max);
+  });
+
+  // The bound and the sentence beside it used to be able to disagree: zod enforced the catalog
+  // while the text quoted whatever range someone last typed. Both now come from the ParamSpec, and
+  // this is what keeps it that way. Field notes ("Defaults to 100.") are appended after the
+  // catalog text, so this checks containment rather than equality. Spanning fields are exempt:
+  // their span is a union in no single unit, so they state no range at all.
+  it.each(GROUP_FIELDS)("$path describes itself from the catalog, not from hand-typed text", async (field) => {
+    const client = await connectClient();
+    close = client.close;
+    const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
+
+    const node = nodeAt(patchSpecNode(tool.inputSchema), field.path);
+    const fromCatalog = describeParam({ group: field.groupId, param: field.paramName });
 
     expect(node.description, `${field.path} should reach the client described`).toBeDefined();
     expect(node.description).toContain(fromCatalog);

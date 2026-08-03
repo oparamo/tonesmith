@@ -70,6 +70,40 @@ describe("generate_gx1_patch", () => {
     expect(saved.chain).toEqual(["PFX", "OD/DS", "FX1", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);
   });
 
+  /**
+   * The echo is documented as the confirmation that replaces a follow-up read_patch, so it has to
+   * agree with the file. It did not, and still would not if taken from the built patch: the builder
+   * mutates one block in place, so fields belonging to whichever type occupied it before survive in
+   * memory. A TERA ECHO reverb, which has no TIME, DENSITY or PRE-DELAY, kept all three from the
+   * blank patch's reverb and reported settings the device never stored.
+   */
+  it("echoes a patch as the file stores it, not as the builder assembled it", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "tera.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Tera",
+      outPath,
+      amp: AMP,
+      reverb: {
+        type: "TERA ECHO", level: 60, direct: 100,
+        params: { spreadTime: 50, feedback: 40, trigger: false },
+      },
+    };
+
+    const { text, isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError, text).toBe(false);
+    const [saved] = savedPatches(text);
+    const echoed = saved.patch as unknown as { reverb: Record<string, unknown> };
+    // Through JSON on both sides: the echo arrives serialized, and that drops the raw-bytes symbol
+    // the codec attaches to every decoded block.
+    const stored = JSON.parse(JSON.stringify(gx1.driver.readFile(outPath).patches[0].reverb)) as Record<string, unknown>;
+    expect(echoed.reverb).toEqual(stored);
+    expect(Object.keys(echoed.reverb)).not.toContain("time");
+  });
+
   // The reason `patches` is an array: a whole set is one call and one file write.
   it("saves every patch in one call, in array order", async () => {
     temp = emptyTempDir();
@@ -421,8 +455,9 @@ describe("generate_gx1_patch", () => {
       name: "Twist Delay",
       outPath,
       amp: AMP,
+      // TWIST has no TIME or FEEDBACK; LEVEL is the only named control it does have.
       delay: {
-        type: "TWIST", time: 500, feedback: 20, level: 25,
+        type: "TWIST", level: 25,
         params: { mode: "RISE-FADE", riseTime: 10, fallTime: 10, fadeTime: 10 },
       },
     };
@@ -627,6 +662,41 @@ describe("generate_gx1_patch", () => {
 
     const atMax = await client.callTool("generate_gx1_patch", single({ ...base, delay: { type: "ANALOG", time: 1200, feedback: 20, level: 40 } }));
     expect(atMax.isError, atMax.text).toBe(false);
+  });
+
+  /**
+   * The other half of the per-type range rule. Bounding a flat field by one representative type
+   * rejected these before validateTypeParams could judge them against the type actually chosen, so
+   * each was a documented value the device accepts and the tool could not express.
+   */
+  it("accepts values only some types allow, which one representative type's bounds excluded", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const base = { outPath: join(temp.dir, "reachable.tsl"), amp: AMP };
+
+    // SHIMMER's reverb LEVEL starts at 0, the halls' at 1.
+    const shimmer = await client.callTool("generate_gx1_patch", single({
+      ...base, name: "Shim", reverb: { type: "SHIMMER", time: 4, level: 0, params: { pitch: 12, pitchLevel: 50 } },
+    }));
+    expect(shimmer.isError, shimmer.text).toBe(false);
+
+    // SUB DELAY's TIME is 1-2000 ms, against the halls' 0.1-10 s.
+    const subDelay = await client.callTool("generate_gx1_patch", single({
+      ...base, name: "Sub", reverb: { type: "SUB DELAY", time: 400, level: 110, params: { feedback: 30, highCut: "4kHz" } },
+    }));
+    expect(subDelay.isError, subDelay.text).toBe(false);
+
+    // GLITCH's TIME is 0-100. It has no FEEDBACK or LEVEL at all.
+    const glitch = await client.callTool("generate_gx1_patch", single({
+      ...base, name: "Glitch", delay: { type: "GLITCH", time: 0, params: { glitch: 60, balance: 50, trigger: false } },
+    }));
+    expect(glitch.isError, glitch.text).toBe(false);
+
+    const spaceEcho = await client.callTool("generate_gx1_patch", single({
+      ...base, name: "Space", delay: { type: "SPACE ECHO", time: 400, feedback: 30, level: 0, params: { head: "1+2" } },
+    }));
+    expect(spaceEcho.isError, spaceEcho.text).toBe(false);
   });
 
   it("rejects an out-of-range params-bag numeric against the effect type's catalog range", async () => {

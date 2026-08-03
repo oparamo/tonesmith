@@ -56,6 +56,16 @@ bags unchecked, so `ANALOG` with a time of 1201 ms, past its 1200 ms limit, got 
 codec's raw byte guard. It is rejected up front now, with a message naming the real range or the
 valid keys.
 
+That check is also the only one that bounds delay and reverb, because a representative type cannot
+speak for the others. Where each type declares its own range for a shared control, the flat field
+carries the union of all of them as an outer gate, so no type's valid values are unreachable:
+reverb LEVEL 0 (SHIMMER, TERA ECHO), reverb TIME above 10 (SUB DELAY, whose range is 1-2000 ms),
+delay LEVEL 0 (SPACE ECHO, SHIMMER, WARP, TWIST) and delay TIME 0 (GLITCH) would otherwise be
+rejected before anything looked at the chosen type. Those fields state no range of their own, since
+the union spans units (reverb TIME runs from 0.1 seconds to 2000 milliseconds) and no type accepts
+all of it; they point at `describe_device`, which is the only thing that can answer for the type
+chosen.
+
 The CLI's `capabilities <group> <item>` prints each param's write `key` and its full `values` list
 alongside the label. Without the key there was no way to tell which dot-path `write` expects, and
 the exact spellings (`2.5kHz`, `FLAT`) appeared nowhere in the CLI.
