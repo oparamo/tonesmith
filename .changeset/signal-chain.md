@@ -15,27 +15,25 @@ the rest of a patch hangs off.
 chain, instead of a `">"`-delimited string, and the CLI prints a chain as a comma-separated list.
 `"OD"` is still an alias for `"OD/DS"`.
 
-A partial order expands through `gx1.normalizeChain()`, and the merge rule is stated the way it
-actually works. Both surfaces used to say a block left out of a partial chain "keeps its default
-position". It is reinserted immediately after whichever block precedes it in the default order, so
-it travels with that neighbor rather than holding a fixed slot. The two rules agree on contiguous
-reorders and diverge on everything else, which made a resolved order unpredictable from the docs.
-One worked non-contiguous example is shared between the chain view and the generate tool
-description, so the two cannot describe it differently, and a guard asserts the example still
-demonstrates an omitted block leaving its default slot. `generate_gx1_patch` states the resolved
-order in its response as well, so a caller does not have to infer whether its reorder was honored.
+**A chain is the complete block order.** `gx1.validateChain()` takes every block exactly once,
+first to last, and rejects a partial list, naming the blocks left out and the default order to copy
+and edit. A partial list used to be filled in by reinserting each missing block after its default
+predecessor, which could carry a listed block clear to the end of the chain: `["OD/DS", "FX1"]`
+resolved to FX1 sitting after the reverb. Omitting `chain` entirely still takes the default order,
+and `generate_gx1_patch` states the stored order in its response, so a caller that omitted it sees
+what it took.
 
 **Every block bypasses uniformly.** `amp()`, `fx()` and `odds()` gained an `on` option, so
 `on: false` turns off any block except FV, which is always active; OD/DS could previously only be
 disabled by leaving it out. On the generate tool, a bare `{ on: false }` is accepted on any
 bypassable block. It used to fail validation demanding `type` and the block's other required
-fields, with an error naming a missing field and no hint that omitting the block was the intended
-move.
+fields, with an error naming a missing field and no hint that leaving the block out was the
+intended move.
 
-Bypassing and omitting are both valid and they store different bytes, so the docs name one instead
-of calling them equally valid and leaving two correct-sounding runs to produce different files.
-Omission is preferred and leaves the block off at factory defaults. Passing `on: false` alongside a
-full block keeps those params behind the bypass, so it can be switched on later with those
+A block's position and its on/off state are separate inputs, and the chain view now says so rather
+than using "omit" for both. To leave a block off, leave its spec out of the patch: it takes no
+params, so nothing has to be invented for a block that isn't sounding. Passing `on: false` alongside
+a full block keeps those params behind the bypass, so it can be switched on later with those
 settings intact.
 
 **Encoding rejects a malformed chain.** The GX-1 stores the chain as a linked list in which each

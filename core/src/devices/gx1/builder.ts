@@ -17,38 +17,33 @@ const moveBefore = (chain: string[], node: string, beforeNode: string): string[]
   return [...without.slice(0, index), node, ...without.slice(index)];
 };
 
-/** Rejects unknown block names and duplicates; "OD" has already been aliased by the caller. */
-const validateChainNames = (names: string[]): void => {
+/**
+ * Rejects anything but a complete block order: every DEFAULT_CHAIN block exactly once, listed
+ * first-to-last. A partial list has no safe reading, since where its missing blocks belong is a
+ * guess, and encodeChain demands all of them anyway. Returns the chain with "OD" resolved to
+ * "OD/DS", the one alias callers may use, which is why it hands back an array rather than
+ * checking in place.
+ */
+const validateChain = (chain: string[]): string[] => {
+  const resolved = chain.map(name => (name === "OD" ? "OD/DS" : name));
+
   const seen = new Set<string>();
-  for (const name of names) {
+  for (const name of resolved) {
     if (!DEFAULT_CHAIN.includes(name)) {
-      throw new Error(`normalizeChain: unknown chain block "${name}" (valid: ${DEFAULT_CHAIN.join(", ")})`);
+      throw new Error(`validateChain: unknown chain block "${name}" (valid: ${DEFAULT_CHAIN.join(", ")})`);
     }
-    if (seen.has(name)) throw new Error(`normalizeChain: duplicate chain block "${name}"`);
+    if (seen.has(name)) throw new Error(`validateChain: duplicate chain block "${name}"`);
     seen.add(name);
   }
-};
 
-/**
- * Expands a partial or reordered chain into the full 10-block chain, preserving
- * the caller's relative ordering. Blocks the caller omits are inserted immediately
- * after their DEFAULT_CHAIN predecessor (or at the front, for DEFAULT_CHAIN's first
- * block). Walking DEFAULT_CHAIN start to end guarantees that predecessor is already
- * in `result` by the time we look for it: either the caller included it, or an
- * earlier pass of this same loop just inserted it. "OD" is accepted as an alias
- * for "OD/DS".
- */
-const normalizeChain = (partial: string[]): string[] => {
-  const mapped = partial.map(name => (name === "OD" ? "OD/DS" : name));
-  validateChainNames(mapped);
-
-  const result = [...mapped];
-  DEFAULT_CHAIN.forEach((block, defaultIndex) => {
-    if (result.includes(block)) return;
-    const insertAt = defaultIndex === 0 ? 0 : result.indexOf(DEFAULT_CHAIN[defaultIndex - 1]) + 1;
-    result.splice(insertAt, 0, block);
-  });
-  return result;
+  const missing = DEFAULT_CHAIN.filter(block => !seen.has(block));
+  if (missing.length > 0) {
+    throw new Error(
+      `validateChain: the chain must list every block exactly once; missing ${missing.join(", ")} ` +
+      `(default order: ${DEFAULT_CHAIN.join(", ")})`
+    );
+  }
+  return resolved;
 };
 
 const basePatch = (name: string, chain: string[] = DEFAULT_CHAIN, key = "C"): Patch => {
@@ -367,7 +362,7 @@ const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
 };
 
 export {
-  DEFAULT_CHAIN, moveBefore, normalizeChain, defaultFxParams,
+  DEFAULT_CHAIN, moveBefore, validateChain, defaultFxParams,
   basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, saveTsl,
 };
 export type {

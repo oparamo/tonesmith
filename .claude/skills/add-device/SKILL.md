@@ -214,11 +214,11 @@ capabilities on top of it. Don't hand-write param ranges twice.
    block order (derive it from the driver's own default-chain constant so the two can't drift),
    and its `description` explains, for this device, how blocks are reordered and how they're
    turned on and off (which blocks can be bypassed, and any that can't). This is the signal-chain
-   model an agent consults first. If a caller may pass a partial chain, state precisely what
-   becomes of the blocks they leave out, and show it with a worked example built by running the
-   device's own chain-merge function. Use a **non-contiguous** reorder, since a contiguous one
-   resolves the same way under several different merge rules and so proves nothing about which
-   one the device uses. Wire capabilities into the driver object from step 3.
+   model an agent consults first. Take a chain as the **complete** block order, every block
+   exactly once, and reject anything less: where a partial list's missing blocks belong is a
+   guess, and a wrong guess silently ships a different sound. Say in the description that position
+   and on/off are separate inputs, so leaving a block out of the order never reads as a way to
+   switch it off. Wire capabilities into the driver object from step 3.
 
 Add the drift guard as a test. Because capabilities derives from the catalog, capabilities and
 the codec can't drift by construction; the real risk is between the two independently authored

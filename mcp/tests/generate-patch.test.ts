@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { gx1 } from "@tonesmith/core";
 import { connectClient, emptyTempDir } from "./helpers";
 
@@ -54,7 +54,8 @@ describe("generate_gx1_patch", () => {
     const outPath = join(temp.dir, "echo.tsl");
     const client = await connectClient();
     close = client.close;
-    const patchSpec = { name: "Echo", outPath, chain: ["OD", "FX1", "AMP"], amp: AMP };
+    const chain = gx1.moveBefore(gx1.DEFAULT_CHAIN, "OD/DS", "FX1");
+    const patchSpec = { name: "Echo", outPath, chain, amp: AMP };
 
     const { text, isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
 
@@ -63,11 +64,9 @@ describe("generate_gx1_patch", () => {
     const echoed = saved.patch as unknown as { name: string; chain: string[]; amp: { type: string } };
     expect(echoed.name).toBe("Echo");
     expect(echoed.amp.type).toBe("JC-120");
-    // resolved chain echoed back: OD/DS was moved ahead of FX1.
-    expect(echoed.chain.indexOf("OD/DS")).toBeLessThan(echoed.chain.indexOf("FX1"));
-    // ...and stated per patch, so a caller never has to infer whether its partial-chain reorder
-    // was honored from the expanded chain array.
-    expect(saved.chain).toEqual(["PFX", "OD/DS", "FX1", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);
+    expect(echoed.chain).toEqual(chain);
+    // Stated per patch as well, so the stored order is readable without digging into the patch.
+    expect(saved.chain).toEqual(chain);
   });
 
   /**
@@ -211,7 +210,7 @@ describe("generate_gx1_patch", () => {
     const patchSpec = {
       name: "Chain",
       outPath,
-      chain: ["FX1", "OD", "AMP", "NS", "DLY", "REV"],
+      chain: gx1.DEFAULT_CHAIN.map(block => (block === "OD/DS" ? "OD" : block)),
       amp: AMP,
       odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
     };
@@ -532,24 +531,20 @@ describe("generate_gx1_patch", () => {
     expect(lowerCaseText).toContain("eisdir");
   });
 
-  it("normalizes a partial chain into the full 10-block chain", async () => {
+  it("rejects a partial chain, naming the blocks left out", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "partial-chain.tsl");
     const client = await connectClient();
     close = client.close;
-    const patchSpec = {
-      name: "Partial",
-      outPath,
-      chain: ["FX1", "OD", "AMP", "FX2", "NS", "DLY", "REV"],
-      amp: AMP,
-      odds: { type: "BLUES OD", drive: 40, tone: 0, level: 70 },
-    };
+    const patchSpec = { name: "Partial", outPath, chain: ["OD/DS", "FX1"], amp: AMP };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
 
-    expect(isError, text).toBe(false);
-    const patch = gx1.driver.readFile(outPath).patches[0];
-    expect(patch.chain).toEqual(["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"]);
+    expect(isError).toBe(true);
+    for (const missing of ["PFX", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]) {
+      expect(text, `the rejection must name ${missing} as missing`).toContain(missing);
+    }
+    expect(existsSync(outPath), "a rejected patch must not leave a file behind").toBe(false);
   });
 
   it("upserts by patch name across calls: same name replaces, different name appends", async () => {

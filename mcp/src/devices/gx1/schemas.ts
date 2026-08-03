@@ -12,8 +12,8 @@ const issueReporter = (ctx: z.RefinementCtx): ((message: string) => void) =>
 /**
  * The `on` field description shared by every bypassable block. Deliberately terse: this string is
  * serialized into the generate schema once per block on every call, so what bypassing actually
- * means (that it preserves the params passed with it, and that omitting a block is the other way
- * to leave it off) is explained once in the chain view rather than repeated here.
+ * means (that it preserves the params passed with it, and that leaving the block's spec out is the
+ * other way to leave it off) is explained once in the chain view rather than repeated here.
  */
 const ON_FIELD_DESCRIPTION =
   "Active by default; set false to bypass the block. See describe_device chain for what bypass keeps.";

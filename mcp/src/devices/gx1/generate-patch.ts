@@ -1,24 +1,22 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { gx1, patchUtils, patchView } from "@tonesmith/core";
-const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, normalizeChain, DEFAULT_CHAIN } = gx1;
+const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain, DEFAULT_CHAIN } = gx1;
 import { ok, err } from "../../common";
 import { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable, issueReporter } from "./schemas";
 import { boundedInt, describeParam, spanningInt, spanningNumber } from "./param-ref";
 import { capabilityItemIds, capabilityParamValues } from "./capability-text";
 import { validateTypeParams } from "./validate-params";
 
-const { CHAIN_EXAMPLE } = gx1;
-
 const patchSpecSchema = z.object({
   name: z.string().max(13).describe("Patch name (max 13 characters)"),
   chain: z.array(z.string()).optional().describe(
-    "Block order as an array, first element = first in the chain. Pass just the blocks you want to " +
-    "move; a block you leave out is reinserted immediately after whichever block precedes it in the " +
-    "default order, so it can shift along with that neighbor (it is NOT disabled; bypass a block " +
-    "via its `on` field instead). List a block explicitly to place it yourself. \"OD\" is an alias " +
-    "for \"OD/DS\". The response states the resolved full order. See `describe_device` items: [\"chain\"] for " +
-    "the default order and how ordering/bypass work."
+    "Block order as an array, first element = first in the chain. Pass the complete order: every " +
+    "block exactly once, copied from the default order with the blocks you care about moved. A " +
+    "chain missing a block is rejected, and leaving a block out is not how it gets switched off " +
+    "(bypass it via its `on` field, or leave its spec out of the patch). Omit this field entirely " +
+    "to take the default order. \"OD\" is an alias for \"OD/DS\". See `describe_device` " +
+    "items: [\"chain\"] for the default order and how ordering and bypass work."
   ),
   key: z.string().optional().describe(
     "Song key for HARMONIST's diatonic intervals: C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B (default C)"
@@ -155,7 +153,7 @@ const applyFxSlots = (patch: Patch, spec: PatchSpec): void => {
 
 /** Builds one decoded patch from its spec. Every block the spec omits stays off at factory defaults. */
 const buildPatch = (spec: PatchSpec): Patch => {
-  const chain = spec.chain === undefined ? undefined : normalizeChain(spec.chain);
+  const chain = spec.chain === undefined ? undefined : validateChain(spec.chain);
   const patch = basePatch(spec.name, chain, spec.key);
 
   amp(patch, spec.amp);
@@ -201,11 +199,10 @@ const registerGeneratePatch = (server: McpServer): void => {
 save rather than calling this once per patch. The array's order is the order they sit in the file,
 and the file is written once.
 
-Signal chain: omit \`chain\` for the default order (${DEFAULT_CHAIN.join(", ")}), or list just the
-blocks you want to move. Worked example: order ${JSON.stringify(CHAIN_EXAMPLE.input)} with
-ns: { on: false } resolves to:
-${CHAIN_EXAMPLE.resolution}
-"OD" is shorthand for "OD/DS". See describe_device items: ["chain"] for the full rule.
+Signal chain: omit \`chain\` for the default order (${DEFAULT_CHAIN.join(", ")}), or pass that whole
+order with the blocks you want moved. Every block appears exactly once; a partial chain is rejected.
+A block's position says nothing about whether it is on. "OD" is shorthand for "OD/DS". See
+describe_device items: ["chain"] for the full rule.
 
 Setting parameters: if a describe_device param's \`key\` matches a named field on the block, set
 that field; otherwise put it in the block's \`params\` record under that key. Unset params take the
@@ -230,8 +227,8 @@ Type ids and value ranges for every block come from describe_device.`,
           return {
             name: stored.name,
             action,
-            // Confirm the resolved chain explicitly: a partial `chain` input expands to the full
-            // block order, and without this a caller can't tell its reorder was honored.
+            // State the stored order outright, so a caller that omitted `chain` sees the default
+            // it took rather than having to look it up.
             chain: stored.chain,
             // Echo back the stored patch so the caller can confirm every field the builder
             // defaulted, without a follow-up read_patch.
