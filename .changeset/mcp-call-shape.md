@@ -20,8 +20,8 @@ for the full payload, or name the items you want.
 waits until the device count justifies it) and it takes `{ outPath, setName?, patches: [ ... ] }`
 instead of one patch per call. A whole set goes out in one call and lands in one file write, with
 array order becoming the order on the device rather than something the caller has to get right
-across N calls. Each patch is echoed back complete with its defaults filled in and its resolved
-chain, so the response is the confirmation and no follow-up read is needed. `setName` names the
+across N calls. Each patch is echoed back complete with its defaults filled in and the chain it was
+stored with, so the response is the confirmation and no follow-up read is needed. `setName` names the
 patch set stored in the file, which is distinct from `outPath`, the filename on disk.
 
 **`write_field` is `write_fields`** and takes a `{dot-path: value}` record instead of a single

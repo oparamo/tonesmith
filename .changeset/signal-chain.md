@@ -15,6 +15,13 @@ the rest of a patch hangs off.
 chain, instead of a `">"`-delimited string, and the CLI prints a chain as a comma-separated list.
 `"OD"` is still an alias for `"OD/DS"`.
 
+**Breaking:** the `CHAINS` lookup is gone. It held a handful of preset layouts keyed by
+`">"`-delimited strings, which only covered the arrangements someone had thought to name. Build the
+order you want from `DEFAULT_CHAIN` instead, with `moveBefore(DEFAULT_CHAIN, "OD/DS", "FX1")` for
+the common case of relocating one block. Chain arrays also no longer carry `INPUT`, `LOOP` and
+`OUTPUT`: those are fixed endpoints rather than reorderable blocks, and the ten blocks that can
+actually move are the whole array now.
+
 **A chain is the complete block order.** `gx1.validateChain()` takes every block exactly once,
 first to last, and rejects a partial list, naming the blocks left out and the default order to copy
 and edit. A partial list used to be filled in by reinserting each missing block after its default
@@ -24,9 +31,10 @@ and `generate_gx1_patch` states the stored order in its response, so a caller th
 what it took.
 
 **Every block bypasses uniformly.** `amp()`, `fx()` and `odds()` gained an `on` option, so
-`on: false` turns off any block except FV, which is always active; OD/DS could previously only be
-disabled by leaving it out. On the generate tool, a bare `{ on: false }` is accepted on any
-bypassable block. It used to fail validation demanding `type` and the block's other required
+`on: false` turns off any block except FV, which is always active. The `clearOdds(patch)` helper is
+gone with it: it existed because OD/DS was the one block with no other way to switch off, and
+`odds(patch, { on: false })` replaces it. On the generate tool, a bare `{ on: false }` is accepted
+on any bypassable block. It used to fail validation demanding `type` and the block's other required
 fields, with an error naming a missing field and no hint that leaving the block out was the
 intended move.
 
