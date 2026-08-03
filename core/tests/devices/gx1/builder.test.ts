@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import {
   DEFAULT_CHAIN,
   moveBefore,
-  normalizeChain,
+  validateChain,
   defaultFxParams,
   basePatch,
   amp,
@@ -83,31 +83,41 @@ describe("moveBefore", () => {
   });
 });
 
-describe("normalizeChain", () => {
-  it("preserves the caller's relative order, inserting omitted blocks after their nearest present predecessor", () => {
-    const partial = ["FX1", "OD/DS", "AMP", "FX2", "NS", "DLY", "REV"];
+describe("validateChain", () => {
+  it("returns a complete reordered chain as given", () => {
+    const reordered = moveBefore(DEFAULT_CHAIN, "OD/DS", "FX1");
 
-    const result = normalizeChain(partial);
+    const result = validateChain(reordered);
 
-    expect(result).toEqual(["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"]);
+    expect(result).toEqual(reordered);
   });
 
   it("accepts \"OD\" as an alias for \"OD/DS\"", () => {
-    const result = normalizeChain(["FX1", "OD", "AMP"]);
+    const aliased = DEFAULT_CHAIN.map(block => (block === "OD/DS" ? "OD" : block));
 
-    expect(result).toEqual(["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);
+    const result = validateChain(aliased);
+
+    expect(result).toEqual(DEFAULT_CHAIN);
+  });
+
+  it("names every missing block when the chain is incomplete", () => {
+    const validatePartialChain = () => validateChain(["OD/DS", "FX1"]);
+
+    // The blocks left out are the whole fix a caller has to make, so the message has to list them.
+    expect(validatePartialChain).toThrow(/PFX/);
+    expect(validatePartialChain).toThrow(/REV/);
   });
 
   it("throws on an unknown block name", () => {
-    const normalizeWithBogusBlock = () => normalizeChain(["FX1", "BOGUS"]);
+    const validateChainWithBogusBlock = () => validateChain([...DEFAULT_CHAIN, "BOGUS"]);
 
-    expect(normalizeWithBogusBlock).toThrow();
+    expect(validateChainWithBogusBlock).toThrow(/BOGUS/);
   });
 
   it("throws on a duplicate block name", () => {
-    const normalizeWithDuplicateBlock = () => normalizeChain(["FX1", "AMP", "FX1"]);
+    const validateChainWithDuplicateBlock = () => validateChain([...DEFAULT_CHAIN, "FX1"]);
 
-    expect(normalizeWithDuplicateBlock).toThrow();
+    expect(validateChainWithDuplicateBlock).toThrow(/FX1/);
   });
 });
 

@@ -16,20 +16,7 @@ import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlock
 import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
-import { DEFAULT_CHAIN, normalizeChain } from "./builder";
-
-// The chain description's worked example, covering both inputs at once: a non-contiguous reorder
-// (FX3 and FV travel with their default predecessors) and a block that is ordered but switched off
-// via its block spec (NS), which keeps its slot while off.
-const CHAIN_EXAMPLE_INPUT = ["FX1", "AMP", "FX2", "NS", "DLY", "REV"];
-/** The example's resolved order, marking the off block so the result shows bypass keeps its slot. */
-const chainExampleResolution = (): string =>
-  normalizeChain(CHAIN_EXAMPLE_INPUT)
-    .map(block => (block === "NS" ? `${block} (off)` : block))
-    .join(", ");
-
-/** The worked chain example, shared so the generate tool and the chain view can't tell it differently. */
-const CHAIN_EXAMPLE = { input: CHAIN_EXAMPLE_INPUT, resolution: chainExampleResolution() };
+import { DEFAULT_CHAIN } from "./builder";
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -440,17 +427,17 @@ const gx1Capabilities: DeviceCapabilities = {
     defaultOrder: [...DEFAULT_CHAIN],
     description:
       "The signal chain is the ordered list of blocks the guitar signal passes through. Every block " +
-      "is always in the chain, with a position and an on/off state, set independently.\n\n" +
-      "• Order: list the blocks first-to-last, naming only the ones you want to move. A block you " +
-      "leave out is reinserted immediately after whichever block precedes it in the default order, " +
-      "so it travels with that neighbor rather than holding a fixed slot.\n" +
-      "• On/off: every block can be turned off except FV (Foot Volume), which is always active. " +
-      "Omitting a block is the preferred way to leave it off: it takes no params, so you never have " +
-      "to invent values for a block that isn't sounding. Pass on: false when you want the block off " +
-      "but its params kept behind the bypass, so it can be switched on later with those settings " +
-      "intact.\n\n" +
-      `Worked example: order ${JSON.stringify(CHAIN_EXAMPLE.input)} with ns: { on: false } ` +
-      `resolves to: ${CHAIN_EXAMPLE.resolution}\n\n` +
+      "is always in the chain. Its position and its on/off state are separate inputs, set " +
+      "independently.\n\n" +
+      "• Order: the chain is the complete list, first-to-last, naming every block below exactly " +
+      "once. To rearrange, copy the default order and move what you want. Leave the chain out " +
+      "entirely to take the default order. A chain missing a block is rejected, since leaving a " +
+      "block out is not how it gets switched off.\n" +
+      "• On/off: every block can be turned off except FV (Foot Volume), which is always active. To " +
+      "leave a block off, leave its spec out of the patch: it takes no params, so you never have " +
+      "to invent values for a block that isn't sounding. Pass on: false alongside the block's " +
+      "settings when you want it off but those params kept behind the bypass, so it can be " +
+      "switched on later with them intact.\n\n" +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
   },
   groups: [
@@ -521,4 +508,4 @@ const gx1Capabilities: DeviceCapabilities = {
   ],
 };
 
-export { gx1Capabilities, CHAIN_EXAMPLE };
+export { gx1Capabilities };
