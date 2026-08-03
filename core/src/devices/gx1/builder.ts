@@ -137,32 +137,25 @@ const defaultFxParams = (fxType: string, subType: string | null = null): Record<
 };
 
 /**
- * The field set a params bag is checked against: `fields` are the codec fields of the block's
- * current `type`, and `covered` names the controls that block sets through its own options
- * (empty for blocks that have none). `label` prefixes the error a bad key raises.
+ * The field set a block's params are checked against: `fields` are the codec fields of the block's
+ * current `type`, and `label` prefixes the error a bad key raises. Every block funnels its named
+ * controls and its `params` record through one bag, so this is the only list either is judged by.
  */
 interface ParamKeySpec {
   label: string;
   type: string;
   fields: FieldCodec[] | undefined;
-  covered: ReadonlySet<string>;
 }
 
-/** For fx and pfx, whose params all live in the bag. */
-const NO_COMMON_CONTROLS: ReadonlySet<string> = new Set();
-
 /**
- * Rejects any key a params bag has no business carrying: a common control, which belongs in its own
- * option instead of the bag, or a key that isn't a field of the current type at all. Without this a
- * typo'd or type-mismatched param writes a byte offset that means something else for this type, and
- * silently corrupts an unrelated field on encode.
+ * Rejects any key that isn't a field of the current type. Without this a typo'd or type-mismatched
+ * param writes a byte offset that means something else for this type, and silently corrupts an
+ * unrelated field on encode. It is also what stops a named control the type has no field for, such
+ * as a TIME on TWIST, from being accepted and then dropped.
  */
 const validateParamKeys = (keys: Iterable<string>, spec: ParamKeySpec): void => {
   const validNames = new Set((spec.fields ?? []).map(field => field.name));
   for (const key of keys) {
-    if (spec.covered.has(key)) {
-      throw new Error(`${spec.label} param "${key}" is one of this block's common controls; set it via its own field, not the params bag`);
-    }
     if (!validNames.has(key)) {
       const valid = [...validNames].join(", ");
       throw new Error(`${spec.label} param "${key}" is not valid for type "${spec.type}" (valid keys: ${valid})`);
@@ -191,7 +184,7 @@ const fx = (patch: Patch, options: FxOptions): void => {
     subType != null && PARAM_SUBTYPE_EFFECTS.has(type) && !("type" in params)
       ? { ...params, type: subType }
       : params;
-  const keySpec: ParamKeySpec = { label: slot, type, fields: fxFieldMap(type, subType), covered: NO_COMMON_CONTROLS };
+  const keySpec: ParamKeySpec = { label: slot, type, fields: fxFieldMap(type, subType) };
   validateParamKeys(Object.keys(merged), keySpec);
   block.params = { ...defaultFxParams(type, subType), ...merged };
 };
@@ -236,10 +229,10 @@ interface BlockTypeSpec extends ParamKeySpec {
 /**
  * Gives every field of the current type that nobody set its real factory value, so a type-specific
  * field (SHIMMER delay's `pitch`, every PEDAL BEND field) can't inherit a stale raw byte left in the
- * block by whatever type occupied it before. Consulting `covered` rather than `field.name in target`
- * is what makes that safe on a block mutated in place call after call: a field name two types share,
- * such as WAH's and PEDAL BEND's `level`, must still be re-defaulted on a type switch even though
- * the property is already there from the prior type.
+ * block by whatever type occupied it before. Asking what the caller supplied rather than what the
+ * block already carries is what makes that safe on a block mutated in place call after call: a field
+ * name two types share, such as WAH's and PEDAL BEND's `level`, must still be re-defaulted on a type
+ * switch even though the property is already there from the prior type.
  *
  * `defaults` covers every field the codec map produces; it is harvested from the same maps and
  * locked to them by the defaults drift guard.
@@ -250,7 +243,7 @@ const applyTypeDefaults = (
   spec: BlockTypeSpec,
 ): void => {
   for (const field of spec.fields ?? []) {
-    if (!spec.covered.has(field.name) && !(field.name in params)) {
+    if (!(field.name in params)) {
       target[field.name] = spec.defaults[field.name];
     }
   }
@@ -282,49 +275,63 @@ const pfx = (patch: Patch, options: PfxOptions): void => {
     label: "pfx",
     type,
     fields: PFX_TYPE_MAPS[type],
-    covered: NO_COMMON_CONTROLS,
     defaults: DEFAULTS_BY_TYPE.pfx[type] ?? {},
   };
   assignExtra(patch.pfx, params, typeSpec);
 };
 
-const DELAY_COVERED_FIELDS = new Set(["time", "feedback", "level", "highCut"]);
+/**
+ * One params bag from a block's named controls and its `params` record.
+ *
+ * Unset named controls are dropped so an omitted one takes its type's factory default, the rule the
+ * bag already follows, rather than being written as `undefined`. A control given both ways is
+ * rejected instead of resolved: quietly keeping one of two conflicting values is the same failure
+ * this path exists to prevent.
+ */
+const mergeBlockParams = (named: object, params: Record<string, unknown>, label: string): Record<string, unknown> => {
+  const supplied = Object.fromEntries(Object.entries(named).filter(([, value]) => value !== undefined));
+  for (const key of Object.keys(supplied)) {
+    if (key in params) {
+      throw new Error(`${label} param "${key}" is set both as a named control and in the params bag; set it once`);
+    }
+  }
+  return { ...supplied, ...params };
+};
 
 interface DelayOptions {
   type: string;
-  time: number;
-  feedback: number;
-  level: number;
+  time?: number;
+  feedback?: number;
+  level?: number;
   highCut?: string;
   on?: boolean;
   params?: Record<string, unknown>;
 }
 
+/**
+ * Sets the delay block. Every control is optional because the types disagree about which they have:
+ * TWIST has no TIME or FEEDBACK, GLITCH has no FEEDBACK or LEVEL, and WARP has no FEEDBACK or HIGH
+ * CUT. Requiring them forced a caller building those types to invent values that encode then
+ * dropped, so a control the chosen type has no field for is now rejected by name.
+ */
 const delay = (patch: Patch, options: DelayOptions): void => {
-  const { type, highCut = "FLAT", on = true, params = {} } = options;
+  const { type, on = true, params = {}, ...named } = options;
   const block = patch.delay;
   block.on = on;
   block.type = type;
-  block.time = options.time;
-  block.feedback = options.feedback;
-  block.level = options.level;
-  block.highCut = highCut;
   const typeSpec: BlockTypeSpec = {
     label: "delay",
     type,
     fields: DELAY_TYPE_MAPS[type],
-    covered: DELAY_COVERED_FIELDS,
     defaults: DEFAULTS_BY_TYPE.delay[type],
   };
-  assignExtra(block, params, typeSpec);
+  assignExtra(block, mergeBlockParams(named, params, typeSpec.label), typeSpec);
 };
-
-const REVERB_COVERED_FIELDS = new Set(["time", "level", "preDelay", "tone", "density", "direct"]);
 
 interface ReverbOptions {
   type: string;
-  time: number;
-  level: number;
+  time?: number;
+  level?: number;
   preDelay?: number;
   tone?: number;
   density?: number;
@@ -333,17 +340,13 @@ interface ReverbOptions {
   params?: Record<string, unknown>;
 }
 
+/** Sets the reverb block, on the same terms as `delay`: TERA ECHO has no TIME, SUB DELAY has no
+ *  TONE, PRE-DELAY or DIRECT, and SHIMMER has no DENSITY or DIRECT. */
 const reverb = (patch: Patch, options: ReverbOptions): void => {
-  const { type, preDelay = 0, tone = 0, density = 5, direct = 100, on = true, params = {} } = options;
+  const { type, on = true, params = {}, ...named } = options;
   const block = patch.reverb;
   block.on = on;
   block.type = type;
-  block.time = options.time;
-  block.level = options.level;
-  block.preDelay = preDelay;
-  block.tone = tone;
-  block.density = density;
-  block.direct = direct;
   const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
     ? REV_TYPE_MAPS.STANDARD
     : REV_TYPE_MAPS[type];
@@ -351,10 +354,9 @@ const reverb = (patch: Patch, options: ReverbOptions): void => {
     label: "reverb",
     type,
     fields,
-    covered: REVERB_COVERED_FIELDS,
     defaults: DEFAULTS_BY_TYPE.reverb[type],
   };
-  assignExtra(block, params, typeSpec);
+  assignExtra(block, mergeBlockParams(named, params, typeSpec.label), typeSpec);
 };
 
 const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {

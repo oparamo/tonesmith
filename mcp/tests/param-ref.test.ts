@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { boundsFor, boundedNumber, boundedInt, describeParam, paramFor } from "../src/devices/gx1/param-ref";
+import { boundsFor, boundedInt, describeParam, paramFor, spanFor, spanningInt, spanningNumber } from "../src/devices/gx1/param-ref";
 
 describe("boundsFor", () => {
   it("reads a group-level param's numeric bounds off its ParamSpec", () => {
@@ -30,15 +30,47 @@ describe("boundsFor", () => {
   });
 });
 
-describe("boundedNumber / boundedInt", () => {
-  it("boundedNumber accepts fractional values within the catalog range", () => {
-    const schema = boundedNumber({ group: "reverb", param: "TIME", type: "HALL S" });
-
-    expect(schema.safeParse(2.4).success).toBe(true);
-    expect(schema.safeParse(0.05).success).toBe(false);
+describe("spanFor", () => {
+  // Written out as literals because these are the exact values a representative-type bound made
+  // unreachable: reverb LEVEL 0 belongs to SHIMMER and TERA ECHO and 120 to SUB DELAY, whose TIME
+  // also runs to 2000 ms while the halls' runs to 10 s, and delay LEVEL 0 belongs to SPACE ECHO,
+  // SHIMMER, WARP and TWIST.
+  it("spans every type's range for a param the types disagree about", () => {
+    expect(spanFor({ group: "reverb", param: "LEVEL" })).toEqual({ min: 0, max: 120 });
+    expect(spanFor({ group: "reverb", param: "TIME" })).toEqual({ min: 0.1, max: 2000 });
+    expect(spanFor({ group: "delay", param: "LEVEL" })).toEqual({ min: 0, max: 120 });
   });
 
-  it("boundedInt rejects non-integers and out-of-range values", () => {
+  it("throws when no type declares the param with numeric bounds", () => {
+    const lookup = (): { min: number; max: number } => spanFor({ group: "reverb", param: "NOPE" });
+
+    expect(lookup).toThrow(/NOPE/);
+  });
+});
+
+describe("spanningInt / spanningNumber", () => {
+  // The point of the span: a value only one type accepts still reaches validateTypeParams, which
+  // is the only check that knows which type was chosen.
+  it("admits a value that only one of the group's types allows", () => {
+    const level = spanningInt({ group: "reverb", param: "LEVEL", description: "Volume." });
+    const time = spanningNumber({ group: "reverb", param: "TIME", description: "Decay." });
+
+    expect(level.safeParse(0).success).toBe(true);
+    expect(level.safeParse(120).success).toBe(true);
+    expect(time.safeParse(2000).success).toBe(true);
+  });
+
+  it("still rejects what no type allows, and non-integers on an int field", () => {
+    const level = spanningInt({ group: "reverb", param: "LEVEL", description: "Volume." });
+
+    expect(level.safeParse(-1).success).toBe(false);
+    expect(level.safeParse(121).success).toBe(false);
+    expect(level.safeParse(50.5).success).toBe(false);
+  });
+});
+
+describe("boundedInt", () => {
+  it("rejects non-integers and out-of-range values", () => {
     const schema = boundedInt({ group: "amp", param: "GAIN" });
 
     expect(schema.safeParse(60).success).toBe(true);

@@ -4,7 +4,7 @@ import { gx1, patchUtils, patchView } from "@tonesmith/core";
 const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, normalizeChain, DEFAULT_CHAIN } = gx1;
 import { ok, err } from "../../common";
 import { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable, issueReporter } from "./schemas";
-import { boundedNumber, boundedInt, describeParam } from "./param-ref";
+import { boundedInt, describeParam, spanningInt, spanningNumber } from "./param-ref";
 import { capabilityItemIds, capabilityParamValues } from "./capability-text";
 import { validateTypeParams } from "./validate-params";
 
@@ -82,9 +82,9 @@ const patchSpecSchema = z.object({
 
   delay: bypassable(z.object({
     type: z.string().describe(`Delay type (${capabilityItemIds("delay")})`),
-    time: boundedNumber({ group: "delay", param: "TIME", type: "STANDARD" }),
-    feedback: boundedInt({ group: "delay", param: "FEEDBACK", type: "STANDARD" }),
-    level: boundedInt({ group: "delay", param: "LEVEL", type: "STANDARD" }),
+    time: spanningNumber({ group: "delay", param: "TIME", description: "Delay time, or the length of the effect sound for GLITCH." }).optional(),
+    feedback: spanningInt({ group: "delay", param: "FEEDBACK", description: "Number of delay repeats." }).optional(),
+    level: spanningInt({ group: "delay", param: "LEVEL", description: "Volume of the delay sound." }).optional(),
     highCut: z.string().optional().describe(`High-cut freq, exact string: ${capabilityParamValues({ group: "delay", param: "HIGH CUT", type: "STANDARD" })}`),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
@@ -101,12 +101,12 @@ const patchSpecSchema = z.object({
 
   reverb: bypassable(z.object({
     type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
-    time: boundedNumber({ group: "reverb", param: "TIME", type: "HALL S" }),
-    level: boundedInt({ group: "reverb", param: "LEVEL", type: "HALL S" }),
-    preDelay: boundedNumber({ group: "reverb", param: "PRE-DELAY", type: "HALL S", note: "Defaults to 0." }).optional(),
-    tone: boundedInt({ group: "reverb", param: "TONE", type: "HALL S", note: "Defaults to 0." }).optional(),
-    density: boundedInt({ group: "reverb", param: "DENSITY", type: "HALL S", note: "Defaults to 5." }).optional(),
-    direct: boundedInt({ group: "reverb", param: "DIRECT", type: "HALL S", note: "Defaults to 100." }).optional(),
+    time: spanningNumber({ group: "reverb", param: "TIME", description: "Reverb decay time, or delay time for SUB DELAY." }).optional(),
+    level: spanningInt({ group: "reverb", param: "LEVEL", description: "Volume of the reverb sound." }).optional(),
+    preDelay: spanningNumber({ group: "reverb", param: "PRE-DELAY", description: "Time until the reverb sound starts." }).optional(),
+    tone: spanningInt({ group: "reverb", param: "TONE", description: "Tonal character of the reverb." }).optional(),
+    density: spanningInt({ group: "reverb", param: "DENSITY", description: "Density of the reverb sound." }).optional(),
+    direct: spanningInt({ group: "reverb", param: "DIRECT", description: "Volume of the direct sound." }).optional(),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
       "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
@@ -169,6 +169,18 @@ const buildPatch = (spec: PatchSpec): Patch => {
   return patch;
 };
 
+/**
+ * The patch as the file holds it, rather than as the builder assembled it.
+ *
+ * A block's decoded shape is per-type, but the builder fills one struct covering every type, so the
+ * built object carries fields the chosen type has no params for: a TERA ECHO reverb came back
+ * carrying `time`, `density` and `preDelay`, none of which that type has. The codec drops them on
+ * the way to bytes, so a round trip through it is what the caller would read back. This echo is
+ * documented as the confirmation that replaces a follow-up read_patch, which is why it has to agree
+ * with the file rather than with the builder.
+ */
+const asStored = (patch: Patch): Patch => gx1.driver.decodePatch(gx1.driver.encodePatch(patch));
+
 /** Patch names already saved at `path`, or undefined when the file doesn't exist yet. */
 const existingPatchNames = (path: string): string[] | undefined => {
   try {
@@ -213,16 +225,17 @@ Type ids and value ranges for every block come from describe_device.`,
         const file = patchUtils.upsertPatches(gx1.driver, request);
 
         const results = built.map(patch => {
-          const action = alreadySaved.has(patch.name) ? "replaced" : "appended";
+          const stored = asStored(patch);
+          const action = alreadySaved.has(stored.name) ? "replaced" : "appended";
           return {
-            name: patch.name,
+            name: stored.name,
             action,
             // Confirm the resolved chain explicitly: a partial `chain` input expands to the full
             // block order, and without this a caller can't tell its reorder was honored.
-            chain: patch.chain,
-            // Echo back the built patch so the caller can confirm every field the builder defaulted,
-            // without a follow-up read_patch.
-            patch: patchView.presentPatch(patch),
+            chain: stored.chain,
+            // Echo back the stored patch so the caller can confirm every field the builder
+            // defaulted, without a follow-up read_patch.
+            patch: patchView.presentPatch(stored),
           };
         });
 

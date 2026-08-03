@@ -365,12 +365,12 @@ describe("delay", () => {
     });
   });
 
-  it("enables the block and flattens the high cut by default", () => {
+  it("enables the block and takes the type's factory high cut by default", () => {
     const patch = basePatch("Test");
 
     delay(patch, { type: "STANDARD", time: 7, feedback: 50, level: 60 });
 
-    expect(patch.delay).toMatchObject({ on: true, highCut: "FLAT" });
+    expect(patch.delay).toMatchObject({ on: true, highCut: "6.3kHz" });
   });
 
   it("throws on encode for an unrecognized high cut label", () => {
@@ -399,13 +399,33 @@ describe("delay", () => {
     expect(setInvalidExtra).toThrow();
   });
 
-  it("rejects a common control passed in the params bag", () => {
+  it("rejects a control set both as a named option and in the params bag", () => {
     const patch = basePatch("Test");
-    const setCovered = () => {
+    const setTwice = () => {
       delay(patch, { type: "STANDARD", time: 7, feedback: 50, level: 60, params: { feedback: 80 } });
     };
 
-    expect(setCovered).toThrow();
+    expect(setTwice).toThrow(/feedback/);
+  });
+
+  // The named controls are not universal: requiring them made a caller invent values for a type
+  // that has no such field, which encode then dropped without a word.
+  it("rejects a named control the chosen type has no field for, naming what it does take", () => {
+    const patch = basePatch("Test");
+    const setAbsentControl = () => {
+      delay(patch, { type: "TWIST", time: 400, level: 50 });
+    };
+
+    expect(setAbsentControl).toThrow(/time/);
+    expect(setAbsentControl).toThrow(/riseTime/);
+  });
+
+  it("builds a type that has none of the usual controls, from its own params alone", () => {
+    const patch = basePatch("Test");
+
+    delay(patch, { type: "GLITCH", time: 0, params: { glitch: 60, balance: 40 } });
+
+    expect(patch.delay).toMatchObject({ on: true, type: "GLITCH", time: 0, glitch: 60, balance: 40, trigger: false });
   });
 
   it("fills type-specific fields no named option covers with real factory defaults", () => {
@@ -419,7 +439,7 @@ describe("delay", () => {
   it("fills WARP's trigger field, which no named option covers at all", () => {
     const patch = basePatch("Test");
 
-    delay(patch, { type: "WARP", time: 1, feedback: 40, level: 50 });
+    delay(patch, { type: "WARP", time: 1, level: 50 });
 
     expect(patch.delay).toMatchObject({ trigger: false, level: 50 });
   });
@@ -438,12 +458,27 @@ describe("reverb", () => {
     });
   });
 
-  it("defaults the optional named controls", () => {
+  // Unset controls take the type's factory value, the same rule the params bag follows. PRE-DELAY
+  // is the one that shows it: the builder used to hardcode 0, which is not what the device ships.
+  it("defaults the unset named controls to the type's factory values", () => {
     const patch = basePatch("Test");
 
     reverb(patch, { type: "ROOM S", time: 1.0, level: 70 });
 
-    expect(patch.reverb).toMatchObject({ on: true, preDelay: 0, tone: 0, density: 5, direct: 100 });
+    expect(patch.reverb).toMatchObject({ on: true, preDelay: 30, tone: 0, density: 5, direct: 100 });
+  });
+
+  // Asserted through the codec because the builder mutates the block in place: a property left by
+  // whichever type occupied it before survives in memory, and encode is what settles which fields
+  // this type really has.
+  it("builds TERA ECHO, which has no TIME, from its own params", () => {
+    const patch = basePatch("Test");
+
+    reverb(patch, { type: "TERA ECHO", level: 60, params: { spreadTime: 50, feedback: 40 } });
+    const stored = decodePatch(encodePatch(patch));
+
+    expect(stored.reverb).toMatchObject({ type: "TERA ECHO", level: 60, spreadTime: 50, feedback: 40 });
+    expect(stored.reverb).not.toHaveProperty("time");
   });
 
   it("merges type-specific params-bag entries", () => {
