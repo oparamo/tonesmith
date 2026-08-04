@@ -240,7 +240,7 @@ Type ids and value ranges for every block come from describe_device.`,
         const summary =
           `${fileVerb} ${params.outPath}: saved ${built.length} patch(es), ` +
           `${file.patches.length} total in set "${file.name}"`;
-        return ok(`${summary}\n\n${JSON.stringify(results, null, 2)}`);
+        return ok(`${summary}\n\n${JSON.stringify(results)}`);
       } catch (error) {
         return err(error);
       }

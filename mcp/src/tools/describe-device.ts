@@ -123,10 +123,10 @@ const registerDescribeDevice = (server: McpServer): void => {
         const { capabilities } = registry.getDriver(device);
 
         if (!items || items.length === 0) {
-          return ok(JSON.stringify(deviceSummary(capabilities), null, 2));
+          return ok(JSON.stringify(deviceSummary(capabilities)));
         }
 
-        return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams), null, 2));
+        return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams)));
       } catch (error) {
         return err(error);
       }

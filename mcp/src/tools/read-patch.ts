@@ -30,13 +30,13 @@ const registerReadPatch = (server: McpServer): void => {
             index,
             ...patchView.presentPatch(patchFile.patches[index]),
           };
-          return ok(JSON.stringify(patchWithIndex, null, 2));
+          return ok(JSON.stringify(patchWithIndex));
         }
         const result = {
           setName: patchFile.name,
           patches: indices.map(index => ({ index, ...patchView.presentPatch(patchFile.patches[index]) })),
         };
-        return ok(JSON.stringify(result, null, 2));
+        return ok(JSON.stringify(result));
       } catch (error) {
         return err(error);
       }
