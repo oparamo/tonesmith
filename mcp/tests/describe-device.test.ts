@@ -95,6 +95,8 @@ describe("describe_device", () => {
 
   // The listing exists to be read in one call. Inlining every item's params put fx past 70k
   // characters, which some clients refuse outright. This is the ceiling that regression would hit.
+  // The full/listing comparison is a ratio rather than a byte count so that changing how the
+  // response is serialized can't quietly turn this guard into a formatting assertion.
   it("keeps the largest group's listing small enough to consume in one call", async () => {
     const client = await connectClient();
     close = client.close;
@@ -103,7 +105,35 @@ describe("describe_device", () => {
     const full = await client.callTool("describe_device", { device: "gx1", items: ["fx"], includeParams: true });
 
     expect(listing.text.length, "an fx listing must stay browsable").toBeLessThan(20_000);
-    expect(full.text.length, "includeParams still returns the full payload").toBeGreaterThan(50_000);
+    expect(full.text.length, "includeParams still returns the full payload")
+      .toBeGreaterThan(listing.text.length * 2);
+  });
+
+  // A client persists any tool result over 25,000 tokens to a file, then refuses to read that file
+  // back for exceeding the same limit, so an oversized response is not merely verbose, it is
+  // unrecoverable. These 30 entries are a whole library's worth of lookups, the scale the server's
+  // instructions tell agents to batch for. The budget is in bytes because the token count is a
+  // client-side measure this suite cannot see; 40 KB stays under 25k tokens at any plausible ratio.
+  it("keeps a library-scale batch under the client's response ceiling", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const items = [
+      "chain", "amp", "odds",
+      "fx/COMPRESSOR", "fx/ENHANCER", "fx/HIGH GEQ", "fx/CHORUS", "fx/ROTARY", "fx/SCRIPT PH",
+      "fx/FLANGER", "fx/PHASER", "fx/TREMOLO", "fx/CLASSIC-VIBE", "fx/VIBRATO",
+      "odds/MUFF FUZZ", "odds/60S FUZZ", "odds/BLUES OD", "odds/T-SCREAM", "odds/TREBLE BST",
+      "odds/LEAD DS",
+      "delay/ANALOG", "delay/STANDARD", "delay/MODULATE",
+      "reverb/HALL M", "reverb/HALL S", "reverb/ROOM S", "reverb/PLATE", "reverb/SHIMMER",
+      "ns", "fv",
+    ];
+
+    const { text, isError } = await client.callTool("describe_device", { device: "gx1", items });
+
+    expect(isError, text).toBe(false);
+    const views = JSON.parse(text) as Record<string, unknown>;
+    expect(Object.keys(views), "every entry still resolves").toHaveLength(items.length);
+    expect(text.length, "a whole library's lookups must fit in one response").toBeLessThan(45_000);
   });
 
   it("keeps the block-level controls in a group listing", async () => {

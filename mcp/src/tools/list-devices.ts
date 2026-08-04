@@ -8,7 +8,7 @@ const registerListDevices = (server: McpServer): void => {
     { description: "List all supported guitar processor devices and their IDs." },
     () => {
       const deviceSummaries = registry.listDrivers().map(driver => ({ id: driver.id, name: driver.name }));
-      return ok(JSON.stringify(deviceSummaries, null, 2));
+      return ok(JSON.stringify(deviceSummaries));
     }
   );
 };
