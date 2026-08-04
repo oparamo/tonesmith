@@ -18,6 +18,15 @@ const issueReporter = (ctx: z.RefinementCtx): ((message: string) => void) =>
 const ON_FIELD_DESCRIPTION =
   "Active by default; set false to bypass the block. See describe_device chain for what bypass keeps.";
 
+/**
+ * The `subType` field description shared by every block that has one. Written for both because the
+ * rule is the device's, not one block's: a variant is a `subType` only where capabilities lists it
+ * as one, and everywhere else it is a param.
+ */
+const SUB_TYPE_DESCRIPTION =
+  "The variant to use, for types whose describe_device entry lists `subTypes`. A type with no such " +
+  "list rejects this field, and any variant it does have is an ordinary entry in `params`.";
+
 /** True when a block spec carries nothing but `on: false`: this block is off, with no settings. */
 const isBareBypass = (value: unknown): boolean => {
   if (typeof value !== "object" || value === null) return false;
@@ -38,12 +47,9 @@ const bypassable = <T extends z.ZodType>(block: T): z.ZodType<z.output<T> | unde
     block.optional()
   );
 
-const FxBlockSchema = z.object({
+const FxBlockSchema = z.strictObject({
   type: z.string().describe(`Effect type. One of: ${fxTypeIds}. (OVERTONE is FX3-only.)`),
-  subType: z.string().optional().describe(
-    "Required for effects whose describe_device entry lists `subTypes`, and unused for those that " +
-    "don't. Anything else shaping the sound is an ordinary entry in `params`."
-  ),
+  subType: z.string().optional().describe(SUB_TYPE_DESCRIPTION),
   on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
     "Every effect parameter, keyed by each param's `key` from describe_device (e.g. preDelay, " +
@@ -56,4 +62,4 @@ const FxBlockSchema = z.object({
   });
 });
 
-export { FxBlockSchema, ON_FIELD_DESCRIPTION, bypassable, isBareBypass, issueReporter };
+export { FxBlockSchema, ON_FIELD_DESCRIPTION, SUB_TYPE_DESCRIPTION, bypassable, isBareBypass, issueReporter };

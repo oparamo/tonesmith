@@ -762,6 +762,91 @@ describe("generate_gx1_patch", () => {
     expect(text).toContain("pfx LEVEL for WAH");
   });
 
+  // A variant sent through a field the effect doesn't have is the one bad input that used to
+  // produce a file: it encoded nowhere, so the patch saved clean and played at the default stage
+  // count. The rejection has to name the param that does carry it, or the caller has nowhere to go.
+  it("rejects a subType on an effect whose variant is an ordinary param, naming that param", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "phaser-subtype.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Phaser",
+      outPath,
+      amp: AMP,
+      fx1: { type: "PHASER", subType: "4 STAGE", params: { rate: 40, depth: 60 } },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text, "should point at the param that carries the variant").toContain("params.stage");
+    expect(existsSync(outPath), "a rejected patch writes no file").toBe(false);
+  });
+
+  it("builds a pedal WAH whose model is selected by subType", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "wah-subtype.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = { name: "Wah", outPath, amp: AMP, pfx: { type: "WAH", subType: "VO WAH" } };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError, text).toBe(false);
+    const patch = gx1.driver.readFile(outPath).patches[0];
+    expect(patch.pfx.wahType).toBe("VO WAH");
+  });
+
+  it("rejects a subType on a pfx type that has no sub-models", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Bend",
+      outPath: join(temp.dir, "bend-subtype.tsl"),
+      amp: AMP,
+      pfx: { type: "PEDAL BEND", subType: "CRY WAH" },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text).toContain("PEDAL BEND");
+  });
+
+  // Every block's fields are the ones its type actually has, so an invented one is a param in the
+  // wrong place (`rate` belongs in `params`) or a guess. Either way the byte it meant to set stays
+  // at its default, which is the same silent miss a stray subType used to produce.
+  it("rejects a field a block does not have, rather than ignoring it", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Stray",
+      outPath: join(temp.dir, "stray-field.tsl"),
+      amp: AMP,
+      fx1: { type: "CHORUS", rate: 50 },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text).toContain("rate");
+  });
+
+  it("rejects a field a patch spec does not have, rather than ignoring it", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = { name: "Stray", outPath: join(temp.dir, "stray-spec.tsl"), amp: AMP, tempo: 120 };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text).toContain("tempo");
+  });
+
   // Bare { on: false } and omitting a block both mean "off at factory defaults", so the bytes must
   // agree, so an agent's choice between the two can never change the file.
   it.each(["odds", "fx1", "delay", "reverb", "ns", "pfx"])(

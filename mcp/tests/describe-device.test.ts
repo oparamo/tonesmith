@@ -113,7 +113,7 @@ describe("describe_device", () => {
   // back for exceeding the same limit, so an oversized response is not merely verbose, it is
   // unrecoverable. These 30 entries are a whole library's worth of lookups, the scale the server's
   // instructions tell agents to batch for. The budget is in bytes because the token count is a
-  // client-side measure this suite cannot see; 40 KB stays under 25k tokens at any plausible ratio.
+  // client-side measure this suite cannot see; 45 KB stays under 25k tokens at any plausible ratio.
   it("keeps a library-scale batch under the client's response ceiling", async () => {
     const client = await connectClient();
     close = client.close;

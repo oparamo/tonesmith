@@ -234,6 +234,24 @@ describe("fx", () => {
     expect(decoded.fx1.params).toMatchObject({ time: 2.5, level: 40 });
   });
 
+  // PHASER's variant is its `stage` param, not a subType, so a subType sent here encodes nowhere.
+  // Accepting and dropping it is what let a patch save clean and play at the wrong stage count.
+  it("throws when given a subType for an effect whose variant is an ordinary param", () => {
+    const patch = basePatch("Test");
+    const setSubType = () => { fx(patch, { slot: "fx1", type: "PHASER", subType: "4 STAGE" }); };
+
+    expect(setSubType).toThrow(/stage/);
+  });
+
+  it("throws when a sub-model is set both as subType and in the params bag", () => {
+    const patch = basePatch("Test");
+    const setBothWays = () => {
+      fx(patch, { slot: "fx1", type: "COMPRESSOR", subType: "D-COMP", params: { type: "ORANGE" } });
+    };
+
+    expect(setBothWays).toThrow();
+  });
+
   // OVERTONE (FX3-only) stores its params in the separate MEMORY%FX3A block instead
   // of the shared 251-byte FX param block, so this proves both halves of that
   // special-casing in codec/patch.ts round-trip correctly.
@@ -338,6 +356,30 @@ describe("pfx", () => {
     expect(patch.pfx).toMatchObject({
       pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0,
     });
+  });
+
+  // WAH's model is a capabilities subType, so it is set as one here too rather than as the
+  // `wahType` params key the codec happens to use, which capabilities never mentions.
+  it("selects the wah model from subType", () => {
+    const patch = basePatch("Test");
+
+    pfx(patch, { type: "WAH", subType: "VO WAH", params: { level: 80 } });
+
+    expect(patch.pfx).toMatchObject({ type: "WAH", wahType: "VO WAH", level: 80 });
+  });
+
+  it("throws when given a subType for a type with no sub-models", () => {
+    const patch = basePatch("Test");
+    const setSubType = () => { pfx(patch, { type: "PEDAL BEND", subType: "CRY WAH" }); };
+
+    expect(setSubType).toThrow(/pitchMin/);
+  });
+
+  it("throws when the wah model is set both as subType and in the params bag", () => {
+    const patch = basePatch("Test");
+    const setBothWays = () => { pfx(patch, { type: "WAH", subType: "VO WAH", params: { wahType: "CRY WAH" } }); };
+
+    expect(setBothWays).toThrow();
   });
 
   it("throws when a param isn't valid for the pfx type", () => {
