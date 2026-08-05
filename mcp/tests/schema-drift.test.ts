@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1, capabilityUtils } from "@tonesmith/core";
+import type { CapabilityGroup } from "@tonesmith/core";
 import { connectClient } from "./helpers";
 import { describeParam } from "../src/devices/gx1/param-ref";
 
@@ -231,6 +232,52 @@ describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () =
       const values = valuesFor(item.id);
       if (values === undefined) continue;
       expect(values, `delay type "${item.id}" HIGH CUT values differ from STANDARD's`).toBe(representative);
+    }
+  });
+});
+
+/**
+ * Which generate-schema blocks each capability group feeds. cab and mic are left out deliberately:
+ * they reach the schema as amp's `speaker`/`mic` strings, which have no room for a variant, so a
+ * subType turning up on one of them is a gap to fail on rather than a mapping to add.
+ */
+const GROUP_BLOCKS: Partial<Record<string, string[]>> = {
+  amp: ["amp"],
+  odds: ["odds"],
+  pfx: ["pfx"],
+  fx: ["fx1", "fx2", "fx3"],
+  ns: ["ns"],
+  fv: ["fv"],
+  delay: ["delay"],
+  reverb: ["reverb"],
+};
+
+/** Every capability group with at least one item offering a variant to choose. */
+const groupsDeclaringSubTypes = (): CapabilityGroup[] =>
+  gx1.driver.capabilities.groups.filter(
+    group => group.items.some(item => item.subTypes !== undefined && item.subTypes.length > 0)
+  );
+
+describe("generate_gx1_patch subType reachability drift guard", () => {
+  let close: () => Promise<void>;
+  afterEach(async () => { await close(); });
+
+  // capabilities advertised WAH's six pedal models as subTypes while the pfx block had no field to
+  // receive one, so the only way to select a model was a params key capabilities never mentions. A
+  // variant a caller can read about but not set is worse than one that doesn't exist: it reads as
+  // available, and the patch that tries it saves at the default.
+  it("gives every group declaring subTypes a schema field that accepts one", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
+    const spec = patchSpecNode(tool.inputSchema);
+
+    for (const group of groupsDeclaringSubTypes()) {
+      const blocks = GROUP_BLOCKS[group.id];
+      expect(blocks, `group "${group.id}" declares subTypes but feeds no generate-schema block`).toBeDefined();
+      for (const block of blocks ?? []) {
+        expect(nodeAt(spec, block).properties?.subType, `${block} must accept a subType`).toBeDefined();
+      }
     }
   });
 });

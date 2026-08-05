@@ -1,6 +1,6 @@
 import type { Patch, FxParams, NsBlock, FvBlock } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
-import { PARAM_SUBTYPE_EFFECTS, NS_DETECT } from "./common";
+import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_FIELDS, NS_DETECT } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
 import { DEFAULTS_BY_TYPE, type ParamDefaults } from "./defaults";
 
@@ -158,6 +158,36 @@ const validateParamKeys = (keys: Iterable<string>, spec: ParamKeySpec): void => 
   }
 };
 
+/** A ParamKeySpec plus the sub-model selection to fold into the block's params bag. */
+interface SubTypeSpec extends ParamKeySpec {
+  subType?: string | null;
+  /** The params key that carries the selection, absent when the type has no sub-model. */
+  field?: string;
+}
+
+/**
+ * Folds a sub-model selection into the params bag under the codec field that carries it, so a
+ * caller names it `subType` whichever block it belongs to. A type with no such field rejects the
+ * value rather than dropping it: nothing downstream would encode it, so the patch would save
+ * without complaint and play as the default, which is the one failure a caller cannot see. Setting
+ * it both ways is rejected too, on the same terms as `mergeBlockParams`.
+ */
+const withSubType = <V>(params: Record<string, V>, spec: SubTypeSpec): Record<string, V | string> => {
+  const { label, type, subType, field } = spec;
+  if (subType == null) return params;
+  if (field === undefined) {
+    const valid = (spec.fields ?? []).map(codecField => codecField.name).join(", ");
+    throw new Error(
+      `${label} type "${type}" has no subType (got "${subType}"); if that names one of this ` +
+      `type's params, pass it in params instead (valid keys: ${valid})`
+    );
+  }
+  if (field in params) {
+    throw new Error(`${label} sub-model for type "${type}" is set both as subType and as params.${field}; set it once`);
+  }
+  return { ...params, [field]: subType };
+};
+
 interface FxOptions {
   slot: "fx1" | "fx2" | "fx3";
   type: string;
@@ -172,14 +202,11 @@ const fx = (patch: Patch, options: FxOptions): void => {
   block.on = on;
   block.type = type;
   block.subType = subType;
-  // For effects whose sub-model lives in param-block byte p[0] (not FX_COM byte[2]),
-  // the encoder reads it from params.type, not block.subType. Threading it through here
-  // lets callers set subType the same way for every effect.
-  const merged =
-    subType != null && PARAM_SUBTYPE_EFFECTS.has(type) && !("type" in params)
-      ? { ...params, type: subType }
-      : params;
   const keySpec: ParamKeySpec = { label: slot, type, fields: fxFieldMap(type, subType) };
+  // For these effects the sub-model lives in param-block byte p[0] (not FX_COM byte[2]), so the
+  // encoder reads it from params.type rather than from block.subType.
+  const field = PARAM_SUBTYPE_EFFECTS.has(type) ? "type" : undefined;
+  const merged = withSubType(params, { ...keySpec, subType, field });
   validateParamKeys(Object.keys(merged), keySpec);
   block.params = { ...defaultFxParams(type, subType), ...merged };
 };
@@ -257,13 +284,15 @@ const assignExtra = (
 
 interface PfxOptions {
   type: string;
+  subType?: string;
   params?: Record<string, unknown>;
   on?: boolean;
 }
 
-/** Sets the expression pedal effect: "WAH" (wahType/level/direct/position/min/max) or "PEDAL BEND" (pitchMin/pitchMax/position/level/direct). */
+/** Sets the expression pedal effect: "WAH" (subType picks the wah model, plus
+ *  level/direct/position/min/max) or "PEDAL BEND" (pitchMin/pitchMax/position/level/direct). */
 const pfx = (patch: Patch, options: PfxOptions): void => {
-  const { type, params = {}, on = true } = options;
+  const { type, subType, params = {}, on = true } = options;
   patch.pfx.on = on;
   patch.pfx.type = type;
   const typeSpec: BlockTypeSpec = {
@@ -272,7 +301,8 @@ const pfx = (patch: Patch, options: PfxOptions): void => {
     fields: PFX_TYPE_MAPS[type],
     defaults: DEFAULTS_BY_TYPE.pfx[type] ?? {},
   };
-  assignExtra(patch.pfx, params, typeSpec);
+  const merged = withSubType(params, { ...typeSpec, subType, field: PFX_SUBTYPE_FIELDS[type] });
+  assignExtra(patch.pfx, merged, typeSpec);
 };
 
 /**

@@ -40,6 +40,36 @@ describe("validateTypeParams", () => {
     expect(messages[0]).toContain("MOD RATE");
   });
 
+  // The one input the device cannot report back on: it encodes nowhere, so the patch saves clean
+  // and plays as the default. Naming the param that does carry the variant is the whole point of
+  // rejecting it here rather than leaving it to the builder.
+  it("rejects a subType on a type whose variant is an ordinary param, naming that param", () => {
+    const messages = collect(add => {
+      validateTypeParams(add, { group: "fx", type: "PHASER", subType: "4 STAGE", values: {} });
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0], "should point at the param that carries the variant").toContain("params.stage");
+    expect(messages[0], "and spell out its values").toContain("12 STAGE");
+  });
+
+  it("rejects a subType on a type with no variant at all", () => {
+    const messages = collect(add => {
+      validateTypeParams(add, { group: "pfx", type: "PEDAL BEND", subType: "CRY WAH", values: {} });
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("PEDAL BEND");
+  });
+
+  it("accepts a subType the item declares", () => {
+    const messages = collect(add => {
+      validateTypeParams(add, { group: "pfx", type: "WAH", subType: "CRY WAH", values: {} });
+    });
+
+    expect(messages).toEqual([]);
+  });
+
   it("passes valid numeric and discrete values", () => {
     const messages = collect(add => {
       validateTypeParams(add, {
