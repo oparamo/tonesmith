@@ -17,6 +17,19 @@ interface ParamSpec {
    */
   min?: number;
   max?: number;
+  /**
+   * Decimal places this param accepts, present only where it takes fractional values (reverb TIME
+   * runs 0.1-10.0 s). Absent means whole numbers only, which is the common case. A consumer
+   * building a schema needs this to know whether to reject 4.5: the bounds alone can't say, since
+   * a fractional param's own min and max are often whole numbers.
+   */
+  decimals?: number;
+  /**
+   * True when this param's value is a real boolean rather than a number or a string. Numeric params
+   * are recognizable by their `min`/`max` and discrete ones by their `values`, so without this flag
+   * a toggle is the one kind a consumer would have to identify by reading `range` as English.
+   */
+  boolean?: boolean;
   description: string;
   /**
    * For discrete lookup-valued params whose `range` is only a compact summary (e.g. the

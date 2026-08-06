@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1, capabilityUtils } from "@tonesmith/core";
-import type { CapabilityGroup } from "@tonesmith/core";
+import type { CapabilityGroup, CapabilityItem, ParamSpec } from "@tonesmith/core";
 import { connectClient } from "./helpers";
 import { describeParam } from "../src/devices/gx1/param-ref";
 
@@ -53,21 +53,8 @@ const GROUP_FIELDS: BoundedField[] = [
   { path: "fv.max", groupId: "fv", paramName: "MAX" },
 ];
 
-/**
- * Fields on per-type blocks, where one flat schema field serves every type and each type declares
- * its own range. These carry the union of those ranges, never one type's.
- */
-const SPANNING_FIELDS: BoundedField[] = [
-  { path: "delay.time", groupId: "delay", paramName: "TIME" },
-  { path: "delay.feedback", groupId: "delay", paramName: "FEEDBACK" },
-  { path: "delay.level", groupId: "delay", paramName: "LEVEL" },
-  { path: "reverb.time", groupId: "reverb", paramName: "TIME" },
-  { path: "reverb.level", groupId: "reverb", paramName: "LEVEL" },
-  { path: "reverb.preDelay", groupId: "reverb", paramName: "PRE-DELAY" },
-  { path: "reverb.tone", groupId: "reverb", paramName: "TONE" },
-  { path: "reverb.density", groupId: "reverb", paramName: "DENSITY" },
-  { path: "reverb.direct", groupId: "reverb", paramName: "DIRECT" },
-];
+/** Blocks that declare one schema per type, taken from the capability group of the same name. */
+const PER_TYPE_BLOCKS = ["pfx", "delay", "reverb"];
 
 const rangeFor = ({ groupId, paramName }: BoundedField): { min: number; max: number } => {
   const group = capabilityUtils.findGroup(gx1.driver.capabilities, groupId);
@@ -79,29 +66,16 @@ const rangeFor = ({ groupId, paramName }: BoundedField): { min: number; max: num
   return { min: param.min, max: param.max };
 };
 
-/** Each declaring type's range for a spanning field's param. Types not declaring it are absent. */
-const typeRangesFor = ({ groupId, paramName }: BoundedField): { min: number; max: number }[] =>
-  capabilityUtils.findGroup(gx1.driver.capabilities, groupId).items.flatMap(item => {
-    const param = item.params?.find(p => p.name === paramName);
-    if (param?.min === undefined || param.max === undefined) return [];
-    return [{ min: param.min, max: param.max }];
-  });
-
-const unionRangeFor = (field: BoundedField): { min: number; max: number } => {
-  const ranges = typeRangesFor(field);
-  if (ranges.length === 0) throw new Error(`No type declares a numeric "${field.paramName}" in "${field.groupId}"`);
-  return {
-    min: Math.min(...ranges.map(range => range.min)),
-    max: Math.max(...ranges.map(range => range.max)),
-  };
-};
-
 interface JsonSchemaNode {
+  type?: string;
+  const?: string;
+  enum?: string[];
   minimum?: number;
   maximum?: number;
   description?: string;
   properties?: Record<string, JsonSchemaNode>;
   items?: JsonSchemaNode;
+  oneOf?: JsonSchemaNode[];
 }
 
 /**
@@ -152,30 +126,10 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
     expect(overriding, `${field.groupId} types redeclare "${field.paramName}"`).toEqual([]);
   });
 
-  /**
-   * Bounding a flat field by one representative type rejected other types' valid values before the
-   * per-type check ever ran: reverb LEVEL 0 (SHIMMER, TERA ECHO), reverb TIME above 10 (SUB DELAY,
-   * whose range is 1-2000 ms), delay LEVEL 0 (SPACE ECHO, SHIMMER, WARP, TWIST) and delay TIME 0
-   * (GLITCH) were all unreachable. The union is the only bound that leaves every type's range
-   * reachable, and validateTypeParams still enforces the exact one.
-   */
-  it.each(SPANNING_FIELDS)("$path spans every type's range, not one representative type's", async (field) => {
-    const client = await connectClient();
-    close = client.close;
-    const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
-
-    const node = nodeAt(patchSpecNode(tool.inputSchema), field.path);
-    const { min, max } = unionRangeFor(field);
-
-    expect(node.minimum, `${field.path} should admit the lowest min any type declares`).toBe(min);
-    expect(node.maximum, `${field.path} should admit the highest max any type declares`).toBe(max);
-  });
-
   // The bound and the sentence beside it used to be able to disagree: zod enforced the catalog
   // while the text quoted whatever range someone last typed. Both now come from the ParamSpec, and
   // this is what keeps it that way. Field notes ("Defaults to 100.") are appended after the
-  // catalog text, so this checks containment rather than equality. Spanning fields are exempt:
-  // their span is a union in no single unit, so they state no range at all.
+  // catalog text, so this checks containment rather than equality.
   it.each(GROUP_FIELDS)("$path describes itself from the catalog, not from hand-typed text", async (field) => {
     const client = await connectClient();
     close = client.close;
@@ -186,6 +140,90 @@ describe("generate_gx1_patch schema/capabilities bounds drift guard", () => {
 
     expect(node.description, `${field.path} should reach the client described`).toBeDefined();
     expect(node.description).toContain(fromCatalog);
+  });
+});
+
+/**
+ * The schema node a caller fills in for one type: that type's own variant where the block declares
+ * one per type, or the block itself where a single schema serves every type (the fx slots).
+ */
+const nodeForType = (block: JsonSchemaNode, typeId: string): JsonSchemaNode | undefined => {
+  if (block.oneOf === undefined) return block;
+  return block.oneOf.find(variant => variant.properties?.type.const === typeId);
+};
+
+/** Every param a type accepts: its group's shared ones plus its own, keyed as the schema keys them. */
+const paramsForType = (group: CapabilityGroup, item: CapabilityItem): ParamSpec[] =>
+  [...(group.params ?? []), ...(item.params ?? [])].filter(spec => spec.key !== undefined);
+
+/** What one param's field should look like, read from the ParamSpec rather than restated. */
+const expectFieldMatchesSpec = (field: JsonSchemaNode | undefined, spec: ParamSpec, label: string): void => {
+  expect(field, `${label} should declare "${spec.key}"`).toBeDefined();
+  if (spec.boolean === true) {
+    expect(field?.type, `${label} "${spec.key}" should take a boolean`).toBe("boolean");
+    return;
+  }
+  if (spec.values !== undefined) {
+    expect(field?.enum, `${label} "${spec.key}" should list the catalog's values`).toEqual([...spec.values]);
+    return;
+  }
+  expect(field?.minimum, `${label} "${spec.key}" should carry this type's own min`).toBe(spec.min);
+  expect(field?.maximum, `${label} "${spec.key}" should carry this type's own max`).toBe(spec.max);
+};
+
+describe("generate_gx1_patch per-type variant drift guard", () => {
+  let close: () => Promise<void> = async () => { /* set per test */ };
+  afterEach(async () => { await close(); });
+
+  /**
+   * One flat field serving every type could only carry the union of their ranges, which put valid
+   * values out of reach until PR #42 widened them: reverb LEVEL 0 on SHIMMER, reverb TIME above 10
+   * on SUB DELAY, delay TIME 0 on GLITCH. A variant per type is what makes the declared bound the
+   * enforced one, and this is the guard that keeps each variant reading off its own ParamSpec.
+   */
+  it.each(PER_TYPE_BLOCKS)("%s declares one variant per type, carrying that type's own params", async (groupId) => {
+    const client = await connectClient();
+    close = client.close;
+    const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
+    const block = nodeAt(patchSpecNode(tool.inputSchema), groupId);
+    const group = capabilityUtils.findGroup(gx1.driver.capabilities, groupId);
+
+    for (const item of group.items) {
+      const variant = nodeForType(block, item.id);
+      expect(variant, `${groupId} should declare a variant for type "${item.id}"`).toBeDefined();
+
+      const params = paramsForType(group, item);
+      const declared = Object.keys(variant?.properties ?? {}).sort();
+      const hasSubTypes = item.subTypes !== undefined && item.subTypes.length > 0;
+      const subTypeField = hasSubTypes ? ["subType"] : [];
+      const expected = [...params.map(spec => spec.key ?? ""), "type", "on", ...subTypeField].sort();
+
+      expect(declared, `${groupId} ${item.id} should declare exactly its own params`).toEqual(expected);
+      for (const spec of params) {
+        expectFieldMatchesSpec(variant?.properties?.[spec.key ?? ""], spec, `${groupId} ${item.id}`);
+      }
+    }
+  });
+
+  // A variant states its bounds and leaves the prose to describe_device, which works while the key
+  // spells the control. It doesn't for the few the device labels differently: nothing in
+  // `spreadTime` says the panel reads S-TIME, and the parameter guide only ever says S-TIME.
+  it.each(PER_TYPE_BLOCKS)("%s glosses a field whose key doesn't spell the device's own label", async (groupId) => {
+    const client = await connectClient();
+    close = client.close;
+    const tool = await client.getToolSchema("generate_gx1_patch") as { inputSchema: JsonSchemaNode };
+    const block = nodeAt(patchSpecNode(tool.inputSchema), groupId);
+    const group = capabilityUtils.findGroup(gx1.driver.capabilities, groupId);
+
+    const normalize = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+    for (const item of group.items) {
+      const renamed = paramsForType(group, item).filter(spec => normalize(spec.name) !== normalize(spec.key ?? ""));
+      for (const spec of renamed) {
+        const field = nodeForType(block, item.id)?.properties?.[spec.key ?? ""];
+        expect(field?.description, `${groupId} ${item.id} "${spec.key}" should say the device calls it ${spec.name}`)
+          .toContain(spec.name);
+      }
+    }
   });
 });
 
@@ -217,23 +255,6 @@ describe("generate_gx1_patch schema/capabilities type-catalog drift guard", () =
     }
   });
 
-  // delay's flat `highCut` field names one representative type's values, which is only sound while
-  // every delay type shares the same table.
-  it("gives every delay type the same HIGH CUT values, so one representative type can speak for all", () => {
-    const delayGroup = capabilityUtils.findGroup(gx1.driver.capabilities, "delay");
-    const valuesFor = (typeId: string): string | undefined => {
-      const param = capabilityUtils.findItem(delayGroup, typeId).params?.find(spec => spec.name === "HIGH CUT");
-      return param?.values?.join(", ");
-    };
-    const representative = valuesFor("STANDARD");
-
-    expect(representative, "STANDARD should declare HIGH CUT values").toBeDefined();
-    for (const item of delayGroup.items) {
-      const values = valuesFor(item.id);
-      if (values === undefined) continue;
-      expect(values, `delay type "${item.id}" HIGH CUT values differ from STANDARD's`).toBe(representative);
-    }
-  });
 });
 
 /**
@@ -275,8 +296,13 @@ describe("generate_gx1_patch subType reachability drift guard", () => {
     for (const group of groupsDeclaringSubTypes()) {
       const blocks = GROUP_BLOCKS[group.id];
       expect(blocks, `group "${group.id}" declares subTypes but feeds no generate-schema block`).toBeDefined();
+      const withVariants = group.items.filter(item => item.subTypes !== undefined && item.subTypes.length > 0);
+
       for (const block of blocks ?? []) {
-        expect(nodeAt(spec, block).properties?.subType, `${block} must accept a subType`).toBeDefined();
+        for (const item of withVariants) {
+          const node = nodeForType(nodeAt(spec, block), item.id);
+          expect(node?.properties?.subType, `${block} must accept a subType for "${item.id}"`).toBeDefined();
+        }
       }
     }
   });

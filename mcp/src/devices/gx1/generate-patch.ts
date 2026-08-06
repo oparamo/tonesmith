@@ -3,10 +3,10 @@ import { z } from "zod";
 import { gx1, patchUtils, patchView } from "@tonesmith/core";
 const { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain, DEFAULT_CHAIN } = gx1;
 import { ok, err } from "../../common";
-import { FxBlockSchema, ON_FIELD_DESCRIPTION, SUB_TYPE_DESCRIPTION, bypassable, issueReporter } from "./schemas";
-import { boundedInt, describeParam, spanningInt, spanningNumber } from "./param-ref";
+import { FxBlockSchema, ON_FIELD_DESCRIPTION, blockSchema, bypassable, perTypeBlockDescription } from "./schemas";
+import { perTypeBlock, blockParams } from "./per-type-block";
+import { boundedInt, describeParam } from "./param-ref";
 import { capabilityItemIds, capabilityParamValues } from "./capability-text";
-import { validateTypeParams } from "./validate-params";
 
 const patchSpecSchema = z.strictObject({
   name: z.string().max(13).describe("Patch name (max 13 characters)"),
@@ -22,7 +22,7 @@ const patchSpecSchema = z.strictObject({
     "Song key for HARMONIST's diatonic intervals: C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B (default C)"
   ),
 
-  amp: z.strictObject({
+  amp: blockSchema("amp", {
     type: z.string().describe(`Amplifier model: ${capabilityItemIds("amp")}`),
     gain: boundedInt({ group: "amp", param: "GAIN" }),
     bass: boundedInt({ group: "amp", param: "BASS" }),
@@ -36,7 +36,7 @@ const patchSpecSchema = z.strictObject({
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   }).describe("Amplifier block (required)"),
 
-  odds: bypassable(z.strictObject({
+  odds: bypassable(blockSchema("odds", {
     type: z.string().describe(`OD/DS pedal type: ${capabilityItemIds("odds")}`),
     drive: boundedInt({ group: "odds", param: "DRIVE" }),
     tone: boundedInt({ group: "odds", param: "TONE" }),
@@ -47,78 +47,29 @@ const patchSpecSchema = z.strictObject({
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
   })).describe("Overdrive/distortion block. Omit to leave it off."),
 
-  pfx: bypassable(z.strictObject({
-    type: z.string().describe(`Pedal FX type: ${capabilityItemIds("pfx")}`),
-    subType: z.string().optional().describe(SUB_TYPE_DESCRIPTION),
-    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
-      "Type-specific params (e.g. { level: 100, direct: 0, position: 100, min: 0, max: 100 } for WAH; " +
-      "{ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 } for PEDAL BEND)"
-    ),
-    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
-  }).superRefine((pfxBlock, ctx) => {
-    validateTypeParams(issueReporter(ctx), {
-      group: "pfx", type: pfxBlock.type, subType: pfxBlock.subType, values: pfxBlock.params ?? {},
-    });
-  })).describe("Expression pedal effect block. Omit to leave it off."),
+  pfx: bypassable(perTypeBlock("pfx")).describe(perTypeBlockDescription("Expression pedal effect block.")),
 
   fx1: bypassable(FxBlockSchema).describe("FX1 slot (pre-amp or first in chain). Omit to leave empty."),
   fx2: bypassable(FxBlockSchema).describe("FX2 slot. Omit to leave empty."),
   fx3: bypassable(FxBlockSchema).describe("FX3 slot. Omit to leave empty."),
 
-  ns: bypassable(z.strictObject({
+  ns: bypassable(blockSchema("ns", {
     threshold: boundedInt({ group: "ns", param: "THRESHOLD" }),
     release: boundedInt({ group: "ns", param: "RELEASE" }),
     on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
     detect: z.string().optional().describe(`Detection point (default INPUT): ${capabilityParamValues({ group: "ns", param: "DETECT" })}`),
   })).describe("Noise suppressor. Omit to leave it off."),
 
-  fv: z.strictObject({
+  fv: blockSchema("fv", {
     position: boundedInt({ group: "fv", param: "POSITION" }),
     min: boundedInt({ group: "fv", param: "MIN" }),
     max: boundedInt({ group: "fv", param: "MAX" }),
     curve: z.string().optional().describe(`Response curve (default NORMAL): ${capabilityParamValues({ group: "fv", param: "CURVE" })}`),
   }).optional().describe("Foot volume block. Omit to use defaults."),
 
-  delay: bypassable(z.strictObject({
-    type: z.string().describe(`Delay type (${capabilityItemIds("delay")})`),
-    time: spanningNumber({ group: "delay", param: "TIME", description: "Delay time, or the length of the effect sound for GLITCH." }).optional(),
-    feedback: spanningInt({ group: "delay", param: "FEEDBACK", description: "Number of delay repeats." }).optional(),
-    level: spanningInt({ group: "delay", param: "LEVEL", description: "Volume of the delay sound." }).optional(),
-    highCut: z.string().optional().describe(`High-cut freq, exact string: ${capabilityParamValues({ group: "delay", param: "HIGH CUT", type: "STANDARD" })}`),
-    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
-    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
-      "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
-      "describe_device (e.g. modRate/modDepth for MODULATE, head for SPACE ECHO)."
-    ),
-  }).superRefine((delayBlock, ctx) => {
-    const values = {
-      time: delayBlock.time, feedback: delayBlock.feedback, level: delayBlock.level,
-      highCut: delayBlock.highCut, ...(delayBlock.params ?? {}),
-    };
-    validateTypeParams(issueReporter(ctx), { group: "delay", type: delayBlock.type, values });
-  })).describe("Delay block. Omit to leave it off."),
+  delay: bypassable(perTypeBlock("delay")).describe(perTypeBlockDescription("Delay block.")),
 
-  reverb: bypassable(z.strictObject({
-    type: z.string().describe(`Reverb type (${capabilityItemIds("reverb")})`),
-    time: spanningNumber({ group: "reverb", param: "TIME", description: "Reverb decay time, or delay time for SUB DELAY." }).optional(),
-    level: spanningInt({ group: "reverb", param: "LEVEL", description: "Volume of the reverb sound." }).optional(),
-    preDelay: spanningNumber({ group: "reverb", param: "PRE-DELAY", description: "Time until the reverb sound starts." }).optional(),
-    tone: spanningInt({ group: "reverb", param: "TONE", description: "Tonal character of the reverb." }).optional(),
-    density: spanningInt({ group: "reverb", param: "DENSITY", description: "Density of the reverb sound." }).optional(),
-    direct: spanningInt({ group: "reverb", param: "DIRECT", description: "Volume of the direct sound." }).optional(),
-    on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
-    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
-      "Type-specific params beyond the named controls above, keyed by each param's `key` from " +
-      "describe_device (e.g. pitch/pitchLevel for SHIMMER, feedback/highCut for SUB DELAY)."
-    ),
-  }).superRefine((reverbBlock, ctx) => {
-    const values = {
-      time: reverbBlock.time, level: reverbBlock.level, preDelay: reverbBlock.preDelay,
-      tone: reverbBlock.tone, density: reverbBlock.density, direct: reverbBlock.direct,
-      ...(reverbBlock.params ?? {}),
-    };
-    validateTypeParams(issueReporter(ctx), { group: "reverb", type: reverbBlock.type, values });
-  })).describe("Reverb block. Omit to leave it off."),
+  reverb: bypassable(perTypeBlock("reverb")).describe(perTypeBlockDescription("Reverb block.")),
 });
 
 const inputSchema = z.strictObject({
@@ -159,14 +110,30 @@ const buildPatch = (spec: PatchSpec): Patch => {
 
   amp(patch, spec.amp);
   if (spec.odds) odds(patch, spec.odds);
-  if (spec.pfx) pfx(patch, spec.pfx);
+  if (spec.pfx) {
+    pfx(patch, { type: spec.pfx.type, subType: spec.pfx.subType, on: spec.pfx.on, params: blockParams(spec.pfx) });
+  }
   applyFxSlots(patch, spec);
   if (spec.ns) ns(patch, spec.ns);
   if (spec.fv) fv(patch, spec.fv);
-  if (spec.delay) delay(patch, spec.delay);
-  if (spec.reverb) reverb(patch, spec.reverb);
+  if (spec.delay) delay(patch, { type: spec.delay.type, on: spec.delay.on, params: blockParams(spec.delay) });
+  if (spec.reverb) reverb(patch, { type: spec.reverb.type, on: spec.reverb.on, params: blockParams(spec.reverb) });
   return patch;
 };
+
+/**
+ * Builds every patch, naming which one failed. A rejection out of a batch of eight otherwise says
+ * only which block was wrong, and the same block is present in all eight.
+ */
+const buildAll = (specs: PatchSpec[]): Patch[] =>
+  specs.map((spec, index) => {
+    try {
+      return buildPatch(spec);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`patches[${index}] "${spec.name}": ${reason}`);
+    }
+  });
 
 /**
  * The patch as the file holds it, rather than as the builder assembled it.
@@ -205,17 +172,18 @@ order with the blocks you want moved. Every block appears exactly once; a partia
 A block's position says nothing about whether it is on. "OD" is shorthand for "OD/DS". See
 describe_device items: ["chain"] for the full rule.
 
-Setting parameters: if a describe_device param's \`key\` matches a named field on the block, set
-that field; otherwise put it in the block's \`params\` record under that key. Unset params take the
-device's factory default for the chosen type, and the patch echoed back is the complete resulting
-state.
+Setting parameters: pfx, delay and reverb take their params as fields on the block, and which
+fields those are follows from \`type\`, so the schema for the type you pick lists exactly them. The
+fx slots are the exception: one slot takes any of 39 effects, so its params go in a \`params\`
+record keyed by each param's \`key\` from describe_device. Unset params take the device's factory
+default for the chosen type, and the patch echoed back is the complete resulting state.
 
 Type ids and value ranges for every block come from describe_device.`,
       inputSchema,
     },
     (params) => {
       try {
-        const built = params.patches.map(buildPatch);
+        const built = buildAll(params.patches);
 
         const namesBefore = existingPatchNames(params.outPath);
         const alreadySaved = new Set(namesBefore ?? []);

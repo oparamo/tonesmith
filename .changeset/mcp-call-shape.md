@@ -37,15 +37,21 @@ dot-paths. `amp.mid` is `amp.middle`, and `delay.timeMs` and `reverb.timeS` are 
 `reverb.time`, with the units documented in each field's description rather than carried in the
 field name.
 
-**One uniform params bag.** Every per-type block (fx, pfx, delay, reverb) takes its type-specific
-params in a `params` record keyed by each param's `key`; delay and reverb's bag used to be called
-`extra`. The rule is one line: if a `describe_device` param's `key` matches a named field on the
-block, set that field, otherwise put it in `params[key]`. Passing a named control inside `params`
-errors instead of silently overriding the field. These records accept strings and booleans as well
-as numbers, which they did not: the many GX-1 params that select a model or mode by name (pedal
-WAH's `wahType`, TOUCH WAH's `filter`, SLICER's `pattern`, HARMONIST's `harmony`, delay TWIST's
-`mode`, SPACE ECHO's `head`) are `lookup()`-encoded strings in the codec, and a
-`z.record(z.string(), z.number())` schema could never build a working patch with any of them.
+**Params go where the decoded patch keeps them.** `pfx`, `delay` and `reverb` take their params as
+fields on the block, which is how `read_patch` returns them and how `write_fields` addresses them by
+dot-path. The schema is one variant per type, so the fields it offers for the type you picked are
+exactly the ones that type has, carrying that type's own bounds and value lists. An fx slot keeps a
+`params` record keyed by each param's `key`, because one slot takes any of 39 effects and a variant
+per type and subtype would cost roughly 35 KB of tool schema on every request, against a
+`describe_device` lookup paid once. Both shapes take strings and booleans as well as numbers, which
+they did not: the many GX-1 params that select a model or mode by name (TOUCH WAH's `filter`,
+SLICER's `pattern`, HARMONIST's `harmony`, delay TWIST's `mode`, SPACE ECHO's `head`) are
+`lookup()`-encoded strings in the codec, and a `z.record(z.string(), z.number())` schema could never
+build a working patch with any of them. A key the chosen type has no field for is rejected with the
+shape that type does take, printed with `type` filled in, so nesting is shown rather than described.
+
+Pedal WAH's model is chosen by `subType`, alongside the fx slots and the way capabilities advertises
+it, rather than through the codec's `wahType` field.
 
 The server advertises onboarding `instructions` at initialize, delivered automatically to every
 client: a device-agnostic account of how many calls the work should take and which shapes get you

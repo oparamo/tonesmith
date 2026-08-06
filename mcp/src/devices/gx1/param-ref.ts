@@ -5,13 +5,10 @@ import type { ParamSpec } from "@tonesmith/core";
 const capabilities = gx1.driver.capabilities;
 
 /**
- * Points at one param in the gx1 capability catalog.
- *
- * `type` names one type within a per-type block (delay/reverb), for the value sets a flat schema
- * field states on behalf of every type; omit it for single-shape blocks (amp/odds/ns/fv). Numeric
- * bounds no longer work this way, since one type cannot speak for the others' ranges: see
- * `SpanRef`. `note` carries builder behavior the catalog has no opinion on, such as what an omitted
- * field defaults to.
+ * Points at one param in the gx1 capability catalog, for the hand-written fields of the blocks
+ * whose params don't vary by type (amp/odds/ns/fv). A per-type block reads its params through
+ * `variantField` instead, which takes the ParamSpec itself. `note` carries builder behavior the
+ * catalog has no opinion on, such as what an omitted field defaults to.
  */
 interface ParamRef {
   group: string;
@@ -19,24 +16,6 @@ interface ParamRef {
   type?: string;
   note?: string;
 }
-
-/**
- * Points at one param that a single flat schema field has to serve for every type in a group.
- *
- * delay and reverb expose their common controls as named fields, but each type declares its own
- * version of them, so there is no single ParamSpec to read. `description` is written here rather
- * than taken from the catalog because the per-type prose genuinely differs (reverb TIME is a decay
- * time for the halls and a delay time for SUB DELAY) and no catalog entry describes the union.
- */
-interface SpanRef {
-  group: string;
-  param: string;
-  description: string;
-  note?: string;
-}
-
-/** Which param a span covers. The prose a `SpanRef` adds has no bearing on the bounds. */
-type SpanTarget = Pick<SpanRef, "group" | "param">;
 
 /** Where a ref points, for error messages: `group "amp"`, or `delay type "STANDARD"`. */
 const refLabel = ({ group, type }: ParamRef): string =>
@@ -103,55 +82,87 @@ const applyBounds = (base: z.ZodNumber, bounds: { min: number; max: number }, de
 const boundedInt = (ref: ParamRef): z.ZodNumber =>
   applyBounds(z.number().int(), boundsFor(ref), describeParam(ref));
 
-/** Every ParamSpec declaring `param`, across all of a group's types, in item order. */
-const specsAcrossTypes = (ref: SpanTarget): ParamSpec[] =>
-  capabilityUtils.findGroup(capabilities, ref.group).items
-    .flatMap(item => item.params?.filter(spec => spec.name === ref.param) ?? []);
-
-/** The numeric bounds among a set of specs, dropping the enum and boolean ones that have none. */
-const numericBounds = (specs: ParamSpec[]): { min: number; max: number }[] =>
-  specs.flatMap(spec => (spec.min === undefined || spec.max === undefined ? [] : [{ min: spec.min, max: spec.max }]));
+/**
+ * The device's own label for a param, stated only where the property key doesn't already spell it.
+ * `preDelay` needs no gloss for PRE-DELAY, but nothing in `spreadTime` says the device calls that
+ * knob S-TIME, and the parameter guide an agent may have read uses the label.
+ */
+const labelGloss = (spec: ParamSpec): string | undefined => {
+  const normalize = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (spec.key === undefined || normalize(spec.name) === normalize(spec.key)) return undefined;
+  return spec.name;
+};
 
 /**
- * Bounds wide enough for every type that declares the param.
+ * The catalog's range string, stated only where it says more than `minimum`/`maximum` already do.
+ * That is the unit and the BPM option: 1-2000 reads as milliseconds only once something says so,
+ * while a bare 0-100 needs no gloss at all.
+ */
+const rangeGloss = (spec: ParamSpec): string | undefined => {
+  if (spec.min === undefined || spec.max === undefined) return undefined;
+  // The catalog signs the upper bound of a range that crosses zero ("-50-+50"), so the comparison
+  // has to sign it too or every bipolar param keeps a description restating its own bounds.
+  const bounds = spec.min < 0 && spec.max > 0 ? `${spec.min}-+${spec.max}` : `${spec.min}-${spec.max}`;
+  if (spec.range === bounds) return undefined;
+  return spec.range;
+};
+
+/**
+ * What a per-type variant says about a param, beyond the bounds it declares.
  *
- * Bounding by one representative type is what made valid values unreachable: zod rejected them
- * before `validateTypeParams` ran its per-type check, so SHIMMER reverb could not take LEVEL 0 and
- * SUB DELAY could not take a TIME above 10, which is nearly its whole 1-2000 ms range. The span is
- * only an outer sanity gate. The chosen type's real range is still enforced, and it is the one that
- * produces the error a caller reads.
+ * Kept to the unit and the device's own label, both of which the schema can't express otherwise.
+ * The full sentence stays in describe_device: prose here is serialized into every variant of every
+ * request, and the same param is declared by as many as nine types.
  */
-const spanFor = (ref: SpanTarget): { min: number; max: number } => {
-  const bounds = numericBounds(specsAcrossTypes(ref));
-  if (bounds.length === 0) {
-    throw new Error(`No numeric ParamSpec "${ref.param}" on any "${ref.group}" type`);
-  }
-  return {
-    min: Math.min(...bounds.map(bound => bound.min)),
-    max: Math.max(...bounds.map(bound => bound.max)),
-  };
+const variantDescription = (spec: ParamSpec): string | undefined => {
+  const parts = [labelGloss(spec), rangeGloss(spec)].filter(part => part !== undefined);
+  if (parts.length === 0) return undefined;
+  return parts.join(" ");
 };
 
 /**
- * Every spanning field says this instead of a range. The span it enforces is the union across
- * types, which is the wrong number to quote at a caller: reverb TIME spans 0.1 (seconds, halls) to
- * 2000 (milliseconds, SUB DELAY), a range in no single unit that no type actually accepts.
+ * The schema for one catalog param, built from that param's own domain.
+ *
+ * `boolean` and `values` identify the non-numeric kinds; a numeric param takes `.int()` unless the
+ * catalog gave it `decimals`, since its bounds alone can't say whether 4.5 is legal (reverb TIME
+ * runs 0.1-10.0 but PRE-DELAY's 0-200 is whole milliseconds).
  */
-const PER_TYPE_RANGE_CLAUSE = "Exact range and unit depend on `type`; see describe_device.";
-
-const describeSpan = (ref: SpanRef): string =>
-  [ref.description, PER_TYPE_RANGE_CLAUSE, ref.note].filter(part => part !== undefined).join(" ");
-
-/** A span-bounded floating-point number, for a flat field serving every type in a group. */
-const spanningNumber = (ref: SpanRef): z.ZodNumber =>
-  applyBounds(z.number(), spanFor(ref), describeSpan(ref));
-
-/** A span-bounded integer, `.int()` applied before the bounds so both survive to JSON schema. */
-const spanningInt = (ref: SpanRef): z.ZodNumber =>
-  applyBounds(z.number().int(), spanFor(ref), describeSpan(ref));
-
-export {
-  boundedInt, boundsFor, paramFor, describeParam, refLabel,
-  spanningNumber, spanningInt, spanFor,
+const buildParamField = (spec: ParamSpec): z.ZodType => {
+  if (spec.boolean === true) return z.boolean();
+  if (spec.values !== undefined) return z.enum([...spec.values]);
+  if (spec.min === undefined || spec.max === undefined) return z.string();
+  const base = spec.decimals === undefined ? z.number().int() : z.number();
+  return base.min(spec.min).max(spec.max);
 };
-export type { ParamRef, SpanRef };
+
+/**
+ * What makes two params the same field. Identical params are authored once in the catalog and
+ * copied per type (`DLY_TIME` serves nine delay types), but each type's copy is a fresh object, so
+ * only a value signature lets the schemas below be shared instances. That sharing is what lets zod
+ * emit one `$defs` entry per distinct field rather than repeating it in every variant.
+ */
+const fieldSignature = (spec: ParamSpec): string =>
+  JSON.stringify([spec.key, spec.min, spec.max, spec.decimals, spec.boolean, spec.values, variantDescription(spec)]);
+
+const fieldsBySignature = new Map<string, z.ZodType>();
+
+/**
+ * A catalog param as one field of a per-type variant, shared with every type declaring the same
+ * param. Always optional: an unset param takes the chosen type's factory default.
+ */
+const variantField = (spec: ParamSpec): z.ZodType => {
+  const signature = fieldSignature(spec);
+  const shared = fieldsBySignature.get(signature);
+  if (shared !== undefined) return shared;
+
+  const description = variantDescription(spec);
+  const base = buildParamField(spec);
+  const described = description === undefined ? base : base.describe(description);
+
+  const field = described.optional();
+  fieldsBySignature.set(signature, field);
+  return field;
+};
+
+export { boundedInt, boundsFor, paramFor, describeParam, refLabel, variantField };
+export type { ParamRef };

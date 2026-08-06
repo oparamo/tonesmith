@@ -13,10 +13,10 @@ DENSITY or DIRECT. `DelayOptions` required `time`, `feedback` and `level` anyway
 it does not have, which encode then dropped without a word. The same fields were required on
 `generate_gx1_patch`.
 
-**Breaking:** every named control on both blocks is optional, and passing one the chosen type has
-no field for is rejected, naming the keys that type does take. Passing the same control both as a
-named option and in the `params` record is rejected too, rather than one of the two values silently
-winning.
+**Breaking:** every control on both blocks is optional, and passing one the chosen type has no field
+for is rejected, showing the shape that type does take. Builder callers can still pass a control
+both as a named option and in the `params` record, which is rejected rather than letting one of the
+two values silently win.
 
 **Breaking:** an unset control now takes the chosen type's factory default, the rule the `params`
 record already followed, instead of a value hardcoded in the builder. Two of those hardcoded values

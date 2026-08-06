@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validateTypeParams } from "./validate-params";
+import { unrecognizedKeyError } from "./block-errors";
 import { capabilityItemIds } from "./capability-text";
 
 /** Every selectable FX1/FX2/FX3 effect type, sourced from gx1 capabilities so this can't drift from constants.ts. */
@@ -10,22 +11,39 @@ const issueReporter = (ctx: z.RefinementCtx): ((message: string) => void) =>
   message => { ctx.addIssue(message); };
 
 /**
- * The `on` field description shared by every bypassable block. Deliberately terse: this string is
- * serialized into the generate schema once per block on every call, so what bypassing actually
- * means (that it preserves the params passed with it, and that leaving the block's spec out is the
- * other way to leave it off) is explained once in the chain view rather than repeated here.
+ * What bypassing actually means (that it preserves the params passed with it, and that leaving the
+ * block's spec out is the other way to leave it off) is explained once in the chain view. Every
+ * mention of bypass in this schema points there rather than restating it: these strings are
+ * serialized on every call, and there are a dozen places that would otherwise say it.
  */
-const ON_FIELD_DESCRIPTION =
-  "Active by default; set false to bypass the block. See describe_device chain for what bypass keeps.";
+const BYPASS_REFERENCE = "See describe_device chain for what bypass keeps.";
+
+/** The `on` field description, for the blocks that declare one schema apiece. */
+const ON_FIELD_DESCRIPTION = `Active by default; set false to bypass the block. ${BYPASS_REFERENCE}`;
 
 /**
- * The `subType` field description shared by every block that has one. Written for both because the
- * rule is the device's, not one block's: a variant is a `subType` only where capabilities lists it
- * as one, and everywhere else it is a param.
+ * A per-type block's own description, carrying the bypass note its variants leave out. A block with
+ * eleven types would otherwise serialize that note eleven times, for one field meaning the same
+ * thing in each.
+ */
+const perTypeBlockDescription = (summary: string): string =>
+  `${summary} Omit to leave it off, or set on: false to bypass it. ${BYPASS_REFERENCE}`;
+
+/**
+ * The `subType` field description, needed only by the fx slots. Every other block declares its
+ * variants per type, so its schema lists the valid ones outright; an fx slot takes one field for
+ * all 39 types and has to state the rule instead.
  */
 const SUB_TYPE_DESCRIPTION =
   "The variant to use, for types whose describe_device entry lists `subTypes`. A type with no such " +
   "list rejects this field, and any variant it does have is an ordinary entry in `params`.";
+
+/**
+ * A block schema that answers a rejected key with the shape it does accept. `group` names the block
+ * for the message; the accepted fields come from `shape` itself, so the two can't disagree.
+ */
+const blockSchema = <T extends z.core.$ZodLooseShape>(group: string, shape: T): z.ZodObject<T, z.core.$strict> =>
+  z.strictObject(shape, { error: unrecognizedKeyError(group, Object.keys(shape)) });
 
 /** True when a block spec carries nothing but `on: false`: this block is off, with no settings. */
 const isBareBypass = (value: unknown): boolean => {
@@ -47,7 +65,10 @@ const bypassable = <T extends z.ZodType>(block: T): z.ZodType<z.output<T> | unde
     block.optional()
   );
 
-const FxBlockSchema = z.strictObject({
+// The one block that keeps a `params` record. Its 39 types across 98 type/subType combinations
+// would cost roughly 35 KB as per-type variants, paid on every request, against per-type validation
+// that already runs at parse time and a describe_device lookup paid once.
+const FxBlockSchema = blockSchema("fx", {
   type: z.string().describe(`Effect type. One of: ${fxTypeIds}. (OVERTONE is FX3-only.)`),
   subType: z.string().optional().describe(SUB_TYPE_DESCRIPTION),
   on: z.boolean().optional().describe(ON_FIELD_DESCRIPTION),
@@ -62,4 +83,12 @@ const FxBlockSchema = z.strictObject({
   });
 });
 
-export { FxBlockSchema, ON_FIELD_DESCRIPTION, SUB_TYPE_DESCRIPTION, bypassable, isBareBypass, issueReporter };
+export {
+  FxBlockSchema,
+  ON_FIELD_DESCRIPTION,
+  blockSchema,
+  bypassable,
+  isBareBypass,
+  issueReporter,
+  perTypeBlockDescription,
+};

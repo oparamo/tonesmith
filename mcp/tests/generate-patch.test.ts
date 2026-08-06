@@ -86,8 +86,7 @@ describe("generate_gx1_patch", () => {
       outPath,
       amp: AMP,
       reverb: {
-        type: "TERA ECHO", level: 60, direct: 100,
-        params: { spreadTime: 50, feedback: 40, trigger: false },
+        type: "TERA ECHO", level: 60, direct: 100, spreadTime: 50, feedback: 40, trigger: false,
       },
     };
 
@@ -176,7 +175,7 @@ describe("generate_gx1_patch", () => {
       key: "G",
       amp: { type: "JC-120", gain: 60, bass: 55, middle: 45, treble: 50 },
       odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
-      pfx: { type: "PEDAL BEND", params: { pitchMin: 0, pitchMax: 12, position: 100, level: 100, direct: 0 } },
+      pfx: { type: "PEDAL BEND", pitchMin: 0, pitchMax: 12, position: 100, level: 100, direct: 0 },
       fx1: { type: "COMPRESSOR", subType: "D-COMP", params: { sustain: 30, attack: 30, level: 70 } },
       ns: { threshold: 45, release: 30 },
       fv: { position: 100, min: 0, max: 100 },
@@ -245,7 +244,7 @@ describe("generate_gx1_patch", () => {
       name: "Explicit Off",
       outPath,
       amp: AMP,
-      pfx: { type: "WAH", on: false, params: { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 } },
+      pfx: { type: "WAH", on: false, subType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 },
       fx1: { type: "COMPRESSOR", subType: "D-COMP", on: false, params: { sustain: 30, attack: 30, level: 70 } },
     };
 
@@ -323,7 +322,9 @@ describe("generate_gx1_patch", () => {
     expect(isError).toBe(true);
   });
 
-  it("builds a pedal WAH whose model is selected by a string params.wahType", async () => {
+  // The wah model reaches the codec's `wahType` field, but it is advertised as one of WAH's
+  // subTypes, so subType is what selects it: the same field, spelled the way capabilities spells it.
+  it("builds a pedal WAH whose model is selected by subType", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "pedal-wah.tsl");
     const client = await connectClient();
@@ -332,7 +333,7 @@ describe("generate_gx1_patch", () => {
       name: "Pedal Wah",
       outPath,
       amp: AMP,
-      pfx: { type: "WAH", params: { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 } },
+      pfx: { type: "WAH", subType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
@@ -445,7 +446,7 @@ describe("generate_gx1_patch", () => {
     expect(patch.fx1.params.harmony).toBe("+3rd");
   });
 
-  it("builds a TWIST delay whose mode is selected by a string params.mode", async () => {
+  it("builds a TWIST delay whose mode is selected by a string field", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "twist.tsl");
     const client = await connectClient();
@@ -454,10 +455,9 @@ describe("generate_gx1_patch", () => {
       name: "Twist Delay",
       outPath,
       amp: AMP,
-      // TWIST has no TIME or FEEDBACK; LEVEL is the only named control it does have.
+      // TWIST declares neither TIME nor FEEDBACK, so its variant has no field for either.
       delay: {
-        type: "TWIST", level: 25,
-        params: { mode: "RISE-FADE", riseTime: 10, fallTime: 10, fadeTime: 10 },
+        type: "TWIST", level: 25, mode: "RISE-FADE", riseTime: 10, fallTime: 10, fadeTime: 10,
       },
     };
 
@@ -469,7 +469,7 @@ describe("generate_gx1_patch", () => {
     expect(patch.delay.mode).toBe("RISE-FADE");
   });
 
-  it("builds a SPACE ECHO delay whose head is selected by a string params.head", async () => {
+  it("builds a SPACE ECHO delay whose head is selected by a string field", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "space-echo.tsl");
     const client = await connectClient();
@@ -478,7 +478,7 @@ describe("generate_gx1_patch", () => {
       name: "Space Echo",
       outPath,
       amp: AMP,
-      delay: { type: "SPACE ECHO", time: 500, feedback: 20, level: 25, params: { head: "1+2" } },
+      delay: { type: "SPACE ECHO", time: 500, feedback: 20, level: 25, head: "1+2" },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
@@ -650,10 +650,12 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const base = { name: "Dly", outPath: join(temp.dir, "dly.tsl"), amp: AMP };
 
-    // ANALOG's TIME max is 1200ms (narrower than the flat 2000 schema bound).
+    // ANALOG's TIME max is 1200 ms, against STANDARD's 2000: the bound quoted back proves the
+    // chosen type's variant judged it, not some wider bound covering every type.
     const overMax = await client.callTool("generate_gx1_patch", single({ ...base, delay: { type: "ANALOG", time: 1201, feedback: 20, level: 40 } }));
     expect(overMax.isError).toBe(true);
-    expect(overMax.text).toContain("delay TIME for ANALOG");
+    expect(overMax.text).toContain("patches.0.delay.time");
+    expect(overMax.text).toContain("1200");
 
     const atMax = await client.callTool("generate_gx1_patch", single({ ...base, delay: { type: "ANALOG", time: 1200, feedback: 20, level: 40 } }));
     expect(atMax.isError, atMax.text).toBe(false);
@@ -672,24 +674,24 @@ describe("generate_gx1_patch", () => {
 
     // SHIMMER's reverb LEVEL starts at 0, the halls' at 1.
     const shimmer = await client.callTool("generate_gx1_patch", single({
-      ...base, name: "Shim", reverb: { type: "SHIMMER", time: 4, level: 0, params: { pitch: 12, pitchLevel: 50 } },
+      ...base, name: "Shim", reverb: { type: "SHIMMER", time: 4, level: 0, pitch: 12, pitchLevel: 50 },
     }));
     expect(shimmer.isError, shimmer.text).toBe(false);
 
     // SUB DELAY's TIME is 1-2000 ms, against the halls' 0.1-10 s.
     const subDelay = await client.callTool("generate_gx1_patch", single({
-      ...base, name: "Sub", reverb: { type: "SUB DELAY", time: 400, level: 110, params: { feedback: 30, highCut: "4kHz" } },
+      ...base, name: "Sub", reverb: { type: "SUB DELAY", time: 400, level: 110, feedback: 30, highCut: "4kHz" },
     }));
     expect(subDelay.isError, subDelay.text).toBe(false);
 
     // GLITCH's TIME is 0-100. It has no FEEDBACK or LEVEL at all.
     const glitch = await client.callTool("generate_gx1_patch", single({
-      ...base, name: "Glitch", delay: { type: "GLITCH", time: 0, params: { glitch: 60, balance: 50, trigger: false } },
+      ...base, name: "Glitch", delay: { type: "GLITCH", time: 0, glitch: 60, balance: 50, trigger: false },
     }));
     expect(glitch.isError, glitch.text).toBe(false);
 
     const spaceEcho = await client.callTool("generate_gx1_patch", single({
-      ...base, name: "Space", delay: { type: "SPACE ECHO", time: 400, feedback: 30, level: 0, params: { head: "1+2" } },
+      ...base, name: "Space", delay: { type: "SPACE ECHO", time: 400, feedback: 30, level: 0, head: "1+2" },
     }));
     expect(spaceEcho.isError, spaceEcho.text).toBe(false);
   });
@@ -725,7 +727,10 @@ describe("generate_gx1_patch", () => {
     const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
 
     expect(isError).toBe(true);
-    expect(text).toContain("delay HIGH CUT for ANALOG");
+    expect(text).toContain("patches.0.delay.highCut");
+    // The rejection enumerates what the field does take, so the caller can pick one.
+    expect(text).toContain("6.3kHz");
+    expect(text).toContain("FLAT");
   });
 
   it("rejects a reverb control outside the chosen type's range", async () => {
@@ -742,7 +747,9 @@ describe("generate_gx1_patch", () => {
     const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
 
     expect(isError).toBe(true);
-    expect(text).toContain("reverb DENSITY for HALL M");
+    expect(text).toContain("patches.0.reverb.density");
+    // HALL M's DENSITY runs 1-10, so 20 is out even though other reverb params reach 100.
+    expect(text).toContain("10");
   });
 
   it("rejects a pfx param outside the chosen type's range", async () => {
@@ -753,13 +760,14 @@ describe("generate_gx1_patch", () => {
       name: "Wah",
       outPath: join(temp.dir, "wah-bad.tsl"),
       amp: AMP,
-      pfx: { type: "WAH", params: { wahType: "CRY WAH", level: 200, direct: 0, position: 100, min: 0, max: 100 } },
+      pfx: { type: "WAH", subType: "CRY WAH", level: 200, direct: 0, position: 100, min: 0, max: 100 },
     };
 
     const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
 
     expect(isError).toBe(true);
-    expect(text).toContain("pfx LEVEL for WAH");
+    expect(text).toContain("patches.0.pfx.level");
+    expect(text).toContain("100");
   });
 
   // A variant sent through a field the effect doesn't have is the one bad input that used to
@@ -845,6 +853,147 @@ describe("generate_gx1_patch", () => {
 
     expect(isError).toBe(true);
     expect(text).toContain("tempo");
+  });
+
+  // The decoded patch carries a per-type param flat on the block, which is the shape read_patch
+  // returns and generate echoes back, so a caller mirroring what it just read sends it flat too.
+  // That used to be rejected. Now it is the accepted shape, and this is the round trip proving it.
+  it("takes a type-specific param as a field on the block and encodes it", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "shimmer.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Shimmer",
+      outPath,
+      amp: AMP,
+      reverb: { type: "SHIMMER", time: 4, tone: -3, preDelay: 25, level: 55, pitch: 12, pitchLevel: 45 },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError, text).toBe(false);
+    const { reverb } = gx1.driver.readFile(outPath).patches[0];
+    expect(reverb.pitch).toBe(12);
+    expect(reverb.pitchLevel).toBe(45);
+  });
+
+  it("rejects a field belonging to a different type of the same block, naming the chosen type's own", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    // `pitch` is SHIMMER's, not HALL M's.
+    const patchSpec = {
+      name: "Hall",
+      outPath: join(temp.dir, "wrong-type-field.tsl"),
+      amp: AMP,
+      reverb: { type: "HALL M", time: 2.4, level: 40, pitch: 12 },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text).toContain("pitch");
+    expect(text, "should print the shape HALL M does take").toContain("density");
+    expect(text).toContain("HALL M");
+  });
+
+  it("rejects an unknown type, naming the ones the block has", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Nope",
+      outPath: join(temp.dir, "unknown-type.tsl"),
+      amp: AMP,
+      delay: { type: "WOBBLE", time: 400 },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    for (const typeId of ["STANDARD", "SPACE ECHO", "GLITCH"]) expect(text).toContain(typeId);
+  });
+
+  // An unknown subType on a type that has them used to reach the codec's lookup and come back as
+  // `Unknown type value: "wobble"`, naming neither the block, nor the field, nor the valid values.
+  it("rejects an unknown subType on a type that has subTypes, naming the valid ones", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Comp",
+      outPath: join(temp.dir, "unknown-subtype.tsl"),
+      amp: AMP,
+      fx1: { type: "COMPRESSOR", subType: "WOBBLE", params: { sustain: 30 } },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text).toContain("WOBBLE");
+    expect(text).toContain("COMPRESSOR");
+    expect(text, "should list the variants the type does have").toContain("ORANGE");
+  });
+
+  // Flattening the other blocks makes the fx slots the odd ones out, so the likely mistake inverts:
+  // a caller sends an fx param as a field by analogy with delay or reverb.
+  it("names params as the destination for an fx param sent at the block level", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Phase",
+      outPath: join(temp.dir, "fx-flat.tsl"),
+      amp: AMP,
+      fx1: { type: "SCRIPT PH", rate: 40, depth: 60 },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text).toContain("rate");
+    expect(text).toContain("depth");
+    expect(text, "should print the type it was sent, not a generic outline").toContain("SCRIPT PH");
+    expect(text, "should name where those params belong").toContain("params");
+  });
+
+  it("names a single-shape block's own fields for a key it doesn't have, with no params to offer", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const patchSpec = {
+      name: "Amp",
+      outPath: join(temp.dir, "amp-stray.tsl"),
+      amp: { ...AMP, presence: 40 },
+    };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+
+    expect(isError).toBe(true);
+    expect(text).toContain("presence");
+    expect(text).toContain("treble");
+    expect(text, "amp has no params record to redirect anything into").not.toContain("params: {");
+  });
+
+  // A batch is one call, and the same block is present in every patch of it, so a rejection that
+  // names only the block leaves eight candidates.
+  it("names which patch of a batch a builder rejection came from", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "batch.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const good = { name: "Good", amp: AMP };
+    const bad = { name: "Bad One", amp: AMP, fx1: { type: "SCRIPT PH", params: { wobble: 3 } } };
+
+    const { isError, text } = await client.callTool("generate_gx1_patch", {
+      outPath, patches: [good, bad],
+    });
+
+    expect(isError).toBe(true);
+    expect(text).toContain("Bad One");
+    expect(text).toContain("wobble");
+    expect(existsSync(outPath), "one bad patch leaves the whole batch unwritten").toBe(false);
   });
 
   // Bare { on: false } and omitting a block both mean "off at factory defaults", so the bytes must

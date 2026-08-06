@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { boundsFor, boundedInt, describeParam, paramFor, spanFor, spanningInt, spanningNumber } from "../src/devices/gx1/param-ref";
+import { boundsFor, boundedInt, describeParam, paramFor, variantField } from "../src/devices/gx1/param-ref";
 
 describe("boundsFor", () => {
   it("reads a group-level param's numeric bounds off its ParamSpec", () => {
@@ -30,42 +30,48 @@ describe("boundsFor", () => {
   });
 });
 
-describe("spanFor", () => {
-  // Written out as literals because these are the exact values a representative-type bound made
-  // unreachable: reverb LEVEL 0 belongs to SHIMMER and TERA ECHO and 120 to SUB DELAY, whose TIME
-  // also runs to 2000 ms while the halls' runs to 10 s, and delay LEVEL 0 belongs to SPACE ECHO,
-  // SHIMMER, WARP and TWIST.
-  it("spans every type's range for a param the types disagree about", () => {
-    expect(spanFor({ group: "reverb", param: "LEVEL" })).toEqual({ min: 0, max: 120 });
-    expect(spanFor({ group: "reverb", param: "TIME" })).toEqual({ min: 0.1, max: 2000 });
-    expect(spanFor({ group: "delay", param: "LEVEL" })).toEqual({ min: 0, max: 120 });
+describe("variantField", () => {
+  // One field serving every type could only carry the union of their ranges, so the bound a caller
+  // read was never the bound that type enforced. These two types disagree about LEVEL by one, and
+  // that one value is what a per-type field is for.
+  it("bounds a param by the type declaring it, not by the widest type in the group", () => {
+    const hall = variantField(paramFor({ group: "reverb", param: "LEVEL", type: "HALL S" }));
+    const shimmer = variantField(paramFor({ group: "reverb", param: "LEVEL", type: "SHIMMER" }));
+
+    expect(hall.safeParse(0).success).toBe(false);
+    expect(shimmer.safeParse(0).success).toBe(true);
   });
 
-  it("throws when no type declares the param with numeric bounds", () => {
-    const lookup = (): { min: number; max: number } => spanFor({ group: "reverb", param: "NOPE" });
+  it("takes a fraction only where the catalog gives the param decimals", () => {
+    const decayTime = variantField(paramFor({ group: "reverb", param: "TIME", type: "HALL S" }));
+    const delayTime = variantField(paramFor({ group: "delay", param: "TIME", type: "STANDARD" }));
 
-    expect(lookup).toThrow(/NOPE/);
-  });
-});
-
-describe("spanningInt / spanningNumber", () => {
-  // The point of the span: a value only one type accepts still reaches validateTypeParams, which
-  // is the only check that knows which type was chosen.
-  it("admits a value that only one of the group's types allows", () => {
-    const level = spanningInt({ group: "reverb", param: "LEVEL", description: "Volume." });
-    const time = spanningNumber({ group: "reverb", param: "TIME", description: "Decay." });
-
-    expect(level.safeParse(0).success).toBe(true);
-    expect(level.safeParse(120).success).toBe(true);
-    expect(time.safeParse(2000).success).toBe(true);
+    expect(decayTime.safeParse(4.5).success).toBe(true);
+    expect(decayTime.safeParse(11).success).toBe(false);
+    expect(delayTime.safeParse(400.5).success).toBe(false);
   });
 
-  it("still rejects what no type allows, and non-integers on an int field", () => {
-    const level = spanningInt({ group: "reverb", param: "LEVEL", description: "Volume." });
+  it("takes only the catalog's values for a discrete param", () => {
+    const highCut = variantField(paramFor({ group: "delay", param: "HIGH CUT", type: "STANDARD" }));
 
-    expect(level.safeParse(-1).success).toBe(false);
-    expect(level.safeParse(121).success).toBe(false);
-    expect(level.safeParse(50.5).success).toBe(false);
+    expect(highCut.safeParse("FLAT").success).toBe(true);
+    expect(highCut.safeParse("9kHz").success).toBe(false);
+  });
+
+  it("takes a real boolean for a toggle param, not the string spelling of one", () => {
+    const trigger = variantField(paramFor({ group: "delay", param: "TRIGGER", type: "REVERSE" }));
+
+    expect(trigger.safeParse(true).success).toBe(true);
+    expect(trigger.safeParse("true").success).toBe(false);
+  });
+
+  // Nine delay types declare the same TIME. Sharing one schema between them is what keeps the
+  // emitted JSON schema from growing a fresh copy per type.
+  it("hands one schema instance to every type declaring the same param", () => {
+    const standard = variantField(paramFor({ group: "delay", param: "TIME", type: "STANDARD" }));
+    const pan = variantField(paramFor({ group: "delay", param: "TIME", type: "PAN" }));
+
+    expect(pan).toBe(standard);
   });
 });
 

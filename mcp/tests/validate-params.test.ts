@@ -62,6 +62,19 @@ describe("validateTypeParams", () => {
     expect(messages[0]).toContain("PEDAL BEND");
   });
 
+  // Only the "declares none" case used to be caught, so a wrong value on a type that does have
+  // variants fell through to the codec's lookup and came back as `Unknown type value: "WOBBLE"`,
+  // naming neither the block, nor the field, nor what it could have been.
+  it("rejects a subType the item doesn't declare, listing the ones it does", () => {
+    const messages = collect(add => {
+      validateTypeParams(add, { group: "fx", type: "COMPRESSOR", subType: "WOBBLE", values: {} });
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("WOBBLE");
+    expect(messages[0], "should list the variants the type does have").toContain("ORANGE");
+  });
+
   it("accepts a subType the item declares", () => {
     const messages = collect(add => {
       validateTypeParams(add, { group: "pfx", type: "WAH", subType: "CRY WAH", values: {} });

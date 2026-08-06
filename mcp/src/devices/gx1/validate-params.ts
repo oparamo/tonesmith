@@ -32,6 +32,10 @@ const resolveSelection = (group: string, type: string): Selection | undefined =>
   }
 };
 
+/** Variant ids are matched case-insensitively, the one place a caller's casing is forgiven. */
+const matchesSubType = (candidate: CapabilityItem, subType: string): boolean =>
+  candidate.id.toUpperCase() === subType.toUpperCase();
+
 /**
  * The ParamSpecs in effect for a selection: the group's shared params, the chosen item's params,
  * and, when a subType is given and carries its own, that subType's params (e.g. a DELAY
@@ -42,7 +46,7 @@ const specsForType = (selection: Selection, subType?: string): ParamSpec[] => {
   const specs = [...(capGroup.params ?? []), ...(item.params ?? [])];
   const matchedSubType = subType === undefined
     ? undefined
-    : item.subTypes?.find(candidate => candidate.id.toUpperCase() === subType.toUpperCase());
+    : item.subTypes?.find(candidate => matchesSubType(candidate, subType));
   if (matchedSubType?.params) specs.push(...matchedSubType.params);
   return specs;
 };
@@ -67,14 +71,21 @@ const subTypeAlternative = (item: CapabilityItem): string => {
 };
 
 /**
- * Rejects a subType on an item that declares none. The device holds a variant selection in one of
- * two places and only one of them is `subType`, so this value would encode nowhere: the patch saves
- * clean, plays as the default, and nothing in the response says the selection was dropped.
+ * Rejects a subType the chosen type can't take, whether because it declares none or because this
+ * isn't one of them. Either way the value would encode nowhere: the patch saves clean, plays as the
+ * default, and nothing in the response says the selection was dropped. An unlisted variant is worse
+ * than a missing one, since the codec's own rejection names only the value it couldn't look up.
  */
 const checkSubType = (addIssue: AddIssue, check: SubTypeCheck): void => {
   const { group, type, item, subType } = check;
-  if (item.subTypes !== undefined && item.subTypes.length > 0) return;
-  addIssue(`${group} ${type} takes no subType (got "${subType}"): ${subTypeAlternative(item)}`);
+  const variants = item.subTypes ?? [];
+  if (variants.length === 0) {
+    addIssue(`${group} ${type} takes no subType (got "${subType}"): ${subTypeAlternative(item)}`);
+    return;
+  }
+  if (variants.some(candidate => matchesSubType(candidate, subType))) return;
+  const valid = variants.map(candidate => candidate.id).join(", ");
+  addIssue(`${group} ${type} has no subType "${subType}". Valid subTypes: ${valid}`);
 };
 
 /** One param's value alongside the spec and selection it is checked against. */
@@ -121,5 +132,38 @@ const validateTypeParams = (addIssue: AddIssue, params: TypeParams): void => {
   }
 };
 
-export { validateTypeParams };
-export type { TypeParams };
+/** A block's selection as an error map finds it: read off input that already failed validation. */
+interface Selected {
+  group: string;
+  type?: unknown;
+  subType?: unknown;
+}
+
+/** What one type accepts: the params it takes, and the variants it offers, if any. */
+interface TypeSurface {
+  paramKeys: string[];
+  subTypes: string[];
+}
+
+/**
+ * The input surface of the chosen type, or undefined when nothing resolves it.
+ *
+ * Tolerant of anything in `type` and `subType`, because its callers hold unvalidated input: a
+ * message deciding whether a rejected key was a real param in the wrong place, and one deciding
+ * which fields are worth offering back. Not resolving is different from resolving to nothing, so
+ * an unknown type is undefined here rather than an empty surface.
+ */
+const typeSurface = (selected: Selected): TypeSurface | undefined => {
+  if (typeof selected.type !== "string") return undefined;
+  const selection = resolveSelection(selected.group, selected.type);
+  if (selection === undefined) return undefined;
+
+  const subType = typeof selected.subType === "string" ? selected.subType : undefined;
+  return {
+    paramKeys: specsForType(selection, subType).flatMap(spec => (spec.key === undefined ? [] : [spec.key])),
+    subTypes: (selection.item.subTypes ?? []).map(variant => variant.id),
+  };
+};
+
+export { validateTypeParams, typeSurface };
+export type { TypeParams, TypeSurface };
