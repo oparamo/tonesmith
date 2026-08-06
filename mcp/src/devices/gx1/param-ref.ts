@@ -136,32 +136,18 @@ const buildParamField = (spec: ParamSpec): z.ZodType => {
 };
 
 /**
- * What makes two params the same field. Identical params are authored once in the catalog and
- * copied per type (`DLY_TIME` serves nine delay types), but each type's copy is a fresh object, so
- * only a value signature lets the schemas below be shared instances. That sharing is what lets zod
- * emit one `$defs` entry per distinct field rather than repeating it in every variant.
- */
-const fieldSignature = (spec: ParamSpec): string =>
-  JSON.stringify([spec.key, spec.min, spec.max, spec.decimals, spec.boolean, spec.values, variantDescription(spec)]);
-
-const fieldsBySignature = new Map<string, z.ZodType>();
-
-/**
- * A catalog param as one field of a per-type variant, shared with every type declaring the same
- * param. Always optional: an unset param takes the chosen type's factory default.
+ * A catalog param as one field of a per-type variant. Always optional: an unset param takes the
+ * chosen type's factory default.
+ *
+ * Params identical across types (`DLY_TIME` serves nine delay types) are not shared instances.
+ * Sharing them would only pay off if zod hoisted a reused schema into `$defs`, and it inlines
+ * instead: `reused` defaults to `"inline"`, and the SDK doesn't override it.
  */
 const variantField = (spec: ParamSpec): z.ZodType => {
-  const signature = fieldSignature(spec);
-  const shared = fieldsBySignature.get(signature);
-  if (shared !== undefined) return shared;
-
   const description = variantDescription(spec);
   const base = buildParamField(spec);
   const described = description === undefined ? base : base.describe(description);
-
-  const field = described.optional();
-  fieldsBySignature.set(signature, field);
-  return field;
+  return described.optional();
 };
 
 export { boundedInt, boundsFor, paramFor, describeParam, refLabel, variantField };

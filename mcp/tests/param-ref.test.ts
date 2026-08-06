@@ -64,15 +64,6 @@ describe("variantField", () => {
     expect(trigger.safeParse(true).success).toBe(true);
     expect(trigger.safeParse("true").success).toBe(false);
   });
-
-  // Nine delay types declare the same TIME. Sharing one schema between them is what keeps the
-  // emitted JSON schema from growing a fresh copy per type.
-  it("hands one schema instance to every type declaring the same param", () => {
-    const standard = variantField(paramFor({ group: "delay", param: "TIME", type: "STANDARD" }));
-    const pan = variantField(paramFor({ group: "delay", param: "TIME", type: "PAN" }));
-
-    expect(pan).toBe(standard);
-  });
 });
 
 describe("boundedInt", () => {
