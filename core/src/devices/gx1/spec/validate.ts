@@ -8,7 +8,8 @@ type Issues = string[];
 /** What the caller selected and supplied for one block. */
 interface TypeParams {
   group: string;
-  type: string;
+  /** Absent for a block whose group offers no types to choose between, such as NS and FV. */
+  type?: string;
   subType?: string;
   values: Record<string, unknown>;
 }
@@ -16,18 +17,40 @@ interface TypeParams {
 /** A block's selection resolved against capabilities: its group, and the item its `type` names. */
 interface Selection {
   capGroup: CapabilityGroup;
-  item: CapabilityItem;
+  /** Absent for a group with no types, where the group's shared params are the whole surface. */
+  item?: CapabilityItem;
 }
 
-/** Resolves a block's group and type, or undefined for either miss, leaving the "unknown type"
- *  error to the builder/codec (whose message lists the valid ids) rather than raising here. */
-const resolveSelection = (group: string, type: string): Selection | undefined => {
+const groupOrUndefined = (id: string): CapabilityGroup | undefined => {
   try {
-    const capGroup = findGroup(gx1Capabilities, group);
-    return { capGroup, item: findItem(capGroup, type) };
+    return findGroup(gx1Capabilities, id);
   } catch {
     return undefined;
   }
+};
+
+const itemOrUndefined = (group: CapabilityGroup, id: string): CapabilityItem | undefined => {
+  try {
+    return findItem(group, id);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Resolves a block's group and type, or undefined for either miss. Tolerant of anything in `type`,
+ * because its callers hold unvalidated input; a caller that needs the miss reported names the valid
+ * ids itself rather than having this raise.
+ */
+const resolveSelection = (group: string, type?: unknown): Selection | undefined => {
+  const capGroup = groupOrUndefined(group);
+  if (capGroup === undefined) return undefined;
+  if (capGroup.items.length === 0) return { capGroup };
+  if (typeof type !== "string") return undefined;
+
+  const item = itemOrUndefined(capGroup, type);
+  if (item === undefined) return undefined;
+  return { capGroup, item };
 };
 
 /** Variant ids are matched case-insensitively, the one place a caller's casing is forgiven. */
@@ -41,10 +64,10 @@ const matchesSubType = (candidate: CapabilityItem, subType: string): boolean =>
  */
 const specsForType = (selection: Selection, subType?: string): ParamSpec[] => {
   const { capGroup, item } = selection;
-  const specs = [...(capGroup.params ?? []), ...(item.params ?? [])];
+  const specs = [...(capGroup.params ?? []), ...(item?.params ?? [])];
   const matchedSubType = subType === undefined
     ? undefined
-    : item.subTypes?.find(candidate => matchesSubType(candidate, subType));
+    : item?.subTypes?.find(candidate => matchesSubType(candidate, subType));
   if (matchedSubType?.params) specs.push(...matchedSubType.params);
   return specs;
 };
@@ -89,22 +112,59 @@ const checkSubType = (issues: Issues, check: SubTypeCheck): void => {
 /** One param's value alongside the spec and selection it is checked against. */
 interface ParamCheck {
   group: string;
-  type: string;
+  type?: string;
   spec: ParamSpec;
   value: unknown;
 }
 
-/** Range-checks a numeric value or enum-membership-checks a string value against one spec. */
+/** How a message names the param, dropping the type clause for a block that has no types. */
+const paramLabel = (check: ParamCheck): string => {
+  const named = `${check.group} ${check.spec.name}`;
+  const label = check.type === undefined ? named : `${named} for ${check.type}`;
+  return label;
+};
+
+/**
+ * What kind of value a spec takes, or undefined where its domain names no kind to check against.
+ * `boolean` and `values` each identify a kind outright; bounds identify a number but not whether a
+ * fraction is legal, which is what `decimals` settles.
+ */
+const expectedKind = (spec: ParamSpec): string | undefined => {
+  if (spec.boolean === true) return "true or false";
+  if (spec.values !== undefined) return `one of: ${spec.values.join(", ")}`;
+  if (spec.min === undefined || spec.max === undefined) return undefined;
+  const numeric = spec.decimals === undefined ? "a whole number" : "a number";
+  return numeric;
+};
+
+/** True when the value is the kind this spec takes at all, before asking whether it is in range. */
+const isRightKind = (spec: ParamSpec, value: unknown): boolean => {
+  if (spec.boolean === true) return typeof value === "boolean";
+  if (spec.values !== undefined) return typeof value === "string";
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  return spec.decimals !== undefined || Number.isInteger(value);
+};
+
+/**
+ * Checks one value against one spec: that it is the kind the param takes, then that it is in range
+ * or a member of the value list. The kind check leads because a value of the wrong kind passes both
+ * of the others by falling through them, which is how a string threshold used to reach the codec.
+ */
 const checkValue = (issues: Issues, check: ParamCheck): void => {
-  const { group, type, spec, value } = check;
+  const { spec, value } = check;
+  const kind = expectedKind(spec);
+  if (kind !== undefined && !isRightKind(spec, value)) {
+    issues.push(`${paramLabel(check)} takes ${kind} (got ${JSON.stringify(value)})`);
+    return;
+  }
   if (typeof value === "number" && spec.min !== undefined && spec.max !== undefined) {
     if (value < spec.min || value > spec.max) {
-      issues.push(`${group} ${spec.name} for ${type} must be ${spec.min}–${spec.max} (got ${value})`);
+      issues.push(`${paramLabel(check)} must be ${spec.min}–${spec.max} (got ${value})`);
     }
     return;
   }
   if (typeof value === "string" && spec.values !== undefined && !spec.values.includes(value)) {
-    issues.push(`${group} ${spec.name} for ${type} must be one of: ${spec.values.join(", ")} (got "${value}")`);
+    issues.push(`${paramLabel(check)} must be one of: ${spec.values.join(", ")} (got "${value}")`);
   }
 };
 
@@ -121,7 +181,10 @@ const validateTypeParams = (params: TypeParams): Issues => {
   const issues: Issues = [];
   const selection = resolveSelection(group, type);
   if (selection === undefined) return issues;
-  if (subType !== undefined) checkSubType(issues, { group, type, item: selection.item, subType });
+  // A subType on a block with no types at all is an unrecognized key, already reported as one.
+  if (subType !== undefined && type !== undefined && selection.item !== undefined) {
+    checkSubType(issues, { group, type, item: selection.item, subType });
+  }
 
   const specs = specsForType(selection, subType);
   const byKey = new Map(specs.flatMap(spec => (spec.key === undefined ? [] : [[spec.key, spec] as const])));
@@ -154,14 +217,13 @@ interface TypeSurface {
  * an unknown type is undefined here rather than an empty surface.
  */
 const typeSurface = (selected: Selected): TypeSurface | undefined => {
-  if (typeof selected.type !== "string") return undefined;
   const selection = resolveSelection(selected.group, selected.type);
   if (selection === undefined) return undefined;
 
   const subType = typeof selected.subType === "string" ? selected.subType : undefined;
   return {
     paramKeys: specsForType(selection, subType).flatMap(spec => (spec.key === undefined ? [] : [spec.key])),
-    subTypes: (selection.item.subTypes ?? []).map(variant => variant.id),
+    subTypes: (selection.item?.subTypes ?? []).map(variant => variant.id),
   };
 };
 

@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validateTypeParams } from "../../../../src/devices/gx1/spec/validate";
+import { validatePatchSpec } from "../../../../src/devices/gx1/spec/build";
+import { gx1Capabilities } from "../../../../src/devices/gx1/capabilities";
 
 describe("validateTypeParams", () => {
   it("reports nothing for an unknown group or type (defers to the builder/codec)", () => {
@@ -77,5 +79,96 @@ describe("validateTypeParams", () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toContain("delay HIGH CUT for ANALOG");
+  });
+});
+
+describe("validatePatchSpec", () => {
+  const amp = { type: "TWIN", gain: 20, bass: 50, middle: 50, treble: 50 };
+  const valid = { name: "Test", amp };
+
+  it("accepts a minimal usable spec", () => {
+    expect(validatePatchSpec(valid)).toEqual([]);
+  });
+
+  it("names the unknown block and lists the real ones", () => {
+    const [issue] = validatePatchSpec({ ...valid, revrb: { type: "HALL S" } });
+
+    expect(issue).toContain("revrb");
+    expect(issue).toContain("reverb");
+  });
+
+  it("rejects a name longer than the device can store", () => {
+    const tooLong = "x".repeat(gx1Capabilities.patchName.maxLength + 1);
+
+    expect(validatePatchSpec({ ...valid, name: tooLong })).not.toEqual([]);
+  });
+
+  it("requires an amp block, which every patch sounds through", () => {
+    expect(validatePatchSpec({ name: "Test" })).not.toEqual([]);
+  });
+
+  it("rejects a value of the wrong kind, naming the param", () => {
+    const [issue] = validatePatchSpec({ ...valid, ns: { threshold: "loud", release: 40 } });
+
+    expect(issue).toContain("THRESHOLD");
+    expect(issue, "should quote back what it was given").toContain("loud");
+  });
+
+  it("rejects a fraction for a param the catalog gives no decimals", () => {
+    const spec = { ...valid, delay: { type: "STANDARD", time: 400.5 } };
+
+    expect(validatePatchSpec(spec)).not.toEqual([]);
+  });
+
+  it("accepts a fraction where the catalog gives decimals", () => {
+    const spec = { ...valid, reverb: { type: "HALL S", time: 4.5 } };
+
+    expect(validatePatchSpec(spec)).toEqual([]);
+  });
+
+  it("rejects a block that names no type, listing the types it has", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { time: 4 } });
+
+    expect(issue).toContain("HALL S");
+  });
+
+  // Without this the type is left unresolved, so every param the caller sent alongside it reads as
+  // an unknown key and nothing in the response says the type was the problem.
+  it("rejects a type the block doesn't have, listing the ones it does", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "HALL XL", time: 4 } });
+
+    expect(issue).toContain("HALL XL");
+    expect(issue).toContain("HALL S");
+  });
+
+  // The builder fills unset params from the device's factory defaults, but only for the blocks whose
+  // params are per-type. These four have no such table, so an omitted control reaches the codec as
+  // undefined and fails there naming nothing.
+  it("rejects a block missing a control it gives no default for", () => {
+    const [issue] = validatePatchSpec({ name: "Test", amp: { type: "TWIN", gain: 20 } });
+
+    expect(issue).toContain("bass");
+    expect(issue).toContain("middle");
+    expect(issue).toContain("treble");
+  });
+
+  it("rejects a control the chosen type has no field for", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "TERA ECHO", time: 4, level: 50 } });
+
+    expect(issue).toContain("time");
+  });
+
+  it("names a flat fx param as a param of its type rather than an unknown key", () => {
+    const spec = { ...valid, fx1: { type: "CHORUS", rate: 16 } };
+    const [issue] = validatePatchSpec(spec);
+
+    expect(issue).toContain("rate");
+    expect(issue, "should say where it belongs").toContain("params");
+  });
+
+  it("reports every problem it finds rather than stopping at the first", () => {
+    const spec = { ...valid, reverb: { type: "HALL S", time: 99, tone: 999 } };
+
+    expect(validatePatchSpec(spec)).toHaveLength(2);
   });
 });
