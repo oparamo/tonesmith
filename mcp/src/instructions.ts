@@ -19,11 +19,12 @@ Building patches takes two calls, however many patches you are building:
    you need, e.g. ["chain", "amp", "ns", "fx/COMPRESSOR", "delay/ANALOG", "reverb/HALL M"]. "chain"
    returns the device's block order and how bypass works; each other entry returns that item's params
    with their exact key, range, and allowed values. Work the full list out first, rather than one
-   call per effect.
-2. generate_<device>_patch takes every patch in the \`patches\` array, in the order you want them
-   on the device, with one output path. The response echoes each patch complete with defaults filled
-   in and its resolved chain, so that response IS your confirmation: you do not need to read the
-   file back to check the write.
+   call per effect. This is the only source for a device's blocks, types and params; no tool schema
+   repeats them.
+2. generate_patch takes every patch in the \`patches\` array, in the order you want them on the
+   device, with one output path. The response echoes each patch complete with defaults filled in and
+   its resolved chain, so that response IS your confirmation: you do not need to read the file back
+   to check the write.
 
 list_devices enumerates device ids when you don't already have one. read_patch and write_fields are
 for files that already exist: inspecting a patch you did not just create, or amending one by
@@ -31,9 +32,9 @@ dot-path.
 
 Two tools cover the rest of the file handling. copy_patch moves a patch into a slot in another file,
 replacing what was there. create_patch_file starts an empty file of blank patches at the device's
-factory defaults. Neither is part of building a patch from parameters: generate_<device>_patch
-creates and appends to its own output file, so reach for these only when the goal really is
-duplicating an existing patch or opening an empty file.
+factory defaults. Neither is part of building a patch from parameters: generate_patch creates and
+appends to its own output file, so reach for these only when the goal really is duplicating an
+existing patch or opening an empty file.
 
 These tools are the complete interface. Everything you need is here: device knowledge, patch
 building, saving, and editing. No shell, file editing, or outside tooling is involved at any

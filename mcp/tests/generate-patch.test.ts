@@ -12,13 +12,13 @@ interface SavedPatch {
 }
 
 /**
- * Wraps one flat patch spec in the tool's `{ outPath, patches: [...] }` shape. Most cases here
+ * Wraps one flat patch spec in the tool's `{ device, outPath, patches: [...] }` shape. Most cases here
  * exercise a single patch's build/validation rules; the multi-patch behavior of `patches` has its
  * own dedicated cases below.
  */
 const single = (spec: Record<string, unknown> & { outPath: string }): Record<string, unknown> => {
   const { outPath, setName, ...patch } = spec;
-  const input: Record<string, unknown> = { outPath, patches: [patch] };
+  const input: Record<string, unknown> = { device: "gx1", outPath, patches: [patch] };
   if (setName !== undefined) input.setName = setName;
   return input;
 };
@@ -29,7 +29,7 @@ const savedPatches = (text: string): SavedPatch[] =>
 
 const AMP = { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 };
 
-describe("generate_gx1_patch", () => {
+describe("generate_patch", () => {
   let close: () => Promise<void>;
   let temp: ReturnType<typeof emptyTempDir>;
   afterEach(async () => { await close(); temp.cleanup(); });
@@ -41,7 +41,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Minimal", outPath, amp: AMP };
 
-    const { isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -57,7 +57,7 @@ describe("generate_gx1_patch", () => {
     const chain = gx1.moveBefore(gx1.DEFAULT_CHAIN, "OD/DS", "FX1");
     const patchSpec = { name: "Echo", outPath, chain, amp: AMP };
 
-    const { text, isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { text, isError } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const [saved] = savedPatches(text);
@@ -90,7 +90,7 @@ describe("generate_gx1_patch", () => {
       },
     };
 
-    const { text, isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { text, isError } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const [saved] = savedPatches(text);
@@ -109,6 +109,7 @@ describe("generate_gx1_patch", () => {
     const client = await connectClient();
     close = client.close;
     const input = {
+      device: "gx1",
       outPath,
       setName: "Album",
       patches: [
@@ -118,7 +119,7 @@ describe("generate_gx1_patch", () => {
       ],
     };
 
-    const { text, isError } = await client.callTool("generate_gx1_patch", input);
+    const { text, isError } = await client.callTool("generate_patch", input);
 
     expect(isError, text).toBe(false);
     const file = gx1.driver.readFile(outPath);
@@ -133,17 +134,18 @@ describe("generate_gx1_patch", () => {
     const outPath = join(temp.dir, "mixed.tsl");
     const client = await connectClient();
     close = client.close;
-    const seed = { outPath, patches: [{ name: "Lead", amp: AMP }] };
-    await client.callTool("generate_gx1_patch", seed);
+    const seed = { device: "gx1", outPath, patches: [{ name: "Lead", amp: AMP }] };
+    await client.callTool("generate_patch", seed);
 
     const input = {
+      device: "gx1",
       outPath,
       patches: [
         { name: "Lead", amp: { ...AMP, gain: 90 } },
         { name: "Rhythm", amp: AMP },
       ],
     };
-    const { text, isError } = await client.callTool("generate_gx1_patch", input);
+    const { text, isError } = await client.callTool("generate_patch", input);
 
     expect(isError, text).toBe(false);
     const actions = savedPatches(text).map(saved => `${saved.name.trim()}:${saved.action}`);
@@ -157,11 +159,27 @@ describe("generate_gx1_patch", () => {
     temp = emptyTempDir();
     const client = await connectClient();
     close = client.close;
-    const input = { outPath: join(temp.dir, "none.tsl"), patches: [] };
+    const input = { device: "gx1", outPath: join(temp.dir, "none.tsl"), patches: [] };
 
-    const { isError } = await client.callTool("generate_gx1_patch", input);
+    const { isError } = await client.callTool("generate_patch", input);
 
     expect(isError).toBe(true);
+  });
+
+  it("rejects an unknown device, naming the ones it has, without writing anything", async () => {
+    temp = emptyTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const outPath = join(temp.dir, "unknown.tsl");
+
+    const { isError, text } = await client.callTool("generate_patch", {
+      device: "zz9", outPath, patches: [{ name: "A", amp: AMP }],
+    });
+
+    expect(isError).toBe(true);
+    expect(text).toContain("zz9");
+    expect(text).toContain("gx1");
+    expect(existsSync(outPath)).toBe(false);
   });
 
   it("round-trips a full patch with every optional block", async () => {
@@ -183,7 +201,7 @@ describe("generate_gx1_patch", () => {
       reverb: { type: "HALL S", time: 2.4, level: 20 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -214,7 +232,7 @@ describe("generate_gx1_patch", () => {
       odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
     };
 
-    await client.callTool("generate_gx1_patch", single(patchSpec));
+    await client.callTool("generate_patch", single(patchSpec));
 
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.chain).toContain("OD/DS");
@@ -227,7 +245,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Omitted", outPath, amp: AMP };
 
-    await client.callTool("generate_gx1_patch", single(patchSpec));
+    await client.callTool("generate_patch", single(patchSpec));
 
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.odds.on).toBe(false);
@@ -248,7 +266,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "COMPRESSOR", subType: "D-COMP", on: false, params: { sustain: 30, attack: 30, level: 70 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -268,7 +286,7 @@ describe("generate_gx1_patch", () => {
       odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70, on: false },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -286,7 +304,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Pfx No Params", outPath, amp: AMP, pfx: { type: "WAH" } };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -305,7 +323,7 @@ describe("generate_gx1_patch", () => {
       amp: { type: "NOT-A-REAL-AMP", gain: 50, bass: 50, middle: 50, treble: 50 },
     };
 
-    const { isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
   });
@@ -317,7 +335,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Bad FX", outPath, amp: AMP, fx1: { type: "NOT-A-REAL-EFFECT" } };
 
-    const { isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
   });
@@ -336,7 +354,7 @@ describe("generate_gx1_patch", () => {
       pfx: { type: "WAH", subType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -356,7 +374,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "FIXED WAH", subType: "CRY WAH", params: { level: 100, direct: 0, manual: 50 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -376,7 +394,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "DELAY", subType: "MODULATE", params: { time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 12, modDepth: 18 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -397,7 +415,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "REVERB", subType: "HALL M", params: { time: 2.5, level: 40 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -418,7 +436,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "SLICER", params: { pattern: "PATTERN 3", rate: 50, level: 70, attack: 30, duty: 50, direct: 0 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -438,7 +456,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "HARMONIST", params: { harmony: "+3rd", preDelay: 0, level: 70, feedback: 0, direct: 100 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -461,7 +479,7 @@ describe("generate_gx1_patch", () => {
       },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -481,7 +499,7 @@ describe("generate_gx1_patch", () => {
       delay: { type: "SPACE ECHO", time: 500, feedback: 20, level: 25, head: "1+2" },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -496,7 +514,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Bad Range", outPath, amp: { ...AMP, gain: 150 } };
 
-    const { isError } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
   });
@@ -508,7 +526,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Deep", outPath, amp: AMP };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     expect(text).toContain("Created");
@@ -524,7 +542,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Bad Path", outPath, amp: AMP };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     const lowerCaseText = text.toLowerCase();
@@ -538,7 +556,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Partial", outPath, chain: ["OD/DS", "FX1"], amp: AMP };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     for (const missing of ["PFX", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]) {
@@ -553,12 +571,12 @@ describe("generate_gx1_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const first = await client.callTool("generate_gx1_patch", single({ name: "Lead", outPath, amp: AMP }));
+    const first = await client.callTool("generate_patch", single({ name: "Lead", outPath, amp: AMP }));
 
     expect(first.isError, first.text).toBe(false);
     expect(first.text).toContain("Created");
 
-    const second = await client.callTool("generate_gx1_patch", single({ name: "Rhythm", outPath, amp: AMP }));
+    const second = await client.callTool("generate_patch", single({ name: "Rhythm", outPath, amp: AMP }));
 
     expect(second.isError, second.text).toBe(false);
     expect(savedPatches(second.text)[0].action).toBe("appended");
@@ -566,7 +584,7 @@ describe("generate_gx1_patch", () => {
     const namesAfterAppend = fileAfterAppend.patches.map(patch => patch.name.trim());
     expect(namesAfterAppend).toEqual(["Lead", "Rhythm"]);
 
-    const replaced = await client.callTool("generate_gx1_patch", single({
+    const replaced = await client.callTool("generate_patch", single({
       name: "Lead", outPath, amp: { ...AMP, gain: 90 },
     }));
 
@@ -590,7 +608,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "HIGH GEQ", params: { level: 15, "4kHz": 5 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -605,12 +623,12 @@ describe("generate_gx1_patch", () => {
     close = client.close;
 
     const named = join(temp.dir, "named.tsl");
-    const withName = await client.callTool("generate_gx1_patch", single({ name: "First", outPath: named, setName: "My Library", amp: AMP }));
+    const withName = await client.callTool("generate_patch", single({ name: "First", outPath: named, setName: "My Library", amp: AMP }));
     expect(withName.isError, withName.text).toBe(false);
     expect(gx1.driver.readFile(named).name).toBe("My Library");
 
     const unnamed = join(temp.dir, "unnamed.tsl");
-    const noName = await client.callTool("generate_gx1_patch", single({ name: "First", outPath: unnamed, amp: AMP }));
+    const noName = await client.callTool("generate_patch", single({ name: "First", outPath: unnamed, amp: AMP }));
     expect(noName.isError, noName.text).toBe(false);
     expect(gx1.driver.readFile(unnamed).name).toBe("First");
   });
@@ -627,7 +645,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "COMPRESSOR", subType: "ORANGE", params: { sustain: 35, attack: 65, level: 55 } },
     };
 
-    const gen = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const gen = await client.callTool("generate_patch", single(patchSpec));
     expect(gen.isError, gen.text).toBe(false);
     const echoed = savedPatches(gen.text)[0].patch as unknown as { fx1: { subType: string; params: Record<string, unknown> } };
     expect(echoed.fx1.subType).toBe("ORANGE");
@@ -652,12 +670,12 @@ describe("generate_gx1_patch", () => {
 
     // ANALOG's TIME max is 1200 ms, against STANDARD's 2000: the bound quoted back proves the
     // chosen type's variant judged it, not some wider bound covering every type.
-    const overMax = await client.callTool("generate_gx1_patch", single({ ...base, delay: { type: "ANALOG", time: 1201, feedback: 20, level: 40 } }));
+    const overMax = await client.callTool("generate_patch", single({ ...base, delay: { type: "ANALOG", time: 1201, feedback: 20, level: 40 } }));
     expect(overMax.isError).toBe(true);
-    expect(overMax.text).toContain("patches.0.delay.time");
+    expect(overMax.text).toContain("delay TIME for ANALOG");
     expect(overMax.text).toContain("1200");
 
-    const atMax = await client.callTool("generate_gx1_patch", single({ ...base, delay: { type: "ANALOG", time: 1200, feedback: 20, level: 40 } }));
+    const atMax = await client.callTool("generate_patch", single({ ...base, delay: { type: "ANALOG", time: 1200, feedback: 20, level: 40 } }));
     expect(atMax.isError, atMax.text).toBe(false);
   });
 
@@ -673,24 +691,24 @@ describe("generate_gx1_patch", () => {
     const base = { outPath: join(temp.dir, "reachable.tsl"), amp: AMP };
 
     // SHIMMER's reverb LEVEL starts at 0, the halls' at 1.
-    const shimmer = await client.callTool("generate_gx1_patch", single({
+    const shimmer = await client.callTool("generate_patch", single({
       ...base, name: "Shim", reverb: { type: "SHIMMER", time: 4, level: 0, pitch: 12, pitchLevel: 50 },
     }));
     expect(shimmer.isError, shimmer.text).toBe(false);
 
     // SUB DELAY's TIME is 1-2000 ms, against the halls' 0.1-10 s.
-    const subDelay = await client.callTool("generate_gx1_patch", single({
+    const subDelay = await client.callTool("generate_patch", single({
       ...base, name: "Sub", reverb: { type: "SUB DELAY", time: 400, level: 110, feedback: 30, highCut: "4kHz" },
     }));
     expect(subDelay.isError, subDelay.text).toBe(false);
 
     // GLITCH's TIME is 0-100. It has no FEEDBACK or LEVEL at all.
-    const glitch = await client.callTool("generate_gx1_patch", single({
+    const glitch = await client.callTool("generate_patch", single({
       ...base, name: "Glitch", delay: { type: "GLITCH", time: 0, glitch: 60, balance: 50, trigger: false },
     }));
     expect(glitch.isError, glitch.text).toBe(false);
 
-    const spaceEcho = await client.callTool("generate_gx1_patch", single({
+    const spaceEcho = await client.callTool("generate_patch", single({
       ...base, name: "Space", delay: { type: "SPACE ECHO", time: 400, feedback: 30, level: 0, head: "1+2" },
     }));
     expect(spaceEcho.isError, spaceEcho.text).toBe(false);
@@ -707,7 +725,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "COMPRESSOR", subType: "ORANGE", params: { sustain: 200, attack: 65, level: 55 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("fx SUSTAIN for COMPRESSOR");
@@ -724,10 +742,10 @@ describe("generate_gx1_patch", () => {
       delay: { type: "ANALOG", time: 360, feedback: 20, level: 40, highCut: "9kHz" },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
-    expect(text).toContain("patches.0.delay.highCut");
+    expect(text).toContain("delay HIGH CUT for ANALOG");
     // The rejection enumerates what the field does take, so the caller can pick one.
     expect(text).toContain("6.3kHz");
     expect(text).toContain("FLAT");
@@ -744,10 +762,10 @@ describe("generate_gx1_patch", () => {
       reverb: { type: "HALL M", time: 2.0, level: 40, density: 20 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
-    expect(text).toContain("patches.0.reverb.density");
+    expect(text).toContain("reverb DENSITY for HALL M");
     // HALL M's DENSITY runs 1-10, so 20 is out even though other reverb params reach 100.
     expect(text).toContain("10");
   });
@@ -763,10 +781,10 @@ describe("generate_gx1_patch", () => {
       pfx: { type: "WAH", subType: "CRY WAH", level: 200, direct: 0, position: 100, min: 0, max: 100 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
-    expect(text).toContain("patches.0.pfx.level");
+    expect(text).toContain("pfx LEVEL for WAH");
     expect(text).toContain("100");
   });
 
@@ -785,7 +803,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "PHASER", subType: "4 STAGE", params: { rate: 40, depth: 60 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text, "should point at the param that carries the variant").toContain("params.stage");
@@ -799,7 +817,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Wah", outPath, amp: AMP, pfx: { type: "WAH", subType: "VO WAH" } };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
@@ -817,7 +835,7 @@ describe("generate_gx1_patch", () => {
       pfx: { type: "PEDAL BEND", subType: "CRY WAH" },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("PEDAL BEND");
@@ -837,7 +855,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "CHORUS", rate: 50 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("rate");
@@ -849,7 +867,7 @@ describe("generate_gx1_patch", () => {
     close = client.close;
     const patchSpec = { name: "Stray", outPath: join(temp.dir, "stray-spec.tsl"), amp: AMP, tempo: 120 };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("tempo");
@@ -870,7 +888,7 @@ describe("generate_gx1_patch", () => {
       reverb: { type: "SHIMMER", time: 4, tone: -3, preDelay: 25, level: 55, pitch: 12, pitchLevel: 45 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
     const { reverb } = gx1.driver.readFile(outPath).patches[0];
@@ -890,7 +908,7 @@ describe("generate_gx1_patch", () => {
       reverb: { type: "HALL M", time: 2.4, level: 40, pitch: 12 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("pitch");
@@ -909,7 +927,7 @@ describe("generate_gx1_patch", () => {
       delay: { type: "WOBBLE", time: 400 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     for (const typeId of ["STANDARD", "SPACE ECHO", "GLITCH"]) expect(text).toContain(typeId);
@@ -928,7 +946,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "COMPRESSOR", subType: "WOBBLE", params: { sustain: 30 } },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("WOBBLE");
@@ -949,7 +967,7 @@ describe("generate_gx1_patch", () => {
       fx1: { type: "SCRIPT PH", rate: 40, depth: 60 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("rate");
@@ -968,7 +986,7 @@ describe("generate_gx1_patch", () => {
       amp: { ...AMP, presence: 40 },
     };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", single(patchSpec));
+    const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(true);
     expect(text).toContain("presence");
@@ -986,8 +1004,8 @@ describe("generate_gx1_patch", () => {
     const good = { name: "Good", amp: AMP };
     const bad = { name: "Bad One", amp: AMP, fx1: { type: "SCRIPT PH", params: { wobble: 3 } } };
 
-    const { isError, text } = await client.callTool("generate_gx1_patch", {
-      outPath, patches: [good, bad],
+    const { isError, text } = await client.callTool("generate_patch", {
+      device: "gx1", outPath, patches: [good, bad],
     });
 
     expect(isError).toBe(true);
@@ -1007,8 +1025,8 @@ describe("generate_gx1_patch", () => {
       const omitted = join(temp.dir, `omit-${block}.tsl`);
       const bypassed = join(temp.dir, `bypass-${block}.tsl`);
 
-      const withoutBlock = await client.callTool("generate_gx1_patch", single({ name: "Bypass", outPath: omitted, amp: AMP }));
-      const withBareOff = await client.callTool("generate_gx1_patch", single({
+      const withoutBlock = await client.callTool("generate_patch", single({ name: "Bypass", outPath: omitted, amp: AMP }));
+      const withBareOff = await client.callTool("generate_patch", single({
         name: "Bypass", outPath: bypassed, amp: AMP, [block]: { on: false },
       }));
 

@@ -1,0 +1,115 @@
+import type { McpServer } from "@modelcontextprotocol/server";
+import { z } from "zod";
+import type { Patch, PatchDriver } from "@tonesmith/core";
+import { patchUtils, patchView, registry } from "@tonesmith/core";
+import { ok, err } from "../common";
+
+const inputSchema = z.object({
+  device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
+  outPath: z.string().describe(
+    "Output file path. Parent directories are created if missing. Saving upserts by patch name: " +
+    "an existing patch of the same name is replaced, any other patch is appended, and a missing " +
+    "file is created."
+  ),
+  setName: z.string().optional().describe(
+    "Name for the patch set stored in the file. Defaults to the first patch's name."
+  ),
+  patches: z.array(z.looseObject({ name: z.string() })).min(1).describe(
+    "Every patch to save, in the order they should sit in the file. Each entry is one patch spec " +
+    "for this device: `name`, an optional `chain`, and one entry per block you want set. Call " +
+    "describe_device first for the device's blocks, their types, and each type's params. A block " +
+    "you leave out stays off. Pass the whole set in one call rather than one call per patch."
+  ),
+});
+
+type PatchSpec = z.infer<typeof inputSchema>["patches"][number];
+
+/**
+ * Builds every patch, naming which one failed. A rejection out of a batch of eight otherwise says
+ * only which block was wrong, and the same block is present in all eight.
+ */
+const buildAll = (driver: PatchDriver, specs: PatchSpec[]): Patch[] =>
+  specs.map((spec, index) => {
+    try {
+      return driver.buildPatch(spec);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`patches[${index}] "${spec.name}": ${reason}`);
+    }
+  });
+
+/**
+ * The patch as the file holds it, rather than as the builder assembled it.
+ *
+ * A block's decoded shape is per-type, but a builder filling one struct covering every type leaves
+ * fields the chosen type has no params for. The codec drops them on the way to bytes, so a round
+ * trip through it is what the caller would read back. This echo is documented as the confirmation
+ * that replaces a follow-up read_patch, which is why it has to agree with the file rather than with
+ * the builder.
+ */
+const asStored = (driver: PatchDriver, patch: Patch): Patch =>
+  driver.decodePatch(driver.encodePatch(patch));
+
+/** Patch names already saved at `path`, or undefined when the file doesn't exist yet. */
+const existingPatchNames = (driver: PatchDriver, path: string): string[] | undefined => {
+  try {
+    return driver.readFile(path).patches.map(patch => patch.name);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+};
+
+const registerGeneratePatch = (server: McpServer): void => {
+  server.registerTool(
+    "generate_patch",
+    {
+      description: `Build patches from structured parameters and save them as a device patch file.
+
+Two calls build any patch: describe_device for the device's blocks, types and params, then this.
+A block's params go where read_patch shows them for that block, and the types and value ranges
+come from describe_device rather than from this schema, so make that call first.
+
+\`patches\` takes an array, so a whole set goes out in ONE call. Pass every patch you intend to
+save rather than calling this once per patch. The array's order is the order they sit in the file,
+and the file is written once. Unset params take the device's factory default for the chosen type,
+and the patch echoed back is the complete resulting state, so no follow-up read is needed.`,
+      inputSchema,
+    },
+    ({ device, outPath, setName, patches }) => {
+      try {
+        const driver = registry.getDriver(device);
+        const built = buildAll(driver, patches);
+
+        const namesBefore = existingPatchNames(driver, outPath);
+        const alreadySaved = new Set(namesBefore ?? []);
+        const file = patchUtils.upsertPatches(driver, { path: outPath, patches: built, setName });
+
+        const results = built.map(patch => {
+          const stored = asStored(driver, patch);
+          const action = alreadySaved.has(stored.name) ? "replaced" : "appended";
+          return {
+            name: stored.name,
+            action,
+            // State the stored order outright, so a caller that omitted `chain` sees the default
+            // it took rather than having to look it up.
+            chain: stored.chain,
+            // Echo back the stored patch so the caller can confirm every field the builder
+            // defaulted, without a follow-up read_patch.
+            patch: patchView.presentPatch(stored),
+          };
+        });
+
+        const fileVerb = namesBefore === undefined ? "Created" : "Updated";
+        const summary =
+          `${fileVerb} ${outPath}: saved ${built.length} patch(es), ` +
+          `${file.patches.length} total in set "${file.name}"`;
+        return ok(`${summary}\n\n${JSON.stringify(results)}`);
+      } catch (error) {
+        return err(error);
+      }
+    }
+  );
+};
+
+export { registerGeneratePatch };
