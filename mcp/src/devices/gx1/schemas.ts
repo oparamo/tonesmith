@@ -1,14 +1,28 @@
 import { z } from "zod";
-import { validateTypeParams } from "./validate-params";
-import { unrecognizedKeyError } from "./block-errors";
+import { gx1 } from "@tonesmith/core";
 import { capabilityItemIds } from "./capability-text";
 
 /** Every selectable FX1/FX2/FX3 effect type, sourced from gx1 capabilities so this can't drift from constants.ts. */
 const fxTypeIds = capabilityItemIds("fx");
 
-/** Adapts a zod refinement context to the zod-free AddIssue callback validate-params takes. */
-const issueReporter = (ctx: z.RefinementCtx): ((message: string) => void) =>
-  message => { ctx.addIssue(message); };
+/**
+ * Bridges core's rejection-message pieces back to a zod error map, for keys a block schema doesn't
+ * declare. `fields` is the schema's own key list, so the message can't drift from what the schema
+ * accepts, and a key counts as misplaced only where the block has a `params` record to have
+ * misplaced it from. Temporary: it goes with this file once the schemas do.
+ */
+const unrecognizedKeyError = (group: string, fields: string[]): z.core.$ZodErrorMap => issue => {
+  if (issue.code !== "unrecognized_keys") return undefined;
+
+  const block = gx1.spec.blockContext(group, issue.input);
+  const paramKeys = block.surface?.paramKeys ?? [];
+  const misplaced = fields.includes(gx1.spec.PARAMS_FIELD) ? issue.keys.filter(key => paramKeys.includes(key)) : [];
+  const unknown = issue.keys.filter(key => !misplaced.includes(key));
+
+  const misplacedText = misplaced.length > 0 ? [gx1.spec.misplacedLine(misplaced, block)] : [];
+  const unknownText = unknown.length > 0 ? [gx1.spec.unknownLine(unknown)] : [];
+  return [...misplacedText, ...unknownText, gx1.spec.shapeSkeleton(fields, block)].join("\n");
+};
 
 /**
  * What bypassing actually means (that it preserves the params passed with it, and that leaving the
@@ -78,9 +92,10 @@ const FxBlockSchema = blockSchema("fx", {
     "them live here."
   ),
 }).superRefine((fx, ctx) => {
-  validateTypeParams(issueReporter(ctx), {
+  const issues = gx1.spec.validateTypeParams({
     group: "fx", type: fx.type, subType: fx.subType, values: fx.params ?? {},
   });
+  for (const issue of issues) ctx.addIssue(issue);
 });
 
 export {
@@ -89,6 +104,5 @@ export {
   blockSchema,
   bypassable,
   isBareBypass,
-  issueReporter,
   perTypeBlockDescription,
 };

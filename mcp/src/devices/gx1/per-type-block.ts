@@ -16,9 +16,9 @@ import { gx1, capabilityUtils } from "@tonesmith/core";
 import type { CapabilityGroup, CapabilityItem } from "@tonesmith/core";
 import { variantField } from "./param-ref";
 import { blockSchema } from "./schemas";
-import { TYPE_FIELD, SUB_TYPE_FIELD } from "./block-errors";
 
 const capabilities = gx1.driver.capabilities;
+const { TYPE_FIELD, SUB_TYPE_FIELD } = gx1.spec;
 
 /** The fields common to every variant, whatever the block and whatever the type. */
 interface PerTypeBlockSpec {

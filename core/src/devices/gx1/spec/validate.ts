@@ -1,11 +1,9 @@
-import { gx1, capabilityUtils } from "@tonesmith/core";
-import type { CapabilityGroup, CapabilityItem, ParamSpec } from "@tonesmith/core";
+import { findGroup, findItem } from "../../../capability-utils";
+import { gx1Capabilities } from "../capabilities";
+import type { CapabilityGroup, CapabilityItem, ParamSpec } from "../../../types";
 
-const capabilities = gx1.driver.capabilities;
-
-/** Reports one validation failure. Decoupled from zod so this module never imports it: the
- *  schema hooks pass `ctx.addIssue`, which accepts a plain string message. */
-type AddIssue = (message: string) => void;
+/** Every problem found with one block, empty when the block is usable. */
+type Issues = string[];
 
 /** What the caller selected and supplied for one block. */
 interface TypeParams {
@@ -25,8 +23,8 @@ interface Selection {
  *  error to the builder/codec (whose message lists the valid ids) rather than raising here. */
 const resolveSelection = (group: string, type: string): Selection | undefined => {
   try {
-    const capGroup = capabilityUtils.findGroup(capabilities, group);
-    return { capGroup, item: capabilityUtils.findItem(capGroup, type) };
+    const capGroup = findGroup(gx1Capabilities, group);
+    return { capGroup, item: findItem(capGroup, type) };
   } catch {
     return undefined;
   }
@@ -76,16 +74,16 @@ const subTypeAlternative = (item: CapabilityItem): string => {
  * default, and nothing in the response says the selection was dropped. An unlisted variant is worse
  * than a missing one, since the codec's own rejection names only the value it couldn't look up.
  */
-const checkSubType = (addIssue: AddIssue, check: SubTypeCheck): void => {
+const checkSubType = (issues: Issues, check: SubTypeCheck): void => {
   const { group, type, item, subType } = check;
   const variants = item.subTypes ?? [];
   if (variants.length === 0) {
-    addIssue(`${group} ${type} takes no subType (got "${subType}"): ${subTypeAlternative(item)}`);
+    issues.push(`${group} ${type} takes no subType (got "${subType}"): ${subTypeAlternative(item)}`);
     return;
   }
   if (variants.some(candidate => matchesSubType(candidate, subType))) return;
   const valid = variants.map(candidate => candidate.id).join(", ");
-  addIssue(`${group} ${type} has no subType "${subType}". Valid subTypes: ${valid}`);
+  issues.push(`${group} ${type} has no subType "${subType}". Valid subTypes: ${valid}`);
 };
 
 /** One param's value alongside the spec and selection it is checked against. */
@@ -97,16 +95,16 @@ interface ParamCheck {
 }
 
 /** Range-checks a numeric value or enum-membership-checks a string value against one spec. */
-const checkValue = (addIssue: AddIssue, check: ParamCheck): void => {
+const checkValue = (issues: Issues, check: ParamCheck): void => {
   const { group, type, spec, value } = check;
   if (typeof value === "number" && spec.min !== undefined && spec.max !== undefined) {
     if (value < spec.min || value > spec.max) {
-      addIssue(`${group} ${spec.name} for ${type} must be ${spec.min}–${spec.max} (got ${value})`);
+      issues.push(`${group} ${spec.name} for ${type} must be ${spec.min}–${spec.max} (got ${value})`);
     }
     return;
   }
   if (typeof value === "string" && spec.values !== undefined && !spec.values.includes(value)) {
-    addIssue(`${group} ${spec.name} for ${type} must be one of: ${spec.values.join(", ")} (got "${value}")`);
+    issues.push(`${group} ${spec.name} for ${type} must be one of: ${spec.values.join(", ")} (got "${value}")`);
   }
 };
 
@@ -118,21 +116,23 @@ const checkValue = (addIssue: AddIssue, check: ParamCheck): void => {
  * delay/reverb fields). Keys with no matching spec are ignored here, since the builder rejects
  * unknown keys at encode with its own message.
  */
-const validateTypeParams = (addIssue: AddIssue, params: TypeParams): void => {
+const validateTypeParams = (params: TypeParams): Issues => {
   const { group, type, subType, values } = params;
+  const issues: Issues = [];
   const selection = resolveSelection(group, type);
-  if (selection === undefined) return;
-  if (subType !== undefined) checkSubType(addIssue, { group, type, item: selection.item, subType });
+  if (selection === undefined) return issues;
+  if (subType !== undefined) checkSubType(issues, { group, type, item: selection.item, subType });
 
   const specs = specsForType(selection, subType);
   const byKey = new Map(specs.flatMap(spec => (spec.key === undefined ? [] : [[spec.key, spec] as const])));
   for (const [key, value] of Object.entries(values)) {
     const spec = byKey.get(key);
-    if (spec !== undefined) checkValue(addIssue, { group, type, spec, value });
+    if (spec !== undefined) checkValue(issues, { group, type, spec, value });
   }
+  return issues;
 };
 
-/** A block's selection as an error map finds it: read off input that already failed validation. */
+/** A block's selection as a rejection message finds it: read off input that already failed. */
 interface Selected {
   group: string;
   type?: unknown;
@@ -166,4 +166,4 @@ const typeSurface = (selected: Selected): TypeSurface | undefined => {
 };
 
 export { validateTypeParams, typeSurface };
-export type { TypeParams, TypeSurface };
+export type { Issues, TypeParams, TypeSurface };
