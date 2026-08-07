@@ -5,4 +5,4 @@ export {
   PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
 } from "./errors";
 export type { BlockContext } from "./errors";
-export { validatePatchSpec } from "./build";
+export { buildPatch, validatePatchSpec } from "./build";

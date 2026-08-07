@@ -10,7 +10,10 @@
  */
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
+import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain } from "../builder";
+import type { AmpOptions, OddsOptions, NsOptions, FvOptions } from "../builder";
 import type { CapabilityGroup } from "../../../types";
+import type { Patch, FxParams } from "../types";
 import { validateTypeParams, typeSurface } from "./validate";
 import type { Issues } from "./validate";
 import {
@@ -203,5 +206,48 @@ const validatePatchSpec = (input: unknown): Issues => {
   return issues;
 };
 
-export { validatePatchSpec, blockControls, setBlocks };
+/**
+ * Hands a validated block to its builder.
+ *
+ * The spec arrives as plain data, so a block's option type is something `validatePatchSpec` has
+ * just established rather than something TypeScript can see; the casts below are that gap and
+ * nothing more. The four blocks with named options pass their spec straight through, since each
+ * schema was shaped to its builder's options. The rest hand their controls over as one bag, which
+ * is how a block whose fields follow from its `type` has always been built.
+ */
+const applyBlock = (patch: Patch, name: BlockName, block: Record<string, unknown>): void => {
+  const type = block[TYPE_FIELD] as string;
+  const on = block[ON_FIELD] as boolean | undefined;
+  const subType = block[SUB_TYPE_FIELD] as string | undefined;
+  const params = blockControls(name, block);
+
+  switch (name) {
+    case "amp": amp(patch, block as unknown as AmpOptions); return;
+    case "odds": odds(patch, block as unknown as OddsOptions); return;
+    case "ns": ns(patch, block as unknown as NsOptions); return;
+    case "fv": fv(patch, block as unknown as FvOptions); return;
+    case "pfx": pfx(patch, { type, subType, on, params }); return;
+    case "delay": delay(patch, { type, on, params }); return;
+    case "reverb": reverb(patch, { type, on, params }); return;
+    // The three fx slots take the same spec and differ only in which slot it lands in.
+    default: fx(patch, { slot: name, type, subType, on, params: params as FxParams }); return;
+  }
+};
+
+/**
+ * Builds one decoded patch from an unvalidated spec, rejecting the whole thing before any of it is
+ * applied. Every block the spec leaves out stays off at the device's factory defaults.
+ */
+const buildPatch = (input: unknown): Patch => {
+  const issues = validatePatchSpec(input);
+  if (issues.length > 0) throw new Error(issues.join("\n"));
+
+  const spec = asRecord(input);
+  const chain = spec.chain === undefined ? undefined : validateChain(spec.chain as string[]);
+  const patch = basePatch(spec.name as string, chain, spec.key as string | undefined);
+  for (const name of setBlocks(spec)) applyBlock(patch, name, asRecord(spec[name]));
+  return patch;
+};
+
+export { buildPatch, validatePatchSpec, blockControls, setBlocks };
 export type { BlockName };

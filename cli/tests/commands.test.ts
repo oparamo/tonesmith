@@ -17,6 +17,7 @@ const makeDriver = (overrides: Partial<PatchDriver> = {}): PatchDriver => ({
   writeFile: () => { /* no-op */ },
   newFile: (setName: string) => ({ name: setName, device: "STUB", patches: [] }),
   blankPatch: (name = "NEW") => ({ name }),
+  buildPatch: (spec: unknown) => ({ name: (spec as { name: string }).name }),
   decodePatch: (raw: RawPatch) => raw as unknown as Patch,
   encodePatch: (patch: Patch) => patch as unknown as RawPatch,
   ...overrides,

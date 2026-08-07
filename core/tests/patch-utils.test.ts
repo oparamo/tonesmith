@@ -31,6 +31,7 @@ const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
     patches: Array.from({ length: nPatches }, () => makePatch("blank")),
   }),
   blankPatch: (name = "blank") => makePatch(name),
+  buildPatch: (spec) => makePatch((spec as { name: string }).name),
   decodePatch: (raw) => raw as unknown as Patch,
   encodePatch: (patch) => patch as unknown as Record<string, unknown>,
 });
