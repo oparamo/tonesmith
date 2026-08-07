@@ -33,10 +33,18 @@ pnpm --filter @tonesmith/mcp start
 pnpm doc-to-md <url|file> [-o out.md] [--format html|pdf]
 ```
 
-Each device's reverse-engineered binary format spec is `core/docs/<id>/FORMAT.md`. Read it before
-modifying that device's encode/decode logic. The authoritative reference for a device's parameter
-names and value ranges is its captured manual docs, also under `core/docs/<id>/`. Each device's
-committed round-trip fixture lives at `fixtures/<id>/`.
+Each device's reverse-engineered binary format spec is `core/docs/<id>/FORMAT.md`. **Read it first
+and treat it as the answer.** It is written from the device's own official parameter tables, not
+inferred from sample files, so its offsets, field widths and value tables are the device's own
+numbers. Anything you would otherwise go digging through vendor material for should already be in
+there; if it isn't, or it disagrees with the code, that is a gap in FORMAT.md worth fixing rather
+than a reason to keep re-deriving it elsewhere.
+
+The captured manual docs alongside it, also under `core/docs/<id>/`, cover what the parameters
+*mean*: what a control does, what it sounds like, how the device is operated. Use them for prose and
+intent, and FORMAT.md for numbers.
+
+Each device's committed round-trip fixture lives at `fixtures/<id>/`.
 
 ## Repository layout
 
