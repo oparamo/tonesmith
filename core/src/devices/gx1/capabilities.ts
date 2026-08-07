@@ -17,6 +17,7 @@ import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } 
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
 import { DEFAULT_CHAIN } from "./builder";
+import { NAME_BYTES } from "./common";
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -440,6 +441,7 @@ const gx1Capabilities: DeviceCapabilities = {
       "switched on later with them intact.\n\n" +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
   },
+  patchName: { maxLength: NAME_BYTES },
   groups: [
     {
       id: "fx",

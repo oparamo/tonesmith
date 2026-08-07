@@ -16,9 +16,10 @@ import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, ODDS_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   FX_DLY_TYPES, FX_REV_TYPES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES,
-  PARAM_SUBTYPE_EFFECTS,
+  PARAM_SUBTYPE_EFFECTS, NAME_BYTES,
 } from "../../../src/devices/gx1/common";
 import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
+import { driver } from "../../../src/devices/gx1/driver";
 import { DEFAULT_CHAIN } from "../../../src/devices/gx1/builder";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../src/devices/gx1/param-catalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../src/devices/gx1/codec/fx-params";
@@ -430,4 +431,22 @@ describe("GX-1 chain capability", () => {
     expect(gx1Capabilities.chain.defaultOrder).toEqual(DEFAULT_CHAIN);
   });
 
+});
+
+// ── patch-name capability: the advertised limit is the encoded one ──
+//
+// These were two numbers until 2026-08-06: the generate schema capped names at 13 while the format
+// stores 16. Nothing caught it, because both were internally consistent and the longest name in the
+// committed exports happened to be 13 characters.
+
+describe("GX-1 patch-name capability", () => {
+  it("advertises the limit the codec actually encodes", () => {
+    expect(gx1Capabilities.patchName.maxLength).toBe(NAME_BYTES);
+  });
+
+  it("keeps a name that fills the stored width", () => {
+    const full = "x".repeat(NAME_BYTES);
+
+    expect(driver.blankPatch(full).name).toBe(full);
+  });
 });

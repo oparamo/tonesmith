@@ -89,11 +89,23 @@ interface ChainSpec {
   defaultOrder: string[];
 }
 
+/**
+ * Limits on the patch name, which no capability group covers: the name belongs to the patch rather
+ * than to any block. A consumer that finds out by being rejected has already built the patch, so
+ * this has to be readable up front.
+ */
+interface PatchNameSpec {
+  /** Longest name the device's file format stores. */
+  maxLength: number;
+}
+
 /** All capability metadata for a device. */
 interface DeviceCapabilities {
   /** The device's signal chain: block order and how blocks are reordered/bypassed. */
   chain: ChainSpec;
+  /** What the device will accept as a patch name. */
+  patchName: PatchNameSpec;
   groups: CapabilityGroup[];
 }
 
-export type { ParamSpec, CapabilityItem, CapabilityGroup, ChainSpec, DeviceCapabilities };
+export type { ParamSpec, CapabilityItem, CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities };

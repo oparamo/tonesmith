@@ -42,7 +42,9 @@ const viewForEntry = (
   entry: string,
   includeParams: boolean | undefined,
 ): object => {
-  if (entry === "chain") return capabilities.chain;
+  // "chain" carries the patch-name limit too. It belongs to no group, so a caller asking only for
+  // groups would never meet it, and finding it out by being rejected costs a patch already built.
+  if (entry === "chain") return { ...capabilities.chain, patchName: capabilities.patchName };
 
   const { group, item } = splitEntry(entry);
   const matched = capabilityUtils.findGroup(capabilities, group);
@@ -84,6 +86,7 @@ const deviceSummary = (capabilities: DeviceCapabilities): object => ({
     defaultOrder: capabilities.chain.defaultOrder,
     help: 'Pass items: ["chain"] for how block order and on/off bypass work.',
   },
+  patchName: capabilities.patchName,
   groups: capabilities.groups.map(capGroup => ({
     id: capGroup.id,
     name: capGroup.name,

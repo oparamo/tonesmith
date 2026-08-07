@@ -9,7 +9,7 @@ import { boundedInt, describeParam } from "./param-ref";
 import { capabilityItemIds, capabilityParamValues } from "./capability-text";
 
 const patchSpecSchema = z.strictObject({
-  name: z.string().max(13).describe("Patch name (max 13 characters)"),
+  name: z.string().max(gx1.NAME_BYTES).describe(`Patch name (max ${gx1.NAME_BYTES} characters)`),
   chain: z.array(z.string()).optional().describe(
     "Block order as an array, first element = first in the chain. Pass the complete order: every " +
     "block exactly once, copied from the default order with the blocks you care about moved. A " +
