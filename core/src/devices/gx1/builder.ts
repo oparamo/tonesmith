@@ -1,8 +1,8 @@
-import type { Patch, FxParams, NsBlock, FvBlock } from "./types";
+import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
-import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_FIELDS, NS_DETECT } from "./common";
+import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_FIELDS } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
-import { DEFAULTS_BY_TYPE, type ParamDefaults } from "./defaults";
+import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, type ParamDefaults } from "./defaults";
 
 // The 10 reorderable blocks. OUTPUT is a fixed endpoint, not part of the chain array
 // (see CHAIN_BLOCK_ORDER in common/constants.ts for the underlying byte encoding).
@@ -53,12 +53,24 @@ const basePatch = (name: string, chain: string[] = DEFAULT_CHAIN, key = "C"): Pa
   return patch;
 };
 
+/**
+ * Applies one single-shape block's controls, giving every control the caller left unset the
+ * device's own factory value. Assigning the defaults first rather than only where the block is
+ * missing a property is what makes this safe on a patch built up call after call: the block already
+ * carries a value for every control, so "unset" has to mean "what the caller supplied", not "what
+ * isn't there yet".
+ */
+const applyBlockDefaults = (target: object, block: string, controls: object): void => {
+  const supplied = Object.fromEntries(Object.entries(controls).filter(([, value]) => value !== undefined));
+  Object.assign(target, BLOCK_DEFAULTS[block], supplied);
+};
+
 interface AmpOptions {
   type: string;
-  gain: number;
-  bass: number;
-  middle: number;
-  treble: number;
+  gain?: number;
+  bass?: number;
+  middle?: number;
+  treble?: number;
   speaker?: string;
   mic?: string;
   level?: number;
@@ -68,26 +80,17 @@ interface AmpOptions {
 }
 
 const amp = (patch: Patch, options: AmpOptions): void => {
-  const { speaker = "ORIGINAL", mic = "DYN57", level = 100, solo = false, soloLevel = 50, on = true } = options;
-  const block = patch.amp;
-  block.on = on;
-  block.type = options.type;
-  block.gain = options.gain;
-  block.bass = options.bass;
-  block.middle = options.middle;
-  block.treble = options.treble;
-  block.speaker = speaker;
-  block.mic = mic;
-  block.level = level;
-  block.solo = solo;
-  block.soloLevel = soloLevel;
+  const { type, on = true, ...controls } = options;
+  patch.amp.on = on;
+  patch.amp.type = type;
+  applyBlockDefaults(patch.amp, "amp", controls);
 };
 
 interface OddsOptions {
   type: string;
-  drive: number;
-  tone: number;
-  level: number;
+  drive?: number;
+  tone?: number;
+  level?: number;
   direct?: number;
   solo?: boolean;
   soloLevel?: number;
@@ -95,16 +98,10 @@ interface OddsOptions {
 }
 
 const odds = (patch: Patch, options: OddsOptions): void => {
-  const { direct = 0, solo = false, soloLevel = 50, on = true } = options;
-  const block = patch.odds;
-  block.on = on;
-  block.type = options.type;
-  block.drive = options.drive;
-  block.tone = options.tone;
-  block.level = options.level;
-  block.direct = direct;
-  block.solo = solo;
-  block.soloLevel = soloLevel;
+  const { type, on = true, ...controls } = options;
+  patch.odds.on = on;
+  patch.odds.type = type;
+  applyBlockDefaults(patch.odds, "odds", controls);
 };
 
 /**
@@ -212,35 +209,27 @@ const fx = (patch: Patch, options: FxOptions): void => {
 };
 
 interface NsOptions {
-  threshold: number;
-  release: number;
+  threshold?: number;
+  release?: number;
   on?: boolean;
   detect?: string;
 }
 
 const ns = (patch: Patch, options: NsOptions): void => {
-  const { on = true, detect = NS_DETECT[0] } = options;
-  const block = patch.ns;
-  block.on = on;
-  block.threshold = options.threshold;
-  block.release = options.release;
-  block.detect = detect as NsBlock["detect"];
+  const { on = true, ...controls } = options;
+  patch.ns.on = on;
+  applyBlockDefaults(patch.ns, "ns", controls);
 };
 
 interface FvOptions {
-  position: number;
-  min: number;
-  max: number;
+  position?: number;
+  min?: number;
+  max?: number;
   curve?: string;
 }
 
 const fv = (patch: Patch, options: FvOptions): void => {
-  const { curve = "NORMAL" } = options;
-  const block = patch.fv;
-  block.position = options.position;
-  block.min = options.min;
-  block.max = options.max;
-  block.curve = curve as FvBlock["curve"];
+  applyBlockDefaults(patch.fv, "fv", options);
 };
 
 /** A ParamKeySpec plus the type's factory values, everything needed to fill a block's params bag. */

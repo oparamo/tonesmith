@@ -35,12 +35,14 @@ describe("blankPatch", () => {
     expect(patch).toHaveProperty("reverb");
   });
 
-  it("opens with the amp on at TRNSPRNT and every other block off", () => {
+  // Every block opens off, at the values the device's own factory-init patch carries. The blocks
+  // this covers are pinned field by field against that patch in the defaults drift guard.
+  it("opens with every block off, at the device's factory settings", () => {
     const patch = blankPatch();
 
-    expect(patch.amp).toMatchObject({ on: true, type: "TRNSPRNT" });
+    expect(patch.amp).toMatchObject({ on: false, type: "NATURAL" });
     expect(patch.ns.on).toBe(false);
-    expect(patch.odds.on).toBe(false);
+    expect(patch.odds).toMatchObject({ on: false, type: "OVERDRIVE" });
   });
 });
 
