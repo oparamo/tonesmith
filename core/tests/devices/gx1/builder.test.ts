@@ -21,6 +21,7 @@ import {
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
 import { readFile } from "../../../src/devices/gx1/tsl";
+import { BLOCK_DEFAULTS } from "../../../src/devices/gx1/defaults";
 
 describe("basePatch", () => {
   it("defaults to DEFAULT_CHAIN and key C", () => {
@@ -136,14 +137,33 @@ describe("amp", () => {
     });
   });
 
-  it("defaults the cabinet, mic, level, solo and on state", () => {
+  // Only `type` has to be supplied: choosing the amp model is the point of setting the block, and
+  // every knob on it has a factory value the device itself ships.
+  it("gives every unset control the device's factory default", () => {
     const patch = basePatch("Test");
 
-    amp(patch, { type: "TWIN", gain: 50, bass: 50, middle: 50, treble: 50 });
+    amp(patch, { type: "TWIN" });
 
-    expect(patch.amp).toMatchObject({
-      on: true, speaker: "ORIGINAL", mic: "DYN57", level: 100, solo: false, soloLevel: 50,
-    });
+    expect(patch.amp).toMatchObject({ on: true, type: "TWIN", ...BLOCK_DEFAULTS.amp });
+  });
+
+  it("keeps what the caller does set, defaulting only the rest", () => {
+    const patch = basePatch("Test");
+
+    amp(patch, { type: "TWIN", gain: 90, mic: "CND87" });
+
+    expect(patch.amp).toMatchObject({ gain: 90, mic: "CND87", level: BLOCK_DEFAULTS.amp.level });
+  });
+
+  // The block is mutated in place call after call, so a control the second call leaves out has to
+  // go back to the factory value rather than keeping what the first call put there.
+  it("re-defaults a control the next call leaves out", () => {
+    const patch = basePatch("Test");
+
+    amp(patch, { type: "TWIN", gain: 90 });
+    amp(patch, { type: "JC-120" });
+
+    expect(patch.amp.gain).toBe(BLOCK_DEFAULTS.amp.gain);
   });
 });
 
