@@ -10,7 +10,6 @@ const BLOCK_BYTES = {
   fxCom: 3,
   fxParams: 251,
   fx3a: 5,
-  odds: 8,
   delay: 29,
   reverb: 20,
   pfx: 14,
@@ -31,14 +30,23 @@ const NAME_PAD = 0x20;
  */
 const DEFAULT_CHAIN_BYTES = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
 
-/** on, TRNSPRNT, gain 50, level 100, bass/mid/treble 50, ORIGINAL speaker, DYN57 mic, solo off. */
-const AMP_DEFAULT_BYTES = [1, 0, 0, 50, 100, 50, 50, 50, 1, 0, 0, 0, 0];
+// The four blocks whose bytes are one fixed shape, so a blank patch can carry the device's own
+// factory values for them outright. Each array is `default-init.tsl`'s bytes for that block, which
+// agree with the device's official parameter table field for field. The other blocks open
+// zero-filled: their bytes mean different things per type, so there is no one value to open at, and
+// the builder fills each type's own defaults from DEFAULTS_BY_TYPE instead.
+
+/** Off, NATURAL, gain 50, level 50, bass/mid/treble 50, ORIGINAL speaker, DYN421 mic, solo off at 50. */
+const AMP_DEFAULT_BYTES = [0, 1, 0, 50, 50, 50, 50, 50, 1, 1, 1, 0, 50];
+
+/** Off, OVERDRIVE, drive 50, tone 0 (stored +50), level 50, direct 0, solo off at 50. */
+const ODDS_DEFAULT_BYTES = [0, 6, 50, 50, 50, 0, 0, 50];
 
 /** Position 100, min 0, max 100, NORMAL curve. */
 const FV_DEFAULT_BYTES = [100, 0, 100, 2];
 
-/** Off, threshold 20, release 20, INPUT detect. */
-const NS_DEFAULT_BYTES = [0, 20, 20, 0];
+/** Off, threshold 30, release 30, INPUT detect. */
+const NS_DEFAULT_BYTES = [0, 30, 30, 0];
 
 // A fresh array per call: RAW is a public escape hatch, and callers are free to mutate
 // patch[RAW]["MEMORY%FXn"] in place (e.g. to probe undecoded byte offsets). A shared array would
@@ -57,7 +65,7 @@ const blankParamSet = (): RawParamSet => {
     "MEMORY%FX3_COM": zeroBytes(BLOCK_BYTES.fxCom),
     "MEMORY%FX3":     zeroBytes(BLOCK_BYTES.fxParams),
     "MEMORY%FX3A":    zeroBytes(BLOCK_BYTES.fx3a),
-    "MEMORY%ODDS":    zeroBytes(BLOCK_BYTES.odds),
+    "MEMORY%ODDS":    hexFromBytes(ODDS_DEFAULT_BYTES),
     "MEMORY%AMP":     hexFromBytes(AMP_DEFAULT_BYTES),
     "MEMORY%DLY":     zeroBytes(BLOCK_BYTES.delay),
     "MEMORY%REV":     zeroBytes(BLOCK_BYTES.reverb),

@@ -104,5 +104,23 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
   },
 };
 
-export { DEFAULTS_BY_TYPE };
+/**
+ * Factory defaults for the four blocks that have one fixed shape rather than a set of types, read
+ * straight off `default-init.tsl` (no shadow region to swap through: these blocks mean the same
+ * thing whatever else the patch does). The block's `on` and `type` selectors are left out, as they
+ * are for the per-type blocks, since the builder sets both from what the caller asked for.
+ *
+ * The builder fills any control the caller doesn't set from here. Before this existed those
+ * controls were required, which made a caller invent a value for every knob on a block it only
+ * wanted switched on, and the ones that did have a hardcoded default disagreed with the device:
+ * amp LEVEL opened at 100 against the device's 50 and amp MIC at DYN57 against DYN421.
+ */
+const BLOCK_DEFAULTS: Record<string, ParamDefaults> = {
+  amp: { gain: 50, level: 50, bass: 50, middle: 50, treble: 50, speaker: "ORIGINAL", mic: "DYN421", solo: false, soloLevel: 50 },
+  odds: { drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50 },
+  ns: { threshold: 30, release: 30, detect: "INPUT" },
+  fv: { position: 100, min: 0, max: 100, curve: "NORMAL" },
+};
+
+export { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS };
 export type { ParamDefaults, BlockDefaults, DefaultsByType };
