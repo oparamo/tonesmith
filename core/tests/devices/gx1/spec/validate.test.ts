@@ -141,15 +141,11 @@ describe("validatePatchSpec", () => {
     expect(issue).toContain("HALL S");
   });
 
-  // The builder fills unset params from the device's factory defaults, but only for the blocks whose
-  // params are per-type. These four have no such table, so an omitted control reaches the codec as
-  // undefined and fails there naming nothing.
-  it("rejects a block missing a control it gives no default for", () => {
-    const [issue] = validatePatchSpec({ name: "Test", amp: { type: "TWIN", gain: 20 } });
-
-    expect(issue).toContain("bass");
-    expect(issue).toContain("middle");
-    expect(issue).toContain("treble");
+  // Every block fills what the caller leaves unset from the device's own factory values, so naming
+  // the type is the whole obligation. These four used to demand their controls outright, which made
+  // a caller invent a value for every knob on a block it only wanted switched on.
+  it("accepts a block that names only its type, leaving the rest to default", () => {
+    expect(validatePatchSpec({ name: "Test", amp: { type: "TWIN" } })).toEqual([]);
   });
 
   it("rejects a control the chosen type has no field for", () => {

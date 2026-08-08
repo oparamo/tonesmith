@@ -11,7 +11,7 @@
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain } from "../builder";
-import type { AmpOptions, OddsOptions, NsOptions, FvOptions } from "../builder";
+import type { AmpOptions, OddsOptions } from "../builder";
 import type { CapabilityGroup } from "../../../types";
 import type { Patch, FxParams } from "../types";
 import { validateTypeParams, typeSurface } from "./validate";
@@ -60,18 +60,6 @@ const REQUIRED_BLOCK = "amp";
 const BYPASSABLE = new Set<string>(
   BLOCK_NAMES.filter(name => name !== REQUIRED_BLOCK && !ALWAYS_ON.has(name))
 );
-
-/**
- * Controls whose block gives no factory default, so one left unset reaches the codec as undefined
- * and fails there naming nothing. The per-type blocks need no entry: their builders fill every
- * unset field from the device's own defaults, which is what makes a partial spec safe for them.
- */
-const REQUIRED_CONTROLS: Partial<Record<BlockName, string[]>> = {
-  amp: ["gain", "bass", "middle", "treble"],
-  odds: ["drive", "tone", "level"],
-  ns: ["threshold", "release"],
-  fv: ["position", "min", "max"],
-};
 
 /** True when a block spec carries nothing but `on: false`. */
 const isBareBypass = (value: unknown): boolean => {
@@ -148,12 +136,6 @@ const checkType = (issues: Issues, capGroup: CapabilityGroup, block: Record<stri
   return false;
 };
 
-const checkRequiredControls = (issues: Issues, name: BlockName, block: Record<string, unknown>): void => {
-  const missing = (REQUIRED_CONTROLS[name] ?? []).filter(control => block[control] === undefined);
-  if (missing.length === 0) return;
-  issues.push(`${name} needs ${missing.join(", ")}: this block has no factory default to fall back on.`);
-};
-
 const checkBlock = (issues: Issues, name: BlockName, input: unknown): void => {
   const group = BLOCK_GROUPS[name];
   const capGroup = findGroup(gx1Capabilities, group);
@@ -163,7 +145,6 @@ const checkBlock = (issues: Issues, name: BlockName, input: unknown): void => {
   const context = blockContext(group, block);
   const selected = typeof block[SUB_TYPE_FIELD] === "string" ? block[SUB_TYPE_FIELD] : undefined;
   checkKeys(issues, block, { fields: acceptedFields(name, context), context });
-  checkRequiredControls(issues, name, block);
   issues.push(...validateTypeParams({
     group,
     type: context.type,
@@ -209,11 +190,11 @@ const validatePatchSpec = (input: unknown): Issues => {
 /**
  * Hands a validated block to its builder.
  *
- * The spec arrives as plain data, so a block's option type is something `validatePatchSpec` has
- * just established rather than something TypeScript can see; the casts below are that gap and
- * nothing more. The four blocks with named options pass their spec straight through, since each
- * schema was shaped to its builder's options. The rest hand their controls over as one bag, which
- * is how a block whose fields follow from its `type` has always been built.
+ * The blocks with named options pass their spec straight through, since each was shaped to its
+ * builder's options. AMP and OD/DS still need a cast for it: they require a `type`, which is
+ * something `validatePatchSpec` has just established rather than something TypeScript can see, and
+ * that gap is all the cast covers. The rest hand their controls over as one bag, which is how a
+ * block whose fields follow from its `type` has always been built.
  */
 const applyBlock = (patch: Patch, name: BlockName, block: Record<string, unknown>): void => {
   const type = block[TYPE_FIELD] as string;
@@ -224,8 +205,8 @@ const applyBlock = (patch: Patch, name: BlockName, block: Record<string, unknown
   switch (name) {
     case "amp": amp(patch, block as unknown as AmpOptions); return;
     case "odds": odds(patch, block as unknown as OddsOptions); return;
-    case "ns": ns(patch, block as unknown as NsOptions); return;
-    case "fv": fv(patch, block as unknown as FvOptions); return;
+    case "ns": ns(patch, block); return;
+    case "fv": fv(patch, block); return;
     case "pfx": pfx(patch, { type, subType, on, params }); return;
     case "delay": delay(patch, { type, on, params }); return;
     case "reverb": reverb(patch, { type, on, params }); return;
