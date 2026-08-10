@@ -12,5 +12,5 @@ Both run through new device-agnostic `patchUtils.copyPatch` and `patchUtils.crea
 the CLI's own `copy` and `new` commands call rather than keeping a second copy of the logic.
 
 Saving a patch creates any missing parent directories rather than failing on a path whose folder
-does not exist yet, and `generate_gx1_patch` upserts into its output file by patch name rather than
+does not exist yet, and `generate_patch` upserts into its output file by patch name rather than
 overwriting the whole file.

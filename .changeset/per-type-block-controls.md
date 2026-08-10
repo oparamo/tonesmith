@@ -10,8 +10,8 @@ they have. TWIST has no TIME or FEEDBACK, GLITCH has no FEEDBACK or LEVEL, WARP 
 HIGH CUT, TERA ECHO has no TIME, SUB DELAY has no TONE, PRE-DELAY or DIRECT, and SHIMMER has no
 DENSITY or DIRECT. `DelayOptions` required `time`, `feedback` and `level` anyway, and
 `ReverbOptions` required `time`, so building one of those types meant inventing values for controls
-it does not have, which encode then dropped without a word. The same fields were required on
-`generate_gx1_patch`.
+it does not have, which encode then dropped without a word. The same fields were required by the
+generate tool.
 
 **Breaking:** every control on both blocks is optional, and passing one the chosen type has no field
 for is rejected, showing the shape that type does take. Builder callers can still pass a control
@@ -21,5 +21,5 @@ two values silently win.
 **Breaking:** an unset control now takes the chosen type's factory default, the rule the `params`
 record already followed, instead of a value hardcoded in the builder. Two of those hardcoded values
 were not the device's: reverb PRE-DELAY defaulted to 0 against a factory 30, and delay HIGH CUT to
-FLAT against a factory 6.3 kHz. Callers that set these controls explicitly are unaffected, and the
-delay and reverb schema fields no longer claim a default the device does not ship.
+FLAT against a factory 6.3 kHz. Callers that set these controls explicitly are unaffected, and an
+unset control no longer defaults to a value the device does not ship.

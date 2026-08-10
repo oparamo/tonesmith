@@ -42,23 +42,16 @@ WAH's `FREQ` is `MANUAL`, the dedicated Delay block never had the `DIRECT` it ad
 FX types were under-reporting `DIRECT` and other params, and the cabinet list was missing its
 `USER1` through `USER8` entries.
 
-The MCP generate schema reads the catalog rather than repeating it. Numeric bounds come off the
-`ParamSpec`, and so does the sentence beside each field: `.describe("Gain 0-120")` sitting next to
-a bound that came from the catalog meant a range change updated the enforcement and left the text
-quoting the old number, with nothing to catch it because the bound itself stayed correct. That
-removed about forty hand-written range strings, and the descriptions an agent reads are fuller than
-the strings they replaced, because the catalog carries real prose per param. One rule covers the
-whole schema: a field whose valid values are a fixed set names that set itself, built from
-capabilities, and only a set that genuinely cannot be known in advance points at `describe_device`.
-So `amp.type`, `amp.speaker`, `amp.mic`, `odds.type`, `ns.detect` and `fv.curve` name their full
-lists in the exact spelling they require, every per-type block's fields carry the chosen type's own
-bounds and values, and an fx slot's `subType` and `params` are what point at `describe_device`,
-since one slot serves 39 effects.
+The device's driver reads the catalog to validate `generate_patch` input at runtime, rather than a
+schema repeating it field by field. `boolean` tells the validator a value must be `true` or
+`false`, `values` tells it which strings are legal, and `decimals` tells it whether a fraction is
+legal for a numeric field, since a bound alone cannot say whether 4.5 is legal, only whether it is
+in range.
 
-Supplied values are checked against the chosen type's real range before anything is written, and
-for the per-type blocks the schema is what checks them. `ANALOG` with a time of 1201 ms, past its
-1200 ms limit, used to get as far as the codec's raw byte guard. It is rejected up front now, by the
-bound the caller could read on the field it filled in.
+The driver checks supplied values against the chosen type's real range before anything is written.
+`ANALOG` with a time of 1201 ms, past its 1200 ms limit, used to get as far as the codec's raw byte
+guard. It is rejected up front now, by the bound `describe_device` already gave the caller for that
+field.
 
 Declaring bounds per type is also what makes every documented value reachable. One field serving
 every type could carry no bound but the union of theirs, in units no single type uses: reverb TIME
@@ -72,4 +65,5 @@ alongside the label. Without the key there was no way to tell which dot-path `wr
 the exact spellings (`2.5kHz`, `FLAT`) appeared nowhere in the CLI.
 
 Because the catalog and the codec are authored independently, a drift guard checks them against
-each other across every block and type, and the MCP schema is checked against the catalog in turn.
+each other across every block and type. The validator reads the catalog rather than restating it,
+so there is no third copy to drift.

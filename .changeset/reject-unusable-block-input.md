@@ -14,10 +14,10 @@ refused the same way, naming the variants it does have; it used to reach the cod
 back as `Unknown type value: "..."`, which named neither the block nor the field nor the alternatives.
 
 The pedal FX block gains the `subType` it already advertised. `describe_device` has always listed
-WAH's six pedal models as subTypes while the generate schema had no field to receive one, leaving
+WAH's six pedal models as subTypes while `generate_patch` had no way to set one, leaving
 `params.wahType`, a key capabilities never mentions, as the only way to pick a model.
 
-Every block in `generate_gx1_patch` now rejects fields it doesn't have. An unrecognized field used
+Every block in `generate_patch` now rejects fields it doesn't have. An unrecognized field used
 to be discarded before validation, so `fx1: { type: "CHORUS", rate: 50 }` built a chorus at the
 default rate and reported success.
 
