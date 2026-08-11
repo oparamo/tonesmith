@@ -186,6 +186,14 @@ that re-harvests from the fixture and asserts equality, so a fixture or codec ch
 the table stale. Harvest rather than guess: an invented default silently ships a value the
 device would never produce.
 
+Harvest the **sub-model each type opens on** as well, wherever a type offers a choice of models.
+That selection usually sits inside the type's own param window like any other field, so it is a
+factory default in exactly the same sense, but a patch spec sets it as the block's variant rather
+than as a control, so it belongs in its own table rather than among the param defaults. The reason
+to pay for the harvest is that the alternatives are both wrong: leaving the variant out of an
+example shows a shape that omits a field the block takes, and naming the first model in the list
+puts a value the device never chose in something labeled a factory default.
+
 Write byte-for-byte round-trip tests in `core/tests/devices/<id>/`, mirroring the source
 layout: decode the fixture, re-encode it, and assert the output bytes match the input exactly.
 Add targeted tests for individual field codecs and any lookup-table edge cases (an
@@ -230,7 +238,9 @@ capabilities on top of it. Don't hand-write param ranges twice.
    block's controls and carry another's flat leaves a consumer to find out by being rejected. Guard
    it by building every example: that one assertion covers the block key, the nesting, the defaults
    and the validator at once. Where the codec stores a variant selection in a field the spec selects
-   differently, the example follows the spec, since it is a spec.
+   differently, the example follows the spec, since it is a spec. A type with sub-models names the
+   one it opens on, from the selector table harvested in step 4, so the variant reads as the sibling
+   of the type that it is. Assert that every item declaring sub-models names one of its own.
 
 Add the drift guard as a test. Because capabilities derives from the catalog, capabilities and
 the codec can't drift by construction; the real risk is between the two independently authored

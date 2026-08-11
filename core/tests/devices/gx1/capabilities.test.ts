@@ -31,7 +31,7 @@ import {
   decodeAmp, decodeOdDs, decodeNs, decodeFv,
 } from "../../../src/devices/gx1/codec/blocks";
 import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
-import type { CapabilityItem, ParamSpec } from "../../../src/types";
+import type { CapabilityItem, ParamSpec, PatchSpecExample } from "../../../src/types";
 import type { FieldCodec } from "../../../src/devices/gx1/codec/fields";
 
 const groupItems = (groupId: string): CapabilityItem[] =>
@@ -466,9 +466,17 @@ describe("GX-1 spec examples", () => {
   ));
 
   const examples = groupsWithBlocks.flatMap(group => {
-    if (group.items.length === 0) return [{ group: group.id, item: "", example: group.example }];
-    return group.items.map(item => ({ group: group.id, item: item.id, example: item.example }));
+    if (group.items.length === 0) return [{ group: group.id, item: "", subTypes: [] as string[], example: group.example }];
+    return group.items.map(item => ({
+      group: group.id,
+      item: item.id,
+      subTypes: (item.subTypes ?? []).map(variant => variant.id),
+      example: item.example,
+    }));
   });
+
+  const bodyOf = (example?: PatchSpecExample): Record<string, unknown> =>
+    Object.values(example ?? {})[0] as Record<string, unknown>;
 
   it.each(examples)("$group $item carries an example", ({ example }) => {
     expect(example).toBeDefined();
@@ -508,13 +516,28 @@ describe("GX-1 spec examples", () => {
     expect(example.wahType).toBeUndefined();
   });
 
-  it("names a subType only where the params live on one", () => {
-    const fxItems = groupItems("fx");
-    const delayBlock = fxItems.find(item => item.id === "DELAY")?.example?.fx1 as Record<string, unknown>;
-    const chorusBlock = fxItems.find(item => item.id === "CHORUS")?.example?.fx1 as Record<string, unknown>;
+  // A type with sub-models opens on one, so an example that leaves subType out shows a shape the
+  // caller has to work out for itself. Naming one is only truthful if it is the model the device
+  // opens with, which is what DEFAULT_SUBTYPES harvests and the defaults guard pins to the fixture.
+  it.each(examples.filter(entry => entry.subTypes.length > 0))(
+    "$group $item example names one of the type's own subTypes",
+    ({ subTypes, example }) => {
+      expect(subTypes).toContain(bodyOf(example).subType);
+    }
+  );
 
-    expect(delayBlock.subType).toBeDefined();
-    expect(chorusBlock.subType).toBeUndefined();
+  it.each(examples.filter(entry => entry.subTypes.length === 0))(
+    "$group $item example leaves subType out, having no sub-models",
+    ({ example }) => {
+      expect(bodyOf(example).subType).toBeUndefined();
+    }
+  );
+
+  it("takes its params from the sub-model where the sub-model owns them", () => {
+    const delay = groupItems("fx").find(item => item.id === "DELAY");
+    const example = delay?.example?.fx1 as { subType: string; params: Record<string, unknown> };
+
+    expect(example.params).toEqual(DEFAULTS_BY_TYPE.fxDelay[example.subType]);
   });
 
   it("leaves the example off a group that names no block", () => {

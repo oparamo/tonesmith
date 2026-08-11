@@ -18,8 +18,9 @@ import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primi
 import {
   FX_TYPES, FX_DLY_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW,
+  PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_FIELDS,
 } from "../../../src/devices/gx1/common";
-import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS } from "../../../src/devices/gx1/defaults";
+import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../../../src/devices/gx1/defaults";
 import type { Patch } from "../../../src/devices/gx1/types";
 
 const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
@@ -95,6 +96,40 @@ const harvestDefaults = (patch: Patch): Record<string, BlockDefaults> => {
   };
 };
 
+/**
+ * An FX type's sub-model selector rides inside its own param window under the codec name `type`,
+ * so decoding the window at rest yields the factory-selected model. `omit` drops it from the param
+ * defaults above, since the spec sets it as `subType` rather than as a control.
+ */
+const harvestFxSubTypes = (fx1: number[]): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const type of FX_TYPES) {
+    if (!PARAM_SUBTYPE_EFFECTS.has(type)) continue;
+    const decoded = decodeFxParams(type, fx1);
+    if ("unknownBytes" in decoded) continue;
+    if (typeof decoded.type === "string") out[type] = decoded.type;
+  }
+  return out;
+};
+
+/** PFX keeps its sub-model in a named field per type, so PFX_SUBTYPE_FIELDS says which to read. */
+const harvestPfxSubTypes = (pfx: number[]): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const [type, field] of Object.entries(PFX_SUBTYPE_FIELDS)) {
+    const swapped = [...pfx];
+    swapped[1] = PFX_TYPE_IDX[type];
+    const decoded = decodePfx(hexFromBytes(swapped)) as Record<string, unknown>;
+    const selected = field === undefined ? undefined : decoded[field];
+    if (typeof selected === "string") out[type] = selected;
+  }
+  return out;
+};
+
+const harvestSubTypes = (patch: Patch): Record<string, Record<string, string>> => ({
+  fx: harvestFxSubTypes(bytesFromHex(patch[RAW]["MEMORY%FX1"])),
+  pfx: harvestPfxSubTypes(bytesFromHex(patch[RAW]["MEMORY%PFX"])),
+});
+
 /** The single-shape blocks are their own default: no type to swap, so the decoded block is it. */
 const harvestBlockDefaults = (patch: Patch): Record<string, ParamDefaults> =>
   Object.fromEntries(
@@ -106,6 +141,10 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
 
   it("DEFAULTS_BY_TYPE matches the factory defaults harvested from default-init.tsl", () => {
     expect(DEFAULTS_BY_TYPE).toEqual(harvestDefaults(patch));
+  });
+
+  it("DEFAULT_SUBTYPES matches the sub-models selected in default-init.tsl", () => {
+    expect(DEFAULT_SUBTYPES).toEqual(harvestSubTypes(patch));
   });
 
   it("BLOCK_DEFAULTS matches the single-shape blocks in default-init.tsl", () => {

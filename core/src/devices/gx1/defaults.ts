@@ -122,5 +122,28 @@ const BLOCK_DEFAULTS: Record<string, ParamDefaults> = {
   fv: { position: 100, min: 0, max: 100, curve: "NORMAL" },
 };
 
-export { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS };
+/**
+ * The sub-model each type opens on, harvested from the same fixture as the params above. A type
+ * with sub-models keeps its selection inside its own param window (FX under the codec name `type`,
+ * PFX under the field named in PFX_SUBTYPE_FIELDS), so it is a factory default like any other, but
+ * it is not a control: a patch spec sets it as `subType`, which is why the param defaults leave it
+ * out. Keyed by catalog block, then by type.
+ */
+const DEFAULT_SUBTYPES: Partial<Record<string, Partial<Record<string, string>>>> = {
+  fx: {
+    "COMPRESSOR": "BOSS COMP",
+    "LIMITER": "BOSS",
+    "FIXED WAH": "CRY WAH",
+    "AC RESO": "NATURAL",
+    "OD/DS": "CLEAN BST",
+    "CHORUS": "MONO",
+    "CLASSIC-VIBE": "CHORUS",
+    "HUMANIZER": "AUTO",
+    "DELAY": "STANDARD",
+    "REVERB": "HALL M",
+  },
+  pfx: { "WAH": "CRY WAH" },
+};
+
+export { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES };
 export type { ParamDefaults, BlockDefaults, DefaultsByType };
