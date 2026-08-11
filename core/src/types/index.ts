@@ -1,3 +1,5 @@
 export type { Patch, PatchFile, RawPatch } from "./patch";
 export type { PatchDriver } from "./driver";
-export type { ParamSpec, CapabilityItem, CapabilityGroup, ChainSpec, DeviceCapabilities } from "./capabilities";
+export type {
+  ParamSpec, PatchSpecExample, CapabilityItem, CapabilityGroup, ChainSpec, DeviceCapabilities,
+} from "./capabilities";

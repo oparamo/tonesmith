@@ -10,6 +10,8 @@
  */
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
+import { BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS } from "../common";
+import type { BlockName } from "../common";
 import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain } from "../builder";
 import type { AmpOptions, OddsOptions } from "../builder";
 import type { CapabilityGroup } from "../../../types";
@@ -27,24 +29,8 @@ const ON_FIELD = "on";
 /** Patch-level fields that are not blocks. Every other key must name one. */
 const PATCH_FIELDS = ["name", "chain", "key"];
 
-/**
- * Every block a patch spec may carry, mapped to the capability group describing it. The three fx
- * slots share one group, so the mapping is spelled out rather than assumed from the block name.
- */
-const BLOCK_GROUPS = {
-  pfx: "pfx", fx1: "fx", fx2: "fx", fx3: "fx", odds: "odds",
-  amp: "amp", ns: "ns", fv: "fv", delay: "delay", reverb: "reverb",
-} as const;
-
-type BlockName = keyof typeof BLOCK_GROUPS;
-
-const BLOCK_NAMES = Object.keys(BLOCK_GROUPS) as BlockName[];
-
 /** The fields that select a block's shape rather than set one of its controls. */
 const SELECTION_FIELDS = new Set<string>([TYPE_FIELD, SUB_TYPE_FIELD, ON_FIELD]);
-
-/** The blocks that keep their controls in a nested `params` record, as the decoded patch does. */
-const NESTED_PARAMS = new Set<string>(["fx1", "fx2", "fx3"]);
 
 /** The one block the device can't bypass, so it takes no `on`. */
 const ALWAYS_ON = new Set<string>(["fv"]);

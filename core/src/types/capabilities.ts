@@ -3,8 +3,9 @@ interface ParamSpec {
   name: string;
   /**
    * The exact property key for this param in machine surfaces: the field name in decoded
-   * patches (`read_patch` output), and the key to use inside a block's `params` record when
-   * building a patch. Distinct from `name`, which is the human display label
+   * patches (`read_patch` output), and the key it is written under when building a patch.
+   * Where that key sits within the block varies by block, so the `example` on the group or item
+   * is what shows the placement. Distinct from `name`, which is the human display label
    * ("PRE-DELAY" vs `preDelay`, "OCT F-BACK" vs `octFeedback`). Absent only for params with
    * no backing codec field (e.g. HARMONIST's KEY, which is the patch-level key).
    */
@@ -42,6 +43,17 @@ interface ParamSpec {
 }
 
 /**
+ * A patch-spec fragment for one block, keyed by the block's own name in a spec and filled with the
+ * device's factory defaults, ready to pass to `PatchDriver.buildPatch` once a patch `name` is added.
+ *
+ * It exists to answer where a param is written, which a list of param keys cannot: a device is free
+ * to nest a block's controls or carry them flat, and that is device knowledge a consumer would
+ * otherwise learn by being rejected, having already built the patch. Showing a real fragment also
+ * avoids inventing a vocabulary to describe nesting in words.
+ */
+type PatchSpecExample = Record<string, unknown>;
+
+/**
  * A selectable option within a capability group: an amp model, effect type, drive pedal,
  * reverb type, cab, mic, etc.
  */
@@ -58,6 +70,8 @@ interface CapabilityItem {
   subTypes?: CapabilityItem[];
   /** Parameters specific to this item (supplement the group's shared params). */
   params?: ParamSpec[];
+  /** A spec fragment selecting this item, at factory defaults. Absent where the item names no block. */
+  example?: PatchSpecExample;
 }
 
 /**
@@ -75,6 +89,11 @@ interface CapabilityGroup {
   items: CapabilityItem[];
   /** Block-level controls shared across all selected items. */
   params?: ParamSpec[];
+  /**
+   * A spec fragment for this block at factory defaults, carried by the groups that offer no types
+   * to choose between. Where a group has items, each item carries its own instead.
+   */
+  example?: PatchSpecExample;
 }
 
 /**
@@ -108,4 +127,7 @@ interface DeviceCapabilities {
   groups: CapabilityGroup[];
 }
 
-export type { ParamSpec, CapabilityItem, CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities };
+export type {
+  ParamSpec, PatchSpecExample, CapabilityItem, CapabilityGroup, ChainSpec, PatchNameSpec,
+  DeviceCapabilities,
+};

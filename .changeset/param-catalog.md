@@ -27,6 +27,13 @@ of the same fact.
   a discrete one by its `values`, so without this a toggle was the one kind a consumer had to
   identify by reading `range` as English.
 
+Each block also carries an **`example`**: the spec that builds it at the device's factory defaults,
+keyed by the block's own name. A key alone says what a control is called and never where it goes,
+and the GX-1 does not keep them all in one place: an fx slot nests its controls under `params` the
+way the decoded patch does, while amp, delay and reverb carry theirs as fields. That was learnable
+only by being rejected, at which point the patch was already built. The example is what a caller
+copies and edits, so it doubles as a statement of what each control is left at when you omit it.
+
 `capabilities.ts` derives each item's params from the catalog rather than restating them, which
 makes delay and reverb **per type**: `describe_device gx1 reverb SHIMMER` answers for SHIMMER
 instead of returning one flat list for the whole block. The FX-slot DELAY gained the same

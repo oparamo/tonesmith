@@ -16,6 +16,13 @@ consumers into one call per item just to see what exists. Each item keeps its id
 description and subtype ids, and the block's own controls stay attached. Pass `includeParams: true`
 for the full payload, or name the items you want.
 
+**Naming an item returns an `example`**: a spec fragment for that block at factory defaults, keyed
+by the block's own name, ready to copy into `generate_patch` and edit. A list of param keys says
+what a control is called but not where it goes, and the answer differs by block, so a caller
+mirroring one block's shape onto another met a rejection on its first call. Blocks with no types to
+choose between carry the example on the group, their only view. A group index leaves it out, since
+naming an item is what asks for that detail.
+
 **`generate_patch` takes a `device` argument, a `patches` array, and `setName`.** The 0.2.0 tool was
 gx1-only and took one patch per call with no `device` argument. One tool now builds patches for any
 device the server supports: a whole set goes out in one call and lands in one file write, with array

@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import type { CapabilityGroup, DeviceCapabilities } from "@tonesmith/core";
+import type { CapabilityGroup, CapabilityItem, DeviceCapabilities } from "@tonesmith/core";
 import { capabilityUtils, registry } from "@tonesmith/core";
 import { ok, err } from "../common";
 
@@ -10,20 +10,40 @@ import { ok, err } from "../common";
  * response. Items keep their identifying detail and their subtype ids; params come from naming a
  * single item, or from `includeParams` when the whole set really is wanted.
  */
-const groupIndex = (group: CapabilityGroup): object => ({
-  id: group.id,
-  name: group.name,
-  description: group.description,
-  params: group.params,
-  items: group.items.map(item => ({
-    id: item.id,
-    name: item.name,
-    models: item.models,
-    description: item.description,
-    subTypes: item.subTypes?.map(subType => subType.id),
-  })),
-  help: `Name an item as "${group.id}/<id>" in \`items\` for its params, or pass includeParams: true for every item's at once.`,
-});
+const groupIndex = (group: CapabilityGroup): object => {
+  // A group offering types shows its example on each item; one offering none has no other view to
+  // carry it, and its params are right here, so it would otherwise say nothing about placement.
+  const example = group.items.length === 0 ? group.example : undefined;
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    params: group.params,
+    example,
+    items: group.items.map(item => ({
+      id: item.id,
+      name: item.name,
+      models: item.models,
+      description: item.description,
+      subTypes: item.subTypes?.map(subType => subType.id),
+    })),
+    help: `Name an item as "${group.id}/<id>" in \`items\` for its params, or pass includeParams: true for every item's at once.`,
+  };
+};
+
+/**
+ * The whole group, minus the per-item examples. A caller asking for every item's params at once is
+ * reading the catalog rather than building one block, and the largest group's 39 examples would add
+ * several KB to a response already large enough to need watching.
+ */
+const fullGroup = (group: CapabilityGroup): object => {
+  const items = group.items.map(item => {
+    const bare: CapabilityItem = { ...item };
+    delete bare.example;
+    return bare;
+  });
+  return { ...group, items };
+};
 
 /**
  * Splits an `items` entry into its group and optional item id, on the FIRST slash only: item ids can
@@ -50,7 +70,7 @@ const viewForEntry = (
   const matched = capabilityUtils.findGroup(capabilities, group);
 
   if (item === undefined) {
-    const view = includeParams === true ? matched : groupIndex(matched);
+    const view = includeParams === true ? fullGroup(matched) : groupIndex(matched);
     return view;
   }
 
@@ -102,7 +122,9 @@ const registerDescribeDevice = (server: McpServer): void => {
     {
       description:
         "Return capability metadata for a device: signal chain, effect types, amp models, cabs, " +
-        "mics, and every param with its key, range, and allowed values.",
+        "mics, and every param with its key, range, and allowed values. Naming an item also " +
+        "returns an `example`: that block's spec at the device's factory defaults, showing where " +
+        "each param is written. Copy it into generate_patch and change the values you care about.",
       inputSchema: z.object({
         device: z.string().describe("Device ID (e.g. 'gx1'). Use list_devices to enumerate IDs."),
         items: z.array(z.string()).optional().describe(

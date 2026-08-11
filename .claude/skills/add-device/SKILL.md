@@ -223,6 +223,14 @@ capabilities on top of it. Don't hand-write param ranges twice.
    device data cross-checks it, and a guess that looks plausible against the sample files can sit
    there wrong for years. A consumer that learns the real limit by being rejected has already built
    the patch. Wire capabilities into the driver object from step 3.
+3. **`example`**: on each item, or on the group itself where the block offers no types to choose
+   between, a spec fragment `buildPatch` would accept, keyed by the block's own name in a spec and
+   filled from the factory defaults harvested in step 4. Derive it; don't hand-write one per item.
+   A param list says what a control is called and never where it goes, so a device free to nest one
+   block's controls and carry another's flat leaves a consumer to find out by being rejected. Guard
+   it by building every example: that one assertion covers the block key, the nesting, the defaults
+   and the validator at once. Where the codec stores a variant selection in a field the spec selects
+   differently, the example follows the spec, since it is a spec.
 
 Add the drift guard as a test. Because capabilities derives from the catalog, capabilities and
 the codec can't drift by construction; the real risk is between the two independently authored

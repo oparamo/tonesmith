@@ -175,6 +175,49 @@ describe("describe_device", () => {
     expect(paramNames).toContain("TREBLE");
   });
 
+  it("carries a copyable spec example on a named item", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", items: ["amp/JC-120", "fx/CHORUS"] };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const amp = viewOf(text, "amp/JC-120") as { example: { amp: Record<string, unknown> } };
+    const fx = viewOf(text, "fx/CHORUS") as { example: { fx1: Record<string, unknown> } };
+    expect(amp.example.amp.type, "the example selects the item it was asked about").toBe("JC-120");
+    expect(amp.example.amp.gain, "amp carries its controls flat").toBeDefined();
+    expect(fx.example.fx1.params, "an fx slot nests its controls").toBeDefined();
+  });
+
+  it("carries the example on a group with no types, its only view", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", items: ["ns"] };
+
+    const { text, isError } = await client.callTool("describe_device", input);
+
+    expect(isError, text).toBe(false);
+    const group = viewOf(text, "ns") as { example: { ns: Record<string, unknown> } };
+    expect(group.example.ns.threshold).toBeDefined();
+  });
+
+  it("leaves examples out of a group index and its full dump", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const index = { device: "gx1", items: ["fx"] };
+    const full = { device: "gx1", items: ["fx"], includeParams: true };
+
+    const indexed = await client.callTool("describe_device", index);
+    const dumped = await client.callTool("describe_device", full);
+
+    const indexView = viewOf(indexed.text, "fx") as { example?: unknown; items: { example?: unknown }[] };
+    const fullView = viewOf(dumped.text, "fx") as { items: { example?: unknown }[] };
+    expect(indexView.example, "a group with types shows examples on its items").toBeUndefined();
+    expect(indexView.items.every(item => item.example === undefined)).toBe(true);
+    expect(fullView.items.every(item => item.example === undefined)).toBe(true);
+  });
+
   it("resolves an item id case-insensitively", async () => {
     const client = await connectClient();
     close = client.close;

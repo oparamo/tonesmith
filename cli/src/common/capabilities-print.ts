@@ -61,6 +61,7 @@ const printGroup = (group: CapabilityGroup): void => {
 
   if (group.items.length === 0) {
     console.info(`${DIM}(no selectable types for this block)${RESET}`);
+    printExample(group.example);
     return;
   }
 
@@ -102,6 +103,17 @@ const printItemParams = (params: CapabilityItem["params"]): void => {
   }
 };
 
+/**
+ * Print the block's spec at factory defaults. It is what an agent copies into a generate call, and
+ * for a person reading the terminal it is the one place the block's own key and nesting are shown
+ * rather than left to be inferred from the param list above.
+ */
+const printExample = (example: CapabilityItem["example"]): void => {
+  if (!example) return;
+  console.info(`\n${YELLOW}Spec at factory defaults:${RESET}`);
+  console.info(JSON.stringify(example, null, 2));
+};
+
 /** Print full detail for a single item: description, models, subTypes, params. */
 const printItem = (group: CapabilityGroup, item: CapabilityItem): void => {
   console.info(`\n${BOLD}${item.name}${RESET}  ${DIM}[${group.id} / ${item.id}]${RESET}\n`);
@@ -115,6 +127,7 @@ const printItem = (group: CapabilityGroup, item: CapabilityItem): void => {
 
   const params = [...(group.params ?? []), ...(item.params ?? [])];
   printItemParams(params);
+  printExample(item.example);
 
   console.info();
 };

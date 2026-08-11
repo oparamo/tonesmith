@@ -11,13 +11,17 @@
  * tool) consume. The drift-guard tests in `capabilities.test.ts` enforce that the catalog
  * (and therefore the params surfaced here) stays in lockstep with the codec's field maps.
  */
-import type { DeviceCapabilities, CapabilityItem, ParamSpec } from "../../types";
+import type {
+  DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec, PatchSpecExample,
+} from "../../types";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlockId } from "./param-catalog";
+import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS } from "./defaults";
+import type { ParamDefaults, BlockDefaults } from "./defaults";
+import { BLOCK_GROUPS, NESTED_PARAMS, NAME_BYTES } from "./common";
 import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
 import { DEFAULT_CHAIN } from "./builder";
-import { NAME_BYTES } from "./common";
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -420,6 +424,110 @@ const PFX_META: CapabilityItem[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Spec examples
+// ---------------------------------------------------------------------------
+
+// Widened views of the defaults, so a group with none reads as undefined rather than as a lookup
+// TypeScript believes always resolves.
+const PER_TYPE_DEFAULTS: Partial<Record<string, BlockDefaults>> = { ...DEFAULTS_BY_TYPE };
+const PER_BLOCK_DEFAULTS: Partial<Record<string, ParamDefaults>> = BLOCK_DEFAULTS;
+
+/**
+ * The catalog block holding an FX-slot DELAY sub-algorithm's params. That item is the one whose
+ * params sit on its subTypes rather than on itself, so an example naming no subType would come back
+ * with no params at all.
+ */
+const VARIANT_BLOCK: PerTypeBlockId = "fxDelay";
+
+/**
+ * The block key a group is written under in a patch spec, taken from the spec's own block map. The
+ * three fx slots share the fx group, so the example names the first of them; the group's own
+ * description is where the fact that there are three lives.
+ */
+const specBlockFor = (group: string): string | undefined =>
+  Object.entries(BLOCK_GROUPS).find(([, id]) => id === group)?.[0];
+
+/** The defaults an example is filled with: per type where a block has types, per block where it doesn't. */
+const defaultsFor = (group: string, type?: string): ParamDefaults | undefined => {
+  const byType = PER_TYPE_DEFAULTS[group];
+  if (byType === undefined) return PER_BLOCK_DEFAULTS[group];
+  if (type === undefined) return undefined;
+  return byType[type];
+};
+
+/**
+ * The variant an example names, which is only the item whose own params are empty because its
+ * subTypes carry them. Everywhere else `subType` is optional and naming one would read as required.
+ */
+const exampleVariant = (item: CapabilityItem): CapabilityItem | undefined => {
+  if ((item.params?.length ?? 0) > 0) return undefined;
+  return item.subTypes?.find(variant => (variant.params?.length ?? 0) > 0);
+};
+
+/** Every param key the chosen shape accepts: the block's shared controls, then the type's own. */
+const acceptedKeys = (params: ParamSpec[]): Set<string> =>
+  new Set(params.flatMap(param => (param.key === undefined ? [] : [param.key])));
+
+/**
+ * The default that names a variant rather than setting a control. Pedal WAH is the case: the codec
+ * carries its model as an ordinary field, while the spec selects it with `subType` the way the fx
+ * slots do, so copying the default across verbatim would offer a key the block rejects.
+ */
+const variantDefault = (item: CapabilityItem | undefined, values: ParamDefaults, accepted: Set<string>): string | undefined => {
+  const ids = new Set((item?.subTypes ?? []).map(variant => variant.id));
+  const named = Object.entries(values)
+    .find(([key, value]) => !accepted.has(key) && typeof value === "string" && ids.has(value));
+  return named?.[1] as string | undefined;
+};
+
+/**
+ * One block's spec fragment at factory defaults: the selection that picks its shape, then its
+ * controls wherever that block keeps them.
+ */
+const exampleFor = (group: CapabilityGroup, item?: CapabilityItem): PatchSpecExample | undefined => {
+  const block = specBlockFor(group.id);
+  if (block === undefined) return undefined;
+
+  const variant = item === undefined ? undefined : exampleVariant(item);
+  const values = variant === undefined
+    ? defaultsFor(group.id, item?.id)
+    : PER_TYPE_DEFAULTS[VARIANT_BLOCK]?.[variant.id];
+  if (values === undefined) return undefined;
+
+  const accepted = acceptedKeys([...(group.params ?? []), ...(item?.params ?? []), ...(variant?.params ?? [])]);
+  const controls = Object.fromEntries(Object.entries(values).filter(([key]) => accepted.has(key)));
+  const selected = variant?.id ?? variantDefault(item, values, accepted);
+
+  const typeField = item === undefined ? {} : { type: item.id };
+  const subTypeField = selected === undefined ? {} : { subType: selected };
+  const body = NESTED_PARAMS.has(block) ? { params: controls } : controls;
+  return { [block]: { ...typeField, ...subTypeField, ...body } };
+};
+
+// Both leave the key off entirely where the group names no block, rather than carrying an empty one.
+const withItemExample = (group: CapabilityGroup, item: CapabilityItem): CapabilityItem => {
+  const example = exampleFor(group, item);
+  const decorated = example === undefined ? item : { ...item, example };
+  return decorated;
+};
+
+const withGroupExample = (group: CapabilityGroup): CapabilityGroup => {
+  const example = exampleFor(group);
+  const decorated = example === undefined ? group : { ...group, example };
+  return decorated;
+};
+
+/**
+ * Attaches each block's example where a caller meets it: on every item for a group that offers
+ * types, and on the group itself for one that doesn't, since that is the only view those have.
+ */
+const withExamples = (groups: CapabilityGroup[]): CapabilityGroup[] =>
+  groups.map(group => {
+    if (group.items.length === 0) return withGroupExample(group);
+    return { ...group, items: group.items.map(item => withItemExample(group, item)) };
+  });
+
+// ---------------------------------------------------------------------------
 // Assembled DeviceCapabilities
 // ---------------------------------------------------------------------------
 
@@ -442,7 +550,7 @@ const gx1Capabilities: DeviceCapabilities = {
       `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
   },
   patchName: { maxLength: NAME_BYTES },
-  groups: [
+  groups: withExamples([
     {
       id: "fx",
       name: "FX1/FX2/FX3",
@@ -507,7 +615,7 @@ const gx1Capabilities: DeviceCapabilities = {
       description: "Dedicated reverb block that adds reverberation. 10 types from natural acoustic spaces to creative shimmer and echo effects.",
       items: withTypeParams("reverb", REV_META),
     },
-  ],
+  ]),
 };
 
 export { gx1Capabilities };
