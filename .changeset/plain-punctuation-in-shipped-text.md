@@ -14,4 +14,4 @@ same way they always did.
 
 Three messages changed shape while their content stayed put: the chain codec's rejection of an
 unknown, repeated, or missing block, the CLI's confirmation after `write`, and the MCP
-`generate_gx1_patch` save summary.
+`generate_patch` save summary.

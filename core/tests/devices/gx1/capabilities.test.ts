@@ -16,9 +16,13 @@ import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, ODDS_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   FX_DLY_TYPES, FX_REV_TYPES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES,
-  PARAM_SUBTYPE_EFFECTS,
+  PARAM_SUBTYPE_EFFECTS, NAME_BYTES,
+  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS,
 } from "../../../src/devices/gx1/common";
+import type { BlockName } from "../../../src/devices/gx1/common";
+import { DEFAULTS_BY_TYPE } from "../../../src/devices/gx1/defaults";
 import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
+import { driver } from "../../../src/devices/gx1/driver";
 import { DEFAULT_CHAIN } from "../../../src/devices/gx1/builder";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../src/devices/gx1/param-catalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../src/devices/gx1/codec/fx-params";
@@ -430,4 +434,95 @@ describe("GX-1 chain capability", () => {
     expect(gx1Capabilities.chain.defaultOrder).toEqual(DEFAULT_CHAIN);
   });
 
+});
+
+// ── patch-name capability: the advertised limit is the encoded one ──
+//
+// These were two numbers until 2026-08-06: the generate schema capped names at 13 while the format
+// stores 16. Nothing caught it, because both were internally consistent and the longest name in the
+// committed exports happened to be 13 characters.
+
+describe("GX-1 patch-name capability", () => {
+  it("advertises the limit the codec actually encodes", () => {
+    expect(gx1Capabilities.patchName.maxLength).toBe(NAME_BYTES);
+  });
+
+  it("keeps a name that fills the stored width", () => {
+    const full = "x".repeat(NAME_BYTES);
+
+    expect(driver.blankPatch(full).name).toBe(full);
+  });
+});
+
+// ── spec examples: what a consumer is shown is what the validator accepts ────────
+//
+// The example exists to answer where a param is written, so the guard that matters is that it
+// builds. An example that drifts from the block key, the nesting, the defaults or the validator
+// stops being a usable spec, and buildPatch is the one check that covers all four at once.
+
+describe("GX-1 spec examples", () => {
+  const groupsWithBlocks = gx1Capabilities.groups.filter(group => BLOCK_NAMES.some(
+    name => BLOCK_GROUPS[name] === group.id
+  ));
+
+  const examples = groupsWithBlocks.flatMap(group => {
+    if (group.items.length === 0) return [{ group: group.id, item: "", example: group.example }];
+    return group.items.map(item => ({ group: group.id, item: item.id, example: item.example }));
+  });
+
+  it.each(examples)("$group $item carries an example", ({ example }) => {
+    expect(example).toBeDefined();
+  });
+
+  it.each(examples)("$group $item example builds", ({ example }) => {
+    const build = (): unknown => driver.buildPatch({ name: "Example", amp: { type: "TWIN" }, ...example });
+
+    expect(build).not.toThrow();
+  });
+
+  it.each(examples)("$group $item example is written under a real block key", ({ group, example }) => {
+    const [block] = Object.keys(example ?? {});
+
+    expect(BLOCK_GROUPS[block as BlockName]).toBe(group);
+  });
+
+  it.each(examples)("$group $item example nests its controls where the spec keeps them", ({ example }) => {
+    const [block] = Object.keys(example ?? {});
+    const body = Object.values(example ?? {})[0] as Record<string, unknown>;
+
+    expect("params" in body).toBe(NESTED_PARAMS.has(block));
+  });
+
+  it("fills the values from the device's own factory defaults, not a guess", () => {
+    const chorus = groupItems("fx").find(item => item.id === "CHORUS");
+    const example = chorus?.example?.fx1 as { params: Record<string, unknown> };
+
+    expect(example.params).toEqual(DEFAULTS_BY_TYPE.fx.CHORUS);
+  });
+
+  it("selects a variant the way the spec does, not the way the codec stores it", () => {
+    const wah = groupItems("pfx").find(item => item.id === "WAH");
+    const example = wah?.example?.pfx as Record<string, unknown>;
+
+    expect(example.subType, "the codec's wahType field is a subType in a spec").toBe("CRY WAH");
+    expect(example.wahType).toBeUndefined();
+  });
+
+  it("names a subType only where the params live on one", () => {
+    const fxItems = groupItems("fx");
+    const delayBlock = fxItems.find(item => item.id === "DELAY")?.example?.fx1 as Record<string, unknown>;
+    const chorusBlock = fxItems.find(item => item.id === "CHORUS")?.example?.fx1 as Record<string, unknown>;
+
+    expect(delayBlock.subType).toBeDefined();
+    expect(chorusBlock.subType).toBeUndefined();
+  });
+
+  it("leaves the example off a group that names no block", () => {
+    const lookupOnly = gx1Capabilities.groups.filter(group => ["cab", "mic"].includes(group.id));
+
+    for (const group of lookupOnly) {
+      expect(group.example).toBeUndefined();
+      for (const item of group.items) expect(item.example).toBeUndefined();
+    }
+  });
 });

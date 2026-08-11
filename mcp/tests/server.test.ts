@@ -28,8 +28,7 @@ describe("server instructions", () => {
   });
 
   // Derived from the live tool roster rather than a hardcoded list: if a tool is renamed, added, or
-  // removed, the instructions have to keep up. Per-device tools (generate_<id>_patch) are matched by
-  // their generic form, since the instructions can't name a device.
+  // removed, the instructions have to keep up.
   it("accounts for every registered tool", async () => {
     const { client, close: cleanup } = await connect();
     close = cleanup;
@@ -38,8 +37,7 @@ describe("server instructions", () => {
     const { tools } = await client.listTools();
 
     for (const { name } of tools) {
-      const generic = name.replace(/^generate_.+_patch$/, "generate_<device>_patch");
-      expect(instructions, `instructions should account for the ${name} tool`).toContain(generic);
+      expect(instructions, `instructions should account for the ${name} tool`).toContain(name);
     }
   });
 

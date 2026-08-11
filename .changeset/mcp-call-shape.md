@@ -16,13 +16,22 @@ consumers into one call per item just to see what exists. Each item keeps its id
 description and subtype ids, and the block's own controls stay attached. Pass `includeParams: true`
 for the full payload, or name the items you want.
 
-**`generate_patch` is `generate_gx1_patch`** (generate tools are per device; a fully generic one
-waits until the device count justifies it) and it takes `{ outPath, setName?, patches: [ ... ] }`
-instead of one patch per call. A whole set goes out in one call and lands in one file write, with
-array order becoming the order on the device rather than something the caller has to get right
-across N calls. Each patch is echoed back complete with its defaults filled in and the chain it was
-stored with, so the response is the confirmation and no follow-up read is needed. `setName` names the
-patch set stored in the file, which is distinct from `outPath`, the filename on disk.
+**Naming an item returns an `example`**: a spec fragment for that block at factory defaults, keyed
+by the block's own name, ready to copy into `generate_patch` and edit. A list of param keys says
+what a control is called but not where it goes, and the answer differs by block, so a caller
+mirroring one block's shape onto another met a rejection on its first call. Blocks with no types to
+choose between carry the example on the group, their only view. A group index leaves it out, since
+naming an item is what asks for that detail.
+
+**`generate_patch` takes a `device` argument, a `patches` array, and `setName`.** The 0.2.0 tool was
+gx1-only and took one patch per call with no `device` argument. One tool now builds patches for any
+device the server supports: a whole set goes out in one call and lands in one file write, with array
+order becoming the order in the file rather than something the caller has to get right across N
+calls. Each patch is echoed back complete with its defaults filled in and the chain it was stored
+with, so the response is the confirmation and no follow-up read is needed. `setName` names the patch
+set stored in the file, distinct from `outPath`, the filename on disk. A block's shape, meaning the
+fields it takes and their bounds, is validated by the device's own driver against its capability
+catalog rather than declared in the tool schema, so `describe_device` is where that detail lives.
 
 **`write_field` is `write_fields`** and takes a `{dot-path: value}` record instead of a single
 field and value pair. The whole set applies in memory before anything is written, so a rejected
@@ -37,15 +46,22 @@ dot-paths. `amp.mid` is `amp.middle`, and `delay.timeMs` and `reverb.timeS` are 
 `reverb.time`, with the units documented in each field's description rather than carried in the
 field name.
 
-**One uniform params bag.** Every per-type block (fx, pfx, delay, reverb) takes its type-specific
-params in a `params` record keyed by each param's `key`; delay and reverb's bag used to be called
-`extra`. The rule is one line: if a `describe_device` param's `key` matches a named field on the
-block, set that field, otherwise put it in `params[key]`. Passing a named control inside `params`
-errors instead of silently overriding the field. These records accept strings and booleans as well
-as numbers, which they did not: the many GX-1 params that select a model or mode by name (pedal
-WAH's `wahType`, TOUCH WAH's `filter`, SLICER's `pattern`, HARMONIST's `harmony`, delay TWIST's
-`mode`, SPACE ECHO's `head`) are `lookup()`-encoded strings in the codec, and a
-`z.record(z.string(), z.number())` schema could never build a working patch with any of them.
+**Params go where the decoded patch keeps them.** `pfx`, `delay` and `reverb` take their params as
+fields on the block, which is how `read_patch` returns them and how `write_fields` addresses them by
+dot-path. An fx slot keeps a `params` record keyed by each param's `key`, because one slot takes any
+of 39 effects and a variant per type and subtype would cost roughly 35 KB of tool schema on every
+request, against a `describe_device` lookup paid once. `generate_patch`'s own schema declares
+neither shape: the device's driver checks each entry against its own catalog, block by block,
+enforcing the same rules a per-type schema used to. Both shapes take strings and booleans as well as
+numbers, which they did not: the many GX-1 params that select a model or mode by name (TOUCH WAH's
+`filter`, SLICER's `pattern`, HARMONIST's `harmony`, delay TWIST's `mode`, SPACE ECHO's `head`) are
+`lookup()`-encoded strings in the codec, and an input restricted to numbers could never build a
+working patch with any of them. A key the chosen type has
+no field for is rejected with the shape that type does take, printed with `type` filled in, so
+nesting is shown rather than described.
+
+Pedal WAH's model is chosen by `subType`, alongside the fx slots and the way capabilities advertises
+it, rather than through the codec's `wahType` field.
 
 The server advertises onboarding `instructions` at initialize, delivered automatically to every
 client: a device-agnostic account of how many calls the work should take and which shapes get you

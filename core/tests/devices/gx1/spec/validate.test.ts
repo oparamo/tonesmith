@@ -1,0 +1,170 @@
+import { describe, it, expect } from "vitest";
+import { validateTypeParams } from "../../../../src/devices/gx1/spec/validate";
+import { validatePatchSpec } from "../../../../src/devices/gx1/spec/build";
+import { gx1Capabilities } from "../../../../src/devices/gx1/capabilities";
+
+describe("validateTypeParams", () => {
+  it("reports nothing for an unknown group or type (defers to the builder/codec)", () => {
+    const issues = validateTypeParams({ group: "fx", type: "NOPE", values: { sustain: 200 } });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("range-checks numeric params and ignores keys with no matching spec", () => {
+    const issues = validateTypeParams({
+      group: "fx", type: "COMPRESSOR", subType: "ORANGE",
+      values: { sustain: 200, attack: 50, bogus: 5 },
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain("fx SUSTAIN for COMPRESSOR");
+  });
+
+  it("merges a subType's own params (delay sub-algorithm) into the checked set", () => {
+    const issues = validateTypeParams({
+      group: "fx", type: "DELAY", subType: "MODULATE", values: { modRate: 500 },
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain("MOD RATE");
+  });
+
+  // The one input the device cannot report back on: it encodes nowhere, so the patch saves clean
+  // and plays as the default. Naming the param that does carry the variant is the whole point of
+  // rejecting it here rather than leaving it to the builder.
+  it("rejects a subType on a type whose variant is an ordinary param, naming that param", () => {
+    const issues = validateTypeParams({ group: "fx", type: "PHASER", subType: "4 STAGE", values: {} });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0], "should point at the param that carries the variant").toContain("params.stage");
+    expect(issues[0], "and spell out its values").toContain("12 STAGE");
+  });
+
+  it("rejects a subType on a type with no variant at all", () => {
+    const issues = validateTypeParams({ group: "pfx", type: "PEDAL BEND", subType: "CRY WAH", values: {} });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain("PEDAL BEND");
+  });
+
+  // Only the "declares none" case used to be caught, so a wrong value on a type that does have
+  // variants fell through to the codec's lookup and came back as `Unknown type value: "WOBBLE"`,
+  // naming neither the block, nor the field, nor what it could have been.
+  it("rejects a subType the item doesn't declare, listing the ones it does", () => {
+    const issues = validateTypeParams({ group: "fx", type: "COMPRESSOR", subType: "WOBBLE", values: {} });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain("WOBBLE");
+    expect(issues[0], "should list the variants the type does have").toContain("ORANGE");
+  });
+
+  it("accepts a subType the item declares", () => {
+    const issues = validateTypeParams({ group: "pfx", type: "WAH", subType: "CRY WAH", values: {} });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("passes valid numeric and discrete values", () => {
+    const issues = validateTypeParams({
+      group: "delay", type: "ANALOG", values: { time: 360, highCut: "2kHz" },
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("checks discrete-value membership", () => {
+    const issues = validateTypeParams({
+      group: "delay", type: "ANALOG", values: { highCut: "9kHz" },
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain("delay HIGH CUT for ANALOG");
+  });
+});
+
+describe("validatePatchSpec", () => {
+  const amp = { type: "TWIN", gain: 20, bass: 50, middle: 50, treble: 50 };
+  const valid = { name: "Test", amp };
+
+  it("accepts a minimal usable spec", () => {
+    expect(validatePatchSpec(valid)).toEqual([]);
+  });
+
+  it("names the unknown block and lists the real ones", () => {
+    const [issue] = validatePatchSpec({ ...valid, revrb: { type: "HALL S" } });
+
+    expect(issue).toContain("revrb");
+    expect(issue).toContain("reverb");
+  });
+
+  it("rejects a name longer than the device can store", () => {
+    const tooLong = "x".repeat(gx1Capabilities.patchName.maxLength + 1);
+
+    expect(validatePatchSpec({ ...valid, name: tooLong })).not.toEqual([]);
+  });
+
+  it("requires an amp block, which every patch sounds through", () => {
+    expect(validatePatchSpec({ name: "Test" })).not.toEqual([]);
+  });
+
+  it("rejects a value of the wrong kind, naming the param", () => {
+    const [issue] = validatePatchSpec({ ...valid, ns: { threshold: "loud", release: 40 } });
+
+    expect(issue).toContain("THRESHOLD");
+    expect(issue, "should quote back what it was given").toContain("loud");
+  });
+
+  it("rejects a fraction for a param the catalog gives no decimals", () => {
+    const spec = { ...valid, delay: { type: "STANDARD", time: 400.5 } };
+
+    expect(validatePatchSpec(spec)).not.toEqual([]);
+  });
+
+  it("accepts a fraction where the catalog gives decimals", () => {
+    const spec = { ...valid, reverb: { type: "HALL S", time: 4.5 } };
+
+    expect(validatePatchSpec(spec)).toEqual([]);
+  });
+
+  it("rejects a block that names no type, listing the types it has", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { time: 4 } });
+
+    expect(issue).toContain("HALL S");
+  });
+
+  // Without this the type is left unresolved, so every param the caller sent alongside it reads as
+  // an unknown key and nothing in the response says the type was the problem.
+  it("rejects a type the block doesn't have, listing the ones it does", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "HALL XL", time: 4 } });
+
+    expect(issue).toContain("HALL XL");
+    expect(issue).toContain("HALL S");
+  });
+
+  // Every block fills what the caller leaves unset from the device's own factory values, so naming
+  // the type is the whole obligation. These four used to demand their controls outright, which made
+  // a caller invent a value for every knob on a block it only wanted switched on.
+  it("accepts a block that names only its type, leaving the rest to default", () => {
+    expect(validatePatchSpec({ name: "Test", amp: { type: "TWIN" } })).toEqual([]);
+  });
+
+  it("rejects a control the chosen type has no field for", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "TERA ECHO", time: 4, level: 50 } });
+
+    expect(issue).toContain("time");
+  });
+
+  it("names a flat fx param as a param of its type rather than an unknown key", () => {
+    const spec = { ...valid, fx1: { type: "CHORUS", rate: 16 } };
+    const [issue] = validatePatchSpec(spec);
+
+    expect(issue).toContain("rate");
+    expect(issue, "should say where it belongs").toContain("params");
+  });
+
+  it("reports every problem it finds rather than stopping at the first", () => {
+    const spec = { ...valid, reverb: { type: "HALL S", time: 99, tone: 999 } };
+
+    expect(validatePatchSpec(spec)).toHaveLength(2);
+  });
+});

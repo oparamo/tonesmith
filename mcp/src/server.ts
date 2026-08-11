@@ -6,8 +6,8 @@ import {
   registerDescribeDevice,
   registerCopyPatch,
   registerCreatePatchFile,
+  registerGeneratePatch,
 } from "./tools";
-import { deviceTools } from "./devices";
 import { instructions } from "./instructions";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -27,10 +27,7 @@ const buildServer = (): McpServer => {
   registerDescribeDevice(server);
   registerCopyPatch(server);
   registerCreatePatchFile(server);
-
-  for (const registerTools of deviceTools) {
-    registerTools(server);
-  }
+  registerGeneratePatch(server);
 
   return server;
 };

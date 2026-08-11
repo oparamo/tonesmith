@@ -62,7 +62,9 @@ const def = (name: string, domain: Domain, description: string): ParamSpec => {
   if (domain.kind === "range") {
     spec.min = domain.min;
     spec.max = domain.max;
+    if (domain.decimals !== undefined) spec.decimals = domain.decimals;
   }
+  if (domain.kind === "boolean") spec.boolean = true;
   return spec;
 };
 

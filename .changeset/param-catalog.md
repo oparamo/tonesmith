@@ -20,7 +20,19 @@ of the same fact.
 - **`values`**, the full ordered list of valid labels for every enum param. A compact `range`
   summary like "20 Hz-12.5 kHz, FLAT" could not tell you whether `"2.5kHz"` or `"2.50kHz"` was the
   spelling the codec accepts.
-- **`min`** and **`max`** for numeric params.
+- **`min`** and **`max`** for numeric params, plus **`decimals`** on the few that take fractional
+  values. Reverb TIME runs 0.1-10.0 s while PRE-DELAY's 0-200 is whole milliseconds, and the bounds
+  alone cannot tell those apart.
+- **`boolean`** on params carried as real toggles. A numeric param is recognizable by its bounds and
+  a discrete one by its `values`, so without this a toggle was the one kind a consumer had to
+  identify by reading `range` as English.
+
+Each block also carries an **`example`**: the spec that builds it at the device's factory defaults,
+keyed by the block's own name. A key alone says what a control is called and never where it goes,
+and the GX-1 does not keep them all in one place: an fx slot nests its controls under `params` the
+way the decoded patch does, while amp, delay and reverb carry theirs as fields. That was learnable
+only by being rejected, at which point the patch was already built. The example is what a caller
+copies and edits, so it doubles as a statement of what each control is left at when you omit it.
 
 `capabilities.ts` derives each item's params from the catalog rather than restating them, which
 makes delay and reverb **per type**: `describe_device gx1 reverb SHIMMER` answers for SHIMMER
@@ -37,38 +49,28 @@ WAH's `FREQ` is `MANUAL`, the dedicated Delay block never had the `DIRECT` it ad
 FX types were under-reporting `DIRECT` and other params, and the cabinet list was missing its
 `USER1` through `USER8` entries.
 
-The MCP generate schema reads the catalog rather than repeating it. Numeric bounds come off the
-`ParamSpec`, and so does the sentence beside each field: `.describe("Gain 0-120")` sitting next to
-a bound that came from the catalog meant a range change updated the enforcement and left the text
-quoting the old number, with nothing to catch it because the bound itself stayed correct. That
-removed about forty hand-written range strings, and the descriptions an agent reads are fuller than
-the strings they replaced, because the catalog carries real prose per param. One rule covers the
-whole schema: a field whose valid values are a fixed set that does not depend on another field
-names that set in its own description, built from capabilities; a field whose valid set varies by
-chosen type does not, because `describe_device` is the only thing that can answer it. So
-`amp.type`, `amp.speaker`, `amp.mic`, `odds.type`, `delay.highCut`, `ns.detect` and `fv.curve` name
-their full lists in the exact spelling they require, and `subType` and the per-type `params`
-records point at `describe_device`.
+The device's driver reads the catalog to validate `generate_patch` input at runtime, rather than a
+schema repeating it field by field. `boolean` tells the validator a value must be `true` or
+`false`, `values` tells it which strings are legal, and `decimals` tells it whether a fraction is
+legal for a numeric field, since a bound alone cannot say whether 4.5 is legal, only whether it is
+in range.
 
-Supplied values are checked against the chosen type's real range before anything is written. The
-flat schema could only bound delay and reverb by a single representative type and left the `params`
-bags unchecked, so `ANALOG` with a time of 1201 ms, past its 1200 ms limit, got as far as the
-codec's raw byte guard. It is rejected up front now, with a message naming the real range or the
-valid keys.
+The driver checks supplied values against the chosen type's real range before anything is written.
+`ANALOG` with a time of 1201 ms, past its 1200 ms limit, used to get as far as the codec's raw byte
+guard. It is rejected up front now, by the bound `describe_device` already gave the caller for that
+field.
 
-That check is also the only one that bounds delay and reverb, because a representative type cannot
-speak for the others. Where each type declares its own range for a shared control, the flat field
-carries the union of all of them as an outer gate, so no type's valid values are unreachable:
-reverb LEVEL 0 (SHIMMER, TERA ECHO), reverb TIME above 10 (SUB DELAY, whose range is 1-2000 ms),
-delay LEVEL 0 (SPACE ECHO, SHIMMER, WARP, TWIST) and delay TIME 0 (GLITCH) would otherwise be
-rejected before anything looked at the chosen type. Those fields state no range of their own, since
-the union spans units (reverb TIME runs from 0.1 seconds to 2000 milliseconds) and no type accepts
-all of it; they point at `describe_device`, which is the only thing that can answer for the type
-chosen.
+Declaring bounds per type is also what makes every documented value reachable. One field serving
+every type could carry no bound but the union of theirs, in units no single type uses: reverb TIME
+would have run 0.1 (seconds, for the halls) to 2000 (milliseconds, for SUB DELAY). Reverb LEVEL 0
+(SHIMMER, TERA ECHO), reverb TIME above 10 (SUB DELAY), delay LEVEL 0 (SPACE ECHO, SHIMMER, WARP,
+TWIST) and delay TIME 0 (GLITCH) are each the device's own range for that type, and each is now
+declared as such.
 
 The CLI's `capabilities <group> <item>` prints each param's write `key` and its full `values` list
 alongside the label. Without the key there was no way to tell which dot-path `write` expects, and
 the exact spellings (`2.5kHz`, `FLAT`) appeared nowhere in the CLI.
 
 Because the catalog and the codec are authored independently, a drift guard checks them against
-each other across every block and type, and the MCP schema is checked against the catalog in turn.
+each other across every block and type. The validator reads the catalog rather than restating it,
+so there is no third copy to drift.

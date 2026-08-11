@@ -3,8 +3,9 @@ interface ParamSpec {
   name: string;
   /**
    * The exact property key for this param in machine surfaces: the field name in decoded
-   * patches (`read_patch` output), and the key to use inside a block's `params` record when
-   * building a patch. Distinct from `name`, which is the human display label
+   * patches (`read_patch` output), and the key it is written under when building a patch.
+   * Where that key sits within the block varies by block, so the `example` on the group or item
+   * is what shows the placement. Distinct from `name`, which is the human display label
    * ("PRE-DELAY" vs `preDelay`, "OCT F-BACK" vs `octFeedback`). Absent only for params with
    * no backing codec field (e.g. HARMONIST's KEY, which is the patch-level key).
    */
@@ -17,6 +18,19 @@ interface ParamSpec {
    */
   min?: number;
   max?: number;
+  /**
+   * Decimal places this param accepts, present only where it takes fractional values (reverb TIME
+   * runs 0.1-10.0 s). Absent means whole numbers only, which is the common case. A consumer
+   * building a schema needs this to know whether to reject 4.5: the bounds alone can't say, since
+   * a fractional param's own min and max are often whole numbers.
+   */
+  decimals?: number;
+  /**
+   * True when this param's value is a real boolean rather than a number or a string. Numeric params
+   * are recognizable by their `min`/`max` and discrete ones by their `values`, so without this flag
+   * a toggle is the one kind a consumer would have to identify by reading `range` as English.
+   */
+  boolean?: boolean;
   description: string;
   /**
    * For discrete lookup-valued params whose `range` is only a compact summary (e.g. the
@@ -27,6 +41,17 @@ interface ParamSpec {
    */
   values?: readonly string[];
 }
+
+/**
+ * A patch-spec fragment for one block, keyed by the block's own name in a spec and filled with the
+ * device's factory defaults, ready to pass to `PatchDriver.buildPatch` once a patch `name` is added.
+ *
+ * It exists to answer where a param is written, which a list of param keys cannot: a device is free
+ * to nest a block's controls or carry them flat, and that is device knowledge a consumer would
+ * otherwise learn by being rejected, having already built the patch. Showing a real fragment also
+ * avoids inventing a vocabulary to describe nesting in words.
+ */
+type PatchSpecExample = Record<string, unknown>;
 
 /**
  * A selectable option within a capability group: an amp model, effect type, drive pedal,
@@ -45,6 +70,8 @@ interface CapabilityItem {
   subTypes?: CapabilityItem[];
   /** Parameters specific to this item (supplement the group's shared params). */
   params?: ParamSpec[];
+  /** A spec fragment selecting this item, at factory defaults. Absent where the item names no block. */
+  example?: PatchSpecExample;
 }
 
 /**
@@ -62,6 +89,11 @@ interface CapabilityGroup {
   items: CapabilityItem[];
   /** Block-level controls shared across all selected items. */
   params?: ParamSpec[];
+  /**
+   * A spec fragment for this block at factory defaults, carried by the groups that offer no types
+   * to choose between. Where a group has items, each item carries its own instead.
+   */
+  example?: PatchSpecExample;
 }
 
 /**
@@ -76,11 +108,26 @@ interface ChainSpec {
   defaultOrder: string[];
 }
 
+/**
+ * Limits on the patch name, which no capability group covers: the name belongs to the patch rather
+ * than to any block. A consumer that finds out by being rejected has already built the patch, so
+ * this has to be readable up front.
+ */
+interface PatchNameSpec {
+  /** Longest name the device's file format stores. */
+  maxLength: number;
+}
+
 /** All capability metadata for a device. */
 interface DeviceCapabilities {
   /** The device's signal chain: block order and how blocks are reordered/bypassed. */
   chain: ChainSpec;
+  /** What the device will accept as a patch name. */
+  patchName: PatchNameSpec;
   groups: CapabilityGroup[];
 }
 
-export type { ParamSpec, CapabilityItem, CapabilityGroup, ChainSpec, DeviceCapabilities };
+export type {
+  ParamSpec, PatchSpecExample, CapabilityItem, CapabilityGroup, ChainSpec, PatchNameSpec,
+  DeviceCapabilities,
+};

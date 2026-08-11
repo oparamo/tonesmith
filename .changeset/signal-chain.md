@@ -11,7 +11,7 @@ that `describe_device` and the CLI's `capabilities chain` surface as their own v
 MCP server's onboarding instructions send a connected agent there first, since the chain is what
 the rest of a patch hangs off.
 
-**Breaking:** `generate_gx1_patch`'s `chain` input is a `string[]`, first element first in the
+**Breaking:** `generate_patch`'s `chain` input is a `string[]`, first element first in the
 chain, instead of a `">"`-delimited string, and the CLI prints a chain as a comma-separated list.
 `"OD"` is still an alias for `"OD/DS"`.
 
@@ -27,7 +27,7 @@ first to last, and rejects a partial list, naming the blocks left out and the de
 and edit. A partial list used to be filled in by reinserting each missing block after its default
 predecessor, which could carry a listed block clear to the end of the chain: `["OD/DS", "FX1"]`
 resolved to FX1 sitting after the reverb. Omitting `chain` entirely still takes the default order,
-and `generate_gx1_patch` states the stored order in its response, so a caller that omitted it sees
+and `generate_patch` states the stored order in its response, so a caller that omitted it sees
 what it took.
 
 **Every block bypasses uniformly.** `amp()`, `fx()` and `odds()` gained an `on` option, so

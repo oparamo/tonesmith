@@ -33,10 +33,18 @@ pnpm --filter @tonesmith/mcp start
 pnpm doc-to-md <url|file> [-o out.md] [--format html|pdf]
 ```
 
-Each device's reverse-engineered binary format spec is `core/docs/<id>/FORMAT.md`. Read it before
-modifying that device's encode/decode logic. The authoritative reference for a device's parameter
-names and value ranges is its captured manual docs, also under `core/docs/<id>/`. Each device's
-committed round-trip fixture lives at `fixtures/<id>/`.
+Each device's reverse-engineered binary format spec is `core/docs/<id>/FORMAT.md`. **Read it first
+and treat it as the answer.** It is written from the device's own official parameter tables, not
+inferred from sample files, so its offsets, field widths and value tables are the device's own
+numbers. Anything you would otherwise go digging through vendor material for should already be in
+there; if it isn't, or it disagrees with the code, that is a gap in FORMAT.md worth fixing rather
+than a reason to keep re-deriving it elsewhere.
+
+The captured manual docs alongside it, also under `core/docs/<id>/`, cover what the parameters
+*mean*: what a control does, what it sounds like, how the device is operated. Use them for prose and
+intent, and FORMAT.md for numbers.
+
+Each device's committed round-trip fixture lives at `fixtures/<id>/`.
 
 ## Repository layout
 
@@ -83,6 +91,10 @@ core/                       @tonesmith/core
       capabilities.ts       the device's DeviceCapabilities metadata (structure/models/subtypes;
                             each item's params come from param-catalog.ts)
       driver.ts             PatchDriver<T> object wiring codec + file I/O together
+      spec/                 validates a patch spec against the device's own capability catalog and
+                            builds it: validate.ts checks blocks, types and values; errors.ts
+                            composes the rejection messages; build.ts assembles the validated spec
+                            via builder.ts (barrel: index.ts). Backs PatchDriver.buildPatch
       index.ts              device barrel: driver, patch types, builder helpers
     index.ts                registers the roster; public re-exports + one namespace per device
   tests/                    mirrors src/: shared-util suites + devices/<id>/ suites (codec
@@ -111,15 +123,10 @@ mcp/                        @tonesmith/mcp  (bin: tonesmith-mcp)
     common/                 response.ts, the ok / err MCP response helpers (barrel: common/index.ts)
     instructions.ts         server-onboarding text sent to every client at initialize, written as
                             the two-call path for building patches rather than a tool inventory
-    tools/                  generic tool registrations, device-agnostic (barrel: tools/index.ts):
+    tools/                  tool registrations, all device-agnostic (barrel: tools/index.ts):
                             list_devices, read_patch, write_fields, describe_device, copy_patch,
-                            create_patch_file
-    devices/index.ts        per-device tool roster
-    devices/<id>/           per device: the generate_<id>_patch tool, its zod schemas, the
-                            param-ref bridge that reads bounds and descriptions off the catalog,
-                            param validation, and the capability-derived type text in its
-                            description
-    server.ts               buildServer(), registering generic tools then the device roster
+                            create_patch_file, generate_patch
+    server.ts               buildServer(), registering the tools
     index.ts                bin entry: shebang + buildServer() over stdio
   tests/                    behavior tests (MCP InMemoryTransport, per-tool suites)
 
@@ -177,8 +184,16 @@ dashes, ternaries assigned before use, cognitive complexity 10), so they are not
 - **`param-catalog.ts`, `capabilities.ts`, and `types/` are three views of one truth**, not
   triplication to collapse. The catalog is the param ground truth, capabilities is the structure an
   agent browses, the types are the decoded shape. The drift guards
-  (`core/tests/devices/<id>/capabilities.test.ts`, `mcp/tests/schema-drift.test.ts`, and the
-  defaults guard) are what let the three coexist, so they stay even when other defensive tests go.
+  (`core/tests/devices/<id>/capabilities.test.ts` and the defaults guard) are what let the three
+  coexist, so they stay even when other defensive tests go.
+- **A device's block catalog never enters the tool schema.** `tools/list` sits in the model's
+  context on every request, and one device's per-type schema measured 24,902 bytes against 5,205
+  for every device-agnostic tool combined, so a per-device generate tool made the resident cost
+  scale with the roster. Deleting that layer took `tools/list` from 30,115 bytes to 7,129. A static
+  schema fits an argument shape that is fixed and independent of the argument values; a block's
+  fields depend on its `type`, which is a lookup, not a signature. `generate_patch` takes a
+  permissive `patches` array and the driver validates it, which is what `fx` already did for all
+  39 of its effect types. Point-of-use detail lives in `describe_device`, paid once.
 - **Tests assert the data a message carries, never its wording.** Assert that a rejection names the
   bad id and lists the valid ones; don't assert the sentence it says them in. Prose written for
   agents gets reworded constantly, and a wording assertion turns every such edit into a test edit.
@@ -211,11 +226,11 @@ repository.
 |-----------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `list_devices`        | none                                                               | Returns `[{ id, name }]`                                                                                                                                                                                                                                  |
 | `read_patch`          | `device`, `file`, `ref?`                                           | `ref` = index or name; omit for all patches                                                                                                                                                                                                               |
-| `generate_<id>_patch` | `outPath`, `setName?`, `patches[]` (per-patch spec is device-specific, derived from the device's builder + capabilities) | One tool per device (currently `generate_gx1_patch`): builds every patch in `patches` and upserts them by name into `outPath` in array order, in one file write (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed). The response echoes each patch complete with defaults plus its resolved chain, so no follow-up read is needed |
+| `generate_patch`      | `device`, `outPath`, `setName?`, `patches[]`                       | One tool for every device: the per-patch spec comes from `describe_device`, not from this tool's schema. Builds every patch in `patches` and upserts them by name into `outPath` in array order, in one file write (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed). The response echoes each patch complete with defaults plus its resolved chain, so no follow-up read is needed |
 | `write_fields`        | `device`, `file`, `ref`, `fields`                                  | Dot-path mutations as a `{path: value}` record, same as CLI `write`. The batch applies atomically: a rejected edit leaves the file untouched                                                                                                              |
-| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<item>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). Omit `items` for all groups plus a chain summary. A bare-group entry is an index with no per-item params, so name the items instead, or pass `includeParams` for the full set. One bad entry fails the whole call |
-| `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use the device's generate tool, which appends by name                                                        |
-| `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults. Never overwrites an existing file. Not part of building a patch from parameters: the generate tool creates its own output file                                                     |
+| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<item>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). Omit `items` for all groups plus a chain summary. A bare-group entry is an index with no per-item params, so name the items instead, or pass `includeParams` for the full set. A named item also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
+| `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use `generate_patch`, which appends by name                                                        |
+| `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                                                     |
 
 ## CLI capabilities command
 

@@ -218,7 +218,19 @@ capabilities on top of it. Don't hand-write param ranges twice.
    exactly once, and reject anything less: where a partial list's missing blocks belong is a
    guess, and a wrong guess silently ships a different sound. Say in the description that position
    and on/off are separate inputs, so leaving a block out of the order never reads as a way to
-   switch it off. Wire capabilities into the driver object from step 3.
+   switch it off. Also declare the required **`patchName`** (`{ maxLength }`): source it from the
+   format's own name-field width, not a guess. It belongs to no capability group, so no other
+   device data cross-checks it, and a guess that looks plausible against the sample files can sit
+   there wrong for years. A consumer that learns the real limit by being rejected has already built
+   the patch. Wire capabilities into the driver object from step 3.
+3. **`example`**: on each item, or on the group itself where the block offers no types to choose
+   between, a spec fragment `buildPatch` would accept, keyed by the block's own name in a spec and
+   filled from the factory defaults harvested in step 4. Derive it; don't hand-write one per item.
+   A param list says what a control is called and never where it goes, so a device free to nest one
+   block's controls and carry another's flat leaves a consumer to find out by being rejected. Guard
+   it by building every example: that one assertion covers the block key, the nesting, the defaults
+   and the validator at once. Where the codec stores a variant selection in a field the spec selects
+   differently, the example follows the spec, since it is a spec.
 
 Add the drift guard as a test. Because capabilities derives from the catalog, capabilities and
 the codec can't drift by construction; the real risk is between the two independently authored
@@ -238,17 +250,19 @@ step, since that data isn't in the repo and so can't be a CI dependency.
   capabilities all come from that shared wiring; write no per-device command code. Add one
   roster line in `cli/src/devices/index.ts`. The printer stays hand-written (see CLAUDE.md's
   Conventions section for why).
-- **MCP**: the generic tools (`list_devices`, `read_patch`, `write_fields`, `describe_device`,
-  `copy_patch`, `create_patch_file`) pick the new device up automatically once its driver is in
-  the core roster. Only patch generation is per-device: `mcp/src/devices/<id>/` with a
-  `generate_<id>_patch` tool plus the zod schemas it needs, and one roster line in
-  `mcp/src/devices/index.ts`. Derive the schemas' bounds and descriptions, and the tool
-  description's type catalog, from the driver's capabilities and catalog so neither can drift.
-  The generate tool takes `{ outPath, setName?, patches: [ …perPatchSpec ] }`, a whole set in one
-  call, saved with one `patchUtils.upsertPatches` write, in array order. Every bypassable block
-  must accept a bare `{ on: false }`: wrap it with the `bypassable` helper so a bypass folds into
-  the omitted case and writes identical bytes. The response must echo each built patch plus its
-  resolved chain, so a caller never needs a follow-up read to confirm a write.
+- **MCP**: every tool, including patch generation, is device-agnostic and already wired, so
+  onboarding a device touches zero files under `mcp/`. `list_devices`, `read_patch`,
+  `write_fields`, `describe_device`, and `copy_patch` / `create_patch_file` pick the new device up
+  automatically once its driver is in the core roster, the same as the CLI. `generate_patch` needs
+  one thing from the driver to work for the new device: implement `buildPatch(spec)` (see
+  `core/src/devices/gx1/spec/` for the current instance), which validates a plain spec object
+  against the device's own capability catalog and builds the patch, owning its own rejection
+  messages. Every bypassable block must accept a bare `{ on: false }`: wrap it with the
+  `bypassable` helper so a bypass folds into the omitted case and writes identical bytes. Once
+  `buildPatch` is in place, verify `generate_patch` works for the new device through the MCP
+  server (per CLAUDE.md's Conventions, that means calling the tool, not checking the CLI). The
+  response echoes each built patch plus its resolved chain, so a caller never needs a follow-up
+  read to confirm a write.
 - **Tests**: behavior tests in `cli/tests/` and `mcp/tests/`, exercising every CLI command and
   MCP tool against the fixture from step 4, including error paths (bad ref, bad field path,
   unknown device).
@@ -270,7 +284,7 @@ the device lists in `README.md` and `CLAUDE.md`'s Project section.
 - Against the built output, `node cli/dist/index.js <id> read fixtures/<id>/<fixture>` prints
   the patches and `node cli/dist/index.js <id> capabilities` lists the device's groups.
 - CLI and MCP behavior tests cover the new device's happy paths and error paths, including
-  `generate_<id>_patch`.
+  `generate_patch` for the new device.
 - Changesets exist (minor for `@tonesmith/core`, `@tonesmith/cli`, `@tonesmith/mcp`) and the
   device lists in `README.md` and `CLAUDE.md` mention the new device.
 
@@ -282,7 +296,7 @@ copy from. Useful pointers:
 - `core/src/devices/gx1/`: a finished example of the step-3 and step-5 file layout.
 - `fixtures/gx1/rock-tones.tsl`: a finished example of the step-4 round-trip fixture, and
   `core/tests/fixtures/gx1/default-init.tsl` of the factory-default one.
-- `cli/src/devices/gx1/`, `mcp/src/devices/gx1/`: finished examples of step 6.
+- `cli/src/devices/gx1/`, `core/src/devices/gx1/spec/`: finished examples of step 6.
 
 A new device's file extension, envelope shape, byte encodings, and terminology will differ from
 GX-1's in ways that matter. Expect to discover them, not assume them.

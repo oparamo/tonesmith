@@ -97,7 +97,7 @@ MCP tools:
 | `read_patch`          | Read one or all patches from a patch file                                                           |
 | `write_fields`        | Edit one or more fields in an existing patch, applied as one batch                                  |
 | `describe_device`     | Look up a device's capability metadata (chain, groups, types, params). `items` takes a list, so one call covers many lookups |
-| `generate_<id>_patch` | Build one or more patches from structured parameters and save them in one write. One tool per device (currently `generate_gx1_patch`) |
+| `generate_patch`      | Build one or more patches from structured parameters and save them in one write. The per-patch spec comes from `describe_device` |
 | `copy_patch`          | Copy a patch into a slot in another file, replacing what was there                                  |
 | `create_patch_file`   | Start an empty patch file of blank patches at the device's factory defaults                         |
 
@@ -118,7 +118,7 @@ pnpm doc-to-md manual.pdf -o out.md    # local PDF manual to Markdown
 ```tree
 core/            @tonesmith/core: device-agnostic types, registry, and utils; one driver per device under src/devices/<id>/
 cli/             @tonesmith/cli:  shared device-agnostic commands; one thin printer/descriptor per device under src/devices/<id>/
-mcp/             @tonesmith/mcp:  generic MCP tools; one generate tool per device under src/devices/<id>/
+mcp/             @tonesmith/mcp:  MCP tools, all device-agnostic; a device is picked up from the core roster
 tools/           repo tooling (doc-to-md); not published
 fixtures/<id>/   one committed real patch-file export per device, the round-trip test baseline
 core/docs/<id>/  captured device documentation + FORMAT.md, the reverse-engineered format spec

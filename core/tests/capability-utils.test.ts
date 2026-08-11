@@ -4,6 +4,7 @@ import { findGroup, findItem } from "../src/capability-utils";
 
 const caps: DeviceCapabilities = {
   chain: { description: "Signal chain", defaultOrder: ["amp", "delay"] },
+  patchName: { maxLength: 16 },
   groups: [
     {
       id: "amp",

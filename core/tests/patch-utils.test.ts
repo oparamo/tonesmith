@@ -15,7 +15,7 @@ const makePatch = (name: string): Patch =>
 const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   id: "fake",
   name: "Fake",
-  capabilities: { chain: { description: "", defaultOrder: [] }, groups: [] },
+  capabilities: { chain: { description: "", defaultOrder: [] }, patchName: { maxLength: 16 }, groups: [] },
   readFile: (path) => {
     const file = files.get(path);
     if (!file) {
@@ -31,6 +31,7 @@ const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
     patches: Array.from({ length: nPatches }, () => makePatch("blank")),
   }),
   blankPatch: (name = "blank") => makePatch(name),
+  buildPatch: (spec) => makePatch((spec as { name: string }).name),
   decodePatch: (raw) => raw as unknown as Patch,
   encodePatch: (patch) => patch as unknown as Record<string, unknown>,
 });
