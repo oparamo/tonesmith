@@ -54,15 +54,15 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     [RAW]: paramSet,
   };
 
-  // Effects in this set store their type/mode in param-block byte p[0] rather than
-  // in FX_COM byte[2]. After decoding, promote params["type"] back to block.subType
-  // so the display layer can show e.g. "COMPRESSOR (D-COMP)".
+  // Effects in this set store their sub-model in param-block byte p[0] rather than in FX_COM
+  // byte[2]. After decoding, promote it from the params bag onto block.subType, so the display
+  // layer can show e.g. "COMPRESSOR (D-COMP)".
   for (const slot of FX_SLOTS) {
     const block = patch[slot];
     const paramBlockBytes = bytesFromHex(paramSet[paramBlockKey(slot, block.type)]);
     const params = decodeFxParams(block.type, paramBlockBytes);
-    if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params.type === "string") {
-      block.subType = params.type;
+    if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params.subType === "string") {
+      block.subType = params.subType;
     }
     block.params = params;
   }

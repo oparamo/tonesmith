@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { presentPatch } from "../src/patch-view";
 
 describe("presentPatch", () => {
-  it("drops params.type from a block that mirrors it onto subType", () => {
+  it("drops the duplicate subType from inside a block that mirrors it", () => {
     const view = presentPatch({
       name: "P",
-      fx1: { type: "COMPRESSOR", subType: "ORANGE", params: { type: "ORANGE", sustain: 35 } },
+      fx1: { type: "COMPRESSOR", subType: "ORANGE", params: { subType: "ORANGE", sustain: 35 } },
     });
 
     const fx1 = view.fx1 as { subType: string; params: Record<string, unknown> };
@@ -13,8 +13,8 @@ describe("presentPatch", () => {
     expect(fx1.params).toEqual({ sustain: 35 });
   });
 
-  it("leaves a block untouched when params.type does not mirror subType", () => {
-    const block = { type: "X", subType: "A", params: { type: "B", rate: 10 } };
+  it("leaves a block untouched when the inner selection does not mirror the outer one", () => {
+    const block = { type: "X", subType: "A", params: { subType: "B", rate: 10 } };
 
     const view = presentPatch({ fx1: block });
 

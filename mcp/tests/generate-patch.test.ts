@@ -340,8 +340,6 @@ describe("generate_patch", () => {
     expect(isError).toBe(true);
   });
 
-  // The wah model reaches the codec's `wahType` field, but it is advertised as one of WAH's
-  // subTypes, so subType is what selects it: the same field, spelled the way capabilities spells it.
   it("builds a pedal WAH whose model is selected by subType", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "pedal-wah.tsl");
@@ -359,7 +357,7 @@ describe("generate_patch", () => {
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.pfx.type).toBe("WAH");
-    expect(patch.pfx.wahType).toBe("CRY WAH");
+    expect(patch.pfx.subType).toBe("CRY WAH");
   });
 
   it("builds an fx-slot FIXED WAH whose model is selected by subType", async () => {
@@ -400,7 +398,7 @@ describe("generate_patch", () => {
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.fx1.type).toBe("DELAY");
     expect(patch.fx1.subType).toBe("MODULATE");
-    expect(patch.fx1.params).toMatchObject({ type: "MODULATE", modRate: 12, modDepth: 18 });
+    expect(patch.fx1.params).toMatchObject({ subType: "MODULATE", modRate: 12, modDepth: 18 });
   });
 
   it("builds an fx-slot REVERB whose algorithm is selected by subType", async () => {
@@ -633,7 +631,7 @@ describe("generate_patch", () => {
     expect(gx1.driver.readFile(unnamed).name).toBe("First");
   });
 
-  it("hides the redundant params.type mirror from the echo and read_patch, keeping subType canonical", async () => {
+  it("hides the duplicate inner selection from the echo and read_patch, keeping one subType", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "comp.tsl");
     const client = await connectClient();
@@ -649,17 +647,18 @@ describe("generate_patch", () => {
     expect(gen.isError, gen.text).toBe(false);
     const echoed = savedPatches(gen.text)[0].patch as unknown as { fx1: { subType: string; params: Record<string, unknown> } };
     expect(echoed.fx1.subType).toBe("ORANGE");
-    expect(echoed.fx1.params).not.toHaveProperty("type");
+    expect(echoed.fx1.params).not.toHaveProperty("subType");
     expect(echoed.fx1.params).toMatchObject({ sustain: 35, attack: 65, level: 55 });
 
     const read = await client.callTool("read_patch", { device: "gx1", file: outPath, ref: "0" });
     expect(read.isError, read.text).toBe(false);
     const body = JSON.parse(read.text) as { fx1: { subType: string; params: Record<string, unknown> } };
     expect(body.fx1.subType).toBe("ORANGE");
-    expect(body.fx1.params).not.toHaveProperty("type");
+    expect(body.fx1.params).not.toHaveProperty("subType");
 
-    // The internal byte storage still carries params.type (driver read bypasses presentPatch).
-    expect(gx1.driver.readFile(outPath).patches[0].fx1.params.type).toBe("ORANGE");
+    // The params bag still carries it internally, where the codec reads it from (a driver read
+    // bypasses presentPatch).
+    expect(gx1.driver.readFile(outPath).patches[0].fx1.params.subType).toBe("ORANGE");
   });
 
   it("rejects a named delay control outside the chosen type's per-type range", async () => {
@@ -821,7 +820,7 @@ describe("generate_patch", () => {
 
     expect(isError, text).toBe(false);
     const patch = gx1.driver.readFile(outPath).patches[0];
-    expect(patch.pfx.wahType).toBe("VO WAH");
+    expect(patch.pfx.subType).toBe("VO WAH");
   });
 
   it("rejects a subType on a pfx type that has no sub-models", async () => {

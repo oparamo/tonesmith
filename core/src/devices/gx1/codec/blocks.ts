@@ -407,14 +407,14 @@ const encodeReverb = (block: ReverbBlock): string[] => {
 
 // ── PFX (expression pedal effect: WAH / PEDAL BEND) block (14 bytes) ──────────
 //
-// Byte 3 (wah_type_bass) is the bass-mode mirror of byte 2's wah type, out of scope in
-// guitar mode, same pattern as AMP/FX_COM's other bass-mode mirror bytes. Both WAH's and
+// Byte 3 is the bass-mode mirror of byte 2's wah model, out of scope in guitar mode, same
+// pattern as AMP/FX_COM's other bass-mode mirror bytes. Both WAH's and
 // PEDAL BEND's fields always occupy their fixed byte ranges regardless of which is
 // currently selected (the same "shadow bytes" union layout as delay/reverb).
 
 const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "WAH": [
-    lookup("wahType", 2, WAH_TYPES), u8("level", 4), u8("direct", 5),
+    lookup("subType", 2, WAH_TYPES), u8("level", 4), u8("direct", 5),
     u8("position", 6), u8("min", 7), u8("max", 8),
   ],
   "PEDAL BEND": [

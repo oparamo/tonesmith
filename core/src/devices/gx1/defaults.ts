@@ -7,7 +7,11 @@
  * re-harvests the same data from the fixture and asserts equality.
  *
  * Keys are codec field names (the decoded `key`), values are the decoded defaults. The block-level
- * `on`/`type` selectors are omitted (set separately by the builder). fx type param windows don't
+ * `on`/`type` selectors are omitted (set separately by the builder), and so is an fx type's
+ * `subType`, which DEFAULT_SUBTYPES below carries instead: an FX-slot DELAY's sub-algorithm decides
+ * which params exist, so the builder has to resolve it before it can pick a field map, rather than
+ * filling it afterwards like any other unset value. PFX has no such type, so its sub-model stays
+ * here as the ordinary field it is. fx type param windows don't
  * overlap, so every fx/fxDelay default is exactly the device's factory value; delay/reverb types
  * share some byte offsets, but those shared fields are exactly the builder's positional "covered"
  * fields, so the harvest is only consulted for each type's own (unshared) fields, where it holds.
@@ -99,7 +103,7 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
     "TERA ECHO": { tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: false },
   },
   pfx: {
-    "WAH": { wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 },
+    "WAH": { subType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 },
     "PEDAL BEND": { pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 },
   },
 };
@@ -122,5 +126,28 @@ const BLOCK_DEFAULTS: Record<string, ParamDefaults> = {
   fv: { position: 100, min: 0, max: 100, curve: "NORMAL" },
 };
 
-export { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS };
+/**
+ * The sub-model each type opens on, harvested from the same fixture as the params above. A type
+ * with sub-models keeps its selection inside its own param window (FX under the codec name `type`,
+ * PFX on the types PFX_SUBTYPE_EFFECTS names), so it is a factory default like any other, but
+ * it is not a control: a patch spec sets it as `subType`, which is why the param defaults leave it
+ * out. Keyed by catalog block, then by type.
+ */
+const DEFAULT_SUBTYPES: Partial<Record<string, Partial<Record<string, string>>>> = {
+  fx: {
+    "COMPRESSOR": "BOSS COMP",
+    "LIMITER": "BOSS",
+    "FIXED WAH": "CRY WAH",
+    "AC RESO": "NATURAL",
+    "OD/DS": "CLEAN BST",
+    "CHORUS": "MONO",
+    "CLASSIC-VIBE": "CHORUS",
+    "HUMANIZER": "AUTO",
+    "DELAY": "STANDARD",
+    "REVERB": "HALL M",
+  },
+  pfx: { "WAH": "CRY WAH" },
+};
+
+export { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES };
 export type { ParamDefaults, BlockDefaults, DefaultsByType };

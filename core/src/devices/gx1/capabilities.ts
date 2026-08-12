@@ -15,7 +15,7 @@ import type {
   DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec, PatchSpecExample,
 } from "../../types";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlockId } from "./param-catalog";
-import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS } from "./defaults";
+import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "./defaults";
 import type { ParamDefaults, BlockDefaults } from "./defaults";
 import { BLOCK_GROUPS, NESTED_PARAMS, NAME_BYTES } from "./common";
 import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
@@ -434,8 +434,7 @@ const PER_BLOCK_DEFAULTS: Partial<Record<string, ParamDefaults>> = BLOCK_DEFAULT
 
 /**
  * The catalog block holding an FX-slot DELAY sub-algorithm's params. That item is the one whose
- * params sit on its subTypes rather than on itself, so an example naming no subType would come back
- * with no params at all.
+ * params sit on its subTypes rather than on itself, so its example takes its values from here.
  */
 const VARIANT_BLOCK: PerTypeBlockId = "fxDelay";
 
@@ -455,30 +454,27 @@ const defaultsFor = (group: string, type?: string): ParamDefaults | undefined =>
   return byType[type];
 };
 
+/** The sub-model a type opens on, for the types that have sub-models at all. */
+const defaultSubType = (group: string, type?: string): string | undefined =>
+  type === undefined ? undefined : DEFAULT_SUBTYPES[group]?.[type];
+
 /**
- * The variant an example names, which is only the item whose own params are empty because its
- * subTypes carry them. Everywhere else `subType` is optional and naming one would read as required.
+ * The chosen sub-model's own catalog entry, for the item whose params sit on its subTypes rather
+ * than on itself (FX-slot DELAY, whose sub-algorithms each take a different set). Everywhere else
+ * the item holds the params and the sub-model only colors them.
  */
-const exampleVariant = (item: CapabilityItem): CapabilityItem | undefined => {
+const variantParams = (item: CapabilityItem, subType: string): CapabilityItem | undefined => {
   if ((item.params?.length ?? 0) > 0) return undefined;
-  return item.subTypes?.find(variant => (variant.params?.length ?? 0) > 0);
+  return item.subTypes?.find(variant => variant.id === subType && (variant.params?.length ?? 0) > 0);
 };
 
 /** Every param key the chosen shape accepts: the block's shared controls, then the type's own. */
 const acceptedKeys = (params: ParamSpec[]): Set<string> =>
   new Set(params.flatMap(param => (param.key === undefined ? [] : [param.key])));
 
-/**
- * The default that names a variant rather than setting a control. Pedal WAH is the case: the codec
- * carries its model as an ordinary field, while the spec selects it with `subType` the way the fx
- * slots do, so copying the default across verbatim would offer a key the block rejects.
- */
-const variantDefault = (item: CapabilityItem | undefined, values: ParamDefaults, accepted: Set<string>): string | undefined => {
-  const ids = new Set((item?.subTypes ?? []).map(variant => variant.id));
-  const named = Object.entries(values)
-    .find(([key, value]) => !accepted.has(key) && typeof value === "string" && ids.has(value));
-  return named?.[1] as string | undefined;
-};
+/** Where an example's values come from: the sub-model's defaults where it owns the params, else the type's. */
+const exampleValues = (group: string, item?: CapabilityItem, variant?: CapabilityItem): ParamDefaults | undefined =>
+  variant === undefined ? defaultsFor(group, item?.id) : PER_TYPE_DEFAULTS[VARIANT_BLOCK]?.[variant.id];
 
 /**
  * One block's spec fragment at factory defaults: the selection that picks its shape, then its
@@ -488,15 +484,15 @@ const exampleFor = (group: CapabilityGroup, item?: CapabilityItem): PatchSpecExa
   const block = specBlockFor(group.id);
   if (block === undefined) return undefined;
 
-  const variant = item === undefined ? undefined : exampleVariant(item);
-  const values = variant === undefined
-    ? defaultsFor(group.id, item?.id)
-    : PER_TYPE_DEFAULTS[VARIANT_BLOCK]?.[variant.id];
+  const selected = defaultSubType(group.id, item?.id);
+  const variant = item === undefined || selected === undefined ? undefined : variantParams(item, selected);
+  const values = exampleValues(group.id, item, variant);
   if (values === undefined) return undefined;
 
+  // A sub-model selection is named on its own below, so the codec field carrying it is not one of
+  // the type's param keys and drops out here along with any other stale default.
   const accepted = acceptedKeys([...(group.params ?? []), ...(item?.params ?? []), ...(variant?.params ?? [])]);
   const controls = Object.fromEntries(Object.entries(values).filter(([key]) => accepted.has(key)));
-  const selected = variant?.id ?? variantDefault(item, values, accepted);
 
   const typeField = item === undefined ? {} : { type: item.id };
   const subTypeField = selected === undefined ? {} : { subType: selected };

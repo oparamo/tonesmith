@@ -18,8 +18,9 @@ import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primi
 import {
   FX_TYPES, FX_DLY_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW,
+  PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD,
 } from "../../../src/devices/gx1/common";
-import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS } from "../../../src/devices/gx1/defaults";
+import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../../../src/devices/gx1/defaults";
 import type { Patch } from "../../../src/devices/gx1/types";
 
 const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
@@ -60,7 +61,7 @@ const harvestFx = (fx1: number[], fx3a: number[]): BlockDefaults => {
     const bytes = type === "OVERTONE" ? fx3a : fx1;
     const decoded = decodeFxParams(type, bytes);
     if ("unknownBytes" in decoded) continue; // not modeled yet
-    out[type] = omit(decoded, ["type"]);
+    out[type] = omit(decoded, [SUB_TYPE_FIELD]);
   }
   return out;
 };
@@ -70,7 +71,7 @@ const harvestFxDelay = (fx1: number[]): BlockDefaults => {
   for (const subAlgo of FX_DLY_TYPES) {
     const bytes = [...fx1];
     bytes[FX_DELAY_SUBALGO_OFFSET] = FX_DLY_TYPES.indexOf(subAlgo);
-    out[subAlgo] = omit(decodeFxParams("DELAY", bytes), ["type"]);
+    out[subAlgo] = omit(decodeFxParams("DELAY", bytes), [SUB_TYPE_FIELD]);
   }
   return out;
 };
@@ -95,6 +96,41 @@ const harvestDefaults = (patch: Patch): Record<string, BlockDefaults> => {
   };
 };
 
+/**
+ * An FX type's sub-model selection rides inside its own param window, so decoding the window at
+ * rest yields the model the device opens on. `omit` drops it from the param defaults above, since
+ * the builder resolves it before it can choose a field map rather than filling it afterwards.
+ */
+const harvestFxSubTypes = (fx1: number[]): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const type of FX_TYPES) {
+    if (!PARAM_SUBTYPE_EFFECTS.has(type)) continue;
+    const decoded = decodeFxParams(type, fx1);
+    if ("unknownBytes" in decoded) continue;
+    const selected = decoded[SUB_TYPE_FIELD];
+    if (typeof selected === "string") out[type] = selected;
+  }
+  return out;
+};
+
+/** PFX carries its sub-model as an ordinary field, on the types PFX_SUBTYPE_EFFECTS names. */
+const harvestPfxSubTypes = (pfx: number[]): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const type of PFX_SUBTYPE_EFFECTS) {
+    const swapped = [...pfx];
+    swapped[1] = PFX_TYPE_IDX[type];
+    const decoded = decodePfx(hexFromBytes(swapped)) as Record<string, unknown>;
+    const selected = decoded[SUB_TYPE_FIELD];
+    if (typeof selected === "string") out[type] = selected;
+  }
+  return out;
+};
+
+const harvestSubTypes = (patch: Patch): Record<string, Record<string, string>> => ({
+  fx: harvestFxSubTypes(bytesFromHex(patch[RAW]["MEMORY%FX1"])),
+  pfx: harvestPfxSubTypes(bytesFromHex(patch[RAW]["MEMORY%PFX"])),
+});
+
 /** The single-shape blocks are their own default: no type to swap, so the decoded block is it. */
 const harvestBlockDefaults = (patch: Patch): Record<string, ParamDefaults> =>
   Object.fromEntries(
@@ -106,6 +142,10 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
 
   it("DEFAULTS_BY_TYPE matches the factory defaults harvested from default-init.tsl", () => {
     expect(DEFAULTS_BY_TYPE).toEqual(harvestDefaults(patch));
+  });
+
+  it("DEFAULT_SUBTYPES matches the sub-models selected in default-init.tsl", () => {
+    expect(DEFAULT_SUBTYPES).toEqual(harvestSubTypes(patch));
   });
 
   it("BLOCK_DEFAULTS matches the single-shape blocks in default-init.tsl", () => {

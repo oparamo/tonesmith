@@ -34,6 +34,12 @@ way the decoded patch does, while amp, delay and reverb carry theirs as fields. 
 only by being rejected, at which point the patch was already built. The example is what a caller
 copies and edits, so it doubles as a statement of what each control is left at when you omit it.
 
+Where a type offers a choice of models, the example names the one the device opens on, harvested
+from the factory-default export the way the param values are. A model selection sits beside `type`
+rather than among the params, which the subtype list alone never showed, and naming the first entry
+in that list instead would have put a value the device never chose in a fragment presented as its
+factory state.
+
 `capabilities.ts` derives each item's params from the catalog rather than restating them, which
 makes delay and reverb **per type**: `describe_device gx1 reverb SHIMMER` answers for SHIMMER
 instead of returning one flat list for the whole block. The FX-slot DELAY gained the same

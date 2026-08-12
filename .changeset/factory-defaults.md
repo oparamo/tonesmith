@@ -10,6 +10,13 @@ one factory-default export carries the true default for every type of every bloc
 harvested into a single `DEFAULTS_BY_TYPE` source, guarded against the fixture by a drift test, and
 the builders fill any param the caller leaves unset from it.
 
+A type's sub-model is filled the same way. An effect that offers a choice of models is always set to
+one of them, so leaving `subType` out means the model the device opens on rather than whatever the
+slot's bytes were carrying. An FX-slot OD/DS built with no model chosen came out MID BOOST where the
+device opens on CLEAN BST, and an FX-slot DELAY came out with every param at 0, because the
+sub-algorithm is what selects the field set and there was none to default from. The selected models
+are harvested from the same factory-default export as the values, so they are the device's own.
+
 This replaces a three-entry hand-maintained override table plus a `defaultForField` heuristic that
 guessed from the field's shape. The guesses were musically wrong for most types: an unset SHIMMER
 reverb `pitch` came out 0 where the device uses 12, and a Tremolo built with no params came out

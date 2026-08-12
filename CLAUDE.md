@@ -181,6 +181,16 @@ dashes, ternaries assigned before use, cognitive complexity 10), so they are not
   refactor and isn't one: a generic loop trades deliberate grouping and ordering for an
   alphabetical field dump, and the only consumer is a person reading a terminal. Agents read the
   same capability data through MCP already.
+- **`type` and `subType` each mean one thing, everywhere.** `type` is the block's own selector, and
+  `subType` is the model within it, in a patch spec, on a decoded block, and in the codec's field
+  maps. Where a device stores the selection among a type's params, the codec still names it
+  `subType` and the decode mirrors it onto the block, which is the only reason `presentPatch` has a
+  duplicate to drop. Which selectors get to be a `subType` at all is decided by what
+  `describe_device` can carry: a `subType` gets a name, a description and a real-world `models`
+  string per value, so a selector qualifies when its values are named variants worth describing one
+  by one, and stays an ordinary param when it sets one aspect of a single effect and the value names
+  speak for themselves. The device's own label is evidence, not the rule (the GX-1 labels two
+  sub-model selectors MODE and one param TYPE).
 - **`param-catalog.ts`, `capabilities.ts`, and `types/` are three views of one truth**, not
   triplication to collapse. The catalog is the param ground truth, capabilities is the structure an
   agent browses, the types are the decoded shape. The drift guards

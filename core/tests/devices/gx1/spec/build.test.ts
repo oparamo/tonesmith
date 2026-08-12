@@ -16,6 +16,27 @@ describe("buildPatch", () => {
     expect(patch.chain).toEqual(gx1.DEFAULT_CHAIN);
   });
 
+  // A sub-model goes in under one name and has to come back out under the same one. Pedal WAH read
+  // back as the codec's own field name, so a caller mirroring what it just read was rejected for
+  // sending a key the block had no field for.
+  it("accepts a block's sub-model spelled the way reading it back spells it", () => {
+    const built = gx1.driver.buildPatch({
+      name: "Wah",
+      amp: { type: "TWIN" },
+      pfx: { type: "WAH", subType: "VO WAH" },
+    });
+
+    const read = gx1.driver.decodePatch(gx1.driver.encodePatch(built));
+    const echoed = (): unknown => gx1.driver.buildPatch({
+      name: "Wah Again",
+      amp: { type: "TWIN" },
+      pfx: { type: read.pfx.type, subType: read.pfx.subType },
+    });
+
+    expect(read.pfx.subType).toBe("VO WAH");
+    expect(echoed).not.toThrow();
+  });
+
   it("nests fx params the way the decoded patch does", () => {
     const patch = gx1.driver.buildPatch({
       name: "Chorus",

@@ -1,8 +1,8 @@
 import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
-import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_FIELDS } from "./common";
+import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
-import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, type ParamDefaults } from "./defaults";
+import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES, type ParamDefaults } from "./defaults";
 
 // The 10 reorderable blocks. OUTPUT is a fixed endpoint, not part of the chain array
 // (see CHAIN_BLOCK_ORDER in common/constants.ts for the underlying byte encoding).
@@ -193,19 +193,33 @@ interface FxOptions {
   on?: boolean;
 }
 
+/**
+ * The sub-model to build with: the caller's, or the one the device opens on. A type that has
+ * sub-models is always set to one, so leaving it out has to mean the factory model rather than
+ * whatever byte the slot happened to be carrying, which is a different model for OD/DS and leaves
+ * DELAY with no param defaults at all. Resolving to nothing when the caller wrote the selection
+ * into the params bag keeps `withSubType` from reporting a conflict against a value never sent.
+ */
+const selectedSubType = (type: string, subType: string | null, params: FxParams): string | null => {
+  if (subType != null) return subType;
+  if (!PARAM_SUBTYPE_EFFECTS.has(type) || SUB_TYPE_FIELD in params) return null;
+  return DEFAULT_SUBTYPES.fx?.[type] ?? null;
+};
+
 const fx = (patch: Patch, options: FxOptions): void => {
   const { slot, type, subType = null, params = {}, on = true } = options;
+  const selected = selectedSubType(type, subType, params);
   const block = patch[slot];
   block.on = on;
   block.type = type;
-  block.subType = subType;
-  const keySpec: ParamKeySpec = { label: slot, type, fields: fxFieldMap(type, subType) };
-  // For these effects the sub-model lives in param-block byte p[0] (not FX_COM byte[2]), so the
-  // encoder reads it from params.type rather than from block.subType.
-  const field = PARAM_SUBTYPE_EFFECTS.has(type) ? "type" : undefined;
-  const merged = withSubType(params, { ...keySpec, subType, field });
+  block.subType = selected;
+  const keySpec: ParamKeySpec = { label: slot, type, fields: fxFieldMap(type, selected) };
+  // For these effects the sub-model lives in param-block byte p[0] (not FX_COM byte[2]), so it
+  // rides in the params bag, under the same name it carries everywhere else.
+  const field = PARAM_SUBTYPE_EFFECTS.has(type) ? SUB_TYPE_FIELD : undefined;
+  const merged = withSubType(params, { ...keySpec, subType: selected, field });
   validateParamKeys(Object.keys(merged), keySpec);
-  block.params = { ...defaultFxParams(type, subType), ...merged };
+  block.params = { ...defaultFxParams(type, selected), ...merged };
 };
 
 interface NsOptions {
@@ -290,7 +304,8 @@ const pfx = (patch: Patch, options: PfxOptions): void => {
     fields: PFX_TYPE_MAPS[type],
     defaults: DEFAULTS_BY_TYPE.pfx[type] ?? {},
   };
-  const merged = withSubType(params, { ...typeSpec, subType, field: PFX_SUBTYPE_FIELDS[type] });
+  const field = PFX_SUBTYPE_EFFECTS.has(type) ? SUB_TYPE_FIELD : undefined;
+  const merged = withSubType(params, { ...typeSpec, subType, field });
   assignExtra(patch.pfx, merged, typeSpec);
 };
 
