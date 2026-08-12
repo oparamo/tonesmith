@@ -151,10 +151,10 @@ decode and encode the type selector byte; use this section to find where a given
 type's own parameters live.
 
 **COMPRESSOR**, starts at byte 0; p[0..3]
-`p[0]`=type (0=BOSS COMP,1=D-COMP,2=ORANGE,3=X-COMP,4=STEREO) `p[1]`=sustain `p[2]`=attack `p[3]`=level
+`p[0]`=subType (0=BOSS COMP,1=D-COMP,2=ORANGE,3=X-COMP,4=STEREO) `p[1]`=sustain `p[2]`=attack `p[3]`=level
 
 **LIMITER**, starts at byte 10; p[0..5]
-`p[0]`=type (0=BOSS,1=RACK 160D,2=VTG RACK U) `p[1]`=threshold `p[2]`=ratio `p[3]`=level `p[4]`=attack `p[5]`=release
+`p[0]`=subType (0=BOSS,1=RACK 160D,2=VTG RACK U) `p[1]`=threshold `p[2]`=ratio `p[3]`=level `p[4]`=attack `p[5]`=release
 
 **SLOW GEAR**, starts at byte 16; p[0..2]
 `p[0]`=sens `p[1]`=riseTime `p[2]`=level
@@ -187,13 +187,13 @@ type's own parameters live.
 `p[0]`=sens `p[1]`=attack `p[2]`=depth `p[3]`=reso `p[4]`=tone (signed50) `p[5]`=level `p[6]`=direct
 
 **FIXED WAH**, starts at byte 85; p[0], p[2..4]  *(p[1] is the bass-mode wah type, not used in guitar mode)*
-`p[0]`=type (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) `p[2]`=level `p[3]`=direct `p[4]`=manual
+`p[0]`=subType (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) `p[2]`=level `p[3]`=direct `p[4]`=manual
 
 **AC. GTR SIM**, starts at byte 93; p[0..3]
 `p[0]`=high (signed50) `p[1]`=body `p[2]`=low (signed50) `p[3]`=level
 
 **AC RESO**, starts at byte 97; p[0..3]
-`p[0]`=type (0=NATURAL,1=WIDE,2=BRIGHT) `p[1]`=reso `p[2]`=tone (signed50) `p[3]`=level
+`p[0]`=subType (0=NATURAL,1=WIDE,2=BRIGHT) `p[1]`=reso `p[2]`=tone (signed50) `p[3]`=level
 
 **FEEDBACKER**, starts at byte 101; p[0..6]
 `p[0]`=mode (0=NORMAL,1=OSC) `p[1]`=trigger `p[2]`=depth `p[3]`=riseTime `p[4]`=octRiseTm `p[5]`=feedback `p[6]`=octFeedback
@@ -202,7 +202,7 @@ type's own parameters live.
 `p[0]`=sens `p[1]`=depth `p[2]`=tone (signed50) `p[3]`=level `p[4]`=reso `p[5]`=buzz `p[6]`=direct
 
 **OD/DS**, starts at byte 115; p[0..6]  *(p[0]=type, stored here like COMPRESSOR and LIMITER, not in FX_COM byte 2)*
-`p[0]`=type (pedal model, table below) `p[1]`=drive `p[2]`=tone (signed50) `p[3]`=level `p[4]`=direct
+`p[0]`=subType (pedal model, table below) `p[1]`=drive `p[2]`=tone (signed50) `p[3]`=level `p[4]`=direct
 `p[5]`=solo `p[6]`=soloLevel. Those last two are this FX-slot instance's own solo boost, distinct
 from the dedicated `MEMORY%ODDS` block's solo: the device exposes "FX1 SOLO", "FX2 SOLO", and
 "FX3 SOLO" as separate footswitch functions from "OD/DS SOLO".
@@ -221,7 +221,7 @@ byte below uses this same table, `ODDS_TYPES`:
 | 30  | BASS DI   | 31  | SA DI DRIVE | 32  | HI BAND DRV | 33  | BASS MT    | 34  | BASS FUZZ |
 
 **CHORUS**, starts at byte 122; p[0..5]
-`p[0]`=type (0=MONO,1=DIR/EFX,2=STEREO) `p[1]`=rate `p[2]`=depth `p[3]`=level `p[4]`=preDelay (raw × 0.5ms) `p[5]`=direct
+`p[0]`=subType (0=MONO,1=DIR/EFX,2=STEREO) `p[1]`=rate `p[2]`=depth `p[3]`=level `p[4]`=preDelay (raw × 0.5ms) `p[5]`=direct
 
 **FLANGER**, starts at byte 128; p[0..5]
 `p[0]`=rate `p[1]`=depth `p[2]`=reso `p[3]`=manual `p[4]`=level `p[5]`=direct
@@ -233,8 +233,9 @@ byte below uses this same table, `ODDS_TYPES`:
 `p[0]`=rate `p[1]`=depth `p[2]`=level
 
 **CLASSIC-VIBE**, starts at byte 144; p[0..3]  *(Roland's manual labels p[0] `MODE` rather than
-`TYPE` as with the other sub-model selectors; this codec still uses `type` for consistency)*
-`p[0]`=type (0=CHORUS,1=VIBRATO) `p[1]`=rate `p[2]`=depth `p[3]`=level
+`TYPE` as with the other sub-model selectors. It is a sub-model here because its values are named
+variants worth describing one by one, which is the test this repo applies; see CLAUDE.md)*
+`p[0]`=subType (0=CHORUS,1=VIBRATO) `p[1]`=rate `p[2]`=depth `p[3]`=level
 
 **ROTARY**, starts at byte 148; p[0..6]
 `p[0]`=speed (0=SLOW,1=FAST) `p[1]`=slowRate `p[2]`=fastRate `p[3]`=level `p[4]`=balance `p[5]`=drive `p[6]`=direct
@@ -251,9 +252,9 @@ byte below uses this same table, `ODDS_TYPES`:
 **RING MOD**, starts at byte 166; p[0..5]
 `p[0]`=intelligent (0=OFF,1=ON) `p[1]`=freq `p[2]`=modRate `p[3]`=modDepth `p[4]`=level `p[5]`=direct
 
-**HUMANIZER**, starts at byte 172; p[0..6]  *(Roland's manual labels p[0] `MODE` rather than
-`TYPE` as with the other sub-model selectors; this codec still uses `type` for consistency)*
-`p[0]`=type (0=PICKING,1=AUTO) `p[1]`=vowel1 `p[2]`=vowel2 (0–4 = a,e,i,o,u) `p[3]`=sens `p[4]`=rate `p[5]`=manual `p[6]`=level
+**HUMANIZER**, starts at byte 172; p[0..6]  *(labeled `MODE` by the manual, a sub-model here for
+the same reason as CLASSIC-VIBE above)*
+`p[0]`=subType (0=PICKING,1=AUTO) `p[1]`=vowel1 `p[2]`=vowel2 (0–4 = a,e,i,o,u) `p[3]`=sens `p[4]`=rate `p[5]`=manual `p[6]`=level
 
 **PITCH SHIFT**, starts at byte 179; p[0..8]  *(preDelay is 16-bit, not a plain byte)*
 `p[0]`=mode (0=FAST,1=MEDIUM,2=SLOW,3=MONO) `p[1]`=pitch, an index into a 51-entry table where 0="+7&-5", 1–49 are semitones -24..+24 (index-25), and 50="+12&-5" `p[2..5]`=preDelay (16-bit) `p[6]`=level `p[7]`=feedback `p[8]`=direct
@@ -285,16 +286,16 @@ the dedicated block's `DLY_TYPES`), and each one uses a different subset of the 
 p[0] is promoted to `block.subType` (via `PARAM_SUBTYPE_EFFECTS`); the codec's field map lives in
 `FX_DELAY_TYPE_MAPS` (`codec/fx-params.ts`). Byte homes are distinct across sub-algorithms, with
 no offset reuse:
-- **STANDARD**: `p[0]`=type `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut (index into `FREQ_HIGH_CUT`, `common/constants.ts`)
+- **STANDARD**: `p[0]`=subType `p[1..4]`=time (16-bit) `p[5]`=feedback `p[6]`=level `p[7]`=highCut (index into `FREQ_HIGH_CUT`, `common/constants.ts`)
 - **MODULATE**: STANDARD's fields plus `p[8]`=modRate `p[9]`=modDepth
-- **WARP**: `p[0]`=type `p[1..4]`=time (16-bit) `p[11]`=trigger (0=OFF,1=ON) `p[12]`=level
-- **TWIST**: `p[0]`=type `p[10]`=mode (`TWIST_MODES`: 0=RISE-FALL, 1=RISE-FADE) `p[11]`=trigger `p[12]`=level `p[13]`=riseTime `p[14]`=fallTime `p[15]`=fadeTime
-- **GLITCH**: `p[0]`=type `p[11]`=trigger `p[16]`=time `p[17]`=glitch `p[18]`=balance
+- **WARP**: `p[0]`=subType `p[1..4]`=time (16-bit) `p[11]`=trigger (0=OFF,1=ON) `p[12]`=level
+- **TWIST**: `p[0]`=subType `p[10]`=mode (`TWIST_MODES`: 0=RISE-FALL, 1=RISE-FADE) `p[11]`=trigger `p[12]`=level `p[13]`=riseTime `p[14]`=fallTime `p[15]`=fadeTime
+- **GLITCH**: `p[0]`=subType `p[11]`=trigger `p[16]`=time `p[17]`=glitch `p[18]`=balance
 
 **REVERB** *(when FX slot type=REVERB)*, starts at byte 231; p[0..5]. Its 5 types are its own
 set (`FX_REV_TYPES`: 0=HALL S, 1=HALL M, 2=PLATE, 3=ROOM, 4=STUDIO, **not** the dedicated REV
 block's `REV_TYPES`), and all 5 share one field set:
-`p[0]`=type index `p[1]`=time (raw × 0.1) `p[2..3]`=preDelay (8-bit) `p[4]`=level `p[5]`=direct
+`p[0]`=subType index `p[1]`=time (raw × 0.1) `p[2..3]`=preDelay (8-bit) `p[4]`=level `p[5]`=direct
 
 **OVERTONE** *(FX3 only, stored in MEMORY%FX3A rather than MEMORY%FX3)*, p[0..4]
 `p[0]`=lower `p[1]`=upper `p[2]`=unison `p[3]`=direct `p[4]`=detune
@@ -421,8 +422,8 @@ same "shadow bytes" union layout as MEMORY%DLY and MEMORY%REV.
 |------|--------------|----------------------------------------------------------------------------------|
 | 0    | on           | 0=OFF, 1=ON                                                                      |
 | 1    | type         | 0=WAH, 1=PEDAL BEND                                                              |
-| 2    | wahType      | WAH_TYPES index (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) |
-| 3    | wahType_bass | Bass-mode mirror of byte 2. Not used in guitar mode, always preserved            |
+| 2    | subType      | WAH_TYPES index (0=CRY WAH,1=VO WAH,2=FAT WAH,3=LIGHT WAH,4=7STR WAH,5=RESO WAH) |
+| 3    | subType_bass | Bass-mode mirror of byte 2. Not used in guitar mode, always preserved            |
 | 4    | level        | WAH: 0–100                                                                       |
 | 5    | direct       | WAH: 0–100                                                                       |
 | 6    | position     | WAH: 0–100                                                                       |

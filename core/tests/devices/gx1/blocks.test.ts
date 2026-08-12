@@ -322,7 +322,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes PFX (active type: WAH)", () => {
     expect(patch.pfx).toMatchObject({
-      on: false, type: "WAH", wahType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100,
+      on: false, type: "WAH", subType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100,
     });
   });
 

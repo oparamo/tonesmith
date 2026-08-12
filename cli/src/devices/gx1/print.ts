@@ -5,9 +5,19 @@ const onOff = (on: boolean): string => (on ? "ON" : "OFF");
 const formatParams = (params: Record<string, unknown>): string =>
   Object.entries(params).map(([key, value]) => `${key}=${String(value)}`).join("  ");
 
+// What a block is set to belongs on its header line, printed by blockLabel below, rather than
+// among the knobs.
+const SELECTORS = ["on", "type", "subType"];
+
 const printParams = (block: Record<string, unknown>): void => {
-  const params = Object.fromEntries(Object.entries(block).filter(([key]) => key !== "on" && key !== "type"));
+  const params = Object.fromEntries(Object.entries(block).filter(([key]) => !SELECTORS.includes(key)));
   if (Object.keys(params).length > 0) console.info(`    ${formatParams(params)}`);
+};
+
+/** A block's type with its sub-model in parentheses, the shape every block's header line takes. */
+const blockLabel = (block: { type: string; subType?: unknown }): string => {
+  const suffix = typeof block.subType === "string" ? ` (${block.subType})` : "";
+  return block.type + suffix;
 };
 
 const printHeader = (patch: gx1.Patch, index?: number): void => {
@@ -35,9 +45,7 @@ const printOdds = (odds: gx1.Patch["odds"]): void => {
 };
 
 const printFxSlot = (slot: "fx1" | "fx2" | "fx3", block: gx1.Patch["fx1"]): void => {
-  const subTypeSuffix = block.subType ? ` (${block.subType})` : "";
-  const label = block.type + subTypeSuffix;
-  console.info(`\n  ${slot.toUpperCase()} [${onOff(block.on)}]  ${label}`);
+  console.info(`\n  ${slot.toUpperCase()} [${onOff(block.on)}]  ${blockLabel(block)}`);
   if (Object.keys(block.params).length > 0) {
     console.info(`    ${formatParams(block.params)}`);
   }
@@ -49,7 +57,7 @@ const printPatch = (patch: gx1.Patch, index?: number): void => {
   printOdds(patch.odds);
 
   const pfx = patch.pfx;
-  console.info(`\n  PFX [${onOff(pfx.on)}]  ${pfx.type}`);
+  console.info(`\n  PFX [${onOff(pfx.on)}]  ${blockLabel(pfx)}`);
   printParams(pfx);
 
   const ns = patch.ns;

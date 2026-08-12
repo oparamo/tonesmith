@@ -53,7 +53,7 @@ describe("FX-slot DELAY per-sub-algorithm round-trip", () => {
     bytes[DELAY_OFFSET + 18] = 100; // balance (GLITCH)
 
     const decoded = decodeFxParams("DELAY", bytes);
-    expect(decoded.type).toBe(subType);
+    expect(decoded.subType).toBe(subType);
 
     const reencoded = bytesFromHex(encodeFxParams("DELAY", decoded, bytes));
     expect(reencoded).toEqual(bytes);
@@ -124,7 +124,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX1 (active type: COMPRESSOR)", () => {
     expect(patch.fx1.type).toBe("COMPRESSOR");
-    expect(patch.fx1.params).toMatchObject({ type: "BOSS COMP", sustain: 50, attack: 50, level: 60 });
+    expect(patch.fx1.params).toMatchObject({ subType: "BOSS COMP", sustain: 50, attack: 50, level: 60 });
   });
 
   it("decodes FX2 (active type: PARA. EQ) in real UI display order", () => {
@@ -137,7 +137,7 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX3 (active type: CHORUS)", () => {
     expect(patch.fx3.type).toBe("CHORUS");
-    expect(patch.fx3.params).toMatchObject({ type: "MONO", rate: 50, depth: 40, level: 100, preDelay: 4 });
+    expect(patch.fx3.params).toMatchObject({ subType: "MONO", rate: 50, depth: 40, level: 100, preDelay: 4 });
   });
 
   // The following decode the SAME real device bytes above, but under a different
@@ -149,7 +149,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("LIMITER", fx1Bytes);
 
     expect(decoded).toEqual({
-      type: "BOSS", threshold: 30, ratio: 10, level: 25, attack: 50, release: 50,
+      subType: "BOSS", threshold: 30, ratio: 10, level: 25, attack: 50, release: 50,
     });
   });
 
@@ -197,7 +197,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("FIXED WAH", fx1Bytes);
 
     expect(decoded).toEqual({
-      type: "CRY WAH", level: 100, direct: 0, manual: 50,
+      subType: "CRY WAH", level: 100, direct: 0, manual: 50,
     });
   });
 
@@ -213,7 +213,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("OD/DS", fx1Bytes);
 
     expect(decoded).toEqual({
-      type: "CLEAN BST", drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50,
+      subType: "CLEAN BST", drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50,
     });
   });
 
@@ -285,7 +285,7 @@ describe("Real device values (default-init.tsl)", () => {
     // The FX-slot DELAY is per-sub-algorithm; the shadow bytes select STANDARD (type byte 0),
     // whose fields are TIME/FEEDBACK/LEVEL/HIGH CUT (no MOD RATE/DEPTH, which are MODULATE's).
     expect(decoded).toEqual({
-      type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz",
+      subType: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz",
     });
   });
 
@@ -293,7 +293,7 @@ describe("Real device values (default-init.tsl)", () => {
     const decoded = decodeFxParams("REVERB", fx1Bytes);
 
     expect(decoded).toEqual({
-      type: "HALL M", time: 3, preDelay: 30, level: 30, direct: 100,
+      subType: "HALL M", time: 3, preDelay: 30, level: 30, direct: 100,
     });
   });
 

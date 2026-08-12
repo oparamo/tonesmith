@@ -218,7 +218,14 @@ capabilities on top of it. Don't hand-write param ranges twice.
    group/item structure, real-world models, sonic descriptions, and subtypes, and it **derives
    each item's `params` from the catalog** rather than restating them. Types whose param set
    varies by sub-model are modeled per-subtype, each subtype carrying its own catalog-derived
-   params. Also author the required **`chain`** (`ChainSpec`): its `defaultOrder` is the device's
+   params. **What earns a sub-model rather than a param** is what the capability response can
+   carry: a subtype gets a name, a description and a real-world models string of its own, so a
+   selector qualifies when its values are named variants worth describing one by one, and stays an
+   ordinary param when it sets one aspect of a single effect and the value names speak for
+   themselves. Read the device's own label as evidence rather than as the rule; a vendor is free to
+   call two selectors the same thing and mean different things by them. Whatever the answer, the
+   two words never trade places: `type` selects the block's own model and `subType` the model
+   within it, in a spec, on a decoded block, and in the codec's field maps alike. Also author the required **`chain`** (`ChainSpec`): its `defaultOrder` is the device's
    block order (derive it from the driver's own default-chain constant so the two can't drift),
    and its `description` explains, for this device, how blocks are reordered and how they're
    turned on and off (which blocks can be bypassed, and any that can't). This is the signal-chain

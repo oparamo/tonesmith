@@ -96,14 +96,14 @@ const FX_PARAM_OFFSETS: Partial<Record<string, number>> = {
 };
 
 const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
-  // COMPRESSOR: p[0]=type (stored in param block, NOT FX_COM byte[2]),
+  // COMPRESSOR: p[0]=subType (stored in param block, NOT FX_COM byte[2]),
   // p[1]=sustain, p[2]=attack, p[3]=level.
   "COMPRESSOR": [
-    lookup("type", 0, COMP_TYPES), u8("sustain", 1), u8("attack", 2), u8("level", 3),
+    lookup("subType", 0, COMP_TYPES), u8("sustain", 1), u8("attack", 2), u8("level", 3),
   ],
-  // LIMITER: p[0]=type (stored in param block), then params shifted by one.
+  // LIMITER: p[0]=subType (stored in param block), then params shifted by one.
   "LIMITER": [
-    lookup("type", 0, LIM_TYPES),
+    lookup("subType", 0, LIM_TYPES),
     u8("threshold", 1), u8("ratio", 2), u8("level", 3), u8("attack", 4), u8("release", 5),
   ],
   "SLOW GEAR": [
@@ -153,14 +153,14 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   // FIXED WAH: byte +1 is the bass-mode wah type, not used in guitar mode.
   "FIXED WAH": [
-    lookup("type", 0, WAH_TYPES), u8("level", 2), u8("direct", 3), u8("manual", 4),
+    lookup("subType", 0, WAH_TYPES), u8("level", 2), u8("direct", 3), u8("manual", 4),
   ],
   "AC. GTR SIM": [
     signed("high", 0), u8("body", 1), signed("low", 2), u8("level", 3),
   ],
-  // AC RESO: p[0]=type (stored in param block), then params shifted by one.
+  // AC RESO: p[0]=subType (stored in param block), then params shifted by one.
   "AC RESO": [
-    lookup("type", 0, ACRESO_TYPES),
+    lookup("subType", 0, ACRESO_TYPES),
     u8("reso", 1), signed("tone", 2), u8("level", 3),
   ],
   "FEEDBACKER": [
@@ -171,12 +171,12 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("sens", 0), u8("depth", 1), signed("tone", 2), u8("level", 3),
     u8("reso", 4), u8("buzz", 5), u8("direct", 6),
   ],
-  // OD/DS: p[0]=type (stored in param block, like COMPRESSOR/LIMITER/etc.), then params
+  // OD/DS: p[0]=subType (stored in param block, like COMPRESSOR/LIMITER/etc.), then params
   // shifted by one. solo/soloLevel are this FX-slot instance's own solo boost, distinct
   // from the dedicated MEMORY%ODDS block's solo (the device exposes "FX1 SOLO"/"FX2
   // SOLO"/"FX3 SOLO" as separate footswitch functions from "OD/DS SOLO").
   "OD/DS": [
-    lookup("type", 0, ODDS_TYPES),
+    lookup("subType", 0, ODDS_TYPES),
     u8("drive", 1), signed("tone", 2), u8("level", 3), u8("direct", 4),
     bool("solo", 5), u8("soloLevel", 6),
   ],
@@ -186,10 +186,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "OVERTONE": [
     u8("lower", 0), u8("upper", 1), u8("unison", 2), u8("direct", 3), u8("detune", 4),
   ],
-  // CHORUS: p[0]=type (stored in param block), then params shifted by one.
+  // CHORUS: p[0]=subType (stored in param block), then params shifted by one.
   // preDelay stored as index × 0.5ms (e.g. 8 → 4.0ms).
   "CHORUS": [
-    lookup("type", 0, CHORUS_TYPES),
+    lookup("subType", 0, CHORUS_TYPES),
     u8("rate", 1), u8("depth", 2), u8("level", 3), scaled("preDelay", 4, 0.5), u8("direct", 5),
   ],
   "FLANGER": [
@@ -203,9 +203,11 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "SCRIPT PH": [
     u8("rate", 0), u8("depth", 1), u8("level", 2),
   ],
-  // CLASSIC-VIBE: p[0]=mode (stored in param block), then params shifted by one.
+  // CLASSIC-VIBE: p[0]=subType (stored in param block), then params shifted by one. The device's
+  // own table labels it MODE; it is a sub-model here because its two values are named variants
+  // worth describing, which is what decides the difference (see CLAUDE.md's Conventions).
   "CLASSIC-VIBE": [
-    lookup("type", 0, VIBE_MODES),
+    lookup("subType", 0, VIBE_MODES),
     u8("rate", 1), u8("depth", 2), u8("level", 3),
   ],
   "ROTARY": [
@@ -226,9 +228,10 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     bool("intelligent", 0),
     u8("freq", 1), u8("modRate", 2), u8("modDepth", 3), u8("level", 4), u8("direct", 5),
   ],
-  // HUMANIZER: p[0]=mode (stored in param block), then params shifted by one.
+  // HUMANIZER: p[0]=subType (stored in param block), then params shifted by one. Labeled MODE by
+  // the device, a sub-model here for the same reason as CLASSIC-VIBE above.
   "HUMANIZER": [
-    lookup("type", 0, HUM_MODES),
+    lookup("subType", 0, HUM_MODES),
     lookup("vowel1", 1, HUM_VOWELS), lookup("vowel2", 2, HUM_VOWELS),
     u8("sens", 3), u8("rate", 4), u8("manual", 5), u8("level", 6),
   ],
@@ -265,7 +268,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   // its own set (HALL S/HALL M/PLATE/ROOM/STUDIO, NOT the dedicated block's REV_TYPES),
   // and all 5 share this one field set, so it stays a single flat map.
   "REVERB": [
-    lookup("type", 0, FX_REV_TYPES), scaled("time", 1, 0.1),
+    lookup("subType", 0, FX_REV_TYPES), scaled("time", 1, 0.1),
     nibblePair("preDelay", 2), u8("level", 4), u8("direct", 5),
   ],
 };
@@ -274,27 +277,27 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
 // like the dedicated DLY block it is modeled per-subtype rather than with one flat
 // map. Offsets are 0-based within the DELAY param block (FX_PARAM_OFFSETS["DELAY"]); every
 // sub-algorithm's byte homes are distinct (no offset reuse), verified against the device's
-// address table. `type` (p[0]) is promoted to block.subType via PARAM_SUBTYPE_EFFECTS.
+// address table. p[0] is promoted to block.subType via PARAM_SUBTYPE_EFFECTS.
 const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
   "STANDARD": [
-    lookup("type", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    lookup("subType", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
     u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
   ],
   "MODULATE": [
-    lookup("type", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    lookup("subType", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
     u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
     u8("modRate", 8), u8("modDepth", 9),
   ],
   "WARP": [
-    lookup("type", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    lookup("subType", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
     bool("trigger", 11), u8("level", 12),
   ],
   "TWIST": [
-    lookup("type", 0, FX_DLY_TYPES), lookup("mode", 10, TWIST_MODES), bool("trigger", 11),
+    lookup("subType", 0, FX_DLY_TYPES), lookup("mode", 10, TWIST_MODES), bool("trigger", 11),
     u8("riseTime", 13), u8("fallTime", 14), u8("fadeTime", 15), u8("level", 12),
   ],
   "GLITCH": [
-    lookup("type", 0, FX_DLY_TYPES), bool("trigger", 11),
+    lookup("subType", 0, FX_DLY_TYPES), bool("trigger", 11),
     u8("time", 16), u8("glitch", 17), u8("balance", 18),
   ],
 };
@@ -336,7 +339,7 @@ const encodeFxParams = (
   if ("unknownBytes" in params) return hexFromBytes(originalBytes);
 
   const bytes = [...originalBytes];
-  const delaySubType = typeof params.type === "string" ? params.type : "";
+  const delaySubType = typeof params.subType === "string" ? params.subType : "";
   const fields = fieldMapFor(fxType, delaySubType);
   if (fields) {
     const offset = FX_PARAM_OFFSETS[fxType] ?? 0;

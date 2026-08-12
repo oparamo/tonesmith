@@ -16,7 +16,7 @@ import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, ODDS_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   FX_DLY_TYPES, FX_REV_TYPES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES,
-  PARAM_SUBTYPE_EFFECTS, NAME_BYTES,
+  PARAM_SUBTYPE_EFFECTS, NAME_BYTES, SUB_TYPE_FIELD,
   BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS,
 } from "../../../src/devices/gx1/common";
 import type { BlockName } from "../../../src/devices/gx1/common";
@@ -74,7 +74,7 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
     block: "fx",
     types: FX_TYPES,
     codecFields: (type) => FX_PARAM_MAPS[type],
-    reverseSkip: new Set(["type"]),
+    reverseSkip: new Set([SUB_TYPE_FIELD]),
     aliases: FIELD_LABEL_ALIASES.fx,
     paramOnly: {
       // KEY is the patch's global key (Patch.key), not a per-effect param.
@@ -85,8 +85,7 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
     block: "pfx",
     types: PFX_TYPES,
     codecFields: (type) => PFX_TYPE_MAPS[type],
-    // wahType is WAH's own sub-model selector, modeled via subTypes rather than a param.
-    reverseSkip: new Set(["wahType"]),
+    reverseSkip: new Set([SUB_TYPE_FIELD]),
     aliases: FIELD_LABEL_ALIASES.pfx,
     paramOnly: {},
   },
@@ -115,7 +114,7 @@ const FX_DELAY_BLOCK: PerTypeBlock = {
   block: "fxDelay",
   types: FX_DLY_TYPES,
   codecFields: (type) => FX_DELAY_TYPE_MAPS[type],
-  reverseSkip: new Set(["type"]),
+  reverseSkip: new Set([SUB_TYPE_FIELD]),
   aliases: FIELD_LABEL_ALIASES.fxDelay,
   paramOnly: {},
 };
@@ -506,14 +505,6 @@ describe("GX-1 spec examples", () => {
     const example = chorus?.example?.fx1 as { params: Record<string, unknown> };
 
     expect(example.params).toEqual(DEFAULTS_BY_TYPE.fx.CHORUS);
-  });
-
-  it("selects a variant the way the spec does, not the way the codec stores it", () => {
-    const wah = groupItems("pfx").find(item => item.id === "WAH");
-    const example = wah?.example?.pfx as Record<string, unknown>;
-
-    expect(example.subType, "the codec's wahType field is a subType in a spec").toBe("CRY WAH");
-    expect(example.wahType).toBeUndefined();
   });
 
   // A type with sub-models opens on one, so an example that leaves subType out shows a shape the

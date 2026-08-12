@@ -489,8 +489,8 @@ const exampleFor = (group: CapabilityGroup, item?: CapabilityItem): PatchSpecExa
   const values = exampleValues(group.id, item, variant);
   if (values === undefined) return undefined;
 
-  // A sub-model selection is set as `subType`, so the codec field carrying it (pedal WAH's
-  // `wahType`) is not a key the block accepts and drops out here with any other stale default.
+  // A sub-model selection is named on its own below, so the codec field carrying it is not one of
+  // the type's param keys and drops out here along with any other stale default.
   const accepted = acceptedKeys([...(group.params ?? []), ...(item?.params ?? []), ...(variant?.params ?? [])]);
   const controls = Object.fromEntries(Object.entries(values).filter(([key]) => accepted.has(key)));
 

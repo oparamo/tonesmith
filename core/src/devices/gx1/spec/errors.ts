@@ -10,9 +10,9 @@
  */
 import { typeSurface } from "./validate";
 import type { TypeSurface } from "./validate";
+import { SUB_TYPE_FIELD } from "../common";
 
 const TYPE_FIELD = "type";
-const SUB_TYPE_FIELD = "subType";
 const PARAMS_FIELD = "params";
 
 /** The block a rejected input was addressing, as far as the input itself reveals. */

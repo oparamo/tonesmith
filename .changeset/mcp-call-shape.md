@@ -61,7 +61,8 @@ no field for is rejected with the shape that type does take, printed with `type`
 nesting is shown rather than described.
 
 Pedal WAH's model is chosen by `subType`, alongside the fx slots and the way capabilities advertises
-it, rather than through the codec's `wahType` field.
+it. It reads back under that name too, so the block you get from `read_patch` is a block you can
+send straight back.
 
 The server advertises onboarding `instructions` at initialize, delivered automatically to every
 client: a device-agnostic account of how many calls the work should take and which shapes get you

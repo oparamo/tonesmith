@@ -23,14 +23,17 @@ on amp/odds/OD-DS were variously an `"OFF"`/`"ON"` string, a raw number, or a bo
 where you found them. They are `true`/`false` end to end now, over a `boolean` param domain and a
 validating `bool` codec field.
 
-**`subType` is the only way a model or sub-algorithm is selected.** Ten effects store that selector
-in their own param block rather than in the shared FX header, and the codec used to expose it
-inconsistently: FIXED WAH's was named `wahType` and never threaded into the encoded bytes at all,
-so its model was silently dropped, and the FX-slot REVERB picked its algorithm through
-`params.type`. All ten round-trip through `subType`. Where the codec still mirrors the value into
-`params.type` internally, `read_patch`, the CLI's `read`, and the generate tool's echo drop the
-mirror through the new `patchView.presentPatch`, so an agent sees one selector rather than two it
-has to keep in agreement.
+**`subType` is the only way a model or sub-algorithm is selected**, and it is the only name that
+selection goes by. Ten effects and the pedal-FX block store the selector among their own params
+rather than in a shared header, and the codec used to expose it three different ways: FIXED WAH's
+was named `wahType` and never threaded into the encoded bytes at all, so its model was silently
+dropped; the FX-slot REVERB picked its algorithm through `params.type`; and pedal WAH's model was
+set as `subType` but read back as `wahType`, so sending back the block you just read was rejected
+for naming a field the block does not have. All of them are `subType` now, on the way in and on the
+way out. `type` means the block's own selector and nothing else. Where the codec still keeps a copy
+among the params, `read_patch`, the CLI's `read`, and the generate tool's echo drop the duplicate
+through the new `patchView.presentPatch`, so an agent sees one selector rather than two it has to
+keep in agreement.
 
 **Blocks and fields that were undecoded now decode**: the `pfx` block (expression pedal WAH and
 PEDAL BEND), `solo` and `soloLevel` on both the dedicated AMP block and the FX-slot OD/DS, and

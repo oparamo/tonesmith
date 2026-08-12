@@ -147,10 +147,15 @@ const ENHANCER_HIGH_FREQ = [
 const KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
 const KEY_IDX = indexMap(KEY_NAMES);
 
+// The one name a sub-model selection goes by: in a codec field map, on a decoded block, and in a
+// patch spec. `type` is the block's own selector and never a sub-model's, so the two words each
+// mean exactly one thing.
+const SUB_TYPE_FIELD = "subType";
+
 // Effects whose sub-model selector lives in param-block byte p[0], read and written via
-// FX_PARAM_MAPS' lookup("type", 0, ...) field. Used by the decoder (to promote params.type back
-// to block.subType for display) and by the fx() builder (to thread a subType argument into
-// params.type so it actually encodes).
+// FX_PARAM_MAPS' lookup(SUB_TYPE_FIELD, 0, ...) field. Used by the decoder (to promote the
+// selection out of the params bag onto block.subType for display) and by the fx() builder (to
+// thread a subType argument back into that bag so it actually encodes).
 //
 // FX_COM byte[2] is never the subtype for any effect: it is always the bass-mode mirror of the
 // type selector in byte[1], which is the guitar-mode one.
@@ -164,10 +169,9 @@ const PARAM_SUBTYPE_EFFECTS = new Set([
   "REVERB",
 ]);
 
-// The PFX equivalent of PARAM_SUBTYPE_EFFECTS, mapping each type to the codec field its sub-model
-// selection lands in. PFX has no separate selector byte, so a type not listed here has no sub-model
-// at all and a subType passed to it would encode nowhere.
-const PFX_SUBTYPE_FIELDS: Partial<Record<string, string>> = { "WAH": "wahType" };
+// The PFX equivalent of PARAM_SUBTYPE_EFFECTS. PFX has no separate selector byte, so a type not
+// listed here has no sub-model at all and a subType passed to it would encode nowhere.
+const PFX_SUBTYPE_EFFECTS = new Set(["WAH"]);
 
 export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
@@ -177,6 +181,6 @@ export {
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, SBEND_PITCH, FB_MODE,
   SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, PHASER_STAGES, SPACE_ECHO_HEAD,
-  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_FIELDS, KEY_NAMES, KEY_IDX,
+  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, KEY_NAMES, KEY_IDX,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 };

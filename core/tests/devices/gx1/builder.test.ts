@@ -21,7 +21,8 @@ import {
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
 import { readFile } from "../../../src/devices/gx1/tsl";
-import { BLOCK_DEFAULTS } from "../../../src/devices/gx1/defaults";
+import { BLOCK_DEFAULTS, DEFAULTS_BY_TYPE, DEFAULT_SUBTYPES } from "../../../src/devices/gx1/defaults";
+import { PARAM_SUBTYPE_EFFECTS } from "../../../src/devices/gx1/common";
 
 describe("basePatch", () => {
   it("defaults to DEFAULT_CHAIN and key C", () => {
@@ -197,9 +198,22 @@ describe("fx", () => {
 
     expect(patch.fx1.on).toBe(true);
     expect(patch.fx1.type).toBe("CHORUS");
-    expect(patch.fx1.subType).toBeNull();
-    expect(patch.fx1.params).toEqual({ rate: 50, depth: 60, level: 100, preDelay: 4, direct: 100 });
+    expect(patch.fx1.params).toMatchObject({ rate: 50, depth: 60, level: 100, preDelay: 4, direct: 100 });
   });
+
+  // A type with sub-models is always set to one, so an omitted subType has to mean the model the
+  // device opens on. It used to mean raw byte 0, which for OD/DS is a different pedal entirely.
+  it.each([...PARAM_SUBTYPE_EFFECTS].map(type => [type, DEFAULT_SUBTYPES.fx?.[type]]))(
+    "opens %s on the device's own sub-model when none is named",
+    (type, expected) => {
+      const patch = basePatch("Test");
+
+      fx(patch, { slot: "fx1", type });
+
+      expect(patch.fx1.subType).toBe(expected);
+      expect(patch.fx1.params.subType).toBe(expected);
+    }
+  );
 
   it("configures each slot independently and honors on: false", () => {
     const patch = basePatch("Test");
@@ -211,13 +225,15 @@ describe("fx", () => {
     expect(patch.fx3).toMatchObject({ on: false, type: "DELAY", subType: "STANDARD" });
   });
 
-  it("fx DELAY with no sub-algorithm yields empty params (the sub-algorithm selects the field set)", () => {
+  // The sub-algorithm picks the field set, so with none named there was nothing to default from
+  // and the block came out with every param at 0. It opens on the factory sub-algorithm instead.
+  it("fx DELAY with no sub-algorithm opens on the factory one, at its own defaults", () => {
     const patch = basePatch("Test");
 
     fx(patch, { slot: "fx1", type: "DELAY" });
 
-    expect(patch.fx1.subType).toBeNull();
-    expect(patch.fx1.params).toEqual({});
+    expect(patch.fx1.subType).toBe("STANDARD");
+    expect(patch.fx1.params).toMatchObject(DEFAULTS_BY_TYPE.fxDelay.STANDARD);
   });
 
   it("fx DELAY with a WARP sub-algorithm defaults that sub-algorithm's own fields", () => {
@@ -225,13 +241,14 @@ describe("fx", () => {
 
     fx(patch, { slot: "fx1", type: "DELAY", subType: "WARP", params: { level: 80 } });
 
-    // WARP's fields are time/trigger/level (type is threaded in but not a defaulted param).
-    expect(patch.fx1.params).toEqual({ time: 400, trigger: false, level: 80, type: "WARP" });
+    // WARP's fields are time/trigger/level; the selection rides along under the same name it
+    // carries everywhere else, and is not one of the defaulted params.
+    expect(patch.fx1.params).toEqual({ time: 400, trigger: false, level: 80, subType: "WARP" });
   });
 
   // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS),
-  // not FX_COM byte[2]. This proves both halves of that threading: fx() writing
-  // subType into params.type on encode, and decodePatch promoting it back on decode.
+  // not FX_COM byte[2]. This proves both halves of that threading: fx() writing the selection
+  // into the params bag on encode, and decodePatch promoting it back onto the block on decode.
   it("round-trips FIXED WAH's subType through encode/decode", () => {
     const patch = basePatch("Test");
     fx(patch, { slot: "fx1", type: "FIXED WAH", subType: "VO WAH", params: { level: 80, direct: 20, manual: 60 } });
@@ -351,7 +368,7 @@ describe("fv", () => {
 describe("pfx", () => {
   it("sets WAH fields and enables the block by default", () => {
     const patch = basePatch("Test");
-    const wahParams = { wahType: "VO WAH", level: 80, direct: 20, position: 90, min: 10, max: 100 };
+    const wahParams = { subType: "VO WAH", level: 80, direct: 20, position: 90, min: 10, max: 100 };
 
     pfx(patch, { type: "WAH", params: wahParams });
 
@@ -364,7 +381,7 @@ describe("pfx", () => {
     pfx(patch, { type: "WAH", params: { level: 90 } });
 
     expect(patch.pfx).toMatchObject({
-      wahType: "CRY WAH", level: 90, direct: 0, position: 100, min: 0, max: 100,
+      subType: "CRY WAH", level: 90, direct: 0, position: 100, min: 0, max: 100,
     });
   });
 
@@ -378,14 +395,12 @@ describe("pfx", () => {
     });
   });
 
-  // WAH's model is a capabilities subType, so it is set as one here too rather than as the
-  // `wahType` params key the codec happens to use, which capabilities never mentions.
   it("selects the wah model from subType", () => {
     const patch = basePatch("Test");
 
     pfx(patch, { type: "WAH", subType: "VO WAH", params: { level: 80 } });
 
-    expect(patch.pfx).toMatchObject({ type: "WAH", wahType: "VO WAH", level: 80 });
+    expect(patch.pfx).toMatchObject({ type: "WAH", subType: "VO WAH", level: 80 });
   });
 
   it("throws when given a subType for a type with no sub-models", () => {
@@ -397,7 +412,7 @@ describe("pfx", () => {
 
   it("throws when the wah model is set both as subType and in the params bag", () => {
     const patch = basePatch("Test");
-    const setBothWays = () => { pfx(patch, { type: "WAH", subType: "VO WAH", params: { wahType: "CRY WAH" } }); };
+    const setBothWays = () => { pfx(patch, { type: "WAH", subType: "VO WAH", params: { subType: "CRY WAH" } }); };
 
     expect(setBothWays).toThrow();
   });
