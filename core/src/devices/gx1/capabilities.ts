@@ -170,7 +170,7 @@ const FX_META: CapabilityItem[] = [
   {
     id: "OD/DS",
     name: "Overdrive/Distortion",
-    description: "Overdrive and distortion effect that distorts the sound to create sustain. The type selects from 35 classic pedal models.",
+    description: "Overdrive and distortion effect that distorts the sound to create sustain. The type selects from 35 classic pedal models. The dedicated odds block carries the same 35 models and is where a patch's overdrive belongs; reach for an fx slot when you want a second overdrive stacked on top of it.",
     subTypes: [
       { id: "MID BOOST",   name: "Mid Boost",     description: "Booster with unique midrange characteristics. Good for solos placed before the amp." },
       { id: "CLEAN BST",   name: "Clean Boost",   description: "Booster with a punchy clean tone." },
@@ -556,7 +556,7 @@ const gx1Capabilities: DeviceCapabilities = {
     {
       id: "odds",
       name: "OD/DS",
-      description: "Dedicated overdrive/distortion block with 35 classic pedal models.",
+      description: "Dedicated overdrive/distortion block with 35 classic pedal models. This is the block to use for a patch's overdrive. The fx slots offer the same 35 models under their OD/DS type, for stacking a second overdrive in the chain.",
       items: ODDS_ITEMS,
       params: withBlockKeys(PARAMS_BY_BLOCK.odds),
     },
