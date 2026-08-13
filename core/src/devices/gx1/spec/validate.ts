@@ -1,5 +1,7 @@
 import { findGroup, findItem } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
+import { onlyBlockFor } from "../common";
+import type { BlockName } from "../common";
 import type { CapabilityGroup, CapabilityItem, ParamSpec } from "../../../types";
 
 /** Every problem found with one block, empty when the block is usable. */
@@ -114,6 +116,18 @@ const typeChoices = (capGroup: CapabilityGroup): string => capGroup.items.map(it
 /** Names what the group does offer, since a rejected `type` leaves the caller with no next step. */
 const unknownTypeIssue = (capGroup: CapabilityGroup, type: unknown): string =>
   `${capGroup.id} has no type ${JSON.stringify(type)}. Types: ${typeChoices(capGroup)}`;
+
+/**
+ * Rejects a type in a block the device does not offer it in. The block that does offer it is named
+ * because moving the block there is the whole fix. Without this the type is accepted, and its
+ * params are written over whatever the block it landed in keeps at those byte offsets.
+ */
+const checkTypeBelongsInBlock = (issues: Issues, name: BlockName, type: unknown): void => {
+  if (typeof type !== "string") return;
+  const onlyBlock = onlyBlockFor(type);
+  if (onlyBlock === undefined || onlyBlock === name) return;
+  issues.push(`${name} has no ${type}: this device offers it in ${onlyBlock} only.`);
+};
 
 /** A block's shape selectors, as they arrive from a caller: unvalidated, and each one optional. */
 interface Selectors {
@@ -254,5 +268,8 @@ const typeSurface = (selected: Selected): TypeSurface | undefined => {
   };
 };
 
-export { checkSelectors, resolveSelection, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface };
+export {
+  checkSelectors, checkTypeBelongsInBlock, resolveSelection, typeChoices, unknownTypeIssue,
+  validateTypeParams, typeSurface,
+};
 export type { Issues, Selection, Selectors, TypeParams, TypeSurface };

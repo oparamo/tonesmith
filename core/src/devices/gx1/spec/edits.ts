@@ -15,7 +15,9 @@ import {
 } from "../common";
 import type { BlockName } from "../common";
 import type { Patch } from "../types";
-import { checkSelectors, resolveSelection, unknownTypeIssue, validateTypeParams } from "./validate";
+import {
+  checkSelectors, checkTypeBelongsInBlock, resolveSelection, unknownTypeIssue, validateTypeParams,
+} from "./validate";
 import type { Issues, Selectors } from "./validate";
 import { asRecord } from "./errors";
 
@@ -61,9 +63,12 @@ const editsByBlock = (edits: Record<string, unknown>): Map<BlockName, EditedFiel
   return byBlock;
 };
 
-const checkType = (issues: Issues, group: string, value: unknown): void => {
-  if (resolveSelection(group, value)?.item !== undefined) return;
-  issues.push(unknownTypeIssue(findGroup(gx1Capabilities, group), value));
+const checkType = (issues: Issues, name: BlockName, value: unknown): void => {
+  if (resolveSelection(BLOCK_GROUPS[name], value)?.item === undefined) {
+    issues.push(unknownTypeIssue(findGroup(gx1Capabilities, BLOCK_GROUPS[name]), value));
+    return;
+  }
+  checkTypeBelongsInBlock(issues, name, value);
 };
 
 const asString = (value: unknown): string | undefined =>
@@ -83,7 +88,7 @@ const blockIssues = (patch: Patch, name: BlockName, fields: EditedField[]): Issu
   const selectors: Selectors = { group };
   for (const { leaf, isParam, value } of fields) {
     if (isParam) values[leaf] = value;
-    else if (leaf === TYPE_FIELD) checkType(issues, group, value);
+    else if (leaf === TYPE_FIELD) checkType(issues, name, value);
     else {
       const selector = leaf === ON_FIELD ? "on" : "subType";
       selectors[selector] = value;

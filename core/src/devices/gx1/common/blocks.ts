@@ -24,6 +24,16 @@ const BLOCK_NAMES = Object.keys(BLOCK_GROUPS) as BlockName[];
 /** The blocks that keep their controls in a nested `params` record, as the decoded patch does. */
 const NESTED_PARAMS = new Set<string>(["fx1", "fx2", "fx3"]);
 
+/**
+ * Types the device offers in one block only, mapped to the block that has them. OVERTONE keeps its
+ * params in `MEMORY%FX3A`, a block that exists for FX3 alone, so in either other slot they would be
+ * written over whatever type owns offset 0 of the shared param block.
+ */
+const BLOCK_ONLY_TYPES: Record<string, BlockName> = { "OVERTONE": "fx3" };
+
+/** The block a type belongs to when it belongs to only one, and undefined when any block takes it. */
+const onlyBlockFor = (type: string): BlockName | undefined => BLOCK_ONLY_TYPES[type];
+
 const TYPE_FIELD = "type";
 const ON_FIELD = "on";
 const PARAMS_FIELD = "params";
@@ -32,7 +42,7 @@ const PARAMS_FIELD = "params";
 const SELECTION_FIELDS = new Set<string>([TYPE_FIELD, SUB_TYPE_FIELD, ON_FIELD]);
 
 export {
-  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS,
+  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS, onlyBlockFor,
   ON_FIELD, PARAMS_FIELD, TYPE_FIELD,
 };
 export type { BlockName };

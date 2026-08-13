@@ -53,8 +53,11 @@ const indexTable = (name: string, offset: number, table: readonly (string | numb
   },
 });
 
-// Byte offset where each type's param block begins within the 251-byte FX block.
+// Byte offset where each type's param block begins within the 251-byte FX block. OVERTONE is the
+// exception: its 5 bytes are the whole of MEMORY%FX3A, so offset 0 there is its own block rather
+// than a window into a shared one.
 const FX_PARAM_OFFSETS: Partial<Record<string, number>> = {
+  "OVERTONE":     0,
   "COMPRESSOR":   0,
   "LIMITER":      10,
   "SLOW GEAR":    16,
@@ -314,7 +317,7 @@ const fieldMapFor = (fxType: string, delaySubType: string): FieldCodec[] | undef
 };
 
 const unmappedTypeMessage = (fxType: string, delaySubType: string): string => {
-  if (fxType !== PER_SUB_ALGORITHM_TYPE) return `Unknown FX type: "${fxType}"`;
+  if (fxType !== PER_SUB_ALGORITHM_TYPE) return `FX type "${fxType}" has no param layout to write to`;
   return `Unknown DELAY subType: "${delaySubType}". Expected one of: ${FX_DLY_TYPES.join(", ")}`;
 };
 
@@ -350,9 +353,11 @@ const encodeFxParams = (
   const bytes = [...originalBytes];
   const delaySubType = typeof params.subType === "string" ? params.subType : "";
   const fields = fieldMapFor(fxType, delaySubType);
-  if (!fields) throw new Error(unmappedTypeMessage(fxType, delaySubType));
+  const offset = FX_PARAM_OFFSETS[fxType];
+  if (fields === undefined || offset === undefined) {
+    throw new Error(unmappedTypeMessage(fxType, delaySubType));
+  }
 
-  const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
   const paramBytes = bytes.slice(offset);
   encodeFields(fields, params, paramBytes);
   bytes.splice(offset, paramBytes.length, ...paramBytes);

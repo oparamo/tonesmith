@@ -18,7 +18,9 @@ import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain, DE
 import type { AmpOptions, OddsOptions } from "../builder";
 import type { CapabilityGroup } from "../../../types";
 import type { Patch, FxParams } from "../types";
-import { checkSelectors, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface } from "./validate";
+import {
+  checkSelectors, checkTypeBelongsInBlock, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface,
+} from "./validate";
 import type { Issues } from "./validate";
 import {
   asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine,
@@ -122,6 +124,7 @@ const checkBlock = (issues: Issues, name: BlockName, input: unknown): void => {
   const capGroup = findGroup(gx1Capabilities, group);
   const block = asRecord(input);
   if (!checkType(issues, capGroup, block)) return;
+  checkTypeBelongsInBlock(issues, name, block[TYPE_FIELD]);
 
   const context = blockContext(group, block);
   const selected = typeof block[SUB_TYPE_FIELD] === "string" ? block[SUB_TYPE_FIELD] : undefined;

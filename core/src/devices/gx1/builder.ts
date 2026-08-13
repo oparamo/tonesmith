@@ -1,6 +1,6 @@
 import type { Patch, FxParams } from "./types";
 import { blankPatch, newFile, writeFile } from "./tsl";
-import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD } from "./common";
+import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, onlyBlockFor } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES, type ParamDefaults } from "./defaults";
 
@@ -208,6 +208,10 @@ const selectedSubType = (type: string, subType: string | null, params: FxParams)
 
 const fx = (patch: Patch, options: FxOptions): void => {
   const { slot, type, subType = null, params = {}, on = true } = options;
+  const onlySlot = onlyBlockFor(type);
+  if (onlySlot !== undefined && onlySlot !== slot) {
+    throw new Error(`${type} is a ${onlySlot} effect; this device has nowhere to store it in ${slot}.`);
+  }
   const selected = selectedSubType(type, subType, params);
   const block = patch[slot];
   block.on = on;

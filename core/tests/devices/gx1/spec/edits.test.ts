@@ -126,6 +126,21 @@ describe("validateFields", () => {
     expect(validateAfter(patch, { [path]: value })).toHaveLength(1);
   });
 
+  it("rejects switching a slot to OVERTONE when that slot cannot hold it", () => {
+    const patch = patchWith({ fx1: { type: "TREMOLO" } });
+
+    const issues = validateAfter(patch, { "fx1.type": "OVERTONE" });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/fx3/);
+  });
+
+  it("accepts switching fx3 to OVERTONE", () => {
+    const patch = patchWith({ fx3: { type: "TREMOLO" } });
+
+    expect(validateAfter(patch, { "fx3.type": "OVERTONE" })).toEqual([]);
+  });
+
   it("passes over a path the catalog says nothing about, leaving it to the codec", () => {
     const patch = patchWith({ amp: { type: "TRNSPRNT" } });
 

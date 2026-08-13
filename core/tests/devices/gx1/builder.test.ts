@@ -302,6 +302,13 @@ describe("fx", () => {
     expect(decoded.fx3.params).toMatchObject({ lower: 60, upper: 40, unison: 50, direct: 100, detune: 20 });
   });
 
+  it("rejects OVERTONE in a slot with no MEMORY%FX3A block to write it to", () => {
+    const patch = basePatch("Test");
+    const setOvertoneOnFx1 = () => { fx(patch, { slot: "fx1", type: "OVERTONE" }); };
+
+    expect(setOvertoneOnFx1).toThrow(/fx3/);
+  });
+
   it("accepts an unrecognized FX type with no params, without throwing", () => {
     const patch = basePatch("Test");
     const setBogusType = () => { fx(patch, { slot: "fx1", type: "BOGUS TYPE" }); };

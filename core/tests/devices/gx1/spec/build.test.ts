@@ -91,4 +91,27 @@ describe("buildPatch", () => {
 
     expect(build).toThrow(/time/);
   });
+
+  // FX1 and FX2 have no MEMORY%FX3A block, so OVERTONE's params landed at offset 0 of the shared
+  // 251-byte block, on top of COMPRESSOR's window and the factory defaults living in it.
+  it("rejects OVERTONE in an fx slot that cannot hold it, naming the one that can", () => {
+    const build = (): unknown => gx1.driver.buildPatch({
+      name: "Overtone",
+      amp: { type: "TWIN" },
+      fx1: { type: "OVERTONE", params: { lower: 60 } },
+    });
+
+    expect(build).toThrow(/OVERTONE/);
+    expect(build).toThrow(/fx3/);
+  });
+
+  it("accepts OVERTONE in fx3", () => {
+    const patch = gx1.driver.buildPatch({
+      name: "Overtone",
+      amp: { type: "TWIN" },
+      fx3: { type: "OVERTONE", params: { lower: 60 } },
+    });
+
+    expect(patch.fx3.params.lower).toBe(60);
+  });
 });
