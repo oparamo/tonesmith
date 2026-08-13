@@ -25,6 +25,23 @@ describe("describe_device", () => {
     expect(summary.chain.defaultOrder, "no-items summary carries a chain pointer").toContain("AMP");
   });
 
+  // The summary's example was written out by hand against one device, so on any other it would name
+  // groups and items that do not exist.
+  it("shows an example `items` list built from this device's own catalog", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const { text } = await client.callTool("describe_device", { device: "gx1" });
+    const { help } = JSON.parse(text) as { help: string };
+    const entries = JSON.parse(help.slice(help.indexOf("["), help.lastIndexOf("]") + 1)) as string[];
+
+    const { isError, text: reply } = await client.callTool("describe_device", { device: "gx1", items: entries });
+
+    expect(entries.length, help).toBeGreaterThan(1);
+    expect(isError, reply).toBe(false);
+    expect(Object.keys(JSON.parse(reply) as object)).toEqual(entries);
+  });
+
   it("returns the full chain model for the chain entry", async () => {
     const client = await connectClient();
     close = client.close;
