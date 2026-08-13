@@ -1,5 +1,5 @@
 ---
-"@tonesmith/core": patch
+"@tonesmith/core": major
 ---
 
 Reject a value the device cannot store instead of writing a corrupt file.
@@ -21,3 +21,19 @@ scaled value, which is what the scale is for.
 
 The CLI `write` command and the MCP `write_fields` and `generate_patch` tools all encode through
 this path, so a rejection replaces silent corruption on every surface.
+
+That guard is the floor, not the message a caller should be reading. Dot-path edits are now checked
+against the device's capability catalog the way `buildPatch` has always checked a patch spec, so the
+rejection names the block, the param and what it accepts:
+
+```
+amp GAIN for NATURAL takes a whole number (got "abc")
+odds TONE for OVERDRIVE must be -50-50 (got -500)
+ns DETECT must be one of: INPUT, NS INPUT (got "BOGUS")
+```
+
+**Breaking.** `PatchDriver` gains `validateFields(patch, edits)`, which every driver must implement,
+and `patchUtils.applyFieldEdits(driver, patch, edits)` takes the driver as its first argument. The
+edits are applied to the patch before the check, so a batch that switches a block's type and sets a
+param of the new type is validated as the one state it describes rather than against the type the
+patch held beforehand.
