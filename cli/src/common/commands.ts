@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { InvalidArgumentError } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
@@ -66,14 +67,30 @@ const addCopy = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =>
     });
 };
 
+/**
+ * Commander hands every option through as a string, and a count that isn't one is a mistake.
+ * InvalidArgumentError is what routes it through commander's own usage error rather than out of
+ * the parse as an unhandled throw.
+ */
+const parseCount = (value: string): number => {
+  if (!/^\d+$/.test(value.trim())) {
+    throw new InvalidArgumentError(`--count takes a whole number of patches (got "${value}").`);
+  }
+  return Number(value.trim());
+};
+
 const addNew = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
-    .command("new <file> [setName] [nPatches]")
+    .command("new <file>")
     .description("create a blank patch file")
-    .action((file: string, setName?: string, patchCountStr?: string) => {
+    .option("--set-name <name>", "name for the patch set stored in the file (default: the filename)")
+    .option("--count <n>", "how many blank patches it opens with", parseCount)
+    .action((file: string, options: { setName?: string; count?: number }) => {
       run(() => {
-        const patchCount = patchCountStr === undefined ? undefined : parseInt(patchCountStr, 10);
-        const patchFile = patchUtils.createPatchFile(driver, file, { setName, patchCount });
+        const patchFile = patchUtils.createPatchFile(driver, file, {
+          setName: options.setName,
+          patchCount: options.count,
+        });
         console.info(
           `Created ${file} with ${patchFile.patches.length} blank patch(es), set name '${patchFile.name}'`
         );

@@ -37,7 +37,7 @@ Every command takes the device id as its first argument:
 tonesmith --help
 
 # Create a new patch file with N blank patches
-tonesmith <device> new <file> [set_name] [n_patches]
+tonesmith <device> new <file> [--set-name <name>] [--count <n>]
 
 # Read all patches in a file, or a single patch by index or name
 tonesmith <device> read <file> [index|name]

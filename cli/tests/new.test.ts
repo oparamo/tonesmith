@@ -20,28 +20,40 @@ describe("gx1 new", () => {
     expect(created.name).toBe("my-tones");
   });
 
-  it("creates N blank patches when given a count", async () => {
+  // Each option stands alone: a count used to sit in the second positional slot, so asking for
+  // three patches meant naming the set as well.
+  it("creates N blank patches when given a count, with no set name", async () => {
     temp = emptyTempDir();
     const file = join(temp.dir, "multi.tsl");
 
-    const { error, exitCode } = await runCli(["gx1", "new", file, "My Set", "3"]);
+    const { error, exitCode } = await runCli(["gx1", "new", file, "--count", "3"]);
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const created = gx1.driver.readFile(file);
     expect(created.patches).toHaveLength(3);
+    expect(created.name).toBe("multi");
   });
 
   it("uses a custom set name when given", async () => {
     temp = emptyTempDir();
     const file = join(temp.dir, "custom.tsl");
 
-    const { error, exitCode } = await runCli(["gx1", "new", file, "Custom Name"]);
+    const { error, exitCode } = await runCli(["gx1", "new", file, "--set-name", "Custom Name"]);
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const created = gx1.driver.readFile(file);
     expect(created.name).toBe("Custom Name");
+  });
+
+  it("rejects a count that is not a whole number of patches", async () => {
+    temp = emptyTempDir();
+    const file = join(temp.dir, "bad-count.tsl");
+
+    const { exitCode } = await runCli(["gx1", "new", file, "--count", "lots"]);
+
+    expect(exitCode).toBe(1);
   });
 
   it("refuses to overwrite an existing file", async () => {
