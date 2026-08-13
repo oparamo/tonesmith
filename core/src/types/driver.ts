@@ -1,4 +1,4 @@
-import type { Patch, PatchFile, RawPatch } from "./patch";
+import type { Encodable, Patch, PatchFile, RawPatch } from "./patch";
 import type { DeviceCapabilities } from "./capabilities";
 
 /** Dot-path to the value written there, as `write_fields` and the CLI's `write` both express it. */
@@ -30,7 +30,7 @@ interface PatchDriver<T extends Patch = Patch> {
    */
   validateFields(patch: T, edits: FieldEdits): string[];
   decodePatch(raw: RawPatch): T;
-  encodePatch(patch: T): RawPatch;
+  encodePatch(patch: Encodable<T>): RawPatch;
 }
 
 export type { FieldEdits, PatchDriver };

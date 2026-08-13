@@ -16,4 +16,21 @@ interface PatchFile<T extends Patch = Patch> {
 
 type RawPatch = Record<string, unknown>;
 
-export type { Patch, PatchFile, RawPatch };
+/**
+ * Marks a patch that has been through `presentPatch`. Declared rather than defined: nothing carries
+ * it at runtime, and its whole job is to make a view and a patch different types.
+ */
+declare const PRESENTED: unique symbol;
+
+/**
+ * A decoded patch prepared for a consumer to read, shaped like the patch it came from but missing
+ * the selector copy `presentPatch` drops. `PatchDriver.encodePatch` refuses it, since it reads that
+ * copy to pick a block's field map and would otherwise write the block's old sub-model byte back
+ * and report the write as done.
+ */
+type PatchView<T> = T & { readonly [PRESENTED]: true };
+
+/** A patch the encoder will take, which is any patch that is not a `PatchView`. */
+type Encodable<T> = T & { readonly [PRESENTED]?: never };
+
+export type { Patch, PatchFile, RawPatch, PatchView, Encodable };

@@ -173,6 +173,17 @@ describe("writeFile + readFile round-trip", () => {
     expect(reloaded.name).toBe("Test Set");
   });
 
+  // PatchDriver.writeFile takes a device-agnostic PatchFile, which anyone can assemble by hand;
+  // this writer starts from the bytes the file was read as and has none for such a file.
+  it("refuses a file it never read, naming the path and the reason", () => {
+    const assembled = { name: "Set", device: "GX-1", patches: newFile("Set", 1).patches };
+
+    const writeAssembled = () => { writeFile(assembled, tmpPath); };
+
+    expect(writeAssembled).toThrow(new RegExp(tmpPath));
+    expect(existsSync(tmpPath), "nothing written").toBe(false);
+  });
+
   it("creates missing parent directories", () => {
     const nestedDir = join(tmpdir(), `tonesmith-tsl-test-nested-${process.pid}`);
     const nestedPath = join(nestedDir, "sub", "patch.tsl");

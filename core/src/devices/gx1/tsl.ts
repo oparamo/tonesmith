@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { decodePatch, encodePatch, hexFromBytes } from "./codec";
 import { encodeName } from "./codec/blocks";
 import { RAW, NAME_BYTES } from "./common";
+import type { PatchFile as BasePatchFile } from "../../types";
 import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types";
 
 /** Byte length of each block that opens zero-filled. */
@@ -173,7 +174,22 @@ const readFile = (path: string): PatchFile => {
   };
 };
 
-const writeFile = (file: PatchFile, path: string): void => {
+/**
+ * The device-agnostic `PatchFile` a caller may hand `PatchDriver.writeFile` is not one this writer
+ * can start from. Every write begins at the envelope the file was read as and overwrites the byte
+ * indices this codec knows, which is what leaves the format's undecoded fields intact, so a file
+ * assembled by hand has nothing to write back.
+ */
+const asWritable = (file: BasePatchFile<Patch>, path: string): PatchFile => {
+  const candidate = file as Partial<PatchFile>;
+  if (candidate[RAW] === undefined || candidate.formatRev === undefined) {
+    throw new Error(`Cannot write ${path}: this patch file did not come from readFile or newFile, so it carries none of the original bytes a write starts from.`);
+  }
+  return file as PatchFile;
+};
+
+const writeFile = (input: BasePatchFile<Patch>, path: string): void => {
+  const file = asWritable(input, path);
   const envelope: TslEnvelope = {
     ...file[RAW],
     name:      file.name,
