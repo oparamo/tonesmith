@@ -1,8 +1,23 @@
 const bytesFromHex = (hexList: string[]): number[] =>
   hexList.map(hex => parseInt(hex, 16));
 
+/** JSON.stringify renders NaN and Infinity as null, which hides the value being rejected. */
+const shownValue = (value: unknown): string =>
+  typeof value === "string" ? JSON.stringify(value) : String(value);
+
+/**
+ * The last line of defense against writing a corrupt file. `toString(16)` returns a string
+ * argument unchanged, renders a negative as "-1C2", and padStart leaves anything already two
+ * characters alone, so an unvalidated value used to reach the file looking like a byte. Every
+ * write goes through here, so no block or field codec can bypass the check.
+ */
 const hexFromBytes = (byteList: number[]): string[] =>
-  byteList.map(byte => byte.toString(16).toUpperCase().padStart(2, "0"));
+  byteList.map((byte, index) => {
+    if (!Number.isInteger(byte) || byte < 0 || byte > 255) {
+      throw new RangeError(`Byte ${index} is not an integer 0–255: ${shownValue(byte)}`);
+    }
+    return byte.toString(16).toUpperCase().padStart(2, "0");
+  });
 
 /**
  * Falls back to an "UNKNOWN_<label><index>" sentinel for an out-of-range index, so malformed
@@ -26,4 +41,4 @@ const toSigned = (raw: number, center = 50): number => raw - center;
 
 const toUnsigned = (value: number, center = 50): number => value + center;
 
-export { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned };
+export { bytesFromHex, hexFromBytes, lookupName, lookupIndex, shownValue, toSigned, toUnsigned };

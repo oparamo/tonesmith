@@ -1,5 +1,42 @@
 import { describe, it, expect } from "vitest";
-import { lookupName, lookupIndex } from "../../../src/devices/gx1/codec/primitives";
+import { bytesFromHex, hexFromBytes, lookupName, lookupIndex } from "../../../src/devices/gx1/codec/primitives";
+
+describe("hexFromBytes", () => {
+  it("renders each byte as two uppercase hex digits", () => {
+    const hex = hexFromBytes([0, 15, 16, 255]);
+
+    expect(hex).toEqual(["00", "0F", "10", "FF"]);
+  });
+
+  it("round-trips every byte value through bytesFromHex", () => {
+    const everyByte = Array.from({ length: 256 }, (_, byte) => byte);
+
+    expect(bytesFromHex(hexFromBytes(everyByte))).toEqual(everyByte);
+  });
+
+  /**
+   * Each case reached the file as-is before the guard: `toString` ignores the radix for a string,
+   * a negative renders as "-1C2", and padStart leaves anything already two characters alone.
+   */
+  it.each([
+    { label: "a string", byteList: ["abc"], bad: "abc" },
+    { label: "a negative", byteList: [0, -450], bad: "-450" },
+    { label: "a value above 255", byteList: [256], bad: "256" },
+    { label: "a fraction", byteList: [1.5], bad: "1.5" },
+    { label: "NaN", byteList: [Number.NaN], bad: "NaN" },
+  ])("throws for $label rather than writing it to the file", ({ byteList, bad }) => {
+    const encodeBadByte = () => hexFromBytes(byteList as number[]);
+
+    expect(encodeBadByte).toThrow(RangeError);
+    expect(encodeBadByte).toThrow(new RegExp(bad.replace(".", "\\.")));
+  });
+
+  it("names the index of the offending byte", () => {
+    const encodeBadByte = () => hexFromBytes([1, 2, 300]);
+
+    expect(encodeBadByte).toThrow(/\b2\b/);
+  });
+});
 
 describe("lookupName", () => {
   const table = ["ONE", "TWO", "THREE"];

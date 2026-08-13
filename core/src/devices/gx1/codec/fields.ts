@@ -1,5 +1,29 @@
-import { toSigned, toUnsigned, lookupName } from "./primitives";
+import { toSigned, toUnsigned, lookupName, shownValue } from "./primitives";
 import type { FxParams } from "../types";
+
+// ── Value guards ──────────────────────────────────────────────────────────────
+
+type Bounds = readonly [min: number, max: number];
+
+const BYTE_RANGE: Bounds = [0, 255];
+const NIBBLE_QUAD_RANGE: Bounds = [0, 0xFFFF];
+
+/**
+ * Every encode runs its value through one of these first. `hexFromBytes` would catch the bad byte
+ * anyway, but only by index, so rejecting here is what lets the message name the param a caller
+ * actually set. Bounds are stated at the field's own scale, not the byte's.
+ */
+const numberWithin = (name: string, value: unknown, [min, max]: Bounds): number => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max)
+    throw new RangeError(`${name}: value ${shownValue(value)} is outside ${min} to ${max}`);
+  return value;
+};
+
+const intWithin = (name: string, value: unknown, bounds: Bounds): number => {
+  const within = numberWithin(name, value, bounds);
+  if (!Number.isInteger(within)) throw new RangeError(`${name}: value ${within} is not a whole number`);
+  return within;
+};
 
 // ── FieldCodec interface ───────────────────────────────────────────────────────
 
@@ -30,11 +54,7 @@ const u8 = (name: string, offset: number): FieldCodec => ({
   name,
   kind: "u8",
   decode: bytes => bytes[offset],
-  encode: (value, bytes) => {
-    const n = value as number;
-    if (n < 0 || n > 255) throw new RangeError(`${name}: value ${n} out of u8 range (0–255)`);
-    bytes[offset] = n;
-  },
+  encode: (value, bytes) => { bytes[offset] = intWithin(name, value, BYTE_RANGE); },
 });
 
 /**
@@ -47,7 +67,10 @@ const signed = (name: string, offset: number, center = 50): FieldCodec => ({
   kind: "signed",
   center,
   decode: bytes => toSigned(bytes[offset], center),
-  encode: (value, bytes) => { bytes[offset] = toUnsigned(value as number, center); },
+  encode: (value, bytes) => {
+    const decodedRange: Bounds = [-center, 255 - center];
+    bytes[offset] = toUnsigned(intWithin(name, value, decodedRange), center);
+  },
 });
 
 /**
@@ -92,7 +115,11 @@ const scaled = (name: string, offset: number, factor: number): FieldCodec => ({
   name,
   kind: "scaled",
   decode: bytes => Math.round(bytes[offset] * factor * 10) / 10,
-  encode: (value, bytes) => { bytes[offset] = Math.round((value as number) / factor); },
+  encode: (value, bytes) => {
+    /** A fraction is legal here, which is what the factor is for, so only the stored byte is bounded. */
+    const scaledRange: Bounds = [0, 255 * factor];
+    bytes[offset] = Math.round(numberWithin(name, value, scaledRange) / factor);
+  },
 });
 
 /**
@@ -104,7 +131,7 @@ const nibblePair = (name: string, offset: number): FieldCodec => ({
   kind: "nibblePair",
   decode: bytes => bytes[offset] * 16 + bytes[offset + 1],
   encode: (value, bytes) => {
-    const n = value as number;
+    const n = intWithin(name, value, BYTE_RANGE);
     bytes[offset]     = (n >> 4) & 0xF;
     bytes[offset + 1] = n & 0xF;
   },
@@ -120,7 +147,7 @@ const nibbleQuad = (name: string, offset: number): FieldCodec => ({
   decode: bytes =>
     bytes[offset] * 4096 + bytes[offset + 1] * 256 + bytes[offset + 2] * 16 + bytes[offset + 3],
   encode: (value, bytes) => {
-    const n = value as number;
+    const n = intWithin(name, value, NIBBLE_QUAD_RANGE);
     bytes[offset]     = (n >> 12) & 0xF;
     bytes[offset + 1] = (n >> 8) & 0xF;
     bytes[offset + 2] = (n >> 4) & 0xF;
