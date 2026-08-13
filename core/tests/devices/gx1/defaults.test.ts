@@ -162,4 +162,16 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
       expect(blank[block], `${block} should open at its factory default`).toEqual(patch[block]);
     }
   });
+
+  // These blocks are preserved verbatim rather than decoded, so the guard reads their bytes. Zero
+  // is a value here, not an absence: it sets memoryLevel to a silent 0 and bpm to 0, below the 40
+  // the device accepts, and leaves every footswitch and assign slot unassigned.
+  it("blankPatch opens the undecoded fixed-shape blocks at the factory bytes", () => {
+    const blank = blankPatch("Blank");
+    const assignSlots = Array.from({ length: 8 }, (_, slot) => `MEMORY%ASGN${slot + 1}`);
+
+    for (const key of ["MEMORY%OTHER", "MEMORY%CTL", ...assignSlots]) {
+      expect(blank[RAW][key], `${key} should open at its factory bytes`).toEqual(patch[RAW][key]);
+    }
+  });
 });

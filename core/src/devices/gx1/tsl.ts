@@ -13,9 +13,6 @@ const BLOCK_BYTES = {
   delay: 29,
   reverb: 20,
   pfx: 14,
-  other: 7,
-  ctl: 32,
-  assign: 15,
 } as const;
 
 const ASSIGN_SLOTS = 8;
@@ -30,11 +27,11 @@ const NAME_PAD = 0x20;
  */
 const DEFAULT_CHAIN_BYTES = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
 
-// The four blocks whose bytes are one fixed shape, so a blank patch can carry the device's own
-// factory values for them outright. Each array is `default-init.tsl`'s bytes for that block, which
-// agree with the device's official parameter table field for field. The other blocks open
-// zero-filled: their bytes mean different things per type, so there is no one value to open at, and
-// the builder fills each type's own defaults from DEFAULTS_BY_TYPE instead.
+// The blocks whose bytes are one fixed shape, so a blank patch can carry the device's own factory
+// values for them outright. Each array is `default-init.tsl`'s bytes for that block, which agree
+// with the device's official parameter table field for field. The rest open zero-filled: their
+// bytes mean different things per type, so there is no one value to open at, and the builder fills
+// each type's own defaults from DEFAULTS_BY_TYPE instead.
 
 /** Off, NATURAL, gain 50, level 50, bass/mid/treble 50, ORIGINAL speaker, DYN421 mic, solo off at 50. */
 const AMP_DEFAULT_BYTES = [0, 1, 0, 50, 50, 50, 50, 50, 1, 1, 1, 0, 50];
@@ -47,6 +44,26 @@ const FV_DEFAULT_BYTES = [100, 0, 100, 2];
 
 /** Off, threshold 30, release 30, INPUT detect. */
 const NS_DEFAULT_BYTES = [0, 30, 30, 0];
+
+/**
+ * Memory level 100 and BPM 120, each a byte split across two nibbles, then key of C, carryover on,
+ * tempo hold off. Zeros are a setting rather than an absence here: they trim the patch's output to
+ * silence and put the tempo below the 40 the device accepts.
+ */
+const OTHER_DEFAULT_BYTES = [6, 4, 7, 8, 0, 1, 0];
+
+/**
+ * The footswitch assignments the device ships a patch with, a function index and a mode per switch.
+ * FORMAT.md documents the shape and leaves the block undecoded, so these are the fixture's bytes
+ * rather than a field-by-field reading of them.
+ */
+const CTL_DEFAULT_BYTES = [
+  1, 0, 2, 0, 3, 0, 0, 0, 0, 0, 5, 0, 5, 2, 5, 0,
+  17, 0, 4, 0, 3, 17, 0, 4, 0, 7, 0, 16, 0, 11, 0, 3,
+];
+
+/** An assign slot at rest. Undecoded like MEMORY%CTL, so this is the fixture's bytes as they are. */
+const ASSIGN_DEFAULT_BYTES = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 // A fresh array per call: RAW is a public escape hatch, and callers are free to mutate
 // patch[RAW]["MEMORY%FXn"] in place (e.g. to probe undecoded byte offsets). A shared array would
@@ -72,11 +89,11 @@ const blankParamSet = (): RawParamSet => {
     "MEMORY%PFX":     zeroBytes(BLOCK_BYTES.pfx),
     "MEMORY%FV":      hexFromBytes(FV_DEFAULT_BYTES),
     "MEMORY%NS":      hexFromBytes(NS_DEFAULT_BYTES),
-    "MEMORY%OTHER":   zeroBytes(BLOCK_BYTES.other),
-    "MEMORY%CTL":     zeroBytes(BLOCK_BYTES.ctl),
+    "MEMORY%OTHER":   hexFromBytes(OTHER_DEFAULT_BYTES),
+    "MEMORY%CTL":     hexFromBytes(CTL_DEFAULT_BYTES),
   };
   for (let slot = 1; slot <= ASSIGN_SLOTS; slot++) {
-    paramSet[`MEMORY%ASGN${slot}`] = zeroBytes(BLOCK_BYTES.assign);
+    paramSet[`MEMORY%ASGN${slot}`] = hexFromBytes(ASSIGN_DEFAULT_BYTES);
   }
   return paramSet;
 };
