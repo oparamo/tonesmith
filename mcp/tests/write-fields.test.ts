@@ -64,6 +64,32 @@ describe("write_fields", () => {
     expect(file.patches[0].amp.solo).toBe(true);
   });
 
+  it("takes a value that arrives as a number, which is how read_patch returns it", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.gain": 88, "amp.solo": true } };
+
+    const { isError, text } = await client.callTool("write_fields", input);
+
+    expect(isError, text).toBe(false);
+    const patch = gx1.driver.readFile(temp.fixture).patches[0];
+    expect(patch.amp.gain).toBe(88);
+    expect(patch.amp.solo).toBe(true);
+  });
+
+  it("keeps a numeric-looking patch name a name", async () => {
+    temp = withTempDir();
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { name: "1984" } };
+
+    const { isError, text } = await client.callTool("write_fields", input);
+
+    expect(isError, text).toBe(false);
+    expect(gx1.driver.readFile(temp.fixture).patches[0].name).toBe("1984");
+  });
+
   it("errors for an unknown device", async () => {
     temp = withTempDir();
     const client = await connectClient();

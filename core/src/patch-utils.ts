@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { basename, extname } from "node:path";
-import type { FieldEdits, Patch, PatchFile, PatchDriver } from "./types";
+import type { FieldEdits, FieldValue, Patch, PatchFile, PatchDriver } from "./types";
 
 /** A reference that names a slot rather than a patch: digits, optionally signed. */
 const INDEX_REF = /^-?\d+$/;
@@ -50,8 +50,15 @@ const resolvePatchIndex = (patches: Patch[], ref: string): number => {
   return soleIndexNamed(named, trimmed);
 };
 
-/** Interprets a CLI/MCP field value: "72" becomes the number 72, "true"/"false" become booleans. */
-const coerceValue = (value: string): string | number | boolean => {
+/**
+ * Interprets a field value against the field it is going into: "72" becomes the number 72 and
+ * "true" becomes a boolean, but only where `existing` shows the field is not itself a string. A
+ * command line can express a number no other way, so the coercion has to happen somewhere; doing it
+ * blind turned a patch named "1984" into the number 1984, which the name encoder then could not pad
+ * to the block's width. A value that arrives already typed is taken as it is.
+ */
+const coerceValue = (value: FieldValue, existing: unknown): FieldValue => {
+  if (typeof value !== "string" || typeof existing === "string") return value;
   if (value === "true") return true;
   if (value === "false") return false;
   const asNumber = Number(value);
@@ -74,19 +81,21 @@ const unknownPathError = (
   );
 };
 
+/** Where a dot-path ends up: the record its last segment lives in, and that segment. */
+interface Field {
+  holder: Record<string, unknown>;
+  key: string;
+}
+
 /**
- * Sets a nested value by dot-notation path: setByPath(patch, "amp.gain", 72) sets patch.amp.gain.
+ * Walks a dot-path to the field it names, so a caller can read what is there before writing over it.
  *
  * Every segment must already exist: a decoded patch carries the complete set of fields its device
  * supports, so a path that isn't there names a field the device doesn't have. Writing it anyway
  * would be silently dropped by the encoder (which only emits known byte indices), leaving the
  * caller believing an edit landed when nothing changed.
  */
-const setByPath = (
-  target: Record<string, unknown>,
-  dottedPath: string,
-  value: unknown,
-): void => {
+const fieldAt = (target: Record<string, unknown>, dottedPath: string): Field => {
   const parts = dottedPath.split(".");
   let current = target;
   for (const [depth, part] of parts.slice(0, -1).entries()) {
@@ -97,9 +106,19 @@ const setByPath = (
     current = next as Record<string, unknown>;
   }
 
-  const leaf = parts[parts.length - 1];
-  if (!(leaf in current)) throw unknownPathError(dottedPath, leaf, current);
-  current[leaf] = value;
+  const key = parts[parts.length - 1];
+  if (!(key in current)) throw unknownPathError(dottedPath, key, current);
+  return { holder: current, key };
+};
+
+/** Sets a nested value by dot-notation path: setByPath(patch, "amp.gain", 72) sets patch.amp.gain. */
+const setByPath = (
+  target: Record<string, unknown>,
+  dottedPath: string,
+  value: unknown,
+): void => {
+  const { holder, key } = fieldAt(target, dottedPath);
+  holder[key] = value;
 };
 
 /** A single index when `ref` is given, every index in file order when it is omitted. */
@@ -109,8 +128,9 @@ const resolvePatchIndices = (patches: Patch[], ref?: string): number[] =>
     : patches.map((_, index) => index);
 
 /**
- * Applies dot-path edits to a patch in place, coercing each raw string value, then checks the
- * result against the device's catalog and throws with every problem at once.
+ * Applies dot-path edits to a patch in place, then checks the result against the device's catalog
+ * and throws with every problem at once. Returns what actually landed, keyed by path, so a caller
+ * can report the written values without re-deriving the coercion each one went through.
  *
  * The edits land before the check because a block's type is one of the things an edit can set, and
  * the driver reads each block's type off the patch. Nothing is written to disk on a rejection: the
@@ -119,17 +139,19 @@ const resolvePatchIndices = (patches: Patch[], ref?: string): number[] =>
 const applyFieldEdits = <T extends Patch>(
   driver: PatchDriver<T>,
   patch: T,
-  edits: readonly (readonly [path: string, rawValue: string])[],
-): void => {
+  edits: readonly (readonly [path: string, rawValue: FieldValue])[],
+): FieldEdits => {
   const applied: FieldEdits = {};
   for (const [path, rawValue] of edits) {
-    const value = coerceValue(rawValue);
-    setByPath(patch as unknown as Record<string, unknown>, path, value);
+    const { holder, key } = fieldAt(patch as unknown as Record<string, unknown>, path);
+    const value = coerceValue(rawValue, holder[key]);
+    holder[key] = value;
     applied[path] = value;
   }
 
   const issues = driver.validateFields(patch, applied);
   if (issues.length > 0) throw new Error(issues.join("\n"));
+  return applied;
 };
 
 /** Reads `path`, or starts a fresh empty file named `setName` when it doesn't exist yet. */

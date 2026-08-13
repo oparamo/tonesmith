@@ -264,10 +264,22 @@ describe("coerceValue", () => {
     { input: "FLAT", expected: "FLAT" },
     { input: "true", expected: true },
     { input: "false", expected: false },
-  ])("coerces \"$input\" to $expected", ({ input, expected }) => {
-    const result = coerceValue(input);
+  ])("coerces \"$input\" to $expected where the field holds a number", ({ input, expected }) => {
+    const result = coerceValue(input, 0);
 
     expect(result).toBe(expected);
+  });
+
+  it.each(["1984", "true", "0"])("leaves %o alone where the field already holds a string", (input) => {
+    const result = coerceValue(input, "Rock Lead");
+
+    expect(result).toBe(input);
+  });
+
+  it.each([88, true, "FLAT"])("passes %o through when it is not a string to interpret", (input) => {
+    const result = coerceValue(input, 0);
+
+    expect(result).toBe(input);
   });
 });
 
@@ -329,6 +341,32 @@ describe("applyFieldEdits", () => {
     applyFieldEdits(permissive, patch, []);
 
     expect((patch as unknown as Record<string, unknown>).key).toBe("C");
+  });
+
+  it("keeps a numeric-looking name a string, since the field it lands in holds one", () => {
+    const patch = editable({});
+
+    applyFieldEdits(permissive, patch, [["name", "1984"]]);
+
+    expect(patch.name).toBe("1984");
+  });
+
+  it("takes a value that arrives already typed, not only its string form", () => {
+    const patch = editable({ amp: { solo: false, gain: 0 } });
+
+    applyFieldEdits(permissive, patch, [["amp.gain", 72], ["amp.solo", true]]);
+
+    const amp = (patch as unknown as Record<string, unknown>).amp as Record<string, unknown>;
+    expect(amp.gain).toBe(72);
+    expect(amp.solo).toBe(true);
+  });
+
+  it("returns each landed value keyed by path, so a caller can report what it wrote", () => {
+    const patch = editable({ amp: { gain: 0 } });
+
+    const applied = applyFieldEdits(permissive, patch, [["name", "1984"], ["amp.gain", "72"]]);
+
+    expect(applied).toEqual({ name: "1984", "amp.gain": 72 });
   });
 
   it("hands the driver every edit it applied, keyed by path", () => {
