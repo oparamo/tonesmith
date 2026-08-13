@@ -32,6 +32,7 @@ const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   }),
   blankPatch: (name = "blank") => makePatch(name),
   buildPatch: (spec) => makePatch((spec as { name: string }).name),
+  validateFields: () => [],
   decodePatch: (raw) => raw as unknown as Patch,
   encodePatch: (patch) => patch as unknown as Record<string, unknown>,
 });
@@ -240,32 +241,60 @@ describe("resolvePatchIndices", () => {
 });
 
 describe("applyFieldEdits", () => {
+  const editable = (fields: Record<string, unknown>): Patch =>
+    ({ name: "Edit me", ...fields });
+
+  /** Accepts everything, so these cases exercise the shared half rather than a device's catalog. */
+  const permissive = makeFakeDriver(new Map());
+
+  /** Stands in for a device rejecting a value its catalog does not allow. */
+  const rejecting = (issues: string[]): PatchDriver =>
+    ({ ...permissive, validateFields: () => issues });
+
   it("applies a single edit with coercion", () => {
-    const patch: Record<string, unknown> = { amp: { gain: 0 } };
+    const patch = editable({ amp: { gain: 0 } });
 
-    applyFieldEdits(patch, [["amp.gain", "72"]]);
+    applyFieldEdits(permissive, patch, [["amp.gain", "72"]]);
 
-    const amp = patch.amp as Record<string, unknown>;
+    const amp = (patch as unknown as Record<string, unknown>).amp as Record<string, unknown>;
     expect(amp.gain).toBe(72);
   });
 
   it("applies multiple edits in order, including booleans", () => {
-    const patch: Record<string, unknown> = { key: "C", amp: { solo: false, gain: 0 } };
+    const patch = editable({ key: "C", amp: { solo: false, gain: 0 } });
 
-    applyFieldEdits(patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
+    applyFieldEdits(permissive, patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
 
-    const amp = patch.amp as Record<string, unknown>;
-    expect(patch.key).toBe("G");
+    const fields = patch as unknown as Record<string, unknown>;
+    const amp = fields.amp as Record<string, unknown>;
+    expect(fields.key).toBe("G");
     expect(amp.solo).toBe(true);
     expect(amp.gain).toBe(50);
   });
 
   it("does nothing given an empty edit list", () => {
-    const patch: Record<string, unknown> = { key: "C" };
+    const patch = editable({ key: "C" });
 
-    applyFieldEdits(patch, []);
+    applyFieldEdits(permissive, patch, []);
 
-    expect(patch.key).toBe("C");
+    expect((patch as unknown as Record<string, unknown>).key).toBe("C");
+  });
+
+  it("hands the driver every edit it applied, keyed by path", () => {
+    const seen: Record<string, unknown>[] = [];
+    const recording: PatchDriver = { ...permissive, validateFields: (_, edits) => { seen.push(edits); return []; } };
+
+    applyFieldEdits(recording, editable({ amp: { gain: 0 } }), [["amp.gain", "72"]]);
+
+    expect(seen).toEqual([{ "amp.gain": 72 }]);
+  });
+
+  it("throws with every issue the driver reports rather than the first", () => {
+    const applyRejectedEdits = () =>
+      { applyFieldEdits(rejecting(["gain is too high", "level is too low"]), editable({ amp: { gain: 0 } }), [["amp.gain", "900"]]); };
+
+    expect(applyRejectedEdits).toThrow(/gain is too high/);
+    expect(applyRejectedEdits).toThrow(/level is too low/);
   });
 });
 

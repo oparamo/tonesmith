@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
+import type { Patch, PatchDriver } from "@tonesmith/core";
 import { ok, err } from "../common";
 
 /** Rejects an input that asks for no change at all, or for a patch edit without naming the patch. */
@@ -21,9 +22,13 @@ const requireSomethingToChange = (ref?: string, fields?: object, setName?: strin
  * memory before anything is written, so a rejected edit anywhere in the set leaves the file
  * exactly as it was rather than half-applied.
  */
-const editPatch = (patch: Record<string, unknown>, fields: Record<string, string>): string => {
+const editPatch = <T extends Patch>(
+  driver: PatchDriver<T>,
+  patch: T,
+  fields: Record<string, string>,
+): string => {
   const edits = Object.entries(fields);
-  patchUtils.applyFieldEdits(patch, edits);
+  patchUtils.applyFieldEdits(driver, patch, edits);
   return edits
     .map(([field, value]) => `${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`)
     .join(", ");
@@ -66,8 +71,7 @@ const registerWriteFields = (server: McpServer): void => {
 
         if (fields !== undefined && ref !== undefined) {
           const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-          const patch = patchFile.patches[index] as unknown as Record<string, unknown>;
-          changes.push(`patch ${index}: ${editPatch(patch, fields)}`);
+          changes.push(`patch ${index}: ${editPatch(driver, patchFile.patches[index], fields)}`);
         }
 
         if (setName !== undefined) {

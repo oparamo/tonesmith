@@ -227,5 +227,5 @@ const typeSurface = (selected: Selected): TypeSurface | undefined => {
   };
 };
 
-export { validateTypeParams, typeSurface };
-export type { Issues, TypeParams, TypeSurface };
+export { resolveSelection, validateTypeParams, typeSurface };
+export type { Issues, Selection, TypeParams, TypeSurface };

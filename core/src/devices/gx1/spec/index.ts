@@ -6,3 +6,4 @@ export {
 } from "./errors";
 export type { BlockContext } from "./errors";
 export { buildPatch, validatePatchSpec } from "./build";
+export { validateFieldEdits } from "./edits";

@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { basename, extname } from "node:path";
-import type { Patch, PatchFile, PatchDriver } from "./types";
+import type { FieldEdits, Patch, PatchFile, PatchDriver } from "./types";
 
 /**
  * Resolves a numeric index string or an exact patch name to an array index.
@@ -88,14 +88,28 @@ const resolvePatchIndices = (patches: Patch[], ref?: string): number[] =>
     ? [resolvePatchIndex(patches, ref)]
     : patches.map((_, index) => index);
 
-/** Applies dot-path edits to a patch in place, coercing each raw string value. */
-const applyFieldEdits = (
-  patch: Record<string, unknown>,
+/**
+ * Applies dot-path edits to a patch in place, coercing each raw string value, then checks the
+ * result against the device's catalog and throws with every problem at once.
+ *
+ * The edits land before the check because a block's type is one of the things an edit can set, and
+ * the driver reads each block's type off the patch. Nothing is written to disk on a rejection: the
+ * caller throws before its `writeFile`, so the patch that was mutated is the one being discarded.
+ */
+const applyFieldEdits = <T extends Patch>(
+  driver: PatchDriver<T>,
+  patch: T,
   edits: readonly (readonly [path: string, rawValue: string])[],
 ): void => {
+  const applied: FieldEdits = {};
   for (const [path, rawValue] of edits) {
-    setByPath(patch, path, coerceValue(rawValue));
+    const value = coerceValue(rawValue);
+    setByPath(patch as unknown as Record<string, unknown>, path, value);
+    applied[path] = value;
   }
+
+  const issues = driver.validateFields(patch, applied);
+  if (issues.length > 0) throw new Error(issues.join("\n"));
 };
 
 /** Reads `path`, or starts a fresh empty file named `setName` when it doesn't exist yet. */

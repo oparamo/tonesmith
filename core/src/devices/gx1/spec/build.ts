@@ -10,7 +10,9 @@
  */
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
-import { BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS } from "../common";
+import {
+  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS, ON_FIELD,
+} from "../common";
 import type { BlockName } from "../common";
 import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain } from "../builder";
 import type { AmpOptions, OddsOptions } from "../builder";
@@ -24,13 +26,8 @@ import {
 } from "./errors";
 import type { BlockContext } from "./errors";
 
-const ON_FIELD = "on";
-
 /** Patch-level fields that are not blocks. Every other key must name one. */
 const PATCH_FIELDS = ["name", "chain", "key"];
-
-/** The fields that select a block's shape rather than set one of its controls. */
-const SELECTION_FIELDS = new Set<string>([TYPE_FIELD, SUB_TYPE_FIELD, ON_FIELD]);
 
 /** The one block the device can't bypass, so it takes no `on`. */
 const ALWAYS_ON = new Set<string>(["fv"]);

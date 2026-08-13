@@ -46,8 +46,7 @@ const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =
       run(() => {
         const patchFile = driver.readFile(file);
         const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-        const patch = patchFile.patches[index] as unknown as Record<string, unknown>;
-        patchUtils.applyFieldEdits(patch, fields.map(parseFieldAssignment));
+        patchUtils.applyFieldEdits(driver, patchFile.patches[index], fields.map(parseFieldAssignment));
         driver.writeFile(patchFile, file);
         console.info(`Wrote ${file}, patch ${index} updated: ${fields.join(", ")}`);
       });
