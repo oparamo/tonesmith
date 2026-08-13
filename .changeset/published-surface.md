@@ -15,6 +15,12 @@ without a major version. The type barrel gained the names it was missing in exch
 and `PatchSpecExample` had no way to be named, and `FieldEdits`, `PatchView` and `Encodable` come
 with the surface above.
 
+`patchUtils.upsertPatches` returns `{ file, created, saved }` rather than the file alone: whether
+the save started the file, and for each patch, whether it replaced a same-named patch or was
+appended. Its own documented property is that it reads once and writes once however many patches
+are saved, and a caller that had to say what the save did could only work it out by reading and
+decoding the whole file a second time first, which is what `generate_patch` was doing.
+
 `saveTsl` is gone rather than narrowed. It wrote a file and then called `console.info`, and the MCP
 server speaks JSON-RPC over stdio, so a consumer reaching for it inside a tool corrupted the
 protocol stream. `patchUtils.upsertPatches` is the supported way to save patches to a file.

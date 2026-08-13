@@ -137,12 +137,12 @@ const readExistingOrNew = <T extends Patch>(
   driver: PatchDriver<T>,
   path: string,
   setName: string,
-): PatchFile<T> => {
+): { file: PatchFile<T>; created: boolean } => {
   try {
-    return driver.readFile(path);
+    return { file: driver.readFile(path), created: false };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return driver.newFile(setName, 0);
-    throw error;
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return { file: driver.newFile(setName, 0), created: true };
   }
 };
 
@@ -151,6 +151,23 @@ interface UpsertRequest<T extends Patch> {
   path: string;
   patches: T[];
   setName?: string;
+}
+
+/** What one saved patch became: it took the place of a same-named patch, or joined the set. */
+interface SavedPatch {
+  name: string;
+  action: "replaced" | "appended";
+}
+
+/**
+ * What a save did, so a caller can say so without reading the file back. A second read costs a
+ * decode of every patch in the set and undoes the read-once, write-once property below.
+ */
+interface UpsertReport<T extends Patch> {
+  file: PatchFile<T>;
+  /** True when `path` held no file and this save started one. */
+  created: boolean;
+  saved: SavedPatch[];
 }
 
 /**
@@ -164,21 +181,25 @@ interface UpsertRequest<T extends Patch> {
  * A `setName` names a freshly created file and renames an existing one. Omitted, a new file takes
  * the first patch's name and an existing file keeps its own.
  */
-const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, request: UpsertRequest<T>): PatchFile<T> => {
+const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, request: UpsertRequest<T>): UpsertReport<T> => {
   const { path, patches, setName } = request;
   if (patches.length === 0) throw new Error("No patches to save: `patches` must hold at least one patch.");
 
-  const file = readExistingOrNew(driver, path, setName ?? patches[0].name);
+  const { file, created } = readExistingOrNew(driver, path, setName ?? patches[0].name);
   if (setName !== undefined) file.name = setName;
 
-  for (const patch of patches) {
+  const saved = patches.map((patch): SavedPatch => {
     const index = file.patches.findIndex(existing => existing.name === patch.name);
-    if (index >= 0) file.patches[index] = patch;
-    else file.patches.push(patch);
-  }
+    if (index >= 0) {
+      file.patches[index] = patch;
+      return { name: patch.name, action: "replaced" };
+    }
+    file.patches.push(patch);
+    return { name: patch.name, action: "appended" };
+  });
 
   driver.writeFile(file, path);
-  return file;
+  return { file, created, saved };
 };
 
 /** Which patch a copy moved, and where, so each surface can word its own confirmation. */
@@ -249,4 +270,4 @@ export {
   copyPatch,
   createPatchFile,
 };
-export type { UpsertRequest, CopiedPatch, CopyRequest, NewFileOptions };
+export type { UpsertRequest, UpsertReport, SavedPatch, CopiedPatch, CopyRequest, NewFileOptions };

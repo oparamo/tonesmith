@@ -23,9 +23,16 @@ const single = (spec: Record<string, unknown> & { outPath: string }): Record<str
   return input;
 };
 
-/** The per-patch results array the tool appends after its summary line. */
-const savedPatches = (text: string): SavedPatch[] =>
-  JSON.parse(text.slice(text.indexOf("["))) as SavedPatch[];
+interface GenerateResponse {
+  summary: string;
+  file: { path: string; setName: string; total: number; created: boolean };
+  patches: SavedPatch[];
+}
+
+const responseOf = (text: string): GenerateResponse => JSON.parse(text) as GenerateResponse;
+
+/** The per-patch results the tool reports, one entry per patch in the order they were sent. */
+const savedPatches = (text: string): SavedPatch[] => responseOf(text).patches;
 
 const AMP = { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 };
 
@@ -129,6 +136,8 @@ describe("generate_patch", () => {
     expect(patchNames, "array order is file order").toEqual(["First", "Second", "Third"]);
     expect(file.name).toBe("Album");
     expect(savedPatches(text)).toHaveLength(3);
+    // The file half of the response, so a caller knows where the set stands without reading it back.
+    expect(responseOf(text).file).toEqual({ path: outPath, setName: "Album", total: 3, created: true });
   });
 
   it("reports each patch as appended or replaced within one call", async () => {
@@ -529,7 +538,7 @@ describe("generate_patch", () => {
     const { isError, text } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError, text).toBe(false);
-    expect(text).toContain("Created");
+    expect(responseOf(text).file.created).toBe(true);
     const patch = gx1.driver.readFile(outPath).patches[0];
     expect(patch.name.trim()).toBe("Deep");
   });
@@ -571,10 +580,10 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
 
-    const first = await client.callTool("generate_patch", single({ name: "Lead", outPath, amp: AMP }));
+    const created = await client.callTool("generate_patch", single({ name: "Lead", outPath, amp: AMP }));
 
-    expect(first.isError, first.text).toBe(false);
-    expect(first.text).toContain("Created");
+    expect(created.isError, created.text).toBe(false);
+    expect(responseOf(created.text).file.created).toBe(true);
 
     const second = await client.callTool("generate_patch", single({ name: "Rhythm", outPath, amp: AMP }));
 

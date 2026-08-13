@@ -50,16 +50,6 @@ const buildAll = (driver: PatchDriver, specs: PatchSpec[]): Patch[] =>
 const asStored = (driver: PatchDriver, patch: Patch): Patch =>
   driver.decodePatch(driver.encodePatch(patch));
 
-/** Patch names already saved at `path`, or undefined when the file doesn't exist yet. */
-const existingPatchNames = (driver: PatchDriver, path: string): string[] | undefined => {
-  try {
-    return driver.readFile(path).patches.map(patch => patch.name);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
-  }
-};
-
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
     "generate_patch",
@@ -80,17 +70,15 @@ and the patch echoed back is the complete resulting state, so no follow-up read 
       try {
         const driver = registry.getDriver(device);
         const built = buildAll(driver, patches);
+        const { file, created, saved } = patchUtils.upsertPatches(driver, {
+          path: outPath, patches: built, setName,
+        });
 
-        const namesBefore = existingPatchNames(driver, outPath);
-        const alreadySaved = new Set(namesBefore ?? []);
-        const file = patchUtils.upsertPatches(driver, { path: outPath, patches: built, setName });
-
-        const results = built.map(patch => {
+        const results = built.map((patch, index) => {
           const stored = asStored(driver, patch);
-          const action = alreadySaved.has(stored.name) ? "replaced" : "appended";
           return {
             name: stored.name,
-            action,
+            action: saved[index].action,
             // State the stored order outright, so a caller that omitted `chain` sees the default
             // it took rather than having to look it up.
             chain: stored.chain,
@@ -100,11 +88,15 @@ and the patch echoed back is the complete resulting state, so no follow-up read 
           };
         });
 
-        const fileVerb = namesBefore === undefined ? "Created" : "Updated";
-        const summary =
-          `${fileVerb} ${outPath}: saved ${built.length} patch(es), ` +
-          `${file.patches.length} total in set "${file.name}"`;
-        return ok(`${summary}\n\n${JSON.stringify(results)}`);
+        const fileVerb = created ? "Created" : "Updated";
+        const response = {
+          summary:
+            `${fileVerb} ${outPath}: saved ${built.length} patch(es), ` +
+            `${file.patches.length} total in set "${file.name}"`,
+          file: { path: outPath, setName: file.name, total: file.patches.length, created },
+          patches: results,
+        };
+        return ok(JSON.stringify(response));
       } catch (error) {
         return err(error);
       }

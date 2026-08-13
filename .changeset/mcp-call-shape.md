@@ -29,7 +29,12 @@ device the server supports: a whole set goes out in one call and lands in one fi
 order becoming the order in the file rather than something the caller has to get right across N
 calls. Each patch is echoed back complete with its defaults filled in and the chain it was stored
 with, so the response is the confirmation and no follow-up read is needed. `setName` names the patch
-set stored in the file, distinct from `outPath`, the filename on disk. A block's shape, meaning the
+set stored in the file, distinct from `outPath`, the filename on disk.
+
+The response is one JSON object, `{ summary, file: { path, setName, total, created }, patches }`,
+rather than a prose line with a JSON array stuck to the end of it, which a consumer could only read
+by finding the first `[`. `file` says where the set stands after the write without reading it back,
+and each entry in `patches` says whether it replaced a same-named patch or was appended. A block's shape, meaning the
 fields it takes and their bounds, is validated by the device's own driver against its capability
 catalog rather than declared in the tool schema, so `describe_device` is where that detail lives.
 

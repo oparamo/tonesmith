@@ -61,7 +61,7 @@ describe("upsertPatches", () => {
     const driver = makeFakeDriver(files);
     const patches = [makePatch("First"), makePatch("Second"), makePatch("Third")];
 
-    const file = upsertPatches(driver, { path: "set.tsl", patches });
+    const { file } = upsertPatches(driver, { path: "set.tsl", patches });
 
     expect(file.patches).toEqual(patches);
     expect(files.get("set.tsl")).toBe(file);
@@ -73,7 +73,7 @@ describe("upsertPatches", () => {
     const driver = makeFakeDriver(files);
     const patches = [makePatch("Rhythm"), makePatch("Solo")];
 
-    const file = upsertPatches(driver, { path: "set.tsl", patches });
+    const { file } = upsertPatches(driver, { path: "set.tsl", patches });
     const patchNames = file.patches.map(patch => patch.name);
 
     expect(patchNames, "Rhythm replaced in place, Solo appended").toEqual(["Lead", "Rhythm", "Solo"]);
@@ -87,7 +87,7 @@ describe("upsertPatches", () => {
     const patches = [makePatch("Rhythm")];
 
     upsertPatches(driver, { path: "set.tsl", patches });
-    const file = upsertPatches(driver, { path: "set.tsl", patches });
+    const { file } = upsertPatches(driver, { path: "set.tsl", patches });
     const patchNames = file.patches.map(patch => patch.name);
 
     expect(patchNames).toEqual(["Lead", "Rhythm"]);
@@ -125,10 +125,10 @@ describe("upsertPatches", () => {
     const patches = [makePatch("First"), makePatch("Second")];
 
     const named = upsertPatches(driver, { path: "named.tsl", patches, setName: "My Library" });
-    expect(named.name).toBe("My Library");
+    expect(named.file.name).toBe("My Library");
 
     const unnamed = upsertPatches(driver, { path: "unnamed.tsl", patches });
-    expect(unnamed.name).toBe("First");
+    expect(unnamed.file.name).toBe("First");
   });
 
   it("renames an existing set when setName is given, and preserves it when omitted", () => {
@@ -138,14 +138,37 @@ describe("upsertPatches", () => {
     const driver = makeFakeDriver(files);
 
     const kept = upsertPatches(driver, { path: "set.tsl", patches: [makePatch("Rhythm")] });
-    expect(kept.name).toBe("Old Name");
+    expect(kept.file.name).toBe("Old Name");
 
     const renamed = upsertPatches(driver, {
       path: "set.tsl",
       patches: [makePatch("Solo")],
       setName: "New Name",
     });
-    expect(renamed.name).toBe("New Name");
+    expect(renamed.file.name).toBe("New Name");
+  });
+
+  // The saving surfaces tell a caller what became of each patch. Reading the file back to work it
+  // out costs a second decode of everything, and undoes this call's read-once/write-once property.
+  it("reports the file as created and says what happened to each patch", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Set", device: "FAKE", patches: [makePatch("Lead")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+
+    const fresh = upsertPatches(driver, { path: "new.tsl", patches: [makePatch("Solo")] });
+    const existing = upsertPatches(driver, {
+      path: "set.tsl",
+      patches: [makePatch("Lead"), makePatch("Clean")],
+    });
+
+    expect(fresh.created).toBe(true);
+    expect(fresh.saved).toEqual([{ name: "Solo", action: "appended" }]);
+    expect(existing.created).toBe(false);
+    expect(existing.saved).toEqual([
+      { name: "Lead", action: "replaced" },
+      { name: "Clean", action: "appended" },
+    ]);
   });
 
   it("rejects an empty batch rather than writing an unnamed file", () => {
