@@ -8,24 +8,28 @@ Every parameter the GX-1 exposes is declared once, and everything else derives f
 
 `param-catalog.ts` holds every block and type's params: the name, the value domain, and a
 description. Each is declared as `def(name, domain, description)`, where the domain is `num`,
-`oneOf`, `lookupOf`, `bool` or `text`. From that one declaration comes the human `range` string,
-the machine `values` list, and the numeric `min`/`max` bounds, which used to be three restatements
-of the same fact.
+`oneOf`, `lookupOf` or `bool`. From that one declaration comes the human `range` string, the machine
+`values` list, and the numeric `min`/`max` bounds, which used to be three restatements of the same
+fact.
 
-`ParamSpec` carries all of it, so a consumer of `describe_device` or the CLI's `capabilities` gets:
+`ParamSpec` carries all of it, as a union of the three kinds a param can be rather than a bag of
+optional fields where `{min, max, values, boolean}` all at once still compiled. Every param states
+its **`kind`**, so a consumer of `describe_device` or the CLI's `capabilities` reads one field
+instead of inferring the answer from which others are present, and a driver validating a value
+switches on it instead of walking a presence chain:
 
-- **`key`**, the exact field name to write when building a patch or editing one by dot-path,
-  stamped automatically from the codec's field map. No transliterating "PRE-DELAY" into `preDelay`
-  by hand.
-- **`values`**, the full ordered list of valid labels for every enum param. A compact `range`
+- **`numeric`** carries **`min`** and **`max`**, plus **`decimals`** on the few params that take
+  fractional values. Reverb TIME runs 0.1-10.0 s while PRE-DELAY's 0-200 is whole milliseconds, and
+  the bounds alone cannot tell those apart.
+- **`discrete`** carries **`values`**, the full ordered list of valid labels. A compact `range`
   summary like "20 Hz-12.5 kHz, FLAT" could not tell you whether `"2.5kHz"` or `"2.50kHz"` was the
   spelling the codec accepts.
-- **`min`** and **`max`** for numeric params, plus **`decimals`** on the few that take fractional
-  values. Reverb TIME runs 0.1-10.0 s while PRE-DELAY's 0-200 is whole milliseconds, and the bounds
-  alone cannot tell those apart.
-- **`boolean`** on params carried as real toggles. A numeric param is recognizable by its bounds and
-  a discrete one by its `values`, so without this a toggle was the one kind a consumer had to
+- **`boolean`** is a real toggle, taking `true` or `false`. It was the one kind a consumer had to
   identify by reading `range` as English.
+
+Every kind carries **`key`**, the exact field name to write when building a patch or editing one by
+dot-path, stamped automatically from the codec's field map. No transliterating "PRE-DELAY" into
+`preDelay` by hand.
 
 Each block also carries an **`example`**: the spec that builds it at the device's factory defaults,
 keyed by the block's own name. A key alone says what a control is called and never where it goes,
@@ -56,10 +60,9 @@ FX types were under-reporting `DIRECT` and other params, and the cabinet list wa
 `USER1` through `USER8` entries.
 
 The device's driver reads the catalog to validate `generate_patch` input at runtime, rather than a
-schema repeating it field by field. `boolean` tells the validator a value must be `true` or
-`false`, `values` tells it which strings are legal, and `decimals` tells it whether a fraction is
-legal for a numeric field, since a bound alone cannot say whether 4.5 is legal, only whether it is
-in range.
+schema repeating it field by field. The param's `kind` says what a value must be, `values` says
+which strings are legal, and `decimals` says whether a fraction is legal for a numeric field, since
+a bound alone cannot say whether 4.5 is legal, only whether it is in range.
 
 The driver checks supplied values against the chosen type's real range before anything is written.
 `ANALOG` with a time of 1201 ms, past its 1200 ms limit, used to get as far as the codec's raw byte

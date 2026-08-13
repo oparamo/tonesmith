@@ -166,45 +166,39 @@ const paramLabel = (check: ParamCheck): string => {
 };
 
 /**
- * What kind of value a spec takes, or undefined where its domain names no kind to check against.
- * `boolean` and `values` each identify a kind outright; bounds identify a number but not whether a
- * fraction is legal, which is what `decimals` settles.
+ * What kind of value a spec takes, in the words the rejection uses. Bounds say a param is numeric
+ * but not whether a fraction is legal, which is what `decimals` settles.
  */
-const expectedKind = (spec: ParamSpec): string | undefined => {
-  if (spec.boolean === true) return "true or false";
-  if (spec.values !== undefined) return `one of: ${spec.values.join(", ")}`;
-  if (spec.min === undefined || spec.max === undefined) return undefined;
+const expectedKind = (spec: ParamSpec): string => {
+  if (spec.kind === "boolean") return "true or false";
+  if (spec.kind === "discrete") return `one of: ${spec.values.join(", ")}`;
   const numeric = spec.decimals === undefined ? "a whole number" : "a number";
   return numeric;
 };
 
 /** True when the value is the kind this spec takes at all, before asking whether it is in range. */
 const isRightKind = (spec: ParamSpec, value: unknown): boolean => {
-  if (spec.boolean === true) return typeof value === "boolean";
-  if (spec.values !== undefined) return typeof value === "string";
+  if (spec.kind === "boolean") return typeof value === "boolean";
+  if (spec.kind === "discrete") return typeof value === "string";
   if (typeof value !== "number" || !Number.isFinite(value)) return false;
   return spec.decimals !== undefined || Number.isInteger(value);
 };
 
 /**
  * Checks one value against one spec: that it is the kind the param takes, then that it is in range
- * or a member of the value list. The kind check leads because a value of the wrong kind passes both
- * of the others by falling through them, which is how a string threshold used to reach the codec.
+ * or a member of the value list. The kind check leads because a value of the wrong kind passes the
+ * range check by falling through it, which is how a string threshold used to reach the codec.
  */
 const checkValue = (issues: Issues, check: ParamCheck): void => {
   const { spec, value } = check;
-  const kind = expectedKind(spec);
-  if (kind !== undefined && !isRightKind(spec, value)) {
-    issues.push(`${paramLabel(check)} takes ${kind} (got ${JSON.stringify(value)})`);
+  if (!isRightKind(spec, value)) {
+    issues.push(`${paramLabel(check)} takes ${expectedKind(spec)} (got ${JSON.stringify(value)})`);
     return;
   }
-  if (typeof value === "number" && spec.min !== undefined && spec.max !== undefined) {
-    if (value < spec.min || value > spec.max) {
-      issues.push(`${paramLabel(check)} must be ${spec.min}–${spec.max} (got ${value})`);
-    }
-    return;
+  if (spec.kind === "numeric" && typeof value === "number" && (value < spec.min || value > spec.max)) {
+    issues.push(`${paramLabel(check)} must be ${spec.min}–${spec.max} (got ${value})`);
   }
-  if (typeof value === "string" && spec.values !== undefined && !spec.values.includes(value)) {
+  if (spec.kind === "discrete" && typeof value === "string" && !spec.values.includes(value)) {
     issues.push(`${paramLabel(check)} must be one of: ${spec.values.join(", ")} (got "${value}")`);
   }
 };

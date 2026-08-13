@@ -1,4 +1,4 @@
-import type { ParamSpec } from "../../types";
+import type { NumericParam, ParamSpec } from "../../types";
 
 interface RangeOpts { unit?: string; decimals?: number; bpm?: boolean; percent?: boolean }
 
@@ -51,21 +51,15 @@ const rangeText = (domain: Domain): string => {
   return out;
 };
 
-const domainValues = (domain: Domain): readonly string[] | undefined =>
-  domain.kind === "enum" || domain.kind === "lookup" ? domain.values : undefined;
-
-/** Builds a ParamSpec from a name + domain + description, deriving range / values / min / max. */
+/** Builds a ParamSpec from a name + domain + description, deriving range / values / bounds. */
 const def = (name: string, domain: Domain, description: string): ParamSpec => {
-  const spec: ParamSpec = { name, range: rangeText(domain), description };
-  const values = domainValues(domain);
-  if (values !== undefined) spec.values = values;
-  if (domain.kind === "range") {
-    spec.min = domain.min;
-    spec.max = domain.max;
-    if (domain.decimals !== undefined) spec.decimals = domain.decimals;
-  }
-  if (domain.kind === "boolean") spec.boolean = true;
-  return spec;
+  const base = { name, range: rangeText(domain), description };
+  if (domain.kind === "boolean") return { ...base, kind: "boolean" };
+  if (domain.kind === "enum" || domain.kind === "lookup") return { ...base, kind: "discrete", values: domain.values };
+
+  const numeric: NumericParam = { ...base, kind: "numeric", min: domain.min, max: domain.max };
+  if (domain.decimals !== undefined) numeric.decimals = domain.decimals;
+  return numeric;
 };
 
 export { num, oneOf, lookupOf, bool, def, rangeText };

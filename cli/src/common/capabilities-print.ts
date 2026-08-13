@@ -97,7 +97,7 @@ const printItemParams = (params: CapabilityItem["params"]): void => {
     const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
     console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
     console.info(`  ${"".padEnd(14)} ${param.description}`);
-    if (param.values) {
+    if (param.kind === "discrete") {
       console.info(`  ${"".padEnd(14)} ${DIM}Values: ${param.values.join(", ")}${RESET}`);
     }
   }

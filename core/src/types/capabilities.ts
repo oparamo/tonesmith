@@ -1,5 +1,5 @@
-/** A single parameter on a capability item or group (informational; not used for encoding). */
-interface ParamSpec {
+/** What every parameter carries, whatever kind of value it takes. */
+interface ParamSpecBase {
   name: string;
   /**
    * The exact property key for this param in machine surfaces: the field name in decoded
@@ -12,12 +12,14 @@ interface ParamSpec {
   key?: string;
   /** Free text: "0–100", "–12–+12 semitones", enum list, etc. Derived from the param's domain. */
   range: string;
-  /**
-   * Machine-readable numeric bounds, present only for numeric params (derived from a `range`-kind
-   * domain). Lets a consumer (e.g. the MCP generate schema) apply min/max without parsing `range`.
-   */
-  min?: number;
-  max?: number;
+  description: string;
+}
+
+/** A param taking a number, bounded by `min` and `max`. */
+interface NumericParam extends ParamSpecBase {
+  kind: "numeric";
+  min: number;
+  max: number;
   /**
    * Decimal places this param accepts, present only where it takes fractional values (reverb TIME
    * runs 0.1-10.0 s). Absent means whole numbers only, which is the common case. A consumer
@@ -25,22 +27,31 @@ interface ParamSpec {
    * a fractional param's own min and max are often whole numbers.
    */
   decimals?: number;
-  /**
-   * True when this param's value is a real boolean rather than a number or a string. Numeric params
-   * are recognizable by their `min`/`max` and discrete ones by their `values`, so without this flag
-   * a toggle is the one kind a consumer would have to identify by reading `range` as English.
-   */
-  boolean?: boolean;
-  description: string;
-  /**
-   * For discrete lookup-valued params whose `range` is only a compact summary (e.g. the
-   * 1/3-octave frequency tables), the full ordered list of exact valid labels. It is the
-   * machine-readable companion to `range`, so a consumer can enumerate the valid values
-   * instead of guessing their spelling. Omitted for plain numeric params and for short
-   * enums that already spell their values out in `range`.
-   */
-  values?: readonly string[];
 }
+
+/**
+ * A param taking one of a fixed set of strings. `values` is the machine-readable companion to
+ * `range`, which for a long table (the 1/3-octave frequencies) is only a compact summary, so a
+ * consumer can enumerate the exact labels instead of guessing their spelling.
+ */
+interface DiscreteParam extends ParamSpecBase {
+  kind: "discrete";
+  values: readonly string[];
+}
+
+/** A param taking a real boolean, not a number or a string. */
+interface BooleanParam extends ParamSpecBase {
+  kind: "boolean";
+}
+
+/**
+ * A single parameter on a capability item or group (informational; not used for encoding).
+ *
+ * `kind` is what a value is checked and built against, so it is a discriminant rather than a hint:
+ * the three kinds are mutually exclusive, and a spec carrying both bounds and a value list would
+ * describe nothing a consumer could act on.
+ */
+type ParamSpec = NumericParam | DiscreteParam | BooleanParam;
 
 /**
  * A patch-spec fragment for one block, keyed by the block's own name in a spec and filled with the
@@ -128,6 +139,6 @@ interface DeviceCapabilities {
 }
 
 export type {
-  ParamSpec, PatchSpecExample, CapabilityItem, CapabilityGroup, ChainSpec, PatchNameSpec,
-  DeviceCapabilities,
+  ParamSpec, NumericParam, DiscreteParam, BooleanParam, PatchSpecExample, CapabilityItem,
+  CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities,
 };
