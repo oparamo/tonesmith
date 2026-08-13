@@ -105,15 +105,18 @@ const blankPatch = (name = "NEW PATCH"): Patch => {
   return decodePatch({ memo: "", paramSet });
 };
 
-/** The `device` field this driver writes, and the only one it reads. */
-const DEVICE_ID = "GX-1";
+/** The `device` field of the file format itself: what this driver writes, and the only one it reads. */
+const FILE_DEVICE = "GX-1";
+
+/** This driver's id in the registry, which is what a decoded file names as its device. */
+const DRIVER_ID = "gx1";
 
 const FORMAT_REV = "0000";
 
 const newFile = (setName: string, patchCount = 1): PatchFile => {
   const patches = Array.from({ length: patchCount }, () => blankPatch());
-  const envelope: TslEnvelope = { name: setName, formatRev: FORMAT_REV, device: DEVICE_ID, data: [[], []] };
-  return { name: setName, formatRev: FORMAT_REV, device: DEVICE_ID, patches, [RAW]: envelope };
+  const envelope: TslEnvelope = { name: setName, formatRev: FORMAT_REV, device: FILE_DEVICE, data: [[], []] };
+  return { name: setName, formatRev: FORMAT_REV, device: DRIVER_ID, patches, [RAW]: envelope };
 };
 
 /**
@@ -153,8 +156,8 @@ const parseEnvelope = (path: string, parsed: unknown): TslEnvelope => {
   if (typeof envelope !== "object" || typeof envelope.device !== "string") {
     throw new Error(`Cannot read ${path}: it is not a patch file.`);
   }
-  if (envelope.device !== DEVICE_ID) {
-    throw new Error(`Cannot read ${path}: it holds a ${envelope.device} patch set, not a ${DEVICE_ID} one.`);
+  if (envelope.device !== FILE_DEVICE) {
+    throw new Error(`Cannot read ${path}: it holds a ${envelope.device} patch set, not a ${FILE_DEVICE} one.`);
   }
   if (!Array.isArray(envelope.data) || !Array.isArray(envelope.data[0])) {
     throw new Error(`Cannot read ${path}: its "data" field holds no list of patches.`);
@@ -168,7 +171,7 @@ const readFile = (path: string): PatchFile => {
   return {
     name:      envelope.name,
     formatRev: envelope.formatRev,
-    device:    envelope.device,
+    device:    DRIVER_ID,
     patches:   envelope.data[0].map(decodePatch),
     [RAW]: envelope,
   };

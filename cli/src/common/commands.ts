@@ -30,7 +30,8 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPat
     .action((file: string, ref?: string) => {
       run(() => {
         const patchFile = driver.readFile(file);
-        console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
+        // The driver's own name, not the file's `device` id, since this line is for a person.
+        console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${driver.name}`);
         for (const index of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
           printPatch(patchView.presentPatch(patchFile.patches[index]), index);
         }

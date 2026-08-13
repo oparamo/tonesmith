@@ -21,7 +21,7 @@ describe("gx1 read", () => {
 
     const output = info.join("\n");
     expect(output).toContain(`Set: ${expected.name}`);
-    expect(output).toContain("Device: GX-1");
+    expect(output).toContain(`Device: ${gx1.driver.name}`);
   });
 
   it("prints a single patch when given a numeric index", async () => {

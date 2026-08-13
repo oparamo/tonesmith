@@ -9,7 +9,13 @@ interface Patch {
 }
 
 interface PatchFile<T extends Patch = Patch> {
+  /** The patch set's own name, which is not the filename it is stored under. */
   name: string;
+  /**
+   * The id of the driver this file belongs to, as `registry.getDriver` takes it, so a consumer
+   * holding a file can find the driver that reads it. Whatever the format calls the device is a
+   * fact about the file rather than about the driver, and stays in the file's own raw envelope.
+   */
   device: string;
   patches: T[];
 }

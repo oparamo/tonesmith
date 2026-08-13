@@ -60,10 +60,12 @@ describe("newFile", () => {
     expect(file.patches).toHaveLength(3);
   });
 
-  it("sets device to GX-1", () => {
+  // The decoded file names its driver, so a consumer holding one can look the driver up; the
+  // device's own name for itself is a fact about the file format and stays in the envelope.
+  it("names the driver that made it, and keeps the format's own device string in the envelope", () => {
     const file = newFile("Set");
 
-    expect(file.device).toBe("GX-1");
+    expect(file.device).toBe("gx1");
     expect(file[RAW].device).toBe("GX-1");
   });
 });
@@ -80,6 +82,12 @@ describe("readFile", () => {
 
     expect(file[RAW]).toBeDefined();
     expect(file[RAW].device).toBe("GX-1");
+  });
+
+  it("names the driver that read it", () => {
+    const file = readFile(FIXTURE);
+
+    expect(file.device).toBe("gx1");
   });
 
   it("decoded patches have string names", () => {

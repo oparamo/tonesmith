@@ -15,6 +15,13 @@ without a major version. The type barrel gained the names it was missing in exch
 and `PatchSpecExample` had no way to be named, and `FieldEdits`, `PatchView` and `Encodable` come
 with the surface above.
 
+`PatchFile.device` is specified, and it is the driver's id: a consumer holding a file can hand that
+field to `registry.getDriver` and get the driver that reads it. It was undocumented, and the GX-1
+driver filled it with `"GX-1"`, the device's name for itself in the file format, which the registry
+knows nothing about. That name is a fact about the file rather than about the driver and stays in
+the file's own raw envelope, which is where the writer takes it from, so no bytes move. The CLI's
+`read` header prints the driver's name, which is what that line was showing a person anyway.
+
 `patchUtils.upsertPatches` returns `{ file, created, saved }` rather than the file alone: whether
 the save started the file, and for each patch, whether it replaced a same-named patch or was
 appended. Its own documented property is that it reads once and writes once however many patches
