@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
 import type { FieldValue, Patch, PatchDriver } from "@tonesmith/core";
-import { ok, err } from "../common";
+import { attempt, deviceField, ok } from "../common";
 
 /** Rejects an input that asks for no change at all, or for a patch edit without naming the patch. */
 const requireSomethingToChange = (ref?: string, fields?: object, setName?: string): void => {
@@ -46,7 +46,7 @@ const registerWriteFields = (server: McpServer): void => {
         "edit is rejected the file is left untouched.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
-        device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
+        device: deviceField,
         ref: z.string().optional().describe(
           "Patch index (0-based integer) or exact patch name. Required with `fields`; not needed " +
             "to rename the set on its own."
@@ -62,30 +62,26 @@ const registerWriteFields = (server: McpServer): void => {
         ),
       }),
     },
-    ({ file, device, ref, fields, setName }) => {
-      try {
-        requireSomethingToChange(ref, fields, setName);
+    ({ file, device, ref, fields, setName }) => attempt(() => {
+      requireSomethingToChange(ref, fields, setName);
 
-        const driver = registry.getDriver(device);
-        const patchFile = driver.readFile(file);
-        const changes: string[] = [];
+      const driver = registry.getDriver(device);
+      const patchFile = driver.readFile(file);
+      const changes: string[] = [];
 
-        if (fields !== undefined && ref !== undefined) {
-          const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-          changes.push(`patch ${index}: ${editPatch(driver, patchFile.patches[index], fields)}`);
-        }
-
-        if (setName !== undefined) {
-          patchFile.name = setName;
-          changes.push(`set name = ${JSON.stringify(setName)}`);
-        }
-
-        driver.writeFile(patchFile, file);
-        return ok(`Updated ${file}: ${changes.join("; ")}`);
-      } catch (error) {
-        return err(error);
+      if (fields !== undefined && ref !== undefined) {
+        const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
+        changes.push(`patch ${index}: ${editPatch(driver, patchFile.patches[index], fields)}`);
       }
-    }
+
+      if (setName !== undefined) {
+        patchFile.name = setName;
+        changes.push(`set name = ${JSON.stringify(setName)}`);
+      }
+
+      driver.writeFile(patchFile, file);
+      return ok(`Updated ${file}: ${changes.join("; ")}`);
+    })
   );
 };
 

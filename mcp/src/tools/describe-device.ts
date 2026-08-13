@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { CapabilityGroup, CapabilityItem, DeviceCapabilities } from "@tonesmith/core";
 import { capabilityUtils, registry } from "@tonesmith/core";
-import { ok, err } from "../common";
+import { attempt, deviceField, messageOf, ok } from "../common";
 
 /**
  * A group listing is an index, not a data dump: every item's full param specs would run to tens of
@@ -95,7 +95,7 @@ const viewsForEntries = (
     try {
       views[entry] = viewForEntry(capabilities, entry, includeParams);
     } catch (error) {
-      throw new Error(`items entry "${entry}": ${(error as Error).message}`);
+      throw new Error(`items entry "${entry}": ${messageOf(error)}`);
     }
   }
   return views;
@@ -141,7 +141,7 @@ const registerDescribeDevice = (server: McpServer): void => {
         "returns an `example`: that block's spec at the device's factory defaults, showing where " +
         "each param is written. Copy it into generate_patch and change the values you care about.",
       inputSchema: z.object({
-        device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
+        device: deviceField,
         items: z.array(z.string()).optional().describe(
           "What to look up, as a list. Each entry is one of: \"chain\" for the signal-chain model " +
             "(default block order, reordering, and how blocks are bypassed); a group id for that " +
@@ -158,19 +158,15 @@ const registerDescribeDevice = (server: McpServer): void => {
         ),
       }),
     },
-    ({ device, items, includeParams }) => {
-      try {
-        const { capabilities } = registry.getDriver(device);
+    ({ device, items, includeParams }) => attempt(() => {
+      const { capabilities } = registry.getDriver(device);
 
-        if (!items || items.length === 0) {
-          return ok(JSON.stringify(deviceSummary(capabilities)));
-        }
-
-        return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams)));
-      } catch (error) {
-        return err(error);
+      if (!items || items.length === 0) {
+        return ok(JSON.stringify(deviceSummary(capabilities)));
       }
-    }
+
+      return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams)));
+    })
   );
 };
 

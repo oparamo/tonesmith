@@ -122,7 +122,10 @@ cli/                        @tonesmith/cli  (bin: tonesmith)
 
 mcp/                        @tonesmith/mcp  (bin: tonesmith-mcp)
   src/
-    common/                 response.ts, the ok / err MCP response helpers (barrel: common/index.ts)
+    common/                 pieces every tool registration shares (barrel: common/index.ts):
+                            response.ts (ok / err), attempt.ts (runs a handler's work, turning a
+                            throw into an error response), errors.ts (messageOf), schemas.ts (the
+                            shared `device` input field)
     instructions.ts         server-onboarding text sent to every client at initialize, written as
                             the two-call path for building patches rather than a tool inventory
     tools/                  tool registrations, all device-agnostic (barrel: tools/index.ts):

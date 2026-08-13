@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { PatchFile } from "@tonesmith/core";
 import { patchUtils, patchView, registry } from "@tonesmith/core";
-import { ok, err } from "../common";
+import { attempt, deviceField, ok } from "../common";
 
 /**
  * How many patches one read returns when the caller doesn't say. A decoded patch runs to roughly
@@ -41,7 +41,7 @@ const registerReadPatch = (server: McpServer): void => {
         "since a full library is more than a caller usually wants in one response.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
-        device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
+        device: deviceField,
         ref: z.string().optional().describe(
           "Patch index (0-based integer) or exact patch name. Omit to page through the file."
         ),
@@ -53,26 +53,22 @@ const registerReadPatch = (server: McpServer): void => {
         ),
       }),
     },
-    ({ file, device, ref, limit, offset }) => {
-      try {
-        const driver = registry.getDriver(device);
-        const patchFile = driver.readFile(file);
+    ({ file, device, ref, limit, offset }) => attempt(() => {
+      const driver = registry.getDriver(device);
+      const patchFile = driver.readFile(file);
 
-        if (ref !== undefined) {
-          const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-          const patchWithIndex = {
-            setName: patchFile.name,
-            index,
-            ...patchView.presentPatch(patchFile.patches[index]),
-          };
-          return ok(JSON.stringify(patchWithIndex));
-        }
-
-        return ok(JSON.stringify(page(patchFile, offset ?? 0, limit ?? DEFAULT_LIMIT)));
-      } catch (error) {
-        return err(error);
+      if (ref !== undefined) {
+        const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
+        const patchWithIndex = {
+          setName: patchFile.name,
+          index,
+          ...patchView.presentPatch(patchFile.patches[index]),
+        };
+        return ok(JSON.stringify(patchWithIndex));
       }
-    }
+
+      return ok(JSON.stringify(page(patchFile, offset ?? 0, limit ?? DEFAULT_LIMIT)));
+    })
   );
 };
 

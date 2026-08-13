@@ -2,10 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, registry } from "@tonesmith/core";
-import { ok, err } from "../common";
+import { attempt, deviceField, ok } from "../common";
 
 const inputSchema = z.object({
-  device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
+  device: deviceField,
   outPath: z.string().describe(
     "Output file path. Parent directories are created if missing. Saving upserts by patch name: " +
     "an existing patch of the same name is replaced, any other patch is appended, and a missing " +
@@ -66,42 +66,38 @@ and the file is written once. Unset params take the device's factory default for
 and the patch echoed back is the complete resulting state, so no follow-up read is needed.`,
       inputSchema,
     },
-    ({ device, outPath, setName, patches }) => {
-      try {
-        const driver = registry.getDriver(device);
-        const built = buildAll(driver, patches);
-        // Every round trip happens before the write, so a patch this codec cannot store fails the
-        // call with the file untouched rather than after it has already been replaced on disk.
-        const stored = built.map(patch => asStored(driver, patch));
+    ({ device, outPath, setName, patches }) => attempt(() => {
+      const driver = registry.getDriver(device);
+      const built = buildAll(driver, patches);
+      // Every round trip happens before the write, so a patch this codec cannot store fails the
+      // call with the file untouched rather than after it has already been replaced on disk.
+      const stored = built.map(patch => asStored(driver, patch));
 
-        const { file, created, saved } = patchUtils.upsertPatches(driver, {
-          path: outPath, patches: built, setName,
-        });
+      const { file, created, saved } = patchUtils.upsertPatches(driver, {
+        path: outPath, patches: built, setName,
+      });
 
-        const results = stored.map((patch, index) => ({
-          name: patch.name,
-          action: saved[index].action,
-          // State the stored order outright, so a caller that omitted `chain` sees the default
-          // it took rather than having to look it up.
-          chain: patch.chain,
-          // Echo back the stored patch so the caller can confirm every field the builder
-          // defaulted, without a follow-up read_patch.
-          patch: patchView.presentPatch(patch),
-        }));
+      const results = stored.map((patch, index) => ({
+        name: patch.name,
+        action: saved[index].action,
+        // State the stored order outright, so a caller that omitted `chain` sees the default
+        // it took rather than having to look it up.
+        chain: patch.chain,
+        // Echo back the stored patch so the caller can confirm every field the builder
+        // defaulted, without a follow-up read_patch.
+        patch: patchView.presentPatch(patch),
+      }));
 
-        const fileVerb = created ? "Created" : "Updated";
-        const response = {
-          summary:
-            `${fileVerb} ${outPath}: saved ${built.length} patch(es), ` +
-            `${file.patches.length} total in set "${file.name}"`,
-          file: { path: outPath, setName: file.name, total: file.patches.length, created },
-          patches: results,
-        };
-        return ok(JSON.stringify(response));
-      } catch (error) {
-        return err(error);
-      }
-    }
+      const fileVerb = created ? "Created" : "Updated";
+      const response = {
+        summary:
+          `${fileVerb} ${outPath}: saved ${built.length} patch(es), ` +
+          `${file.patches.length} total in set "${file.name}"`,
+        file: { path: outPath, setName: file.name, total: file.patches.length, created },
+        patches: results,
+      };
+      return ok(JSON.stringify(response));
+    })
   );
 };
 
