@@ -70,23 +70,24 @@ and the patch echoed back is the complete resulting state, so no follow-up read 
       try {
         const driver = registry.getDriver(device);
         const built = buildAll(driver, patches);
+        // Every round trip happens before the write, so a patch this codec cannot store fails the
+        // call with the file untouched rather than after it has already been replaced on disk.
+        const stored = built.map(patch => asStored(driver, patch));
+
         const { file, created, saved } = patchUtils.upsertPatches(driver, {
           path: outPath, patches: built, setName,
         });
 
-        const results = built.map((patch, index) => {
-          const stored = asStored(driver, patch);
-          return {
-            name: stored.name,
-            action: saved[index].action,
-            // State the stored order outright, so a caller that omitted `chain` sees the default
-            // it took rather than having to look it up.
-            chain: stored.chain,
-            // Echo back the stored patch so the caller can confirm every field the builder
-            // defaulted, without a follow-up read_patch.
-            patch: patchView.presentPatch(stored),
-          };
-        });
+        const results = stored.map((patch, index) => ({
+          name: patch.name,
+          action: saved[index].action,
+          // State the stored order outright, so a caller that omitted `chain` sees the default
+          // it took rather than having to look it up.
+          chain: patch.chain,
+          // Echo back the stored patch so the caller can confirm every field the builder
+          // defaulted, without a follow-up read_patch.
+          patch: patchView.presentPatch(patch),
+        }));
 
         const fileVerb = created ? "Created" : "Updated";
         const response = {

@@ -193,6 +193,24 @@ interface UpsertReport<T extends Patch> {
 }
 
 /**
+ * Refuses a batch that names the same patch twice. The save keys on the name, so the second would
+ * replace the first and the report would claim two patches landed where the file holds one.
+ */
+const requireDistinctNames = (patches: Patch[]): void => {
+  const seen = new Map<string, number>();
+  for (const [index, patch] of patches.entries()) {
+    const first = seen.get(patch.name);
+    if (first !== undefined) {
+      throw new Error(
+        `Duplicate patch name "${patch.name}" at patches[${first}] and patches[${index}]: ` +
+        "a save keys on the name, so only the last would survive. Give each patch its own name."
+      );
+    }
+    seen.set(patch.name, index);
+  }
+};
+
+/**
  * Saves every patch into the file at `path`, keyed by name: a patch whose name already exists
  * replaces it, otherwise it is appended, in array order. Creates the file (and, via the driver's
  * writeFile, any missing parent directories) when `path` doesn't exist yet.
@@ -206,6 +224,7 @@ interface UpsertReport<T extends Patch> {
 const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, request: UpsertRequest<T>): UpsertReport<T> => {
   const { path, patches, setName } = request;
   if (patches.length === 0) throw new Error("No patches to save: `patches` must hold at least one patch.");
+  requireDistinctNames(patches);
 
   const { file, created } = readExistingOrNew(driver, path, setName ?? patches[0].name);
   if (setName !== undefined) file.name = setName;

@@ -166,6 +166,28 @@ describe("generate_patch", () => {
     expect(file.patches[0].amp.gain).toBe(90);
   });
 
+  // The response is documented as the confirmation, so an echo of two patches where the file keeps
+  // one would be a lie a caller has no reason to check.
+  it("rejects two patches of the same name in one call, naming both positions", async () => {
+    temp = emptyTempDir();
+    const outPath = join(temp.dir, "dupes.tsl");
+    const client = await connectClient();
+    close = client.close;
+    const input = {
+      device: "gx1",
+      outPath,
+      patches: [{ name: "Lead", amp: AMP }, { name: "Clean", amp: AMP }, { name: "Lead", amp: AMP }],
+    };
+
+    const { isError, text } = await client.callTool("generate_patch", input);
+
+    expect(isError).toBe(true);
+    expect(text).toContain("Lead");
+    expect(text).toMatch(/0/);
+    expect(text).toMatch(/2/);
+    expect(existsSync(outPath)).toBe(false);
+  });
+
   it("rejects an empty patches array", async () => {
     temp = emptyTempDir();
     const client = await connectClient();

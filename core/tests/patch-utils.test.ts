@@ -178,6 +178,21 @@ describe("upsertPatches", () => {
 
     expect(upsertNothing).toThrow();
   });
+
+  // A save keys on the name, so a repeat within one batch cannot be honored: the second patch
+  // replaces the first, and the report would say both were saved when only one survives.
+  it("rejects a name repeated within one batch, naming it and both positions", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const patches = [makePatch("Lead"), makePatch("Clean"), makePatch("Lead")];
+
+    const upsertRepeatedName = () => upsertPatches(driver, { path: "set.tsl", patches });
+
+    expect(upsertRepeatedName).toThrow(/Lead/);
+    expect(upsertRepeatedName).toThrow(/0/);
+    expect(upsertRepeatedName).toThrow(/2/);
+    expect(files.has("set.tsl"), "nothing is written when the batch is rejected").toBe(false);
+  });
 });
 
 describe("resolvePatchIndex", () => {
