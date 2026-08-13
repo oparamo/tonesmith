@@ -16,6 +16,13 @@ consumers into one call per item just to see what exists. Each item keeps its id
 description and subtype ids, and the block's own controls stay attached. Pass `includeParams: true`
 for the full payload, or name the items you want.
 
+Nothing in the tool schemas names a device any more. `describe_device` carried one device's id as
+the example device, listed that device's group ids as though every device had them, and printed a
+hand-written `items` example naming its effects, which on any other device demonstrates a call that
+fails. The summary's example is built from the catalog in hand, and the descriptions say what an
+entry is shaped like. Two other tools pointed at "the device's generate tool", which has not existed
+since `generate_patch` replaced it.
+
 **Naming an item returns an `example`**: a spec fragment for that block at factory defaults, keyed
 by the block's own name, ready to copy into `generate_patch` and edit. A list of param keys says
 what a control is called but not where it goes, and the answer differs by block, so a caller
