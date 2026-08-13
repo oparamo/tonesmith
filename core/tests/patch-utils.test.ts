@@ -198,6 +198,34 @@ describe("resolvePatchIndex", () => {
     expect(resolveAmbiguousName).toThrow(/rock lead/);
     expect(resolveAmbiguousName, "names both colliding indices").toThrow(/0.*2|2.*0/);
   });
+
+  // Every surface takes the ref as a bare string, so an omitted one arrives here as "". Read as a
+  // number it is 0, which selected the first patch and, on a write, overwrote it.
+  it.each(["", "   "])("rejects %o rather than selecting the first patch", (ref) => {
+    const resolveEmpty = () => resolvePatchIndex(patches, ref);
+
+    expect(resolveEmpty).toThrow();
+  });
+
+  it("reads a padded integer as that index", () => {
+    const index = resolvePatchIndex(patches, " 1 ");
+
+    expect(index).toBe(1);
+  });
+
+  // Number() accepts both of these and rounds them into an index, so each used to select a patch
+  // the caller never spelled out.
+  it.each(["0x1", "2.0"])("does not read %o as an index", (ref) => {
+    const resolveNonIndex = () => resolvePatchIndex(patches, ref);
+
+    expect(resolveNonIndex).toThrow(new RegExp(ref.replace(".", "\\.")));
+  });
+
+  it("finds a patch whose name is all digits once no such index exists", () => {
+    const withNumericName = [...patches, makePatch("808")];
+
+    expect(resolvePatchIndex(withNumericName, "808")).toBe(3);
+  });
 });
 
 describe("coerceValue", () => {

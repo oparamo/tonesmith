@@ -2,32 +2,52 @@ import { existsSync } from "node:fs";
 import { basename, extname } from "node:path";
 import type { FieldEdits, Patch, PatchFile, PatchDriver } from "./types";
 
-/**
- * Resolves a numeric index string or an exact patch name to an array index.
- *
- * An index past the end is rejected rather than passed through: callers index straight into
- * `patches` with the result, so an unchecked one reads as `undefined` or, on a write, leaves a hole
- * in the array that encodes as a corrupt file.
- */
-const resolvePatchIndex = (patches: Patch[], ref: string): number => {
-  const asNumber = Number(ref);
-  if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) {
-    if (asNumber < 0 || asNumber >= patches.length) {
-      throw new Error(`No patch at index ${asNumber}: the file holds ${patches.length} patch(es).`);
-    }
-    return asNumber;
-  }
+/** A reference that names a slot rather than a patch: digits, optionally signed. */
+const INDEX_REF = /^-?\d+$/;
 
+/** Every index whose patch carries this name, matched whole and case-insensitively. */
+const indicesNamed = (patches: Patch[], ref: string): number[] => {
   const needle = ref.toLowerCase();
-  const matches = patches.flatMap((patch, index) =>
+  return patches.flatMap((patch, index) =>
     patch.name.trim().toLowerCase() === needle ? [index] : []
   );
+};
 
+/** The single patch a name picks out, or why it picks out none or several. */
+const soleIndexNamed = (matches: number[], ref: string): number => {
   if (matches.length === 0) throw new Error(`No patch named "${ref}"`);
   if (matches.length > 1) {
     throw new Error(`Ambiguous name "${ref}": matches indices ${matches.join(", ")}`);
   }
   return matches[0];
+};
+
+/**
+ * Resolves an index string or an exact patch name to an array index.
+ *
+ * Which of the two a ref is comes from its shape, not from `Number`, whose idea of an index is wide
+ * enough to be dangerous: it reads `""` as 0, so a ref left out by a caller selected the first
+ * patch and, on a write, overwrote it, and it rounds `"0x1"` and `"2.0"` into indices the caller
+ * never spelled out.
+ *
+ * An index past the end is rejected rather than passed through: callers index straight into
+ * `patches` with the result, so an unchecked one reads as `undefined` or, on a write, leaves a hole
+ * in the array that encodes as a corrupt file. Ruling it out is also what makes a patch named "808"
+ * reachable, since a digits-only ref is read as an index first.
+ */
+const resolvePatchIndex = (patches: Patch[], ref: string): number => {
+  const trimmed = ref.trim();
+  if (trimmed.length === 0) throw new Error("Empty patch reference: give an index or a patch name.");
+
+  const named = indicesNamed(patches, trimmed);
+  if (!INDEX_REF.test(trimmed)) return soleIndexNamed(named, trimmed);
+
+  const index = Number(trimmed);
+  if (index >= 0 && index < patches.length) return index;
+  if (named.length === 0) {
+    throw new Error(`No patch at index ${index}: the file holds ${patches.length} patch(es).`);
+  }
+  return soleIndexNamed(named, trimmed);
 };
 
 /** Interprets a CLI/MCP field value: "72" becomes the number 72, "true"/"false" become booleans. */
