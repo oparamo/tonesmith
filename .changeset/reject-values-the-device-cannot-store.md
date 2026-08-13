@@ -32,6 +32,16 @@ odds TONE for OVERDRIVE must be -50-50 (got -500)
 ns DETECT must be one of: INPUT, NS INPUT (got "BOGUS")
 ```
 
+Four more inputs were reaching the codec unchecked, and each is now reported alongside every other
+problem in the spec rather than as a throw of its own. `on` and `subType` select a block's shape
+rather than set a control, so they were filtered out before the param check and handed to the
+builder on a cast: `on: "false"` encoded as `NAN` and `subType: 42` counted as absent. `chain: "PFX"`
+surfaced as an uncaught `chain.map is not a function`, and `key: "Am"` built a complete patch before
+throwing from the codec at write time. Four params also carried a bare display string (`"1:1-INF:1"`,
+`"P01-P20"`) as their whole domain, which gave the validator nothing to check against, so a LIMITER
+`ratio` of `"4:1"` was accepted; each now states the values or bounds the device takes, and
+HARMONIST's `KEY` names the patch key's own values rather than a form the codec cannot encode.
+
 **Breaking.** `PatchDriver` gains `validateFields(patch, edits)`, which every driver must implement,
 and `patchUtils.applyFieldEdits(driver, patch, edits)` takes the driver as its first argument. The
 edits are applied to the patch before the check, so a batch that switches a block's type and sets a
