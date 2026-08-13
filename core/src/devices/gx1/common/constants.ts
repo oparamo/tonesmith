@@ -56,6 +56,16 @@ const PFX_TYPES = ["WAH", "PEDAL BEND"] as const;
 // MEMORY%COM holds the patch name as space-padded ASCII across its whole width.
 const NAME_BYTES = 16;
 
+/** The highest code point the name block can store, since it gives each character one byte. */
+const LAST_STORABLE_CHAR = 0xFF;
+
+/** The highest code point the device's own display and name entry cover. */
+const LAST_NAMEABLE_CHAR = 0x7F;
+
+/** The characters of a name sitting above a ceiling, empty when every one of them fits. */
+const charsAbove = (ceiling: number, name: string): string[] =>
+  Array.from(name).filter(char => (char.codePointAt(0) ?? 0) > ceiling);
+
 // MEMORY%CHAIN is a linked list, not a positional array: byte 0 holds the firmware
 // value of whichever block comes first, and byte (1 + CHAIN_BLOCK_ORDER.indexOf(name))
 // holds the firmware value of whatever comes immediately after that block. A firmware
@@ -177,7 +187,7 @@ const PFX_SUBTYPE_EFFECTS = new Set(["WAH"]);
 
 export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
-  FX_DLY_TYPES, FX_REV_TYPES, NAME_BYTES,
+  FX_DLY_TYPES, FX_REV_TYPES, NAME_BYTES, LAST_STORABLE_CHAR, LAST_NAMEABLE_CHAR, charsAbove,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,

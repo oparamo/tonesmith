@@ -103,6 +103,14 @@ describe("validatePatchSpec", () => {
     expect(validatePatchSpec({ ...valid, name: tooLong })).not.toEqual([]);
   });
 
+  // The block stores one ASCII byte per character. A character outside that set has no byte, and
+  // encoding it would write the low half of its code point as some other letter entirely.
+  it("rejects a name the device has no characters for", () => {
+    const [issue] = validatePatchSpec({ ...valid, name: "Café" });
+
+    expect(issue).toContain("é");
+  });
+
   it("requires an amp block, which every patch sounds through", () => {
     expect(validatePatchSpec({ name: "Test" })).not.toEqual([]);
   });

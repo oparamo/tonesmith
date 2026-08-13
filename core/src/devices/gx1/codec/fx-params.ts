@@ -321,40 +321,37 @@ const unmappedTypeMessage = (fxType: string, delaySubType: string): string => {
   return `Unknown DELAY subType: "${delaySubType}". Expected one of: ${FX_DLY_TYPES.join(", ")}`;
 };
 
-/** How many bytes of an unrecognized type's block to stash for the round trip. */
-const UNKNOWN_BYTES_KEPT = 32;
-
 /**
- * Decodes the 251-byte FX parameter block for a given effect type. An unrecognized type yields
- * `{ unknownBytes: rawBytes }`, which the encoder writes back untouched rather than losing.
+ * Decodes the 251-byte FX parameter block for a given effect type. A type this codec has no field
+ * map for reads as no params at all; its bytes are still in the block, which is what the encoder
+ * writes back.
  */
 const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
   const paramBytes = bytes.slice(offset);
   const fields = fieldMapFor(fxType, lookupName(FX_DLY_TYPES, paramBytes[0]));
-  if (!fields) return { unknownBytes: bytes.slice(0, UNKNOWN_BYTES_KEPT) };
+  if (!fields) return {};
 
   return decodeFields(fields, paramBytes);
 };
 
 /**
  * Encodes FX params back into the 251-byte hex block, always starting from `originalBytes` so
- * unmapped positions survive. Params carrying `unknownBytes` return those bytes unchanged.
- * A type with no field map throws, since every param in the bag would otherwise encode nowhere
- * and the write would report success having changed nothing.
+ * unmapped positions survive. A type with no field map has nowhere to put params, so it keeps
+ * those bytes when there are none to place and throws when there are: writing nothing and
+ * reporting success is how an edit goes missing.
  */
 const encodeFxParams = (
   fxType: string,
   params: FxParams,
   originalBytes: number[],
 ): string[] => {
-  if ("unknownBytes" in params) return hexFromBytes(originalBytes);
-
   const bytes = [...originalBytes];
   const delaySubType = typeof params.subType === "string" ? params.subType : "";
   const fields = fieldMapFor(fxType, delaySubType);
   const offset = FX_PARAM_OFFSETS[fxType];
   if (fields === undefined || offset === undefined) {
+    if (Object.keys(params).length === 0) return hexFromBytes(originalBytes);
     throw new Error(unmappedTypeMessage(fxType, delaySubType));
   }
 

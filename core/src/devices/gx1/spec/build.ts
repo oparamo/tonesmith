@@ -12,6 +12,7 @@ import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import {
   BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS, ON_FIELD, KEY_NAMES,
+  LAST_NAMEABLE_CHAR, charsAbove,
 } from "../common";
 import type { BlockName } from "../common";
 import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain, DEFAULT_CHAIN } from "../builder";
@@ -147,6 +148,10 @@ const checkName = (issues: Issues, spec: Record<string, unknown>): void => {
   }
   if (name.length > maxLength) {
     issues.push(`Patch name "${name}" is ${name.length} characters; this device stores ${maxLength}.`);
+  }
+  const unnameable = charsAbove(LAST_NAMEABLE_CHAR, name);
+  if (unnameable.length > 0) {
+    issues.push(`Patch name "${name}" uses characters this device cannot display: ${unnameable.join(" ")}`);
   }
 };
 

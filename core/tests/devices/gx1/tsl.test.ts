@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, unlinkSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, unlinkSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
@@ -88,6 +88,40 @@ describe("readFile", () => {
     for (const patch of file.patches) {
       expect(typeof patch.name).toBe("string");
     }
+  });
+
+  // Anything can be handed to a tool that takes a path, and what came back was a TypeError from
+  // whichever field the codec reached for first, naming neither the file nor what was wrong with it.
+  describe("a file that is not one of this device's", () => {
+    const badPath = join(tmpdir(), `tonesmith-bad-${process.pid}.tsl`);
+
+    afterEach(() => {
+      if (existsSync(badPath)) unlinkSync(badPath);
+    });
+
+    const readWritten = (contents: unknown) => {
+      writeFileSync(badPath, JSON.stringify(contents));
+      return () => readFile(badPath);
+    };
+
+    it("rejects JSON that is not a patch file at all", () => {
+      const read = readWritten({ hello: "world" });
+
+      expect(read).toThrow(new RegExp(badPath.replace(/[/\\]/g, "\\$&")));
+    });
+
+    it("rejects a file another device wrote, naming the device it holds", () => {
+      const read = readWritten({ name: "Set", formatRev: "0000", device: "GT-1000", data: [[], []] });
+
+      expect(read).toThrow(/GT-1000/);
+    });
+
+    it("rejects a patch missing a block the codec reads", () => {
+      const patch = { paramSet: { "MEMORY%COM": ["41"] } };
+      const read = readWritten({ name: "Set", formatRev: "0000", device: "GX-1", data: [[patch], []] });
+
+      expect(read).toThrow(/MEMORY%/);
+    });
   });
 });
 

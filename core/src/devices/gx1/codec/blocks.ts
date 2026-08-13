@@ -8,7 +8,7 @@ import {
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
-  FREQ_HIGH_CUT, NAME_BYTES, RAW,
+  FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
 import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
@@ -17,12 +17,39 @@ import { decodeFxType, encodeFxType } from "./fx-params";
 
 // ── Name block ────────────────────────────────────────────────────────────────
 
+/**
+ * The device writes ASCII, but "ascii" masks bit 7 in both directions, so a byte above 0x7F comes
+ * back as a different character and is written back as that one. "latin1" is the same encoding
+ * below 0x80 and byte-exact above it, which is what leaves a name this codec did not author alone.
+ */
+const NAME_ENCODING = "latin1";
+
+/**
+ * Why the block cannot hold this name, or undefined when it can. The ceiling is one byte per
+ * character rather than ASCII: a name read out of a file may carry any byte, and the encoder's job
+ * is to put it back as it was found. What a caller may *author* is narrower, and the spec validator
+ * is where that is decided.
+ */
+const nameIssue = (name: string): string | undefined => {
+  const unstorable = charsAbove(LAST_STORABLE_CHAR, name);
+  if (unstorable.length > 0) {
+    return `Patch name "${name}" uses characters this device has no byte for: ${unstorable.join(" ")}`;
+  }
+  if (name.length > NAME_BYTES) {
+    return `Patch name "${name}" is ${name.length} characters; this device stores ${NAME_BYTES}.`;
+  }
+  return undefined;
+};
+
 const decodeName = (hexList: string[]): string =>
-  Buffer.from(hexList.join(""), "hex").toString("ascii").trimEnd();
+  Buffer.from(hexList.join(""), "hex").toString(NAME_ENCODING).trimEnd();
 
 const encodeName = (name: string): string[] => {
+  const issue = nameIssue(name);
+  if (issue !== undefined) throw new Error(issue);
+
   const buffer = Buffer.alloc(NAME_BYTES, 0x20);
-  buffer.write(name.slice(0, NAME_BYTES), "ascii");
+  buffer.write(name, NAME_ENCODING);
   return hexFromBytes(Array.from(buffer));
 };
 

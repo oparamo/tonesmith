@@ -59,9 +59,7 @@ const harvestFx = (fx1: number[], fx3a: number[]): BlockDefaults => {
   for (const type of FX_TYPES) {
     if (type === "DELAY") continue; // per-sub-algorithm, harvested under fxDelay
     const bytes = type === "OVERTONE" ? fx3a : fx1;
-    const decoded = decodeFxParams(type, bytes);
-    if ("unknownBytes" in decoded) continue; // not modeled yet
-    out[type] = omit(decoded, [SUB_TYPE_FIELD]);
+    out[type] = omit(decodeFxParams(type, bytes), [SUB_TYPE_FIELD]);
   }
   return out;
 };
@@ -106,7 +104,6 @@ const harvestFxSubTypes = (fx1: number[]): Record<string, string> => {
   for (const type of FX_TYPES) {
     if (!PARAM_SUBTYPE_EFFECTS.has(type)) continue;
     const decoded = decodeFxParams(type, fx1);
-    if ("unknownBytes" in decoded) continue;
     const selected = decoded[SUB_TYPE_FIELD];
     if (typeof selected === "string") out[type] = selected;
   }

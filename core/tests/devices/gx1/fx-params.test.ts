@@ -19,9 +19,6 @@ describe("FX param map symmetry (all types)", () => {
   it.each(FX_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (fxType) => {
     const decoded = decodeFxParams(fxType, zeroBytes);
 
-    // Types not yet in FX_PARAM_MAPS return { unknownBytes: [...] }, so skip them
-    if ("unknownBytes" in decoded) return;
-
     const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
     const reencodedBytes = bytesFromHex(reencoded);
     const reDecoded = decodeFxParams(fxType, reencodedBytes);
@@ -69,19 +66,18 @@ describe("FX-slot DELAY per-sub-algorithm round-trip", () => {
 // type is the opposite case: there is nowhere to put the values, so it throws.
 
 describe("Unknown FX type handling", () => {
-  it("decodeFxParams returns unknownBytes for a type with no FX_PARAM_MAPS entry", () => {
+  it("decodeFxParams reads no params off a type it does not recognize", () => {
     const bytes = new Array<number>(40).fill(7);
 
     const decoded = decodeFxParams("BOGUS TYPE", bytes);
 
-    expect(decoded).toEqual({ unknownBytes: bytes.slice(0, 32) });
+    expect(decoded).toEqual({});
   });
 
-  it("encodeFxParams returns the original bytes unchanged when params has unknownBytes", () => {
+  it("encodeFxParams leaves an unrecognized type's bytes as they were read", () => {
     const originalBytes = [1, 2, 3, 4];
 
-    const result = encodeFxParams("COMPRESSOR", { unknownBytes: originalBytes }, originalBytes);
-    const resultBytes = bytesFromHex(result);
+    const resultBytes = bytesFromHex(encodeFxParams("BOGUS TYPE", {}, originalBytes));
 
     expect(resultBytes).toEqual(originalBytes);
   });

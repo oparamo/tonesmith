@@ -104,21 +104,71 @@ const blankPatch = (name = "NEW PATCH"): Patch => {
   return decodePatch({ memo: "", paramSet });
 };
 
+/** The `device` field this driver writes, and the only one it reads. */
+const DEVICE_ID = "GX-1";
+
+const FORMAT_REV = "0000";
+
 const newFile = (setName: string, patchCount = 1): PatchFile => {
   const patches = Array.from({ length: patchCount }, () => blankPatch());
-  const envelope: TslEnvelope = { name: setName, formatRev: "0000", device: "GX-1", data: [[], []] };
-  return { name: setName, formatRev: "0000", device: "GX-1", patches, [RAW]: envelope };
+  const envelope: TslEnvelope = { name: setName, formatRev: FORMAT_REV, device: DEVICE_ID, data: [[], []] };
+  return { name: setName, formatRev: FORMAT_REV, device: DEVICE_ID, patches, [RAW]: envelope };
+};
+
+/**
+ * Every block a patch has to carry, read off the blank patch so the list cannot fall behind the
+ * codec: a block the codec learns to write is a block a file has to hold.
+ */
+const REQUIRED_BLOCKS = Object.keys(blankParamSet());
+
+const isHexList = (value: unknown): boolean =>
+  Array.isArray(value) && value.every(entry => typeof entry === "string");
+
+const paramSetOf = (patch: unknown): Record<string, unknown> | undefined => {
+  if (patch === null || typeof patch !== "object") return undefined;
+  const { paramSet } = patch as { paramSet?: unknown };
+  if (paramSet === null || typeof paramSet !== "object") return undefined;
+  return paramSet as Record<string, unknown>;
+};
+
+const checkPatch = (path: string, index: number, patch: unknown): void => {
+  const paramSet = paramSetOf(patch);
+  if (paramSet === undefined) {
+    throw new Error(`Cannot read ${path}: patch ${index} carries no paramSet.`);
+  }
+  const missing = REQUIRED_BLOCKS.filter(block => !isHexList(paramSet[block]));
+  if (missing.length > 0) {
+    throw new Error(`Cannot read ${path}: patch ${index} is missing ${missing.join(", ")}.`);
+  }
+};
+
+/**
+ * Narrows what `JSON.parse` handed back to an envelope this device wrote. Anything at all can be
+ * pointed at a tool that takes a path, and without this the first field the codec reached for threw
+ * a TypeError naming neither the file nor what was wrong with it.
+ */
+const parseEnvelope = (path: string, parsed: unknown): TslEnvelope => {
+  const envelope = (parsed ?? {}) as Partial<TslEnvelope>;
+  if (typeof envelope !== "object" || typeof envelope.device !== "string") {
+    throw new Error(`Cannot read ${path}: it is not a patch file.`);
+  }
+  if (envelope.device !== DEVICE_ID) {
+    throw new Error(`Cannot read ${path}: it holds a ${envelope.device} patch set, not a ${DEVICE_ID} one.`);
+  }
+  if (!Array.isArray(envelope.data) || !Array.isArray(envelope.data[0])) {
+    throw new Error(`Cannot read ${path}: its "data" field holds no list of patches.`);
+  }
+  envelope.data[0].forEach((patch, index) => { checkPatch(path, index, patch); });
+  return envelope as TslEnvelope;
 };
 
 const readFile = (path: string): PatchFile => {
-  const envelope = JSON.parse(readFileSync(path, "utf8")) as TslEnvelope;
+  const envelope = parseEnvelope(path, JSON.parse(readFileSync(path, "utf8")));
   return {
     name:      envelope.name,
     formatRev: envelope.formatRev,
     device:    envelope.device,
-    patches:   envelope.data[0].map(rawPatch =>
-      decodePatch(rawPatch as unknown as { memo?: string; paramSet: RawParamSet })
-    ),
+    patches:   envelope.data[0].map(decodePatch),
     [RAW]: envelope,
   };
 };
@@ -128,10 +178,7 @@ const writeFile = (file: PatchFile, path: string): void => {
     ...file[RAW],
     name:      file.name,
     formatRev: file.formatRev,
-    data: [
-      file.patches.map(patch => encodePatch(patch) as unknown as RawParamSet),
-      file[RAW].data[1],
-    ],
+    data: [file.patches.map(encodePatch), file[RAW].data[1]],
   };
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(envelope));

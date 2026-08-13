@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { readFile } from "../../../src/devices/gx1/tsl";
 import {
   decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePfx,
-  decodeKey, encodeKey, decodeNs, encodeNs, decodeFv, encodeFv,
+  decodeKey, encodeKey, decodeNs, encodeNs, decodeFv, encodeFv, decodeName, encodeName,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import {
@@ -283,6 +283,31 @@ describe("Malformed/unmapped byte handling", () => {
     const decoded = decodePfx(hexList);
 
     expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", [RAW]: bytes });
+  });
+});
+
+
+// ── Name block ────────────────────────────────────────────────────────────────
+
+describe("Name block", () => {
+  it("round-trips a name byte the device's own character set does not reach", () => {
+    const bytes = [0x41, 0xC3, 0xA9, ...new Array<number>(13).fill(0x20)];
+
+    const reencoded = bytesFromHex(encodeName(decodeName(hexFromBytes(bytes))));
+
+    expect(reencoded).toEqual(bytes);
+  });
+
+  it("pads a short name out to the full block with spaces", () => {
+    const encoded = bytesFromHex(encodeName("AB"));
+
+    expect(encoded).toEqual([0x41, 0x42, ...new Array<number>(14).fill(0x20)]);
+  });
+
+  it("throws on a name longer than the block rather than storing a truncation", () => {
+    const encodeLongName = () => encodeName("x".repeat(17));
+
+    expect(encodeLongName).toThrow(/16/);
   });
 });
 

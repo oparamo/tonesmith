@@ -42,8 +42,8 @@ interface FieldCodec {
   readonly kind?: "u8" | "signed" | "lookup" | "bool" | "scaled" | "nibblePair" | "nibbleQuad" | "indexTable";
   readonly center?: number;
   readonly table?: readonly (string | number)[];
-  decode(bytes: number[]): string | number | boolean | number[];
-  encode(value: string | number | boolean | number[], bytes: number[]): void;
+  decode(bytes: number[]): string | number | boolean;
+  encode(value: string | number | boolean, bytes: number[]): void;
 }
 
 
