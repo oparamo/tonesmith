@@ -93,9 +93,9 @@ describe("validateFields", () => {
   });
 
   /**
-   * A dot-path edit sets one field at a time, so switching a type leaves the old sub-model in place
-   * where the builder would have filled in the new type's factory one. The codec has no field map
-   * for that pairing, so the edit has to be reported rather than encoded.
+   * A dot-path edit sets one field at a time, so switching a type leaves the sub-model the previous
+   * type chose. The codec has no field map for that pairing, so the mismatch has to be reported
+   * rather than encoded.
    */
   it("rejects a type change that leaves the previous type's sub-model behind", () => {
     const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
@@ -112,6 +112,18 @@ describe("validateFields", () => {
     const issues = validateAfter(patch, { "amp.gain": 900, "amp.level": -1 });
 
     expect(issues).toHaveLength(2);
+  });
+
+  /** Each of these params carries a compact display, which is not on its own something to check against. */
+  it.each([
+    { label: "a LIMITER ratio the byte cannot hold", type: "LIMITER", path: "fx1.params.ratio", value: "4:1" },
+    { label: "a LIMITER ratio above the device's range", type: "LIMITER", path: "fx1.params.ratio", value: 20 },
+    { label: "a SLICER pattern that is not in the table", type: "SLICER", path: "fx1.params.pattern", value: "P99" },
+    { label: "a HARMONIST harmony that is not in the table", type: "HARMONIST", path: "fx1.params.harmony", value: "wobble" },
+  ])("rejects $label", ({ type, path, value }) => {
+    const patch = patchWith({ fx1: { type } });
+
+    expect(validateAfter(patch, { [path]: value })).toHaveLength(1);
   });
 
   it("passes over a path the catalog says nothing about, leaving it to the codec", () => {

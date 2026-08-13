@@ -9,9 +9,9 @@ const BYTE_RANGE: Bounds = [0, 255];
 const NIBBLE_QUAD_RANGE: Bounds = [0, 0xFFFF];
 
 /**
- * Every encode runs its value through one of these first. `hexFromBytes` would catch the bad byte
- * anyway, but only by index, so rejecting here is what lets the message name the param a caller
- * actually set. Bounds are stated at the field's own scale, not the byte's.
+ * `hexFromBytes` catches a bad byte too, but knows only its index. Checking here is what lets the
+ * message name the param the caller set, and the bounds are stated at the field's own scale rather
+ * than the byte's for the same reason.
  */
 const numberWithin = (name: string, value: unknown, [min, max]: Bounds): number => {
   if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max)

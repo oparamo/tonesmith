@@ -21,8 +21,11 @@
  * `min`/`max` bounds all derive from it.
  */
 import type { ParamSpec } from "../../types";
-import { FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ, SP_TYPES, MIC_TYPES } from "./common";
-import { def, num, oneOf, lookupOf, bool, text } from "./param-domain";
+import {
+  FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
+  SP_TYPES, MIC_TYPES, SLICER_PAT, HARMONIST_HR, KEY_NAMES,
+} from "./common";
+import { def, num, oneOf, lookupOf, bool } from "./param-domain";
 
 // ── Shared param fragments (identical across many types, defined once) ────────
 
@@ -43,7 +46,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   ],
   "LIMITER": [
     def("THRESHOLD", num(0, 100), "Level above which limiting is applied."),
-    def("RATIO", text("1:1-INF:1"), "Compression ratio for signals exceeding the threshold."),
+    def("RATIO", num(0, 17), "Compression ratio for signals exceeding the threshold, as a step from 1:1 at 0 up to INF:1 at 17."),
     def("ATTACK", num(0, 100), "Strength of the picking attack."),
     def("RELEASE", num(0, 100), "Release time after the signal drops below threshold."),
     LEVEL_0_100,
@@ -221,7 +224,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     LEVEL_0_100,
   ],
   "SLICER": [
-    def("PATTERN", text("P01-P20"), "Selects the rhythm pattern used to slice the sound."),
+    def("PATTERN", lookupOf(SLICER_PAT, "P01-P20"), "Selects the rhythm pattern used to slice the sound."),
     def("RATE", num(0, 100, { bpm: true }), "Speed at which the sound is sliced."),
     def("ATTACK", num(0, 100), "Attack volume for the rhythm pattern."),
     def("DUTY", num(1, 99), "Duration of the sound within each slice."),
@@ -258,8 +261,8 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     def("DIRECT", num(0, 100), "Volume of the direct signal."),
   ],
   "HARMONIST": [
-    def("HARMONY", text("-2oct-+2oct"), "Pitch of the harmony voice relative to the input."),
-    def("KEY", text("Am-Ab major/minor"), "Key of the song for diatonic harmony calculation."),
+    def("HARMONY", lookupOf(HARMONIST_HR, "-2oct-+2oct"), "Pitch of the harmony voice relative to the input."),
+    def("KEY", oneOf(...KEY_NAMES), "Key the harmony is calculated against. It is the patch's own `key`, not a control of this block."),
     def("PRE-DELAY", num(0, 300, { unit: "ms", bpm: true }), "Delay before the harmony voice appears."),
     def("FEEDBACK", num(0, 100), "Feedback of the harmony signal."),
     def("LEVEL", num(0, 100), "Volume of the harmony sound."),

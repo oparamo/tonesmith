@@ -2,10 +2,10 @@
  * Checks dot-path edits against the device's capability catalog.
  *
  * `setByPath` proves only that the field exists, which is a different question from whether the
- * value belongs in it: `amp.gain=abc` and `odds.tone=-500` both name real fields. Before the
- * encoder's byte guard those reached the file, and the guard can only report a byte index, so this
- * is what lets an edit be rejected by the name the caller used and the range the param accepts.
- * `buildPatch` has had the same check since it existed; this is the other write path getting it.
+ * value belongs in it: `amp.gain=abc` and `odds.tone=-500` both name real fields. The encoder's
+ * byte guard rejects them in the end but knows only a byte index, so this is what names the param
+ * and the range it accepts. It runs on `validateTypeParams`, the same function the spec validator
+ * uses, so the two write paths cannot drift in what they accept.
  */
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
@@ -48,7 +48,7 @@ const editTarget = (path: string): { block: BlockName; field: Omit<EditedField, 
   return { block: head, field: { leaf: rest[0], isParam: !nested && !SELECTION_FIELDS.has(rest[0]) } };
 };
 
-/** Groups the edits by the block each one lands in, dropping those that address no block. */
+/** A path addressing no block is dropped rather than reported: the codec still has its say on it. */
 const editsByBlock = (edits: Record<string, unknown>): Map<BlockName, EditedField[]> => {
   const byBlock = new Map<BlockName, EditedField[]>();
   for (const [path, value] of Object.entries(edits)) {

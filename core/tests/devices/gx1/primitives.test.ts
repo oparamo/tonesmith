@@ -14,10 +14,7 @@ describe("hexFromBytes", () => {
     expect(bytesFromHex(hexFromBytes(everyByte))).toEqual(everyByte);
   });
 
-  /**
-   * Each case reached the file as-is before the guard: `toString` ignores the radix for a string,
-   * a negative renders as "-1C2", and padStart leaves anything already two characters alone.
-   */
+  /** Each case renders as a plausible-looking hex pair when it is not checked first. */
   it.each([
     { label: "a string", byteList: ["abc"], bad: "abc" },
     { label: "a negative", byteList: [0, -450], bad: "-450" },

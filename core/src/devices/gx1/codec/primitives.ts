@@ -6,10 +6,10 @@ const shownValue = (value: unknown): string =>
   typeof value === "string" ? JSON.stringify(value) : String(value);
 
 /**
- * The last line of defense against writing a corrupt file. `toString(16)` returns a string
- * argument unchanged, renders a negative as "-1C2", and padStart leaves anything already two
- * characters alone, so an unvalidated value used to reach the file looking like a byte. Every
- * write goes through here, so no block or field codec can bypass the check.
+ * `toString(16)` hands back a string argument unchanged and renders a negative as "-1C2", and
+ * `padStart(2)` leaves anything already two characters alone, so without the guard a value that is
+ * not a byte still comes out looking like one. Every encoder funnels through here, which is what
+ * makes this the one place the check cannot be bypassed.
  */
 const hexFromBytes = (byteList: number[]): string[] =>
   byteList.map((byte, index) => {
