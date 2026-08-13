@@ -24,6 +24,22 @@ describe("create_patch_file", () => {
     expect(gx1.driver.readFile(path).patches).toHaveLength(3);
   });
 
+  // A mistyped exponent asks for a hundred million blank patches, and the server sits building them.
+  it("refuses a patch count past the limit rather than working on it", async () => {
+    const temp = emptyTempDir();
+    cleanup = temp.cleanup;
+    const client = await connectClient();
+    close = client.close;
+    const path = join(temp.dir, "huge.tsl");
+
+    const result = await client.callTool("create_patch_file", {
+      device: "gx1", file: path, patchCount: 1e8,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(existsSync(path)).toBe(false);
+  });
+
   it("names the set after the file when setName is omitted", async () => {
     const temp = emptyTempDir();
     cleanup = temp.cleanup;

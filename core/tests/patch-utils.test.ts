@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
   resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits,
-  upsertPatches, copyPatch, createPatchFile,
+  upsertPatches, copyPatch, createPatchFile, MAX_NEW_PATCHES,
 } from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
@@ -551,5 +551,29 @@ describe("createPatchFile", () => {
     const overwrite = () => createPatchFile(driver, path);
 
     expect(overwrite).toThrow(path);
+  });
+
+  // A count is the kind of input a mistyped exponent turns into 100 million blank patches, which
+  // no device holds and which the surface asking for them sits and waits on.
+  it.each([0, -1, 2.5, MAX_NEW_PATCHES + 1])("rejects a patch count of %o without writing", (patchCount) => {
+    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const path = join(dir, "junk.tsl");
+
+    const createWithBadCount = () => createPatchFile(driver, path, { patchCount });
+
+    expect(createWithBadCount).toThrow(String(MAX_NEW_PATCHES));
+    expect(files.has(path)).toBe(false);
+  });
+
+  it("takes the largest count it allows", () => {
+    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
+    const driver = makeFakeDriver(new Map<string, PatchFile>());
+    const path = join(dir, "full.tsl");
+
+    const file = createPatchFile(driver, path, { patchCount: MAX_NEW_PATCHES });
+
+    expect(file.patches).toHaveLength(MAX_NEW_PATCHES);
   });
 });

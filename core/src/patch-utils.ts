@@ -284,6 +284,21 @@ interface NewFileOptions {
 const DEFAULT_NEW_PATCH_COUNT = 1;
 
 /**
+ * The most blank patches one file can be started with. This is a guard against a mistyped count,
+ * not a device's capacity: it sits well above the memory of any device a driver speaks for, and
+ * below the point where a surface asking for patches sits and waits on the answer.
+ */
+const MAX_NEW_PATCHES = 500;
+
+const requireUsableCount = (patchCount: number): void => {
+  if (!Number.isInteger(patchCount) || patchCount < 1 || patchCount > MAX_NEW_PATCHES) {
+    throw new Error(
+      `Cannot start a file with ${patchCount} patches: give a whole number from 1 to ${MAX_NEW_PATCHES}.`
+    );
+  }
+};
+
+/**
  * Creates a patch file at `path` and returns it. Refuses to overwrite an existing file, since the
  * whole point is a blank start and the caller would lose a library to a mistyped path.
  * The set takes the filename when `setName` is omitted.
@@ -293,6 +308,7 @@ const createPatchFile = <T extends Patch>(
   path: string,
   options: NewFileOptions = {},
 ): PatchFile<T> => {
+  requireUsableCount(options.patchCount ?? DEFAULT_NEW_PATCH_COUNT);
   if (existsSync(path)) throw new Error(`${path} already exists, refusing to overwrite it.`);
 
   const setName = options.setName ?? basename(path, extname(path));
@@ -302,6 +318,7 @@ const createPatchFile = <T extends Patch>(
 };
 
 export {
+  MAX_NEW_PATCHES,
   resolvePatchIndex,
   coerceValue,
   setByPath,

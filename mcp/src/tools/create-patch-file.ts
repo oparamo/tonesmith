@@ -18,8 +18,8 @@ const registerCreatePatchFile = (server: McpServer): void => {
         setName: z.string().optional().describe(
           "Name for the patch set the file holds. Defaults to the filename without its extension."
         ),
-        patchCount: z.number().int().min(1).optional().describe(
-          "How many blank patches to start with (default 1)."
+        patchCount: z.number().int().min(1).max(patchUtils.MAX_NEW_PATCHES).optional().describe(
+          `How many blank patches to start with (default 1, at most ${patchUtils.MAX_NEW_PATCHES}).`
         ),
       }),
     },
