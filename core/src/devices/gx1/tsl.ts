@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
+import { writeFileAtomic } from "../../atomic-write";
 import { decodePatch, encodePatch, hexFromBytes } from "./codec";
 import { encodeName } from "./codec/blocks";
 import { RAW, NAME_BYTES } from "./common";
@@ -199,8 +199,7 @@ const writeFile = (input: BasePatchFile<Patch>, path: string): void => {
     formatRev: file.formatRev,
     data: [file.patches.map(encodePatch), file[RAW].data[1]],
   };
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(envelope));
+  writeFileAtomic(path, JSON.stringify(envelope));
 };
 
 export { blankPatch, newFile, readFile, writeFile };

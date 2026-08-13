@@ -71,6 +71,8 @@ core/                       @tonesmith/core
                             the model selector that decode mirrors onto both subType and
                             params.type so a consumer isn't left guessing which to set
     capability-utils.ts     findGroup / findItem
+    atomic-write.ts         writeFileAtomic: sibling file then rename, so a driver's writeFile can
+                            never truncate a patch library it fails partway through
     devices/index.ts        driver roster, one line per device
     devices/<id>/           per-device driver, always this shape:
       types/                device type definitions split by domain (barrel: index.ts)
