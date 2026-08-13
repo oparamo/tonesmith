@@ -51,3 +51,47 @@ describe("server instructions", () => {
     }
   });
 });
+
+describe("tool registrations", () => {
+  let close: () => Promise<void> = async () => { /* set per test */ };
+  afterEach(async () => { await close(); });
+
+  // These sit in the client's context on every request, so a device named here is a cost every
+  // device pays, and a caller reading one device's ids as the universal set is how they mislead.
+  it("keep device-specific tokens out of every tool definition", async () => {
+    const { client, close: cleanup } = await connect();
+    close = cleanup;
+
+    const { tools } = await client.listTools();
+
+    for (const tool of tools) {
+      const definition = JSON.stringify(tool);
+      for (const token of ["gx1", "GX-1", "BOSS", ".tsl"]) {
+        expect(definition, `${tool.name} should not name device-specific token ${token}`).not.toContain(token);
+      }
+    }
+  });
+
+  // Without these a client has to guess from the name whether a call reads or writes, which is
+  // what its approval rules are built on.
+  it("say whether each tool reads or writes, and that none of them reach the network", async () => {
+    const { client, close: cleanup } = await connect();
+    close = cleanup;
+
+    const { tools } = await client.listTools();
+    const annotationsOf = (name: string): Record<string, unknown> =>
+      tools.find(tool => tool.name === name)?.annotations ?? {};
+
+    for (const name of ["list_devices", "read_patch", "describe_device"]) {
+      expect(annotationsOf(name).readOnlyHint, `${name} only reads`).toBe(true);
+    }
+    for (const name of ["write_fields", "copy_patch", "generate_patch"]) {
+      expect(annotationsOf(name).readOnlyHint, `${name} writes`).toBe(false);
+      expect(annotationsOf(name).destructiveHint, `${name} can replace what is there`).toBe(true);
+    }
+    expect(annotationsOf("create_patch_file").destructiveHint, "it refuses an existing file").toBe(false);
+    for (const tool of tools) {
+      expect(tool.annotations?.openWorldHint, `${tool.name} touches no network`).toBe(false);
+    }
+  });
+});

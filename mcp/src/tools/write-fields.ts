@@ -61,6 +61,9 @@ const registerWriteFields = (server: McpServer): void => {
             "Applies to the file rather than to any one patch."
         ),
       }),
+      // It edits a file the caller already has, which is the destructive case: the values it
+      // replaces are gone.
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
     ({ file, device, ref, fields, setName }) => attempt(() => {
       requireSomethingToChange(ref, fields, setName);

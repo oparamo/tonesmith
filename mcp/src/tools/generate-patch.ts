@@ -65,6 +65,8 @@ save rather than calling this once per patch. The array's order is the order the
 and the file is written once. Unset params take the device's factory default for the chosen type,
 and the patch echoed back is the complete resulting state, so no follow-up read is needed.`,
       inputSchema,
+      // A patch whose name is already in the file replaces it, so a save can overwrite work.
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
     ({ device, outPath, setName, patches }) => attempt(() => {
       const driver = registry.getDriver(device);

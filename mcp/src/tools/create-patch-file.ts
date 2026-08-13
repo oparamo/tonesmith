@@ -21,6 +21,8 @@ const registerCreatePatchFile = (server: McpServer): void => {
           `How many blank patches to start with (default 1, at most ${patchUtils.MAX_NEW_PATCHES}).`
         ),
       }),
+      // It writes, but only where there is no file: an existing one is refused rather than replaced.
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     ({ device, file, setName, patchCount }) => attempt(() => {
       const driver = registry.getDriver(device);

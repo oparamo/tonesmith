@@ -21,6 +21,9 @@ const registerCopyPatch = (server: McpServer): void => {
             "there is replaced."
         ),
       }),
+      // Replacing the patch in the destination slot is the whole operation, so it is destructive
+      // by design rather than by accident.
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
     ({ device, src, srcRef, dst, dstRef }) => attempt(() => {
       const driver = registry.getDriver(device);

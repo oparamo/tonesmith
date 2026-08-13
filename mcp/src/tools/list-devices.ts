@@ -5,7 +5,10 @@ import { ok } from "../common";
 const registerListDevices = (server: McpServer): void => {
   server.registerTool(
     "list_devices",
-    { description: "List all supported guitar processor devices and their IDs." },
+    {
+      description: "List all supported guitar processor devices and their IDs.",
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
     () => {
       const deviceSummaries = registry.listDrivers().map(driver => ({ id: driver.id, name: driver.name }));
       return ok(JSON.stringify(deviceSummaries));

@@ -157,6 +157,7 @@ const registerDescribeDevice = (server: McpServer): void => {
             "\"<group>/<item>\" entries."
         ),
       }),
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ device, items, includeParams }) => attempt(() => {
       const { capabilities } = registry.getDriver(device);

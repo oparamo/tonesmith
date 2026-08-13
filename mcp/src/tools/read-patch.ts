@@ -52,6 +52,7 @@ const registerReadPatch = (server: McpServer): void => {
           "Index to start at (default 0). Ignored when `ref` names a patch."
         ),
       }),
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ file, device, ref, limit, offset }) => attempt(() => {
       const driver = registry.getDriver(device);
