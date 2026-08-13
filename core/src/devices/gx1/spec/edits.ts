@@ -15,8 +15,8 @@ import {
 } from "../common";
 import type { BlockName } from "../common";
 import type { Patch } from "../types";
-import { resolveSelection, validateTypeParams } from "./validate";
-import type { Issues } from "./validate";
+import { checkSelectors, resolveSelection, unknownTypeIssue, validateTypeParams } from "./validate";
+import type { Issues, Selectors } from "./validate";
 import { asRecord } from "./errors";
 
 /** One edit resolved against the block it addresses. */
@@ -63,14 +63,7 @@ const editsByBlock = (edits: Record<string, unknown>): Map<BlockName, EditedFiel
 
 const checkType = (issues: Issues, group: string, value: unknown): void => {
   if (resolveSelection(group, value)?.item !== undefined) return;
-  const valid = findGroup(gx1Capabilities, group).items.map(item => item.id).join(", ");
-  issues.push(`${group} has no type ${JSON.stringify(value)}. Valid types: ${valid}`);
-};
-
-const checkOn = (issues: Issues, group: string, value: unknown): void => {
-  if (typeof value !== "boolean") {
-    issues.push(`${group} ${ON_FIELD} takes true or false (got ${JSON.stringify(value)})`);
-  }
+  issues.push(unknownTypeIssue(findGroup(gx1Capabilities, group), value));
 };
 
 const asString = (value: unknown): string | undefined =>
@@ -87,11 +80,16 @@ const blockIssues = (patch: Patch, name: BlockName, fields: EditedField[]): Issu
   const issues: Issues = [];
   const values: Record<string, unknown> = {};
 
+  const selectors: Selectors = { group };
   for (const { leaf, isParam, value } of fields) {
     if (isParam) values[leaf] = value;
-    else if (leaf === ON_FIELD) checkOn(issues, group, value);
     else if (leaf === TYPE_FIELD) checkType(issues, group, value);
+    else {
+      const selector = leaf === ON_FIELD ? "on" : "subType";
+      selectors[selector] = value;
+    }
   }
+  checkSelectors(issues, selectors);
 
   const selection = { group, type: asString(block[TYPE_FIELD]), subType: asString(block[SUB_TYPE_FIELD]) };
   issues.push(...validateTypeParams({ ...selection, values }));

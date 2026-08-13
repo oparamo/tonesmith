@@ -167,4 +167,28 @@ describe("validatePatchSpec", () => {
 
     expect(validatePatchSpec(spec)).toHaveLength(2);
   });
+
+  /**
+   * `on` and `subType` select a block's shape rather than set a control, so they are filtered out
+   * before the param check and reach the builder on trust.
+   */
+  it.each([
+    { label: "a non-boolean on", block: { type: "TWIN", on: "yes" } },
+    { label: "a non-string subType", block: { type: "TWIN", subType: 42 } },
+  ])("rejects $label", ({ block }) => {
+    expect(validatePatchSpec({ name: "Test", amp: block })).toHaveLength(1);
+  });
+
+  it.each([
+    { label: "a chain that is not an array", spec: { chain: "PFX" } },
+    { label: "a chain naming a block twice", spec: { chain: ["amp", "amp"] } },
+    { label: "a key the device has no name for", spec: { key: "Am" } },
+    { label: "a key that is not a string", spec: { key: 5 } },
+  ])("rejects $label", ({ spec }) => {
+    expect(validatePatchSpec({ ...valid, ...spec })).toHaveLength(1);
+  });
+
+  it("accepts a key the device names", () => {
+    expect(validatePatchSpec({ ...valid, key: "G" })).toEqual([]);
+  });
 });

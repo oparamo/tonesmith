@@ -109,6 +109,33 @@ const checkSubType = (issues: Issues, check: SubTypeCheck): void => {
   issues.push(`${group} ${type} has no subType "${subType}". Valid subTypes: ${valid}`);
 };
 
+const typeChoices = (capGroup: CapabilityGroup): string => capGroup.items.map(item => item.id).join(", ");
+
+/** Names what the group does offer, since a rejected `type` leaves the caller with no next step. */
+const unknownTypeIssue = (capGroup: CapabilityGroup, type: unknown): string =>
+  `${capGroup.id} has no type ${JSON.stringify(type)}. Types: ${typeChoices(capGroup)}`;
+
+/** A block's shape selectors, as they arrive from a caller: unvalidated, and each one optional. */
+interface Selectors {
+  group: string;
+  on?: unknown;
+  subType?: unknown;
+}
+
+/**
+ * `on` and `subType` pick a block's shape rather than set one of its controls, so they are filtered
+ * out of the param check and would otherwise reach the builder on nothing but a cast.
+ */
+const checkSelectors = (issues: Issues, selectors: Selectors): void => {
+  const { group, on, subType } = selectors;
+  if (on !== undefined && typeof on !== "boolean") {
+    issues.push(`${group} on takes true or false (got ${JSON.stringify(on)})`);
+  }
+  if (subType !== undefined && typeof subType !== "string") {
+    issues.push(`${group} subType takes the name of a variant (got ${JSON.stringify(subType)})`);
+  }
+};
+
 /** One param's value alongside the spec and selection it is checked against. */
 interface ParamCheck {
   group: string;
@@ -227,5 +254,5 @@ const typeSurface = (selected: Selected): TypeSurface | undefined => {
   };
 };
 
-export { resolveSelection, validateTypeParams, typeSurface };
-export type { Issues, Selection, TypeParams, TypeSurface };
+export { checkSelectors, resolveSelection, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface };
+export type { Issues, Selection, Selectors, TypeParams, TypeSurface };

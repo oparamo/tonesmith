@@ -11,14 +11,14 @@
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import {
-  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS, ON_FIELD,
+  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS, ON_FIELD, KEY_NAMES,
 } from "../common";
 import type { BlockName } from "../common";
-import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain } from "../builder";
+import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain, DEFAULT_CHAIN } from "../builder";
 import type { AmpOptions, OddsOptions } from "../builder";
 import type { CapabilityGroup } from "../../../types";
 import type { Patch, FxParams } from "../types";
-import { validateTypeParams, typeSurface } from "./validate";
+import { checkSelectors, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface } from "./validate";
 import type { Issues } from "./validate";
 import {
   asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine,
@@ -98,8 +98,6 @@ const checkKeys = (issues: Issues, block: Record<string, unknown>, check: KeyChe
   issues.push([...misplacedText, ...unknownText, shapeSkeleton(fields, context)].join("\n"));
 };
 
-const typeChoices = (capGroup: CapabilityGroup): string => capGroup.items.map(item => item.id).join(", ");
-
 /**
  * Rejects a block whose `type` names nothing the catalog knows, and reports whether it is usable.
  * Every later check reads the chosen type's own surface, so an unresolved one would leave the
@@ -115,7 +113,7 @@ const checkType = (issues: Issues, capGroup: CapabilityGroup, block: Record<stri
   }
   if (typeSurface({ group: capGroup.id, type }) !== undefined) return true;
 
-  issues.push(`${capGroup.id} has no type "${type}". Types: ${typeChoices(capGroup)}`);
+  issues.push(unknownTypeIssue(capGroup, type));
   return false;
 };
 
@@ -127,6 +125,7 @@ const checkBlock = (issues: Issues, name: BlockName, input: unknown): void => {
 
   const context = blockContext(group, block);
   const selected = typeof block[SUB_TYPE_FIELD] === "string" ? block[SUB_TYPE_FIELD] : undefined;
+  checkSelectors(issues, { group, on: block[ON_FIELD], subType: block[SUB_TYPE_FIELD] });
   checkKeys(issues, block, { fields: acceptedFields(name, context), context });
   issues.push(...validateTypeParams({
     group,
@@ -148,6 +147,34 @@ const checkName = (issues: Issues, spec: Record<string, unknown>): void => {
   }
 };
 
+/**
+ * `chain` reaches the builder as an array it maps over, and `key` reaches the codec as a table
+ * lookup, so an unchecked one surfaces as a TypeError or a codec throw at write time with nothing
+ * naming the field that caused it.
+ */
+const checkChain = (issues: Issues, spec: Record<string, unknown>): void => {
+  const chain = spec.chain;
+  if (chain === undefined) return;
+  if (!Array.isArray(chain) || chain.some(block => typeof block !== "string")) {
+    issues.push(`chain lists every block in signal order. Blocks: ${DEFAULT_CHAIN.join(", ")}`);
+    return;
+  }
+  try {
+    validateChain(chain as string[]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    issues.push(message);
+  }
+};
+
+const checkKey = (issues: Issues, spec: Record<string, unknown>): void => {
+  const key = spec.key;
+  if (key === undefined) return;
+  if (typeof key !== "string" || !(KEY_NAMES as readonly string[]).includes(key)) {
+    issues.push(`Patch key ${JSON.stringify(key)} is not one this device names. Keys: ${KEY_NAMES.join(", ")}`);
+  }
+};
+
 const checkBlockNames = (issues: Issues, spec: Record<string, unknown>): void => {
   const known = new Set<string>([...PATCH_FIELDS, ...BLOCK_NAMES]);
   const unknown = Object.keys(spec).filter(key => !known.has(key));
@@ -165,6 +192,8 @@ const validatePatchSpec = (input: unknown): Issues => {
   const spec = asRecord(input);
   const issues: Issues = [];
   checkName(issues, spec);
+  checkChain(issues, spec);
+  checkKey(issues, spec);
   checkBlockNames(issues, spec);
   for (const name of setBlocks(spec)) checkBlock(issues, name, spec[name]);
   return issues;
