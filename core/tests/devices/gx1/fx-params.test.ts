@@ -64,9 +64,9 @@ describe("FX-slot DELAY per-sub-algorithm round-trip", () => {
 
 // ── Unknown/invalid type handling ─────────────────────────────────────────────
 //
-// FX_PARAM_MAPS is a Partial<Record<string, FieldCodec[]>>, so types outside the known
-// FX_TYPES list (or not-yet-mapped ones) fall through gracefully rather than throwing,
-// so a corrupt or newer-firmware byte doesn't crash the whole decode.
+// A type outside the known FX_TYPES list decodes to its raw bytes rather than throwing, so a
+// corrupt or newer-firmware byte doesn't crash the whole read. Encoding a params bag for such a
+// type is the opposite case: there is nowhere to put the values, so it throws.
 
 describe("Unknown FX type handling", () => {
   it("decodeFxParams returns unknownBytes for a type with no FX_PARAM_MAPS entry", () => {
@@ -86,13 +86,21 @@ describe("Unknown FX type handling", () => {
     expect(resultBytes).toEqual(originalBytes);
   });
 
-  it("encodeFxParams leaves bytes unchanged for a type with no FX_PARAM_MAPS entry", () => {
+  it("encodeFxParams throws rather than drop params for a type with no FX_PARAM_MAPS entry", () => {
     const originalBytes = [1, 2, 3, 4];
 
-    const result = encodeFxParams("BOGUS TYPE", { sustain: 50 }, originalBytes);
-    const resultBytes = bytesFromHex(result);
+    const encodeUnmappedType = () => encodeFxParams("BOGUS TYPE", { sustain: 50 }, originalBytes);
 
-    expect(resultBytes).toEqual(originalBytes);
+    expect(encodeUnmappedType).toThrow(/BOGUS TYPE/);
+  });
+
+  it("encodeFxParams throws when DELAY's sub-algorithm has no field map of its own", () => {
+    const originalBytes = new Array<number>(251).fill(0);
+    const staleSubType = { subType: "BOSS COMP", time: 400 };
+
+    const encodeStaleSubType = () => encodeFxParams("DELAY", staleSubType, originalBytes);
+
+    expect(encodeStaleSubType).toThrow(/BOSS COMP/);
   });
 
   it("indexTable's encode throws for a value outside its table (PITCH SHIFT's pitch field)", () => {

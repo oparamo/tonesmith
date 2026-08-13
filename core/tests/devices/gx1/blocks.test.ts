@@ -287,6 +287,27 @@ describe("Malformed/unmapped byte handling", () => {
 });
 
 
+// ── Values the device has no byte for ─────────────────────────────────────────
+
+describe("Values the device has no byte for", () => {
+  it("encodeNs throws on a detect the device does not name", () => {
+    const block = { on: true, threshold: 30, release: 30, detect: "BOGUS", [RAW]: [1, 30, 30, 0] };
+
+    const encodeBadDetect = () => encodeNs(block);
+
+    expect(encodeBadDetect).toThrow(/BOGUS/);
+  });
+
+  it("encodeFv throws on a curve the device does not name", () => {
+    const block = { position: 100, min: 0, max: 100, curve: "BOGUS", [RAW]: [100, 0, 100, 2] };
+
+    const encodeBadCurve = () => encodeFv(block);
+
+    expect(encodeBadCurve).toThrow(/BOGUS/);
+  });
+});
+
+
 // ── Real device values (factory default init patch) ──────────────────────────
 //
 // default-init.tsl is a real GX-1 factory-default patch export. Every block below

@@ -26,10 +26,19 @@ const hexFromBytes = (byteList: number[]): string[] =>
 const lookupName = (table: readonly string[], index: number, label = ""): string =>
   (index >= 0 && index < table.length) ? table[index] : `UNKNOWN_${label}${index}`;
 
-/** Throws on an unknown name: callers should only pass values decoded from the same table. */
+/** Matches a `lookupName` sentinel and captures the index it was built from. */
+const SENTINEL_INDEX = /^UNKNOWN_.*?(-?\d+)$/;
+
+/**
+ * The inverse of `lookupName`, sentinel included: a name invented for an index outside the table
+ * reads back as that index, so a byte this codec cannot name still survives a round trip. Any
+ * other unknown name throws, since there is no byte to write for it.
+ */
 const lookupIndex = (tableMap: Record<string, number>, name: string, label = ""): number => {
-  if (!(name in tableMap)) throw new Error(`Unknown ${label}: "${name}"`);
-  return tableMap[name];
+  if (name in tableMap) return tableMap[name];
+  const sentinel = SENTINEL_INDEX.exec(name);
+  if (sentinel === null) throw new Error(`Unknown ${label}: "${name}"`);
+  return Number(sentinel[1]);
 };
 
 /**

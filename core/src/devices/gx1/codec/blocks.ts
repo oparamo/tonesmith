@@ -7,7 +7,7 @@ import {
   REV_TYPES, REV_TYPE_IDX,
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
-  NS_DETECT, FV_CURVE, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
+  NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
   FREQ_HIGH_CUT, NAME_BYTES, RAW,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
@@ -214,7 +214,7 @@ const decodeNs = (hexList: string[]): NsBlock => {
     on:        Boolean(bytes[0]),
     threshold: bytes[1],
     release:   bytes[2],
-    detect:    lookupName(NS_DETECT, bytes[3]) as typeof NS_DETECT[number],
+    detect:    lookupName(NS_DETECT, bytes[3]),
     [RAW]:     bytes,
   };
 };
@@ -224,8 +224,7 @@ const encodeNs = (block: NsBlock): string[] => {
   bytes[0] = Number(block.on);
   bytes[1] = block.threshold;
   bytes[2] = block.release;
-  const detectIndex = NS_DETECT.indexOf(block.detect);
-  if (detectIndex >= 0) bytes[3] = detectIndex;
+  bytes[3] = lookupIndex(NS_DETECT_IDX, block.detect, "NS detect");
   return hexFromBytes(bytes);
 };
 
@@ -234,7 +233,7 @@ const encodeNs = (block: NsBlock): string[] => {
 
 const decodeFv = (hexList: string[]): FvBlock => {
   const bytes = bytesFromHex(hexList);
-  const curve = bytes.length > 3 ? lookupName(FV_CURVE, bytes[3]) as typeof FV_CURVE[number] : "NORMAL";
+  const curve = bytes.length > 3 ? lookupName(FV_CURVE, bytes[3]) : "NORMAL";
   return {
     position: bytes[0],
     min:      bytes[1],
@@ -249,10 +248,8 @@ const encodeFv = (block: FvBlock): string[] => {
   bytes[0] = block.position;
   bytes[1] = block.min;
   bytes[2] = block.max;
-  if (bytes.length > 3) {
-    const curveIndex = FV_CURVE.indexOf(block.curve);
-    if (curveIndex >= 0) bytes[3] = curveIndex;
-  }
+  // A 3-byte FV block predates the curve control and has no byte to write it to.
+  if (bytes.length > 3) bytes[3] = lookupIndex(FV_CURVE_IDX, block.curve, "FV curve");
   return hexFromBytes(bytes);
 };
 

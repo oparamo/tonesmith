@@ -1,4 +1,4 @@
-import type { RAW, NS_DETECT, FV_CURVE } from "../common";
+import type { RAW } from "../common";
 import type { FxParams } from "./tsl";
 
 interface FxBlock {
@@ -40,7 +40,7 @@ interface NsBlock {
   on: boolean;
   threshold: number;
   release: number;
-  detect: (typeof NS_DETECT)[number];
+  detect: string;
   [RAW]: number[];
 }
 
@@ -48,7 +48,7 @@ interface FvBlock {
   position: number;
   min: number;
   max: number;
-  curve: (typeof FV_CURVE)[number];
+  curve: string;
   [RAW]: number[];
 }
 

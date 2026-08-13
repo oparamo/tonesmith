@@ -83,4 +83,22 @@ describe("lookupIndex", () => {
 
     expect(lookupUnknownName).toThrow('Unknown key: "FOUR"');
   });
+
+  it("gives back the index a lookupName sentinel stands for", () => {
+    const index = lookupIndex(tableMap, lookupName(["ONE"], 5));
+
+    expect(index).toBe(5);
+  });
+
+  it("reads the index out of a labelled sentinel", () => {
+    const index = lookupIndex(tableMap, lookupName(["ONE"], 38, "FX"), "FX type");
+
+    expect(index).toBe(38);
+  });
+
+  it("throws for a sentinel with no index to read", () => {
+    const lookupBareSentinel = () => lookupIndex(tableMap, "UNKNOWN_");
+
+    expect(lookupBareSentinel).toThrow(/UNKNOWN_/);
+  });
 });

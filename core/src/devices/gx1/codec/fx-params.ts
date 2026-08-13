@@ -305,10 +305,17 @@ const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
 
 // ── Public decode / encode ────────────────────────────────────────────────────
 
-/** DELAY selects its field map by sub-algorithm; every other type has one flat map. */
+/** The one FX type that selects its field map by sub-algorithm rather than having one flat map. */
+const PER_SUB_ALGORITHM_TYPE = "DELAY";
+
 const fieldMapFor = (fxType: string, delaySubType: string): FieldCodec[] | undefined => {
-  if (fxType === "DELAY") return FX_DELAY_TYPE_MAPS[delaySubType];
+  if (fxType === PER_SUB_ALGORITHM_TYPE) return FX_DELAY_TYPE_MAPS[delaySubType];
   return FX_PARAM_MAPS[fxType];
+};
+
+const unmappedTypeMessage = (fxType: string, delaySubType: string): string => {
+  if (fxType !== PER_SUB_ALGORITHM_TYPE) return `Unknown FX type: "${fxType}"`;
+  return `Unknown DELAY subType: "${delaySubType}". Expected one of: ${FX_DLY_TYPES.join(", ")}`;
 };
 
 /** How many bytes of an unrecognized type's block to stash for the round trip. */
@@ -330,6 +337,8 @@ const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
 /**
  * Encodes FX params back into the 251-byte hex block, always starting from `originalBytes` so
  * unmapped positions survive. Params carrying `unknownBytes` return those bytes unchanged.
+ * A type with no field map throws, since every param in the bag would otherwise encode nowhere
+ * and the write would report success having changed nothing.
  */
 const encodeFxParams = (
   fxType: string,
@@ -341,12 +350,12 @@ const encodeFxParams = (
   const bytes = [...originalBytes];
   const delaySubType = typeof params.subType === "string" ? params.subType : "";
   const fields = fieldMapFor(fxType, delaySubType);
-  if (fields) {
-    const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
-    const paramBytes = bytes.slice(offset);
-    encodeFields(fields, params, paramBytes);
-    bytes.splice(offset, paramBytes.length, ...paramBytes);
-  }
+  if (!fields) throw new Error(unmappedTypeMessage(fxType, delaySubType));
+
+  const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
+  const paramBytes = bytes.slice(offset);
+  encodeFields(fields, params, paramBytes);
+  bytes.splice(offset, paramBytes.length, ...paramBytes);
   return hexFromBytes(bytes);
 };
 

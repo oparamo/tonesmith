@@ -20,5 +20,19 @@ The builders reject an unknown param key for the block's current type, listing t
 does accept (`... is not valid for type "ROTARY" (valid keys: speed, slowRate, ...)`). A key that
 means something else for this type used to write its byte anyway.
 
-The CLI `write` command and the MCP `write_fields` tool share this pipeline, so all three apply to
+Three paths inside the codec did the same thing one level lower, returning normally without writing
+the bytes they were handed. The FX param encoder gave back the original bytes whenever the effect
+type resolved to no field map, so switching `fx1.type` to `DELAY` in the same batch as a param edit
+discarded every param in the bag. The NS `detect` and FV `curve` encoders skipped their byte when
+the value was not one the device names, so `ns.detect = "BOGUS"` reported `Updated` and changed
+nothing. All three throw now, and both selectors go through the same lookup as every other enum in
+the codec.
+
+That lookup is also the inverse of the one decode uses, sentinel included. A byte outside a table's
+range decodes to `UNKNOWN_<n>`, and that name now encodes back to the byte it came from rather than
+throwing, so a value this codec cannot name survives a read and write cycle instead of blocking the
+write. `NsBlock.detect` and `FvBlock.curve` are typed `string` to match, as every other decoded
+selector already was.
+
+The CLI `write` command and the MCP `write_fields` tool share this pipeline, so all of it applies to
 both.
