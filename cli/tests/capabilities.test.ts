@@ -22,7 +22,7 @@ describe("gx1 capabilities", () => {
   it("prints the full default block order for the chain argument", async () => {
     const output = await capabilitiesOutput("chain");
 
-    for (const block of gx1.DEFAULT_CHAIN) {
+    for (const block of gx1.driver.capabilities.chain.defaultOrder) {
       expect(output).toContain(block);
     }
   });

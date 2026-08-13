@@ -1,5 +1,5 @@
 import type { Patch, FxParams } from "./types";
-import { blankPatch, newFile, writeFile } from "./tsl";
+import { blankPatch } from "./tsl";
 import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, onlyBlockFor } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES, type ParamDefaults } from "./defaults";
@@ -392,16 +392,9 @@ const reverb = (patch: Patch, options: ReverbOptions): void => {
   assignExtra(block, mergeBlockParams(named, params, typeSpec.label), typeSpec);
 };
 
-const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
-  const file = newFile(setName, 0);
-  file.patches = patches;
-  writeFile(file, outPath);
-  console.info(`Saved ${outPath} (${patches.length} patches)`);
-};
-
 export {
   DEFAULT_CHAIN, moveBefore, validateChain, defaultFxParams,
-  basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, saveTsl,
+  basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb,
 };
 export type {
   AmpOptions, OddsOptions, FxOptions, NsOptions, FvOptions, PfxOptions, DelayOptions, ReverbOptions,

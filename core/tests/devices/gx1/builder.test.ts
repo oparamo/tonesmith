@@ -1,7 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { existsSync, unlinkSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { describe, it, expect } from "vitest";
+import { resolve } from "node:path";
 import {
   DEFAULT_CHAIN,
   moveBefore,
@@ -16,7 +14,6 @@ import {
   pfx,
   delay,
   reverb,
-  saveTsl,
 } from "../../../src/devices/gx1/builder";
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
@@ -645,27 +642,5 @@ describe("defaultFxParams (anchored to default-init.tsl)", () => {
       rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100,
     });
     expect(patch.fx3.params).toMatchObject(chorusDefaults);
-  });
-});
-
-describe("saveTsl", () => {
-  const tmpPath = join(tmpdir(), `tonesmith-builder-test-${process.pid}.tsl`);
-
-  afterEach(() => {
-    if (existsSync(tmpPath)) unlinkSync(tmpPath);
-    vi.restoreAllMocks();
-  });
-
-  it("writes a file that can be read back, logging where it went", () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
-    const patch = basePatch("Save Test");
-    amp(patch, { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 });
-
-    saveTsl([patch], "Save Test Set", tmpPath);
-
-    const loaded = readFile(tmpPath);
-    expect(loaded.patches).toHaveLength(1);
-    expect(loaded.patches[0].name).toBe("Save Test");
-    expect(info).toHaveBeenCalledWith(expect.stringContaining(tmpPath));
   });
 });

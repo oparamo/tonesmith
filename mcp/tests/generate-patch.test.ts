@@ -54,7 +54,9 @@ describe("generate_patch", () => {
     const outPath = join(temp.dir, "echo.tsl");
     const client = await connectClient();
     close = client.close;
-    const chain = gx1.moveBefore(gx1.DEFAULT_CHAIN, "OD/DS", "FX1");
+    const chain = [...gx1.driver.capabilities.chain.defaultOrder];
+    chain.splice(chain.indexOf("OD/DS"), 1);
+    chain.splice(chain.indexOf("FX1"), 0, "OD/DS");
     const patchSpec = { name: "Echo", outPath, chain, amp: AMP };
 
     const { text, isError } = await client.callTool("generate_patch", single(patchSpec));
@@ -227,7 +229,7 @@ describe("generate_patch", () => {
     const patchSpec = {
       name: "Chain",
       outPath,
-      chain: gx1.DEFAULT_CHAIN.map(block => (block === "OD/DS" ? "OD" : block)),
+      chain: gx1.driver.capabilities.chain.defaultOrder.map(block => (block === "OD/DS" ? "OD" : block)),
       amp: AMP,
       odds: { type: "BLUES OD", drive: 40, tone: 10, level: 70 },
     };

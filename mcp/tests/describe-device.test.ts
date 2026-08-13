@@ -33,7 +33,7 @@ describe("describe_device", () => {
 
     expect(isError, text).toBe(false);
     const chain = viewOf(text, "chain") as { defaultOrder: string[] };
-    expect(chain.defaultOrder, "chain view lists the default block order").toEqual(gx1.DEFAULT_CHAIN);
+    expect(chain.defaultOrder, "chain view lists the default block order").toEqual(gx1.driver.capabilities.chain.defaultOrder);
   });
 
   // The whole point of the batch form: a patch's worth of lookups in one round trip.
@@ -47,7 +47,7 @@ describe("describe_device", () => {
     expect(isError, text).toBe(false);
     const views = JSON.parse(text) as Record<string, { id?: string; defaultOrder?: string[] }>;
     expect(Object.keys(views), "every requested entry comes back").toEqual(items);
-    expect(views.chain.defaultOrder).toEqual(gx1.DEFAULT_CHAIN);
+    expect(views.chain.defaultOrder).toEqual(gx1.driver.capabilities.chain.defaultOrder);
     expect(views.amp.id).toBe("amp");
     expect(views["fx/CHORUS"].id).toBe("CHORUS");
     expect(views["reverb/HALL M"].id).toBe("HALL M");

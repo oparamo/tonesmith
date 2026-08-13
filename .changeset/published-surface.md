@@ -5,6 +5,20 @@
 What `@tonesmith/core` publishes is what a consumer is meant to use, and each published type says
 what is actually true of the value behind it.
 
+A device namespace publishes its `driver`, its patch and block types, and `RAW`, the key the bytes
+this codec doesn't decode are kept under. It used to publish around twenty more names: the builder
+functions and their option types, the chain helpers, the param catalog, the codec's fx-type
+converters, the spec module's wording helpers, and `NAME_BYTES`, which the device's own
+`capabilities.patchName.maxLength` states. None were part of building or editing a patch, all of
+which goes through the driver, and each one published a signature that could not then change
+without a major version. The type barrel gained the names it was missing in exchange: `PatchNameSpec`
+and `PatchSpecExample` had no way to be named, and `FieldEdits`, `PatchView` and `Encodable` come
+with the surface above.
+
+`saveTsl` is gone rather than narrowed. It wrote a file and then called `console.info`, and the MCP
+server speaks JSON-RPC over stdio, so a consumer reaching for it inside a tool corrupted the
+protocol stream. `patchUtils.upsertPatches` is the supported way to save patches to a file.
+
 `presentPatch` returns a `PatchView<T>` rather than a `T`. The view drops the selector copy a device
 mirrors into a block's params, which is a copy the encoder reads to pick that block's field map, so
 handing a view back to `encodePatch` would write the block's old sub-model byte and report the write
