@@ -199,7 +199,13 @@ describe("fx", () => {
 
   // A type with sub-models is always set to one, so an omitted subType has to mean the model the
   // device opens on. It used to mean raw byte 0, which for OD/DS is a different pedal entirely.
-  it.each([...PARAM_SUBTYPE_EFFECTS].map(type => [type, DEFAULT_SUBTYPES.fx?.[type]]))(
+  // Read through `present` rather than `?.`: an effect dropping out of the defaults would otherwise
+  // make the assertion `expect(undefined).toBe(undefined)` and pass on the regression it guards.
+  const fxSubModelDefaults = present(DEFAULT_SUBTYPES.fx, "the fx block's default sub-models");
+
+  it.each([...PARAM_SUBTYPE_EFFECTS].map(
+    type => [type, present(fxSubModelDefaults[type], `a default sub-model for fx ${type}`)]
+  ))(
     "opens %s on the device's own sub-model when none is named",
     (type, expected) => {
       const patch = basePatch("Test");

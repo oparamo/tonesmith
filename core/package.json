@@ -1,7 +1,11 @@
 {
   "name": "@tonesmith/core",
   "version": "0.2.0",
+  "description": "Read, edit, and build guitar multi-effects patch files. Each device is a driver behind one interface.",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
   "exports": {

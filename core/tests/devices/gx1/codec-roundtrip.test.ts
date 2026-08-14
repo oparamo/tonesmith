@@ -29,6 +29,10 @@ describe("GX-1 round-trip", () => {
   it.each(patchCases)("decodes and re-encodes patch $index byte-for-byte", ({ patch, index, original }) => {
     const reencoded = encodePatch(patch);
 
+    // The loop below walks the original's keys, so a block the encoder invented would pass it.
+    expect(Object.keys(reencoded.paramSet).sort(), `patch ${index} block set`)
+      .toEqual(Object.keys(original.paramSet).sort());
+
     for (const key of Object.keys(original.paramSet)) {
       expect(reencoded.paramSet[key], `patch ${index} key ${key}`).toEqual(original.paramSet[key]);
     }

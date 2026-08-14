@@ -17,7 +17,9 @@ describe("validateTypeParams", () => {
     });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toContain("fx SUSTAIN for COMPRESSOR");
+    expect(issues[0], "names the param that failed").toContain("SUSTAIN");
+    expect(issues[0], "and the type it was checked against").toContain("COMPRESSOR");
+    expect(issues[0], "and quotes back the value it rejected").toContain("200");
   });
 
   it("merges a subType's own params (delay sub-algorithm) into the checked set", () => {
@@ -78,7 +80,9 @@ describe("validateTypeParams", () => {
     });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toContain("delay HIGH CUT for ANALOG");
+    expect(issues[0], "names the param that failed").toContain("HIGH CUT");
+    expect(issues[0], "and the type it was checked against").toContain("ANALOG");
+    expect(issues[0], "and quotes back the value it rejected").toContain("9kHz");
   });
 });
 

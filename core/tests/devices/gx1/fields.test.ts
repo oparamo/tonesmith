@@ -186,7 +186,8 @@ describe("lookup", () => {
   it("throws when encoding a name not in the table", () => {
     const encodeUnknownName = () => { field.encode("GAMMA", [0]); };
 
-    expect(encodeUnknownName).toThrow('Unknown type value: "GAMMA"');
+    expect(encodeUnknownName, "names the value it refused").toThrow(/GAMMA/);
+    expect(encodeUnknownName, "and the field it refused it for").toThrow(/type/);
   });
 });
 

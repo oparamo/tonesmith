@@ -24,3 +24,7 @@ jobs:
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm coverage
+
+      # tools/ is outside the workspace builds, so nothing above type-checks or runs it.
+      - run: pnpm exec tsc --noEmit -p tools/tsconfig.json
+      - run: pnpm test:tools

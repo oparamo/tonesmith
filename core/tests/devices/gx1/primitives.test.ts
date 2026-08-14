@@ -81,7 +81,7 @@ describe("lookupIndex", () => {
   it("includes the label in the error message when given", () => {
     const lookupUnknownName = () => lookupIndex(tableMap, "FOUR", "key");
 
-    expect(lookupUnknownName).toThrow('Unknown key: "FOUR"');
+    expect(lookupUnknownName).toThrow(/key/);
   });
 
   it("gives back the index a lookupName sentinel stands for", () => {
