@@ -27,6 +27,16 @@ describe("gx1 capabilities", () => {
     }
   });
 
+  // Every real group matches case-insensitively, so the chain pointer printed alongside them has
+  // to as well, or the one argument the group listing recommends is the one that needs exact case.
+  it("takes the chain argument in any case", async () => {
+    const output = await capabilitiesOutput("CHAIN");
+
+    for (const block of gx1.driver.capabilities.chain.defaultOrder) {
+      expect(output).toContain(block);
+    }
+  });
+
   it("lists a group's item ids", async () => {
     const output = await capabilitiesOutput("amp");
 
@@ -92,5 +102,14 @@ describe("gx1 capabilities", () => {
     const { exitCode } = await runCli(["gx1", "capabilities", "amp", "nonexistent"]);
 
     expect(exitCode).toBe(1);
+  });
+
+  // The chain is one view with nothing under it. Printing it anyway would answer a question the
+  // caller did not ask, and every other group rejects a second argument it cannot resolve.
+  it("exits with an error when the chain is given a second argument", async () => {
+    const { error, exitCode } = await runCli(["gx1", "capabilities", "chain", "bogus"]);
+
+    expect(exitCode).toBe(1);
+    expect(error.join("\n")).toContain("bogus");
   });
 });

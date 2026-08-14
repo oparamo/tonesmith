@@ -125,7 +125,11 @@ const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>):
           return;
         }
 
-        if (groupId === "chain") {
+        // The chain sits alongside the groups in the listing, so it answers to the same
+        // case-insensitive match they do, and to a second argument the same way: there is nothing
+        // under it to name.
+        if (groupId.toLowerCase() === "chain") {
+          if (item) throw new Error(`The chain has no items, so there is no "${item}" to show.`);
           printChain(caps.chain);
           return;
         }
