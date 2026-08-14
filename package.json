@@ -13,7 +13,7 @@
     "lint": "eslint core cli mcp tools",
     "lint:fix": "eslint core cli mcp tools --fix",
     "changeset": "changeset",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && pnpm lint && pnpm coverage && changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",

@@ -1,7 +1,11 @@
 {
   "name": "@tonesmith/cli",
   "version": "0.2.0",
+  "description": "Command line for guitar multi-effects patch files: read a patch, edit a field, copy between files.",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "bin": {
     "tonesmith": "./dist/index.js"
   },

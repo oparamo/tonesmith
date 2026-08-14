@@ -3,7 +3,9 @@
   "compilerOptions": {
     "noEmit": false,
     "declaration": true,
-    "declarationMap": true,
+    // A declaration map points an editor at the `src/` file a type came from, and the package
+    // ships `dist` alone, so every map published would resolve to nothing.
+    "declarationMap": false,
     "emitDeclarationOnly": true,
     "outDir": "dist",
     "rootDir": "src"

@@ -1,7 +1,11 @@
 {
   "name": "@tonesmith/mcp",
   "version": "0.2.0",
+  "description": "MCP server carrying the device knowledge an agent needs to build guitar multi-effects patches.",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "bin": {
     "tonesmith-mcp": "./dist/index.js"
   },
