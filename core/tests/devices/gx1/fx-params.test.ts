@@ -17,6 +17,10 @@ describe("FX param map symmetry (all types)", () => {
   it.each(FX_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (fxType) => {
     const decoded = decodeFxParams(fxType, zeroBytes);
 
+    // A type with no field map decodes to an empty bag, which re-encodes to an empty bag, so the
+    // comparison below passes on exactly the regression it exists to catch.
+    expect(Object.keys(decoded), `${fxType} has no field map to decode through`).not.toEqual([]);
+
     const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
     const reencodedBytes = bytesFromHex(reencoded);
     const reDecoded = decodeFxParams(fxType, reencodedBytes);
@@ -103,7 +107,8 @@ describe("Unknown FX type handling", () => {
 
     const encodeWithBadPitch = () => encodeFxParams("PITCH SHIFT", params, bytes);
 
-    expect(encodeWithBadPitch).toThrow('Unknown pitch value: 999');
+    expect(encodeWithBadPitch, "names the value it refused").toThrow(/999/);
+    expect(encodeWithBadPitch, "and the field it refused it for").toThrow(/pitch/);
   });
 });
 

@@ -1,17 +1,11 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, it, expect } from "vitest";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeFileAtomic } from "../src/atomic-write";
+import { withTempDir } from "./helpers";
 
 describe("writeFileAtomic", () => {
-  let dir = "";
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
-
-  const scratch = (): string => {
-    dir = mkdtempSync(join(tmpdir(), "tonesmith-atomic-"));
-    return dir;
-  };
+  const scratch = withTempDir();
 
   it("writes the contents, creating any missing parent directories", () => {
     const path = join(scratch(), "nested", "deeper", "set.tsl");

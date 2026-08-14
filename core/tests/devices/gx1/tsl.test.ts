@@ -1,10 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, unlinkSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
-import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../helpers";
+import {
+  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
+  present, withTempDir, withTempFile,
+} from "../../helpers";
 
 describe("blankPatch", () => {
   it("uses 'NEW PATCH' as the default name", () => {
@@ -70,16 +72,16 @@ describe("newFile", () => {
 });
 
 describe("readFile", () => {
-  it("returns a file with patches", () => {
+  it("returns the set and every patch the fixture holds, in file order", () => {
     const file = readFile(FIXTURE);
 
-    expect(file.patches.length).toBeGreaterThan(0);
+    expect(file.name).toBe(ROCK_TONES_SET_NAME);
+    expect(file.patches.map(patch => patch.name)).toEqual(ROCK_TONES_PATCH_NAMES);
   });
 
   it("attaches the raw envelope via RAW symbol", () => {
     const file = readFile(FIXTURE);
 
-    expect(file[RAW]).toBeDefined();
     expect(file[RAW].device).toBe("GX-1");
   });
 
@@ -89,32 +91,20 @@ describe("readFile", () => {
     expect(file.device).toBe("gx1");
   });
 
-  it("decoded patches have string names", () => {
-    const file = readFile(FIXTURE);
-
-    for (const patch of file.patches) {
-      expect(typeof patch.name).toBe("string");
-    }
-  });
-
   // Anything can be handed to a tool that takes a path, and what came back was a TypeError from
   // whichever field the codec reached for first, naming neither the file nor what was wrong with it.
   describe("a file that is not one of this device's", () => {
-    const badPath = join(tmpdir(), `tonesmith-bad-${process.pid}.tsl`);
-
-    afterEach(() => {
-      if (existsSync(badPath)) unlinkSync(badPath);
-    });
+    const badPath = withTempFile("not-a-patch-file.tsl");
 
     const readWritten = (contents: unknown) => {
-      writeFileSync(badPath, JSON.stringify(contents));
-      return () => readFile(badPath);
+      writeFileSync(badPath(), JSON.stringify(contents));
+      return () => readFile(badPath());
     };
 
     it("rejects JSON that is not a patch file at all", () => {
       const read = readWritten({ hello: "world" });
 
-      expect(read).toThrow(new RegExp(badPath.replace(/[/\\]/g, "\\$&")));
+      expect(read).toThrow(badPath());
     });
 
     it("rejects a file another device wrote, naming the device it holds", () => {
@@ -133,17 +123,14 @@ describe("readFile", () => {
 });
 
 describe("writeFile + readFile round-trip", () => {
-  const tmpPath = join(tmpdir(), `tonesmith-tsl-test-${process.pid}.tsl`);
-
-  afterEach(() => {
-    if (existsSync(tmpPath)) unlinkSync(tmpPath);
-  });
+  const scratch = withTempDir();
+  const tmpPath = (): string => join(scratch(), "written-set.tsl");
 
   it("written file can be read back with identical patch names", () => {
     const original = readFile(FIXTURE);
 
-    writeFile(original, tmpPath);
-    const reloaded = readFile(tmpPath);
+    writeFile(original, tmpPath());
+    const reloaded = readFile(tmpPath());
 
     const reloadedNames = reloaded.patches.map(patch => patch.name);
     const originalNames = original.patches.map(patch => patch.name);
@@ -153,13 +140,13 @@ describe("writeFile + readFile round-trip", () => {
   it("written file preserves all paramSet keys byte-for-byte", () => {
     const original = readFile(FIXTURE);
 
-    writeFile(original, tmpPath);
+    writeFile(original, tmpPath());
 
     const origFileContents = readFileSync(FIXTURE, "utf8");
     const origRaw = JSON.parse(origFileContents) as {
       data: [{ paramSet: Record<string, string[]> }[], unknown[]];
     };
-    const writtenFileContents = readFileSync(tmpPath, "utf8");
+    const writtenFileContents = readFileSync(tmpPath(), "utf8");
     const writtenRaw = JSON.parse(writtenFileContents) as typeof origRaw;
 
     for (const [index, originalPatch] of origRaw.data[0].entries()) {
@@ -173,8 +160,8 @@ describe("writeFile + readFile round-trip", () => {
   it("writes a blank file and reads it back", () => {
     const file = newFile("Test Set", 2);
 
-    writeFile(file, tmpPath);
-    const reloaded = readFile(tmpPath);
+    writeFile(file, tmpPath());
+    const reloaded = readFile(tmpPath());
 
     expect(reloaded.patches).toHaveLength(2);
     expect(reloaded.name).toBe("Test Set");
@@ -185,24 +172,18 @@ describe("writeFile + readFile round-trip", () => {
   it("refuses a file it never read, naming the path and the reason", () => {
     const assembled = { name: "Set", device: "GX-1", patches: newFile("Set", 1).patches };
 
-    const writeAssembled = () => { writeFile(assembled, tmpPath); };
+    const writeAssembled = () => { writeFile(assembled, tmpPath()); };
 
-    expect(writeAssembled).toThrow(new RegExp(tmpPath));
-    expect(existsSync(tmpPath), "nothing written").toBe(false);
+    expect(writeAssembled).toThrow(tmpPath());
+    expect(existsSync(tmpPath()), "nothing written").toBe(false);
   });
 
   it("creates missing parent directories", () => {
-    const nestedDir = join(tmpdir(), `tonesmith-tsl-test-nested-${process.pid}`);
-    const nestedPath = join(nestedDir, "sub", "patch.tsl");
+    const nestedPath = join(scratch(), "sub", "patch.tsl");
+    const file = newFile("Nested Set", 1);
 
-    try {
-      const file = newFile("Nested Set", 1);
+    writeFile(file, nestedPath);
 
-      writeFile(file, nestedPath);
-
-      expect(existsSync(nestedPath)).toBe(true);
-    } finally {
-      rmSync(nestedDir, { recursive: true, force: true });
-    }
+    expect(existsSync(nestedPath)).toBe(true);
   });
 });

@@ -1,4 +1,7 @@
-import { resolve } from "node:path";
+import { afterEach, beforeEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { readFile } from "../src/devices/gx1/tsl";
 import { RAW } from "../src/devices/gx1/common";
 import type { Patch } from "../src/devices/gx1/types";
@@ -7,6 +10,10 @@ import type { Patch } from "../src/devices/gx1/types";
 const REPO_ROOT = resolve(import.meta.dirname, "../..");
 const ROCK_TONES_FIXTURE = resolve(REPO_ROOT, "fixtures/gx1/rock-tones.tsl");
 const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "fixtures/gx1/default-init.tsl");
+
+/** What the committed fixture holds, so a suite can assert its contents rather than that it has any. */
+const ROCK_TONES_SET_NAME = "Rock Tones";
+const ROCK_TONES_PATCH_NAMES = ["SWORD LEAD", "DROPTUNE RIFF", "GLASSY DIST", "FAT DIST"];
 
 /**
  * A value the suite has already established is there: a patch of a committed fixture, a raw block
@@ -26,4 +33,28 @@ const patchAt = (path: string, index = 0): Patch =>
 const rawBlock = (patch: Patch, key: string): string[] =>
   present(patch[RAW][key], `${key} of the decoded patch`);
 
-export { ROCK_TONES_FIXTURE, DEFAULT_INIT_FIXTURE, present, patchAt, rawBlock };
+/**
+ * A scratch directory of its own for every test in the calling suite, cleaned up after each one.
+ * Call it in a `describe` body: it registers hooks against the suite being collected, and returns
+ * a getter because the directory cannot exist until the test it belongs to starts.
+ */
+const withTempDir = (): (() => string) => {
+  let dir = "";
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "tonesmith-")); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  return () => dir;
+};
+
+/**
+ * A path in a scratch directory for every test in the calling suite, whether or not the test
+ * writes anything there. Same call-in-a-`describe` rule as `withTempDir`.
+ */
+const withTempFile = (basename: string): (() => string) => {
+  const dir = withTempDir();
+  return () => join(dir(), basename);
+};
+
+export {
+  ROCK_TONES_FIXTURE, DEFAULT_INIT_FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
+  present, patchAt, rawBlock, withTempDir, withTempFile,
+};

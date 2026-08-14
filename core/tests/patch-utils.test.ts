@@ -1,12 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, it, expect } from "vitest";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
   resolvePatchIndex, coerceValue, setByPath, resolvePatches, applyFieldEdits,
   upsertPatches, copyPatch, createPatchFile, MAX_NEW_PATCHES,
 } from "../src/patch-utils";
+import { withTempDir } from "./helpers";
 
 const makePatch = (name: string): Patch =>
   ({ name });
@@ -213,7 +213,7 @@ describe("resolvePatchIndex", () => {
   it("throws when no patch matches the name", () => {
     const resolveMissingName = () => resolvePatchIndex(patches, "Metal");
 
-    expect(resolveMissingName).toThrow('No patch named "Metal"');
+    expect(resolveMissingName).toThrow(/Metal/);
   });
 
   // Callers index straight into the array with what this returns, so an unchecked index reads as
@@ -317,7 +317,7 @@ describe("resolvePatches", () => {
   it("propagates resolvePatchIndex's not-found error", () => {
     const resolveMissingName = () => resolvePatches(patches, "Bogus");
 
-    expect(resolveMissingName).toThrow('No patch named "Bogus"');
+    expect(resolveMissingName).toThrow(/Bogus/);
   });
 });
 
@@ -512,20 +512,19 @@ describe("copyPatch", () => {
 
     const copyPastEnd = () => copyPatch(driver, { src: "src.tsl", srcRef: "0", dst: "dst.tsl", dstRef: "5" });
 
-    expect(copyPastEnd).toThrow(/No patch at index 5/);
+    expect(copyPastEnd, "names the index it was asked for").toThrow(/5/);
+    expect(copyPastEnd, "and how many the file actually holds").toThrow(/1 patch/);
     expect(files.get("dst.tsl")?.patches).toHaveLength(1);
   });
 });
 
 describe("createPatchFile", () => {
-  let dir = "";
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  const dir = withTempDir();
 
   it("names the set after the file and opens with one blank patch by default", () => {
-    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
     const files = new Map<string, PatchFile>();
     const driver = makeFakeDriver(files);
-    const path = join(dir, "my-tones.tsl");
+    const path = join(dir(), "my-tones.tsl");
 
     const file = createPatchFile(driver, path);
 
@@ -535,9 +534,8 @@ describe("createPatchFile", () => {
   });
 
   it("takes the given set name and patch count", () => {
-    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
     const driver = makeFakeDriver(new Map<string, PatchFile>());
-    const path = join(dir, "my-tones.tsl");
+    const path = join(dir(), "my-tones.tsl");
 
     const file = createPatchFile(driver, path, { setName: "Live Set", patchCount: 4 });
 
@@ -546,9 +544,8 @@ describe("createPatchFile", () => {
   });
 
   it("refuses to overwrite an existing file, so a mistyped path can't cost a library", () => {
-    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
     const driver = makeFakeDriver(new Map<string, PatchFile>());
-    const path = join(dir, "taken.tsl");
+    const path = join(dir(), "taken.tsl");
     writeFileSync(path, "{}");
 
     const overwrite = () => createPatchFile(driver, path);
@@ -559,10 +556,9 @@ describe("createPatchFile", () => {
   // A count is the kind of input a mistyped exponent turns into 100 million blank patches, which
   // no device holds and which the surface asking for them sits and waits on.
   it.each([0, -1, 2.5, MAX_NEW_PATCHES + 1])("rejects a patch count of %o without writing", (patchCount) => {
-    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
     const files = new Map<string, PatchFile>();
     const driver = makeFakeDriver(files);
-    const path = join(dir, "junk.tsl");
+    const path = join(dir(), "junk.tsl");
 
     const createWithBadCount = () => createPatchFile(driver, path, { patchCount });
 
@@ -571,9 +567,8 @@ describe("createPatchFile", () => {
   });
 
   it("takes the largest count it allows", () => {
-    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
     const driver = makeFakeDriver(new Map<string, PatchFile>());
-    const path = join(dir, "full.tsl");
+    const path = join(dir(), "full.tsl");
 
     const file = createPatchFile(driver, path, { patchCount: MAX_NEW_PATCHES });
 

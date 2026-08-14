@@ -1,15 +1,14 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { describe, it, expect } from "vitest";
 import { driver } from "../../../src/devices/gx1/driver";
-import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../helpers";
+import {
+  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_PATCH_NAMES, present, withTempFile,
+} from "../../helpers";
 
 describe("gx1 driver", () => {
   it("exposes its id, name, and capabilities", () => {
     expect(driver.id).toBe("gx1");
     expect(driver.name).toBe("BOSS GX-1");
-    expect(driver.capabilities.groups.length).toBeGreaterThan(0);
+    expect(driver.capabilities.groups.map(group => group.id)).toContain("amp");
   });
 
   it("blankPatch delegates to the gx1 builder", () => {
@@ -28,7 +27,7 @@ describe("gx1 driver", () => {
   it("readFile decodes a real fixture", () => {
     const file = driver.readFile(FIXTURE);
 
-    expect(file.patches.length).toBeGreaterThan(0);
+    expect(file.patches.map(patch => patch.name)).toEqual(ROCK_TONES_PATCH_NAMES);
   });
 
   it("encodePatch/decodePatch round-trip a patch through the driver", () => {
@@ -42,18 +41,14 @@ describe("gx1 driver", () => {
   });
 
   describe("writeFile", () => {
-    const tmpPath = join(tmpdir(), `tonesmith-driver-test-${process.pid}.tsl`);
-
-    afterEach(() => {
-      if (existsSync(tmpPath)) unlinkSync(tmpPath);
-    });
+    const tmpPath = withTempFile("driver-set.tsl");
 
     it("writes a file that can be read back", () => {
       const file = driver.newFile("Driver Set");
 
-      driver.writeFile(file, tmpPath);
+      driver.writeFile(file, tmpPath());
 
-      const loaded = driver.readFile(tmpPath);
+      const loaded = driver.readFile(tmpPath());
       expect(loaded.name).toBe("Driver Set");
     });
   });
