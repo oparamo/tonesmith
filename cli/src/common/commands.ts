@@ -4,19 +4,31 @@ import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
-/** Splits "amp.gain=72" at the first "=", so a value containing one survives intact. */
+/**
+ * Splits "amp.gain=72" at the first "=", so a value containing one survives intact. Without the
+ * separator there is nothing to split on, and slicing at -1 quietly drops the argument's last
+ * character, which sent "amp.gain" on as the path "amp.gai" and reported it as an unknown field.
+ */
 const parseFieldAssignment = (assignment: string): [string, string] => {
   const separatorIndex = assignment.indexOf("=");
+  if (separatorIndex < 1) {
+    throw new Error(`Cannot read "${assignment}" as a field edit: write each one as path=value.`);
+  }
   return [assignment.slice(0, separatorIndex), assignment.slice(separatorIndex + 1)];
 };
 
+/**
+ * Runs one command's work, turning a throw into a printed message and a failing exit code. Setting
+ * the code rather than calling process.exit lets the runtime finish flushing stdout, so a failure
+ * piped into another command arrives whole.
+ */
 const run = (action: () => void): void => {
   try {
     action();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
-    process.exit(1);
+    process.exitCode = 1;
   }
 };
 
@@ -46,9 +58,10 @@ const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =
     .description("update patch fields by dot-path (e.g. amp.gain=72, key=G)")
     .action((file: string, ref: string, fields: string[]) => {
       run(() => {
+        const edits = fields.map(parseFieldAssignment);
         const patchFile = driver.readFile(file);
         const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-        patchUtils.applyFieldEdits(driver, patchFile.patches[index], fields.map(parseFieldAssignment));
+        patchUtils.applyFieldEdits(driver, patchFile.patches[index], edits);
         driver.writeFile(patchFile, file);
         console.info(`Wrote ${file}, patch ${index} updated: ${fields.join(", ")}`);
       });

@@ -32,19 +32,25 @@ const buildTestCommand = (driver: PatchDriver): Command => {
 };
 
 describe("configureDeviceCommands", () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
 
-  it("prints the driver's error message and exits 1 when an action throws", async () => {
+  it("prints the driver's error message and fails the exit code when an action throws", async () => {
     const driver = makeDriver({
       readFile: () => { throw new Error("boom"); },
     });
     const cmd = buildTestCommand(driver);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit(1)"); });
+    // Calling process.exit tears the process down with output still queued, so a failure piped
+    // into another command can arrive truncated. Setting the code lets the runtime drain first.
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit called"); });
 
-    const runReadCommand = cmd.parseAsync(["read", "file.tsl"], { from: "user" });
+    await cmd.parseAsync(["read", "file.tsl"], { from: "user" });
 
-    await expect(runReadCommand).rejects.toThrow("exit(1)");
     expect(errorSpy).toHaveBeenCalledWith("boom");
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
   });
 });

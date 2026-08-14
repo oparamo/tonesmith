@@ -78,6 +78,15 @@ describe("gx1 write", () => {
     expect(exitCode).toBe(1);
   });
 
+  it("rejects a field argument with no '=', naming it as typed", async () => {
+    temp = withTempDir();
+
+    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain"]);
+
+    expect(exitCode).toBe(1);
+    expect(error.join("\n")).toContain("amp.gain");
+  });
+
   it("exits with an error for a bad dot-path", async () => {
     temp = withTempDir();
 
