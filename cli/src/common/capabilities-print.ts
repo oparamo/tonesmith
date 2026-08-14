@@ -1,11 +1,16 @@
 import type { DeviceCapabilities, CapabilityGroup, CapabilityItem, ChainSpec } from "@tonesmith/core";
 
-const RESET  = "\x1b[0m";
-const BOLD   = "\x1b[1m";
-const DIM    = "\x1b[2m";
-const CYAN   = "\x1b[36m";
-const YELLOW = "\x1b[33m";
-const GREEN  = "\x1b[32m";
+// Redirected into a file or piped into another command, an escape sequence is literal garbage in
+// the destination rather than color, so ask the same two questions every colored CLI asks.
+const colored = process.stdout.isTTY && !process.env.NO_COLOR;
+const sgr = (code: string): string => (colored ? `\x1b[${code}m` : "");
+
+const RESET  = sgr("0");
+const BOLD   = sgr("1");
+const DIM    = sgr("2");
+const CYAN   = sgr("36");
+const YELLOW = sgr("33");
+const GREEN  = sgr("32");
 
 /** Print the device's signal-chain model: default order, plus how ordering and bypass work. */
 const printChain = (chain: ChainSpec): void => {
