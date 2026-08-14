@@ -1,16 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
-import { readFile } from "../../../src/devices/gx1/tsl";
 import {
   decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePfx,
-  decodeKey, encodeKey, decodeNs, encodeNs, decodeFv, encodeFv,
+  decodeKey, encodeKey, decodeNs, encodeNs, decodeFv, encodeFv, decodeName, encodeName,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import {
   DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW, CHAIN_BLOCK_ORDER,
 } from "../../../src/devices/gx1/common";
-
-const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
 // ── Delay block symmetry tests ────────────────────────────────────────────────
 
@@ -287,6 +284,52 @@ describe("Malformed/unmapped byte handling", () => {
 });
 
 
+// ── Name block ────────────────────────────────────────────────────────────────
+
+describe("Name block", () => {
+  it("round-trips a name byte the device's own character set does not reach", () => {
+    const bytes = [0x41, 0xC3, 0xA9, ...new Array<number>(13).fill(0x20)];
+
+    const reencoded = bytesFromHex(encodeName(decodeName(hexFromBytes(bytes))));
+
+    expect(reencoded).toEqual(bytes);
+  });
+
+  it("pads a short name out to the full block with spaces", () => {
+    const encoded = bytesFromHex(encodeName("AB"));
+
+    expect(encoded).toEqual([0x41, 0x42, ...new Array<number>(14).fill(0x20)]);
+  });
+
+  it("throws on a name longer than the block rather than storing a truncation", () => {
+    const encodeLongName = () => encodeName("x".repeat(17));
+
+    expect(encodeLongName).toThrow(/16/);
+  });
+});
+
+
+// ── Values the device has no byte for ─────────────────────────────────────────
+
+describe("Values the device has no byte for", () => {
+  it("encodeNs throws on a detect the device does not name", () => {
+    const block = { on: true, threshold: 30, release: 30, detect: "BOGUS", [RAW]: [1, 30, 30, 0] };
+
+    const encodeBadDetect = () => encodeNs(block);
+
+    expect(encodeBadDetect).toThrow(/BOGUS/);
+  });
+
+  it("encodeFv throws on a curve the device does not name", () => {
+    const block = { position: 100, min: 0, max: 100, curve: "BOGUS", [RAW]: [100, 0, 100, 2] };
+
+    const encodeBadCurve = () => encodeFv(block);
+
+    expect(encodeBadCurve).toThrow(/BOGUS/);
+  });
+});
+
+
 // ── Real device values (factory default init patch) ──────────────────────────
 //
 // default-init.tsl is a real GX-1 factory-default patch export. Every block below
@@ -297,11 +340,10 @@ describe("Malformed/unmapped byte handling", () => {
 // still exercises genuine device data for every field checked below.
 
 describe("Real device values (default-init.tsl)", () => {
-  const file = readFile(DEFAULT_INIT_FIXTURE);
-  const patch = file.patches[0];
-  const dlyBytes = bytesFromHex(patch[RAW]["MEMORY%DLY"]);
-  const revBytes = bytesFromHex(patch[RAW]["MEMORY%REV"]);
-  const pfxBytes = bytesFromHex(patch[RAW]["MEMORY%PFX"]);
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const dlyBytes = bytesFromHex(rawBlock(patch, "MEMORY%DLY"));
+  const revBytes = bytesFromHex(rawBlock(patch, "MEMORY%REV"));
+  const pfxBytes = bytesFromHex(rawBlock(patch, "MEMORY%PFX"));
 
   it("decodes the active chain order", () => {
     expect(patch.chain).toEqual(["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);

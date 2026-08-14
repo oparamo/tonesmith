@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { gx1 } from "@tonesmith/core";
-import { runCli, FIXTURE } from "./helpers";
+import { runCli, present, FIXTURE } from "./helpers";
 
 const expected = gx1.driver.readFile(FIXTURE);
+const firstPatch = present(expected.patches[0], "fixture patch 0");
+const secondPatch = present(expected.patches[1], "fixture patch 1");
 
 describe("gx1 read", () => {
   it("prints every patch when ref is omitted", async () => {
@@ -21,7 +23,7 @@ describe("gx1 read", () => {
 
     const output = info.join("\n");
     expect(output).toContain(`Set: ${expected.name}`);
-    expect(output).toContain("Device: GX-1");
+    expect(output).toContain(`Device: ${gx1.driver.name}`);
   });
 
   it("prints a single patch when given a numeric index", async () => {
@@ -30,8 +32,8 @@ describe("gx1 read", () => {
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const output = info.join("\n");
-    expect(output).toContain(expected.patches[0].name);
-    expect(output).not.toContain(expected.patches[1].name);
+    expect(output).toContain(firstPatch.name);
+    expect(output).not.toContain(secondPatch.name);
   });
 
   it("exits with an error for a patch name that doesn't exist", async () => {
@@ -54,7 +56,7 @@ describe("gx1 read", () => {
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const output = info.join("\n");
-    const expectedChain = expected.patches[0].chain.join(", ");
+    const expectedChain = firstPatch.chain.join(", ");
     expect(output).toContain(`Chain: ${expectedChain}`);
     expect(output).not.toContain("→");
   });
@@ -65,8 +67,7 @@ describe("gx1 read", () => {
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const output = info.join("\n");
-    const patch = expected.patches[0];
-    const mirror = [patch.fx1, patch.fx2, patch.fx3].find(
+    const mirror = [firstPatch.fx1, firstPatch.fx2, firstPatch.fx3].find(
       block => block.subType !== null && block.params.subType === block.subType,
     );
     expect(mirror, "fixture patch 0 has no subtype fx block to prove the mirror is hidden").toBeDefined();
@@ -80,7 +81,7 @@ describe("gx1 read", () => {
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const output = info.join("\n");
-    const expectedHighCut = String(expected.patches[0].delay.highCut);
+    const expectedHighCut = String(firstPatch.delay.highCut);
     expect(output).toContain(`highCut=${expectedHighCut}`);
   });
 });

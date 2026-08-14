@@ -21,5 +21,13 @@ Every block in `generate_patch` now rejects fields it doesn't have. An unrecogni
 to be discarded before validation, so `fx1: { type: "CHORUS", rate: 50 }` built a chorus at the
 default rate and reported success.
 
-Builder callers see the same rules: `fx()` and `pfx()` throw on a subType the type cannot carry,
-and `pfx()` takes `subType` alongside its existing `params`.
+OVERTONE is refused in an fx slot that cannot hold it, naming the one that can. The GX-1 keeps its
+five controls in a block only FX3 has, so in FX1 or FX2 they were written over the start of the
+shared param block, on top of whatever that slot's COMPRESSOR settings were, and the patch still
+saved and reported success. `describe_device` said "FX3 only" in prose while handing back an
+`example` written under `fx1`, so following the example was the way to hit it; the example now
+names `fx3`.
+
+Builder callers see the same rules: `fx()` and `pfx()` throw on a subType the type cannot carry, or
+on a type the slot has nowhere to store, and `pfx()` takes `subType` alongside its existing
+`params`.

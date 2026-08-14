@@ -1,11 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, unlinkSync, readFileSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, unlinkSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
-
-const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tones.tsl");
+import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../helpers";
 
 describe("blankPatch", () => {
   it("uses 'NEW PATCH' as the default name", () => {
@@ -60,10 +59,12 @@ describe("newFile", () => {
     expect(file.patches).toHaveLength(3);
   });
 
-  it("sets device to GX-1", () => {
+  // The decoded file names its driver, so a consumer holding one can look the driver up; the
+  // device's own name for itself is a fact about the file format and stays in the envelope.
+  it("names the driver that made it, and keeps the format's own device string in the envelope", () => {
     const file = newFile("Set");
 
-    expect(file.device).toBe("GX-1");
+    expect(file.device).toBe("gx1");
     expect(file[RAW].device).toBe("GX-1");
   });
 });
@@ -82,12 +83,52 @@ describe("readFile", () => {
     expect(file[RAW].device).toBe("GX-1");
   });
 
+  it("names the driver that read it", () => {
+    const file = readFile(FIXTURE);
+
+    expect(file.device).toBe("gx1");
+  });
+
   it("decoded patches have string names", () => {
     const file = readFile(FIXTURE);
 
     for (const patch of file.patches) {
       expect(typeof patch.name).toBe("string");
     }
+  });
+
+  // Anything can be handed to a tool that takes a path, and what came back was a TypeError from
+  // whichever field the codec reached for first, naming neither the file nor what was wrong with it.
+  describe("a file that is not one of this device's", () => {
+    const badPath = join(tmpdir(), `tonesmith-bad-${process.pid}.tsl`);
+
+    afterEach(() => {
+      if (existsSync(badPath)) unlinkSync(badPath);
+    });
+
+    const readWritten = (contents: unknown) => {
+      writeFileSync(badPath, JSON.stringify(contents));
+      return () => readFile(badPath);
+    };
+
+    it("rejects JSON that is not a patch file at all", () => {
+      const read = readWritten({ hello: "world" });
+
+      expect(read).toThrow(new RegExp(badPath.replace(/[/\\]/g, "\\$&")));
+    });
+
+    it("rejects a file another device wrote, naming the device it holds", () => {
+      const read = readWritten({ name: "Set", formatRev: "0000", device: "GT-1000", data: [[], []] });
+
+      expect(read).toThrow(/GT-1000/);
+    });
+
+    it("rejects a patch missing a block the codec reads", () => {
+      const patch = { paramSet: { "MEMORY%COM": ["41"] } };
+      const read = readWritten({ name: "Set", formatRev: "0000", device: "GX-1", data: [[patch], []] });
+
+      expect(read).toThrow(/MEMORY%/);
+    });
   });
 });
 
@@ -122,7 +163,7 @@ describe("writeFile + readFile round-trip", () => {
     const writtenRaw = JSON.parse(writtenFileContents) as typeof origRaw;
 
     for (const [index, originalPatch] of origRaw.data[0].entries()) {
-      const writtenParamSet = writtenRaw.data[0][index].paramSet;
+      const writtenParamSet = present(writtenRaw.data[0][index], `written patch ${index}`).paramSet;
       for (const key of Object.keys(originalPatch.paramSet)) {
         expect(writtenParamSet[key], `patch ${index} key ${key}`).toEqual(originalPatch.paramSet[key]);
       }
@@ -137,6 +178,17 @@ describe("writeFile + readFile round-trip", () => {
 
     expect(reloaded.patches).toHaveLength(2);
     expect(reloaded.name).toBe("Test Set");
+  });
+
+  // PatchDriver.writeFile takes a device-agnostic PatchFile, which anyone can assemble by hand;
+  // this writer starts from the bytes the file was read as and has none for such a file.
+  it("refuses a file it never read, naming the path and the reason", () => {
+    const assembled = { name: "Set", device: "GX-1", patches: newFile("Set", 1).patches };
+
+    const writeAssembled = () => { writeFile(assembled, tmpPath); };
+
+    expect(writeAssembled).toThrow(new RegExp(tmpPath));
+    expect(existsSync(tmpPath), "nothing written").toBe(false);
   });
 
   it("creates missing parent directories", () => {

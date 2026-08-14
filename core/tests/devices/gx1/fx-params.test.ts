@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
-import { readFile } from "../../../src/devices/gx1/tsl";
 import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
-import { FX_TYPES, FX_DLY_TYPES, RAW } from "../../../src/devices/gx1/common";
-const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
+import { FX_TYPES, FX_DLY_TYPES } from "../../../src/devices/gx1/common";
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
 // ── Per-effect-type symmetry tests ────────────────────────────────────────────
 //
@@ -18,9 +16,6 @@ describe("FX param map symmetry (all types)", () => {
 
   it.each(FX_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (fxType) => {
     const decoded = decodeFxParams(fxType, zeroBytes);
-
-    // Types not yet in FX_PARAM_MAPS return { unknownBytes: [...] }, so skip them
-    if ("unknownBytes" in decoded) return;
 
     const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
     const reencodedBytes = bytesFromHex(reencoded);
@@ -64,35 +59,42 @@ describe("FX-slot DELAY per-sub-algorithm round-trip", () => {
 
 // ── Unknown/invalid type handling ─────────────────────────────────────────────
 //
-// FX_PARAM_MAPS is a Partial<Record<string, FieldCodec[]>>, so types outside the known
-// FX_TYPES list (or not-yet-mapped ones) fall through gracefully rather than throwing,
-// so a corrupt or newer-firmware byte doesn't crash the whole decode.
+// A type outside the known FX_TYPES list decodes to its raw bytes rather than throwing, so a
+// corrupt or newer-firmware byte doesn't crash the whole read. Encoding a params bag for such a
+// type is the opposite case: there is nowhere to put the values, so it throws.
 
 describe("Unknown FX type handling", () => {
-  it("decodeFxParams returns unknownBytes for a type with no FX_PARAM_MAPS entry", () => {
+  it("decodeFxParams reads no params off a type it does not recognize", () => {
     const bytes = new Array<number>(40).fill(7);
 
     const decoded = decodeFxParams("BOGUS TYPE", bytes);
 
-    expect(decoded).toEqual({ unknownBytes: bytes.slice(0, 32) });
+    expect(decoded).toEqual({});
   });
 
-  it("encodeFxParams returns the original bytes unchanged when params has unknownBytes", () => {
+  it("encodeFxParams leaves an unrecognized type's bytes as they were read", () => {
     const originalBytes = [1, 2, 3, 4];
 
-    const result = encodeFxParams("COMPRESSOR", { unknownBytes: originalBytes }, originalBytes);
-    const resultBytes = bytesFromHex(result);
+    const resultBytes = bytesFromHex(encodeFxParams("BOGUS TYPE", {}, originalBytes));
 
     expect(resultBytes).toEqual(originalBytes);
   });
 
-  it("encodeFxParams leaves bytes unchanged for a type with no FX_PARAM_MAPS entry", () => {
+  it("encodeFxParams throws rather than drop params for a type with no FX_PARAM_MAPS entry", () => {
     const originalBytes = [1, 2, 3, 4];
 
-    const result = encodeFxParams("BOGUS TYPE", { sustain: 50 }, originalBytes);
-    const resultBytes = bytesFromHex(result);
+    const encodeUnmappedType = () => encodeFxParams("BOGUS TYPE", { sustain: 50 }, originalBytes);
 
-    expect(resultBytes).toEqual(originalBytes);
+    expect(encodeUnmappedType).toThrow(/BOGUS TYPE/);
+  });
+
+  it("encodeFxParams throws when DELAY's sub-algorithm has no field map of its own", () => {
+    const originalBytes = new Array<number>(251).fill(0);
+    const staleSubType = { subType: "BOSS COMP", time: 400 };
+
+    const encodeStaleSubType = () => encodeFxParams("DELAY", staleSubType, originalBytes);
+
+    expect(encodeStaleSubType).toThrow(/BOSS COMP/);
   });
 
   it("indexTable's encode throws for a value outside its table (PITCH SHIFT's pitch field)", () => {
@@ -116,11 +118,10 @@ describe("Unknown FX type handling", () => {
 // exercises genuine device data for every field checked below.
 
 describe("Real device values (default-init.tsl)", () => {
-  const file = readFile(DEFAULT_INIT_FIXTURE);
-  const patch = file.patches[0];
-  const fx1Bytes = bytesFromHex(patch[RAW]["MEMORY%FX1"]);
-  const fx2Bytes = bytesFromHex(patch[RAW]["MEMORY%FX2"]);
-  const fx3aBytes = bytesFromHex(patch[RAW]["MEMORY%FX3A"]);
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const fx1Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX1"));
+  const fx2Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX2"));
+  const fx3aBytes = bytesFromHex(rawBlock(patch, "MEMORY%FX3A"));
 
   it("decodes FX1 (active type: COMPRESSOR)", () => {
     expect(patch.fx1.type).toBe("COMPRESSOR");

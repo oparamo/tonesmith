@@ -8,22 +8,14 @@ const capturedOutput = (info: MockInstance<(message?: unknown) => void>): string
 describe("printPatch", () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it("omits the bracketed index label when index is not given", () => {
-    const patch = gx1.basePatch("Solo Patch");
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
-
-    printPatch(patch);
-
-    const output = capturedOutput(info);
-    expect(output).toContain("Solo Patch");
-    expect(output).not.toMatch(/\[\d+\] Solo Patch/);
-  });
-
   // A bypassed block keeps its settings on the device, so the printer shows them rather than
   // hiding the block, matching every other block and matching read_patch.
   it("prints the OD/DS line with its params when odds is off", () => {
-    const patch = gx1.basePatch("Test");
-    gx1.odds(patch, { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, on: false });
+    const patch = gx1.driver.buildPatch({
+      name: "Test",
+      amp: { type: "JC-120" },
+      odds: { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, on: false },
+    });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
@@ -34,7 +26,7 @@ describe("printPatch", () => {
   });
 
   it("prints the memo when a patch carries one", () => {
-    const patch = gx1.basePatch("Test");
+    const patch = gx1.driver.blankPatch("Test");
     patch.memo = "bridge pickup";
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
@@ -44,8 +36,11 @@ describe("printPatch", () => {
   });
 
   it("shows the solo level when odds solo is enabled", () => {
-    const patch = gx1.basePatch("Test");
-    gx1.odds(patch, { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, solo: true, soloLevel: 75 });
+    const patch = gx1.driver.buildPatch({
+      name: "Test",
+      amp: { type: "JC-120" },
+      odds: { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, solo: true, soloLevel: 75 },
+    });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
@@ -55,8 +50,11 @@ describe("printPatch", () => {
   });
 
   it("shows the type's default params for an FX slot the caller didn't configure", () => {
-    const patch = gx1.basePatch("Test");
-    gx1.fx(patch, { slot: "fx1", type: "TREMOLO" });
+    const patch = gx1.driver.buildPatch({
+      name: "Test",
+      amp: { type: "JC-120" },
+      fx1: { type: "TREMOLO" },
+    });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);
@@ -67,9 +65,9 @@ describe("printPatch", () => {
   });
 
   it("omits the params line for a block whose type has no known fields", () => {
-    const patch = gx1.basePatch("Test");
-    // A pfx type outside PFX_TYPE_MAPS decodes to a bare { on, type } block, so
-    // printParams should print nothing beyond the PFX header line for it.
+    const patch = gx1.driver.blankPatch("Test");
+    // A pfx type outside PFX_TYPE_MAPS decodes to a bare { on, type } block, which leaves the
+    // header line with nothing to print under it.
     patch.pfx = { on: true, type: "BOGUS TYPE" } as unknown as gx1.Patch["pfx"];
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
@@ -81,8 +79,10 @@ describe("printPatch", () => {
   });
 
   it("omits the params line for an FX slot whose type has no known fields", () => {
-    const patch = gx1.basePatch("Test");
-    gx1.fx(patch, { slot: "fx1", type: "BOGUS EFFECT" });
+    const patch = gx1.driver.blankPatch("Test");
+    // An fx type outside the codec's param maps: the builder refuses it, so it can only arrive
+    // here the way a file holding it would, decoded straight onto the block.
+    patch.fx1 = { on: true, type: "BOGUS EFFECT", subType: null, params: {} } as unknown as gx1.Patch["fx1"];
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);

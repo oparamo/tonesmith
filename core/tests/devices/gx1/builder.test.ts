@@ -1,7 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { existsSync, unlinkSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { describe, it, expect } from "vitest";
 import {
   DEFAULT_CHAIN,
   moveBefore,
@@ -16,13 +13,12 @@ import {
   pfx,
   delay,
   reverb,
-  saveTsl,
 } from "../../../src/devices/gx1/builder";
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
-import { readFile } from "../../../src/devices/gx1/tsl";
 import { BLOCK_DEFAULTS, DEFAULTS_BY_TYPE, DEFAULT_SUBTYPES } from "../../../src/devices/gx1/defaults";
 import { PARAM_SUBTYPE_EFFECTS } from "../../../src/devices/gx1/common";
+import { DEFAULT_INIT_FIXTURE, present, patchAt } from "../../helpers";
 
 describe("basePatch", () => {
   it("defaults to DEFAULT_CHAIN and key C", () => {
@@ -69,7 +65,7 @@ describe("moveBefore", () => {
     const patch = basePatch("Test", chain);
 
     const encoded = encodePatch(patch);
-    const chainBytes = bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]);
+    const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
 
     expect(chainBytes).toEqual([1, 2, 3, 4, 5, 7, 9, 8, 6, 10, 0, 11, 12]);
   });
@@ -79,7 +75,7 @@ describe("moveBefore", () => {
     const patch = basePatch("Test", chain);
 
     const encoded = encodePatch(patch);
-    const chainBytes = bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]);
+    const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
 
     expect(chainBytes).toEqual([1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]);
   });
@@ -153,7 +149,7 @@ describe("amp", () => {
 
     amp(patch, { type: "TWIN", gain: 90, mic: "CND87" });
 
-    expect(patch.amp).toMatchObject({ gain: 90, mic: "CND87", level: BLOCK_DEFAULTS.amp.level });
+    expect(patch.amp).toMatchObject({ gain: 90, mic: "CND87", level: present(BLOCK_DEFAULTS.amp, "the amp defaults").level });
   });
 
   // The block is mutated in place call after call, so a control the second call leaves out has to
@@ -164,7 +160,7 @@ describe("amp", () => {
     amp(patch, { type: "TWIN", gain: 90 });
     amp(patch, { type: "JC-120" });
 
-    expect(patch.amp.gain).toBe(BLOCK_DEFAULTS.amp.gain);
+    expect(patch.amp.gain).toBe(present(BLOCK_DEFAULTS.amp, "the amp defaults").gain);
   });
 });
 
@@ -233,7 +229,7 @@ describe("fx", () => {
     fx(patch, { slot: "fx1", type: "DELAY" });
 
     expect(patch.fx1.subType).toBe("STANDARD");
-    expect(patch.fx1.params).toMatchObject(DEFAULTS_BY_TYPE.fxDelay.STANDARD);
+    expect(patch.fx1.params).toMatchObject(present(DEFAULTS_BY_TYPE.fxDelay.STANDARD, "the STANDARD fx-delay defaults"));
   });
 
   it("fx DELAY with a WARP sub-algorithm defaults that sub-algorithm's own fields", () => {
@@ -300,6 +296,13 @@ describe("fx", () => {
 
     expect(decoded.fx3.type).toBe("OVERTONE");
     expect(decoded.fx3.params).toMatchObject({ lower: 60, upper: 40, unison: 50, direct: 100, detune: 20 });
+  });
+
+  it("rejects OVERTONE in a slot with no MEMORY%FX3A block to write it to", () => {
+    const patch = basePatch("Test");
+    const setOvertoneOnFx1 = () => { fx(patch, { slot: "fx1", type: "OVERTONE" }); };
+
+    expect(setOvertoneOnFx1).toThrow(/fx3/);
   });
 
   it("accepts an unrecognized FX type with no params, without throwing", () => {
@@ -608,9 +611,7 @@ describe("reverb", () => {
 // Had defaultFxParams existed and drifted from reality, this is what would have caught
 // the class of bug where an unset GEQ band decoded to -20 dB instead of 0 dB.
 describe("defaultFxParams (anchored to default-init.tsl)", () => {
-  const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
-  const file = readFile(FIXTURE);
-  const patch = file.patches[0];
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
 
   it("matches the fixture's real COMPRESSOR params (fx1)", () => {
     const compressorDefaults = defaultFxParams("COMPRESSOR");
@@ -638,27 +639,5 @@ describe("defaultFxParams (anchored to default-init.tsl)", () => {
       rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100,
     });
     expect(patch.fx3.params).toMatchObject(chorusDefaults);
-  });
-});
-
-describe("saveTsl", () => {
-  const tmpPath = join(tmpdir(), `tonesmith-builder-test-${process.pid}.tsl`);
-
-  afterEach(() => {
-    if (existsSync(tmpPath)) unlinkSync(tmpPath);
-    vi.restoreAllMocks();
-  });
-
-  it("writes a file that can be read back, logging where it went", () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
-    const patch = basePatch("Save Test");
-    amp(patch, { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 });
-
-    saveTsl([patch], "Save Test Set", tmpPath);
-
-    const loaded = readFile(tmpPath);
-    expect(loaded.patches).toHaveLength(1);
-    expect(loaded.patches[0].name).toBe("Save Test");
-    expect(info).toHaveBeenCalledWith(expect.stringContaining(tmpPath));
   });
 });

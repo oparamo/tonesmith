@@ -56,6 +56,16 @@ const PFX_TYPES = ["WAH", "PEDAL BEND"] as const;
 // MEMORY%COM holds the patch name as space-padded ASCII across its whole width.
 const NAME_BYTES = 16;
 
+/** The highest code point the name block can store, since it gives each character one byte. */
+const LAST_STORABLE_CHAR = 0xFF;
+
+/** The highest code point the device's own display and name entry cover. */
+const LAST_NAMEABLE_CHAR = 0x7F;
+
+/** The characters of a name sitting above a ceiling, empty when every one of them fits. */
+const charsAbove = (ceiling: number, name: string): string[] =>
+  Array.from(name).filter(char => (char.codePointAt(0) ?? 0) > ceiling);
+
 // MEMORY%CHAIN is a linked list, not a positional array: byte 0 holds the firmware
 // value of whichever block comes first, and byte (1 + CHAIN_BLOCK_ORDER.indexOf(name))
 // holds the firmware value of whatever comes immediately after that block. A firmware
@@ -69,8 +79,13 @@ const CHAIN_VALUE_TO_NAME: Record<number, string | undefined> = {
 
 const CHAIN_TERMINATOR = 0;
 
-const indexMap = (list: readonly string[]): Record<string, number> =>
-  Object.fromEntries(list.map((name, index) => [name, index]));
+/**
+ * The reverse of a lookup list, typed over that list's own members, which is exactly what the line
+ * below puts in it. A name taken from the list resolves without a check; a name from anywhere else
+ * (a file, a caller) still goes through `lookupIndex`, which is where the miss is handled.
+ */
+const indexMap = <T extends string>(list: readonly T[]): Record<T, number> =>
+  Object.fromEntries(list.map((name, index) => [name, index])) as Record<T, number>;
 
 const FX_TYPE_IDX  = indexMap(FX_TYPES);
 const ODDS_IDX     = indexMap(ODDS_TYPES);
@@ -100,6 +115,8 @@ const FB_MODE      = ["NORMAL", "OSC"] as const;
 const SLICER_PAT   = Array.from({ length: 20 }, (_, i) => `PATTERN ${i + 1}`);
 const NS_DETECT    = ["INPUT", "NS INPUT"] as const;
 const FV_CURVE     = ["SLOW1", "SLOW2", "NORMAL", "FAST"] as const;
+const NS_DETECT_IDX = indexMap(NS_DETECT);
+const FV_CURVE_IDX  = indexMap(FV_CURVE);
 const TWIST_MODES  = ["RISE-FALL", "RISE-FADE"] as const;
 // PHASER TYPE: raw byte 0/1/2 selects the number of phase-shifting stages.
 const PHASER_STAGES = ["4 STAGE", "8 STAGE", "12 STAGE"] as const;
@@ -175,12 +192,12 @@ const PFX_SUBTYPE_EFFECTS = new Set(["WAH"]);
 
 export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
-  FX_DLY_TYPES, FX_REV_TYPES, NAME_BYTES,
+  FX_DLY_TYPES, FX_REV_TYPES, NAME_BYTES, LAST_STORABLE_CHAR, LAST_NAMEABLE_CHAR, charsAbove,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
   FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, SBEND_PITCH, FB_MODE,
-  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, PHASER_STAGES, SPACE_ECHO_HEAD,
+  SLICER_PAT, NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, PHASER_STAGES, SPACE_ECHO_HEAD,
   HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, KEY_NAMES, KEY_IDX,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 };

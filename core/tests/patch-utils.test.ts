@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
-  resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits,
-  upsertPatches, copyPatch, createPatchFile,
+  resolvePatchIndex, coerceValue, setByPath, resolvePatches, applyFieldEdits,
+  upsertPatches, copyPatch, createPatchFile, MAX_NEW_PATCHES,
 } from "../src/patch-utils";
 
 const makePatch = (name: string): Patch =>
@@ -32,6 +32,7 @@ const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   }),
   blankPatch: (name = "blank") => makePatch(name),
   buildPatch: (spec) => makePatch((spec as { name: string }).name),
+  validateFields: () => [],
   decodePatch: (raw) => raw as unknown as Patch,
   encodePatch: (patch) => patch as unknown as Record<string, unknown>,
 });
@@ -60,7 +61,7 @@ describe("upsertPatches", () => {
     const driver = makeFakeDriver(files);
     const patches = [makePatch("First"), makePatch("Second"), makePatch("Third")];
 
-    const file = upsertPatches(driver, { path: "set.tsl", patches });
+    const { file } = upsertPatches(driver, { path: "set.tsl", patches });
 
     expect(file.patches).toEqual(patches);
     expect(files.get("set.tsl")).toBe(file);
@@ -72,7 +73,7 @@ describe("upsertPatches", () => {
     const driver = makeFakeDriver(files);
     const patches = [makePatch("Rhythm"), makePatch("Solo")];
 
-    const file = upsertPatches(driver, { path: "set.tsl", patches });
+    const { file } = upsertPatches(driver, { path: "set.tsl", patches });
     const patchNames = file.patches.map(patch => patch.name);
 
     expect(patchNames, "Rhythm replaced in place, Solo appended").toEqual(["Lead", "Rhythm", "Solo"]);
@@ -86,7 +87,7 @@ describe("upsertPatches", () => {
     const patches = [makePatch("Rhythm")];
 
     upsertPatches(driver, { path: "set.tsl", patches });
-    const file = upsertPatches(driver, { path: "set.tsl", patches });
+    const { file } = upsertPatches(driver, { path: "set.tsl", patches });
     const patchNames = file.patches.map(patch => patch.name);
 
     expect(patchNames).toEqual(["Lead", "Rhythm"]);
@@ -124,10 +125,10 @@ describe("upsertPatches", () => {
     const patches = [makePatch("First"), makePatch("Second")];
 
     const named = upsertPatches(driver, { path: "named.tsl", patches, setName: "My Library" });
-    expect(named.name).toBe("My Library");
+    expect(named.file.name).toBe("My Library");
 
     const unnamed = upsertPatches(driver, { path: "unnamed.tsl", patches });
-    expect(unnamed.name).toBe("First");
+    expect(unnamed.file.name).toBe("First");
   });
 
   it("renames an existing set when setName is given, and preserves it when omitted", () => {
@@ -137,14 +138,37 @@ describe("upsertPatches", () => {
     const driver = makeFakeDriver(files);
 
     const kept = upsertPatches(driver, { path: "set.tsl", patches: [makePatch("Rhythm")] });
-    expect(kept.name).toBe("Old Name");
+    expect(kept.file.name).toBe("Old Name");
 
     const renamed = upsertPatches(driver, {
       path: "set.tsl",
       patches: [makePatch("Solo")],
       setName: "New Name",
     });
-    expect(renamed.name).toBe("New Name");
+    expect(renamed.file.name).toBe("New Name");
+  });
+
+  // The saving surfaces tell a caller what became of each patch. Reading the file back to work it
+  // out costs a second decode of everything, and undoes this call's read-once/write-once property.
+  it("reports the file as created and says what happened to each patch", () => {
+    const files = new Map<string, PatchFile>([
+      ["set.tsl", { name: "Set", device: "FAKE", patches: [makePatch("Lead")] }],
+    ]);
+    const driver = makeFakeDriver(files);
+
+    const fresh = upsertPatches(driver, { path: "new.tsl", patches: [makePatch("Solo")] });
+    const existing = upsertPatches(driver, {
+      path: "set.tsl",
+      patches: [makePatch("Lead"), makePatch("Clean")],
+    });
+
+    expect(fresh.created).toBe(true);
+    expect(fresh.saved).toEqual([{ name: "Solo", action: "appended" }]);
+    expect(existing.created).toBe(false);
+    expect(existing.saved).toEqual([
+      { name: "Lead", action: "replaced" },
+      { name: "Clean", action: "appended" },
+    ]);
   });
 
   it("rejects an empty batch rather than writing an unnamed file", () => {
@@ -153,6 +177,21 @@ describe("upsertPatches", () => {
     const upsertNothing = () => upsertPatches(driver, { path: "set.tsl", patches: [] });
 
     expect(upsertNothing).toThrow();
+  });
+
+  // A save keys on the name, so a repeat within one batch cannot be honored: the second patch
+  // replaces the first, and the report would say both were saved when only one survives.
+  it("rejects a name repeated within one batch, naming it and both positions", () => {
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const patches = [makePatch("Lead"), makePatch("Clean"), makePatch("Lead")];
+
+    const upsertRepeatedName = () => upsertPatches(driver, { path: "set.tsl", patches });
+
+    expect(upsertRepeatedName).toThrow(/Lead/);
+    expect(upsertRepeatedName).toThrow(/0/);
+    expect(upsertRepeatedName).toThrow(/2/);
+    expect(files.has("set.tsl"), "nothing is written when the batch is rejected").toBe(false);
   });
 });
 
@@ -197,6 +236,34 @@ describe("resolvePatchIndex", () => {
     expect(resolveAmbiguousName).toThrow(/rock lead/);
     expect(resolveAmbiguousName, "names both colliding indices").toThrow(/0.*2|2.*0/);
   });
+
+  // Every surface takes the ref as a bare string, so an omitted one arrives here as "". Read as a
+  // number it is 0, which selected the first patch and, on a write, overwrote it.
+  it.each(["", "   "])("rejects %o rather than selecting the first patch", (ref) => {
+    const resolveEmpty = () => resolvePatchIndex(patches, ref);
+
+    expect(resolveEmpty).toThrow();
+  });
+
+  it("reads a padded integer as that index", () => {
+    const index = resolvePatchIndex(patches, " 1 ");
+
+    expect(index).toBe(1);
+  });
+
+  // Number() accepts both of these and rounds them into an index, so each used to select a patch
+  // the caller never spelled out.
+  it.each(["0x1", "2.0"])("does not read %o as an index", (ref) => {
+    const resolveNonIndex = () => resolvePatchIndex(patches, ref);
+
+    expect(resolveNonIndex).toThrow(new RegExp(ref.replace(".", "\\.")));
+  });
+
+  it("finds a patch whose name is all digits once no such index exists", () => {
+    const withNumericName = [...patches, makePatch("808")];
+
+    expect(resolvePatchIndex(withNumericName, "808")).toBe(3);
+  });
 });
 
 describe("coerceValue", () => {
@@ -212,60 +279,129 @@ describe("coerceValue", () => {
     { input: "FLAT", expected: "FLAT" },
     { input: "true", expected: true },
     { input: "false", expected: false },
-  ])("coerces \"$input\" to $expected", ({ input, expected }) => {
-    const result = coerceValue(input);
+  ])("coerces \"$input\" to $expected where the field holds a number", ({ input, expected }) => {
+    const result = coerceValue(input, 0);
 
     expect(result).toBe(expected);
   });
-});
 
-describe("resolvePatchIndices", () => {
-  const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Metal")];
+  it.each(["1984", "true", "0"])("leaves %o alone where the field already holds a string", (input) => {
+    const result = coerceValue(input, "Rock Lead");
 
-  it("returns every index in file order when ref is omitted", () => {
-    expect(resolvePatchIndices(patches)).toEqual([0, 1, 2]);
+    expect(result).toBe(input);
   });
 
-  it("returns a single resolved index when ref is given", () => {
-    const indices = resolvePatchIndices(patches, "1");
+  it.each([88, true, "FLAT"])("passes %o through when it is not a string to interpret", (input) => {
+    const result = coerceValue(input, 0);
 
-    expect(indices).toEqual([1]);
+    expect(result).toBe(input);
+  });
+});
+
+describe("resolvePatches", () => {
+  const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Metal")];
+
+  it("returns every patch in file order when ref is omitted", () => {
+    const selected = resolvePatches(patches);
+
+    expect(selected.map(entry => entry.index)).toEqual([0, 1, 2]);
+    expect(selected.map(entry => entry.patch)).toEqual(patches);
+  });
+
+  it("returns the one patch a ref names, with the index it sits at", () => {
+    const selected = resolvePatches(patches, "1");
+
+    expect(selected).toEqual([{ index: 1, patch: patches[1] }]);
   });
 
   it("propagates resolvePatchIndex's not-found error", () => {
-    const resolveMissingName = () => resolvePatchIndices(patches, "Bogus");
+    const resolveMissingName = () => resolvePatches(patches, "Bogus");
 
     expect(resolveMissingName).toThrow('No patch named "Bogus"');
   });
 });
 
 describe("applyFieldEdits", () => {
+  const editable = (fields: Record<string, unknown>): Patch =>
+    ({ name: "Edit me", ...fields });
+
+  /** Accepts everything, so these cases exercise the shared half rather than a device's catalog. */
+  const permissive = makeFakeDriver(new Map());
+
+  /** Stands in for a device rejecting a value its catalog does not allow. */
+  const rejecting = (issues: string[]): PatchDriver =>
+    ({ ...permissive, validateFields: () => issues });
+
   it("applies a single edit with coercion", () => {
-    const patch: Record<string, unknown> = { amp: { gain: 0 } };
+    const patch = editable({ amp: { gain: 0 } });
 
-    applyFieldEdits(patch, [["amp.gain", "72"]]);
+    applyFieldEdits(permissive, patch, [["amp.gain", "72"]]);
 
-    const amp = patch.amp as Record<string, unknown>;
+    const amp = (patch as unknown as Record<string, unknown>).amp as Record<string, unknown>;
     expect(amp.gain).toBe(72);
   });
 
   it("applies multiple edits in order, including booleans", () => {
-    const patch: Record<string, unknown> = { key: "C", amp: { solo: false, gain: 0 } };
+    const patch = editable({ key: "C", amp: { solo: false, gain: 0 } });
 
-    applyFieldEdits(patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
+    applyFieldEdits(permissive, patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
 
-    const amp = patch.amp as Record<string, unknown>;
-    expect(patch.key).toBe("G");
+    const fields = patch as unknown as Record<string, unknown>;
+    const amp = fields.amp as Record<string, unknown>;
+    expect(fields.key).toBe("G");
     expect(amp.solo).toBe(true);
     expect(amp.gain).toBe(50);
   });
 
   it("does nothing given an empty edit list", () => {
-    const patch: Record<string, unknown> = { key: "C" };
+    const patch = editable({ key: "C" });
 
-    applyFieldEdits(patch, []);
+    applyFieldEdits(permissive, patch, []);
 
-    expect(patch.key).toBe("C");
+    expect((patch as unknown as Record<string, unknown>).key).toBe("C");
+  });
+
+  it("keeps a numeric-looking name a string, since the field it lands in holds one", () => {
+    const patch = editable({});
+
+    applyFieldEdits(permissive, patch, [["name", "1984"]]);
+
+    expect(patch.name).toBe("1984");
+  });
+
+  it("takes a value that arrives already typed, not only its string form", () => {
+    const patch = editable({ amp: { solo: false, gain: 0 } });
+
+    applyFieldEdits(permissive, patch, [["amp.gain", 72], ["amp.solo", true]]);
+
+    const amp = (patch as unknown as Record<string, unknown>).amp as Record<string, unknown>;
+    expect(amp.gain).toBe(72);
+    expect(amp.solo).toBe(true);
+  });
+
+  it("returns each landed value keyed by path, so a caller can report what it wrote", () => {
+    const patch = editable({ amp: { gain: 0 } });
+
+    const applied = applyFieldEdits(permissive, patch, [["name", "1984"], ["amp.gain", "72"]]);
+
+    expect(applied).toEqual({ name: "1984", "amp.gain": 72 });
+  });
+
+  it("hands the driver every edit it applied, keyed by path", () => {
+    const seen: Record<string, unknown>[] = [];
+    const recording: PatchDriver = { ...permissive, validateFields: (_, edits) => { seen.push(edits); return []; } };
+
+    applyFieldEdits(recording, editable({ amp: { gain: 0 } }), [["amp.gain", "72"]]);
+
+    expect(seen).toEqual([{ "amp.gain": 72 }]);
+  });
+
+  it("throws with every issue the driver reports rather than the first", () => {
+    const applyRejectedEdits = () =>
+      { applyFieldEdits(rejecting(["gain is too high", "level is too low"]), editable({ amp: { gain: 0 } }), [["amp.gain", "900"]]); };
+
+    expect(applyRejectedEdits).toThrow(/gain is too high/);
+    expect(applyRejectedEdits).toThrow(/level is too low/);
   });
 });
 
@@ -418,5 +554,29 @@ describe("createPatchFile", () => {
     const overwrite = () => createPatchFile(driver, path);
 
     expect(overwrite).toThrow(path);
+  });
+
+  // A count is the kind of input a mistyped exponent turns into 100 million blank patches, which
+  // no device holds and which the surface asking for them sits and waits on.
+  it.each([0, -1, 2.5, MAX_NEW_PATCHES + 1])("rejects a patch count of %o without writing", (patchCount) => {
+    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
+    const files = new Map<string, PatchFile>();
+    const driver = makeFakeDriver(files);
+    const path = join(dir, "junk.tsl");
+
+    const createWithBadCount = () => createPatchFile(driver, path, { patchCount });
+
+    expect(createWithBadCount).toThrow(String(MAX_NEW_PATCHES));
+    expect(files.has(path)).toBe(false);
+  });
+
+  it("takes the largest count it allows", () => {
+    dir = mkdtempSync(join(tmpdir(), "tonesmith-core-"));
+    const driver = makeFakeDriver(new Map<string, PatchFile>());
+    const path = join(dir, "full.tsl");
+
+    const file = createPatchFile(driver, path, { patchCount: MAX_NEW_PATCHES });
+
+    expect(file.patches).toHaveLength(MAX_NEW_PATCHES);
   });
 });

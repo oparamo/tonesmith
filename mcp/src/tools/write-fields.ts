@@ -1,7 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
-import { ok, err } from "../common";
+import type { FieldValue, Patch, PatchDriver } from "@tonesmith/core";
+import { attempt, deviceField, ok } from "../common";
 
 /** Rejects an input that asks for no change at all, or for a patch edit without naming the patch. */
 const requireSomethingToChange = (ref?: string, fields?: object, setName?: string): void => {
@@ -19,13 +20,17 @@ const requireSomethingToChange = (ref?: string, fields?: object, setName?: strin
 /**
  * Applies a batch of dot-path edits to one patch and reports what landed. Every edit lands in
  * memory before anything is written, so a rejected edit anywhere in the set leaves the file
- * exactly as it was rather than half-applied.
+ * exactly as it was rather than half-applied. The report reads the values back out of the edit
+ * rather than re-deriving them, so what it says is what the patch now holds.
  */
-const editPatch = (patch: Record<string, unknown>, fields: Record<string, string>): string => {
-  const edits = Object.entries(fields);
-  patchUtils.applyFieldEdits(patch, edits);
-  return edits
-    .map(([field, value]) => `${field} = ${JSON.stringify(patchUtils.coerceValue(value))}`)
+const editPatch = <T extends Patch>(
+  driver: PatchDriver<T>,
+  patch: T,
+  fields: Record<string, FieldValue>,
+): string => {
+  const applied = patchUtils.applyFieldEdits(driver, patch, Object.entries(fields));
+  return Object.entries(applied)
+    .map(([field, value]) => `${field} = ${JSON.stringify(value)}`)
     .join(", ");
 };
 
@@ -41,46 +46,45 @@ const registerWriteFields = (server: McpServer): void => {
         "edit is rejected the file is left untouched.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
-        device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
+        device: deviceField,
         ref: z.string().optional().describe(
           "Patch index (0-based integer) or exact patch name. Required with `fields`; not needed " +
             "to rename the set on its own."
         ),
-        fields: z.record(z.string(), z.string()).optional().describe(
-          'Dot-path → new value, e.g. { "amp.gain": "72", "fx1.params.rate": "50", "key": "G" }. ' +
-            "Numbers and booleans are coerced from their string form automatically."
+        fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
+          'Dot-path → new value, e.g. { "amp.gain": 72, "fx1.params.rate": 50, "key": "G" }. ' +
+            "Pass each value as the type read_patch shows for that field; a string spelling a " +
+            "number or a boolean is read as one where the field takes one."
         ),
         setName: z.string().optional().describe(
           "New name for the patch set: the file's own label, shown as `setName` by read_patch. " +
             "Applies to the file rather than to any one patch."
         ),
       }),
+      // It edits a file the caller already has, which is the destructive case: the values it
+      // replaces are gone.
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
-    ({ file, device, ref, fields, setName }) => {
-      try {
-        requireSomethingToChange(ref, fields, setName);
+    ({ file, device, ref, fields, setName }) => attempt(() => {
+      requireSomethingToChange(ref, fields, setName);
 
-        const driver = registry.getDriver(device);
-        const patchFile = driver.readFile(file);
-        const changes: string[] = [];
+      const driver = registry.getDriver(device);
+      const patchFile = driver.readFile(file);
+      const changes: string[] = [];
 
-        if (fields !== undefined && ref !== undefined) {
-          const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-          const patch = patchFile.patches[index] as unknown as Record<string, unknown>;
-          changes.push(`patch ${index}: ${editPatch(patch, fields)}`);
-        }
-
-        if (setName !== undefined) {
-          patchFile.name = setName;
-          changes.push(`set name = ${JSON.stringify(setName)}`);
-        }
-
-        driver.writeFile(patchFile, file);
-        return ok(`Updated ${file}: ${changes.join("; ")}`);
-      } catch (error) {
-        return err(error);
+      if (fields !== undefined && ref !== undefined) {
+        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
+        changes.push(`patch ${index}: ${editPatch(driver, patch, fields)}`);
       }
-    }
+
+      if (setName !== undefined) {
+        patchFile.name = setName;
+        changes.push(`set name = ${JSON.stringify(setName)}`);
+      }
+
+      driver.writeFile(patchFile, file);
+      return ok(`Updated ${file}: ${changes.join("; ")}`);
+    })
   );
 };
 

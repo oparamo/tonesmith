@@ -8,10 +8,10 @@ import {
   writeFile as tslWriteFile,
 } from "./tsl";
 import { gx1Capabilities } from "./capabilities";
-import { buildPatch as specBuildPatch } from "./spec";
+import { buildPatch as specBuildPatch, validateFieldEdits } from "./spec";
 
-// Arrow wrappers narrow the PatchDriver contract to the concrete GX-1 file type,
-// keeping the driver fully typed without widening the concrete file I/O functions.
+// Arrow wrappers pair the PatchDriver contract with the concrete GX-1 file type, keeping the driver
+// fully typed without widening the file I/O functions underneath it.
 const driver: PatchDriver<Patch> = {
   id:           "gx1",
   name:         "BOSS GX-1",
@@ -21,7 +21,7 @@ const driver: PatchDriver<Patch> = {
     tslReadFile(path),
 
   writeFile: (file, path): void =>
-    { tslWriteFile(file as PatchFile, path); },
+    { tslWriteFile(file, path); },
 
   newFile: (setName: string, patchCount?: number): PatchFile =>
     tslNewFile(setName, patchCount),
@@ -31,6 +31,9 @@ const driver: PatchDriver<Patch> = {
 
   buildPatch: (spec: unknown): Patch =>
     specBuildPatch(spec),
+
+  validateFields: (patch: Patch, edits: Record<string, unknown>): string[] =>
+    validateFieldEdits(patch, edits),
 
   decodePatch: (raw: RawPatch): Patch =>
     codecDecodePatch(raw as { memo?: string; paramSet: RawParamSet }),

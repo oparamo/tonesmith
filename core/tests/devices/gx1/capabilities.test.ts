@@ -33,6 +33,7 @@ import {
 import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import type { CapabilityItem, ParamSpec, PatchSpecExample } from "../../../src/types";
 import type { FieldCodec } from "../../../src/devices/gx1/codec/fields";
+import { present } from "../../helpers";
 
 const groupItems = (groupId: string): CapabilityItem[] =>
   gx1Capabilities.groups.find(group => group.id === groupId)?.items ?? [];
@@ -149,7 +150,7 @@ describe("GX-1 catalog id coverage", () => {
 const assertTypeParity = (block: PerTypeBlock, type: string): void => {
   const fields = block.codecFields(type);
   const codecNames = codecFieldNames(fields);
-  const catalog = PARAMS_BY_TYPE[block.block][type];
+  const catalog = present(PARAMS_BY_TYPE[block.block][type], `the ${block.block} ${type} catalog`);
   const catalogNames = catalogParamNames(catalog);
   const aliases = block.aliases[type] ?? {};
   const aliasTargets = new Set(Object.values(aliases).map(normalize));
@@ -274,34 +275,26 @@ describe("GX-1 single-shape block param keys name a real decoded field", () => {
 //
 // The name-parity guards above match field/param NAMES only. This guard is auto-derived over
 // every per-type codec field and asserts its *representation* agrees with the catalog's authored
-// domain: a boolean toggle is a `bool` field; an enum/lookup is a `lookup`/`indexTable` whose
-// table equals the catalog `values` verbatim; a numeric range is a numeric field. It catches a
-// catalog enum backed by a hand-rolled numeric codec (how PHASER `stage` shipped a raw index) and
-// the trigger/solo drift between strings, numbers, and booleans. Without a hand-maintained list,
-// so a new effect/field can't silently reintroduce the class. Catalog `text` domains (compact
-// displays like SLICER "P01-P20", HARMONIST harmony) are opaque by design, so their representation
-// is intentionally not pinned. (amp/odds/ns/fv are hand-decoded, not FieldCodec maps, so they're
-// covered by their own round-trip guards above rather than here.)
+// kind: a boolean toggle is a `bool` field; a discrete param is a `lookup` whose table equals its
+// `values` verbatim; a numeric one is a numeric field. It catches a catalog enum backed by a
+// hand-rolled numeric codec (how PHASER `stage` shipped a raw index) and the trigger/solo drift
+// between strings, numbers, and booleans. Without a hand-maintained list, so a new effect/field
+// can't silently reintroduce the class. An `indexTable` field is the one exception, since its
+// mixed string/number table answers to no single kind. (amp/odds/ns/fv are hand-decoded, not
+// FieldCodec maps, so they're covered by their own round-trip guards above rather than here.)
 
 const NUMERIC_KINDS = new Set(["u8", "signed", "scaled", "nibblePair", "nibbleQuad"]);
 
-type ReprClass = "numeric" | "discrete" | "boolean" | "text" | "unknown";
+type ReprClass = ParamSpec["kind"] | "opaque" | "unknown";
 
 const codecClass = (field: FieldCodec): ReprClass => {
   if (field.kind === "bool") return "boolean";
   if (field.kind === "lookup") return "discrete";
-  // indexTable holds a mixed string/number table (PITCH SHIFT's pitch presets), opaque like a
-  // catalog `text` domain, so its representation isn't strictly pinned.
-  if (field.kind === "indexTable") return "text";
+  // indexTable holds a mixed string/number table (PITCH SHIFT's pitch presets), so its
+  // representation isn't strictly pinned.
+  if (field.kind === "indexTable") return "opaque";
   const numeric = field.kind !== undefined && NUMERIC_KINDS.has(field.kind);
   const cls: ReprClass = numeric ? "numeric" : "unknown";
-  return cls;
-};
-
-const catalogClass = (param: ParamSpec): ReprClass => {
-  if (param.values !== undefined) return "discrete";
-  if (param.min !== undefined) return "numeric";
-  const cls: ReprClass = param.range === "true, false" ? "boolean" : "text";
   return cls;
 };
 
@@ -315,26 +308,25 @@ const representationChecks = [...PER_TYPE_BLOCKS, FX_DELAY_BLOCK].flatMap(block 
 
 const assertRepresentationParity = (block: PerTypeBlock, type: string, field: FieldCodec): void => {
   const aliases = block.aliases[type] ?? {};
-  const catalogLabel = field.name in aliases ? aliases[field.name] : field.name;
-  const param = PARAMS_BY_TYPE[block.block][type].find(candidate => normalize(candidate.name) === normalize(catalogLabel));
+  const catalogLabel = aliases[field.name] ?? field.name;
+  const catalog = present(PARAMS_BY_TYPE[block.block][type], `the ${block.block} ${type} catalog`);
+  const param = catalog.find(candidate => normalize(candidate.name) === normalize(catalogLabel));
   expect(param, `${block.block} "${type}" catalog has no param for codec field "${field.name}"`).toBeDefined();
   if (!param) return;
 
-  const catClass = catalogClass(param);
   const codClass = codecClass(field);
-  // Opaque on either side (catalog `text` display, or a mixed indexTable), so not strictly pinned.
-  if (catClass === "text" || codClass === "text") return;
+  if (codClass === "opaque") return;
 
   expect(
     codClass,
-    `${block.block} "${type}" field "${field.name}": codec kind "${field.kind ?? "none"}" vs catalog domain "${catClass}"`,
-  ).toBe(catClass);
+    `${block.block} "${type}" field "${field.name}": codec kind "${field.kind ?? "none"}" vs catalog kind "${param.kind}"`,
+  ).toBe(param.kind);
 
-  if (catClass === "discrete") {
+  if (param.kind === "discrete") {
     expect(
       [...(field.table ?? [])],
       `${block.block} "${type}" field "${field.name}": codec table vs catalog values`,
-    ).toEqual([...(param.values ?? [])]);
+    ).toEqual([...param.values]);
   }
 };
 
@@ -497,7 +489,7 @@ describe("GX-1 spec examples", () => {
     const [block] = Object.keys(example ?? {});
     const body = Object.values(example ?? {})[0] as Record<string, unknown>;
 
-    expect("params" in body).toBe(NESTED_PARAMS.has(block));
+    expect("params" in body).toBe(NESTED_PARAMS.has(present(block, "the example's block key")));
   });
 
   it("fills the values from the device's own factory defaults, not a guess", () => {

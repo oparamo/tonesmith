@@ -23,5 +23,13 @@ Three defaults were wrong, having been written into the builder rather than read
 A patch that leaves amp `level` unset now stores 50 rather than 100, so anything relying on the old
 value has to set it explicitly.
 
+The three blocks the codec preserves rather than decodes were zero-filled for the same reason and
+now carry the factory bytes too. A blank patch's master block set memory level to 0, which trims the
+patch's output to silence, and BPM to 0, below the 40 the device accepts; it opens at level 100 and
+120 BPM now, in the key of C with carryover on. The footswitch block and the eight assign slots
+likewise open at the device's own values instead of every switch unassigned. Patches read from a
+file are unaffected: those bytes have always been preserved as they were found.
+
 The values live in `BLOCK_DEFAULTS`, lifted from the same factory-default export that already backs
-`DEFAULTS_BY_TYPE`, and the drift guard now checks both against it plus the blank patch itself.
+`DEFAULTS_BY_TYPE`, and the drift guard now checks both against it, plus the blank patch's decoded
+blocks and its bytes for the three undecoded ones.

@@ -10,13 +10,18 @@
  */
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
-import { BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS } from "../common";
+import {
+  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS, ON_FIELD, KEY_NAMES,
+  LAST_NAMEABLE_CHAR, charsAbove,
+} from "../common";
 import type { BlockName } from "../common";
-import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain } from "../builder";
+import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain, DEFAULT_CHAIN } from "../builder";
 import type { AmpOptions, OddsOptions } from "../builder";
 import type { CapabilityGroup } from "../../../types";
 import type { Patch, FxParams } from "../types";
-import { validateTypeParams, typeSurface } from "./validate";
+import {
+  checkSelectors, checkTypeBelongsInBlock, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface,
+} from "./validate";
 import type { Issues } from "./validate";
 import {
   asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine,
@@ -24,13 +29,8 @@ import {
 } from "./errors";
 import type { BlockContext } from "./errors";
 
-const ON_FIELD = "on";
-
 /** Patch-level fields that are not blocks. Every other key must name one. */
 const PATCH_FIELDS = ["name", "chain", "key"];
-
-/** The fields that select a block's shape rather than set one of its controls. */
-const SELECTION_FIELDS = new Set<string>([TYPE_FIELD, SUB_TYPE_FIELD, ON_FIELD]);
 
 /** The one block the device can't bypass, so it takes no `on`. */
 const ALWAYS_ON = new Set<string>(["fv"]);
@@ -101,8 +101,6 @@ const checkKeys = (issues: Issues, block: Record<string, unknown>, check: KeyChe
   issues.push([...misplacedText, ...unknownText, shapeSkeleton(fields, context)].join("\n"));
 };
 
-const typeChoices = (capGroup: CapabilityGroup): string => capGroup.items.map(item => item.id).join(", ");
-
 /**
  * Rejects a block whose `type` names nothing the catalog knows, and reports whether it is usable.
  * Every later check reads the chosen type's own surface, so an unresolved one would leave the
@@ -118,7 +116,7 @@ const checkType = (issues: Issues, capGroup: CapabilityGroup, block: Record<stri
   }
   if (typeSurface({ group: capGroup.id, type }) !== undefined) return true;
 
-  issues.push(`${capGroup.id} has no type "${type}". Types: ${typeChoices(capGroup)}`);
+  issues.push(unknownTypeIssue(capGroup, type));
   return false;
 };
 
@@ -127,9 +125,11 @@ const checkBlock = (issues: Issues, name: BlockName, input: unknown): void => {
   const capGroup = findGroup(gx1Capabilities, group);
   const block = asRecord(input);
   if (!checkType(issues, capGroup, block)) return;
+  checkTypeBelongsInBlock(issues, name, block[TYPE_FIELD]);
 
   const context = blockContext(group, block);
   const selected = typeof block[SUB_TYPE_FIELD] === "string" ? block[SUB_TYPE_FIELD] : undefined;
+  checkSelectors(issues, { group, on: block[ON_FIELD], subType: block[SUB_TYPE_FIELD] });
   checkKeys(issues, block, { fields: acceptedFields(name, context), context });
   issues.push(...validateTypeParams({
     group,
@@ -148,6 +148,38 @@ const checkName = (issues: Issues, spec: Record<string, unknown>): void => {
   }
   if (name.length > maxLength) {
     issues.push(`Patch name "${name}" is ${name.length} characters; this device stores ${maxLength}.`);
+  }
+  const unnameable = charsAbove(LAST_NAMEABLE_CHAR, name);
+  if (unnameable.length > 0) {
+    issues.push(`Patch name "${name}" uses characters this device cannot display: ${unnameable.join(" ")}`);
+  }
+};
+
+/**
+ * `chain` reaches the builder as an array it maps over, and `key` reaches the codec as a table
+ * lookup, so an unchecked one surfaces as a TypeError or a codec throw at write time with nothing
+ * naming the field that caused it.
+ */
+const checkChain = (issues: Issues, spec: Record<string, unknown>): void => {
+  const chain = spec.chain;
+  if (chain === undefined) return;
+  if (!Array.isArray(chain) || chain.some(block => typeof block !== "string")) {
+    issues.push(`chain lists every block in signal order. Blocks: ${DEFAULT_CHAIN.join(", ")}`);
+    return;
+  }
+  try {
+    validateChain(chain as string[]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    issues.push(message);
+  }
+};
+
+const checkKey = (issues: Issues, spec: Record<string, unknown>): void => {
+  const key = spec.key;
+  if (key === undefined) return;
+  if (typeof key !== "string" || !(KEY_NAMES as readonly string[]).includes(key)) {
+    issues.push(`Patch key ${JSON.stringify(key)} is not one this device names. Keys: ${KEY_NAMES.join(", ")}`);
   }
 };
 
@@ -168,6 +200,8 @@ const validatePatchSpec = (input: unknown): Issues => {
   const spec = asRecord(input);
   const issues: Issues = [];
   checkName(issues, spec);
+  checkChain(issues, spec);
+  checkKey(issues, spec);
   checkBlockNames(issues, spec);
   for (const name of setBlocks(spec)) checkBlock(issues, name, spec[name]);
   return issues;

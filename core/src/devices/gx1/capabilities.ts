@@ -17,7 +17,7 @@ import type {
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlockId } from "./param-catalog";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "./defaults";
 import type { ParamDefaults, BlockDefaults } from "./defaults";
-import { BLOCK_GROUPS, NESTED_PARAMS, NAME_BYTES } from "./common";
+import { BLOCK_GROUPS, NESTED_PARAMS, NAME_BYTES, onlyBlockFor } from "./common";
 import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
@@ -58,8 +58,8 @@ const withKeys = (block: PerTypeBlockId, type: string, params: readonly ParamSpe
  */
 const withBlockKeys = (params: readonly ParamSpec[]): ParamSpec[] =>
   params.map(param => {
-    const [head, ...rest] = param.name.toLowerCase().split(" ");
-    const key = head + rest.map(word => word[0].toUpperCase() + word.slice(1)).join("");
+    const [head = "", ...rest] = param.name.toLowerCase().split(" ");
+    const key = head + rest.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join("");
     return { ...param, key };
   });
 
@@ -441,10 +441,14 @@ const VARIANT_BLOCK: PerTypeBlockId = "fxDelay";
 /**
  * The block key a group is written under in a patch spec, taken from the spec's own block map. The
  * three fx slots share the fx group, so the example names the first of them; the group's own
- * description is where the fact that there are three lives.
+ * description is where the fact that there are three lives. A type the device offers in one slot
+ * only names that slot instead, since the example is copied and has to be buildable as it stands.
  */
-const specBlockFor = (group: string): string | undefined =>
-  Object.entries(BLOCK_GROUPS).find(([, id]) => id === group)?.[0];
+const specBlockFor = (group: string, type?: string): string | undefined => {
+  const onlyBlock = type === undefined ? undefined : onlyBlockFor(type);
+  if (onlyBlock !== undefined) return onlyBlock;
+  return Object.entries(BLOCK_GROUPS).find(([, id]) => id === group)?.[0];
+};
 
 /** The defaults an example is filled with: per type where a block has types, per block where it doesn't. */
 const defaultsFor = (group: string, type?: string): ParamDefaults | undefined => {
@@ -481,7 +485,7 @@ const exampleValues = (group: string, item?: CapabilityItem, variant?: Capabilit
  * controls wherever that block keeps them.
  */
 const exampleFor = (group: CapabilityGroup, item?: CapabilityItem): PatchSpecExample | undefined => {
-  const block = specBlockFor(group.id);
+  const block = specBlockFor(group.id, item?.id);
   if (block === undefined) return undefined;
 
   const selected = defaultSubType(group.id, item?.id);

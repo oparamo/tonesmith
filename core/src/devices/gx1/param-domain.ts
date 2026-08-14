@@ -1,4 +1,4 @@
-import type { ParamSpec } from "../../types";
+import type { NumericParam, ParamSpec } from "../../types";
 
 interface RangeOpts { unit?: string; decimals?: number; bpm?: boolean; percent?: boolean }
 
@@ -15,14 +15,16 @@ interface RangeOpts { unit?: string; decimals?: number; bpm?: boolean; percent?:
  *  - `lookup`:  a discrete quantized table (the frequency steps) whose full value list comes from
  *               a codec constant but whose `range` display is a compact human summary.
  *  - `boolean`: an on/off toggle carried as a real boolean (`true`/`false`); no `values`/bounds.
- *  - `text`:    an opaque/compact range with no enumerable value list (e.g. "-2oct-+2oct").
+ *
+ * There is no display-only kind. A domain is what gives a param a shape the validator can check
+ * against, so a param whose domain were a bare string like "1:1-INF:1" would accept any value at
+ * all. A compact display belongs on `lookup`, which carries the real value list beside it.
  */
 type Domain =
   | ({ kind: "range"; min: number; max: number } & RangeOpts)
   | { kind: "enum"; values: readonly string[] }
   | { kind: "lookup"; values: readonly string[]; display: string }
-  | { kind: "boolean" }
-  | { kind: "text"; display: string };
+  | { kind: "boolean" };
 
 /** A numeric interval. `decimals` fixes display precision; `bpm`/`percent`/`unit` shape the suffix. */
 const num = (min: number, max: number, opts: RangeOpts = {}): Domain => ({ kind: "range", min, max, ...opts });
@@ -32,8 +34,6 @@ const oneOf = (...values: string[]): Domain => ({ kind: "enum", values });
 const lookupOf = (values: readonly string[], display: string): Domain => ({ kind: "lookup", values, display });
 /** An on/off toggle carried as a real boolean (`true`/`false`). */
 const bool = (): Domain => ({ kind: "boolean" });
-/** An opaque/compact range with no enumerable value list. */
-const text = (display: string): Domain => ({ kind: "text", display });
 
 const fmt = (n: number, decimals?: number): string => (decimals === undefined ? String(n) : n.toFixed(decimals));
 
@@ -41,7 +41,7 @@ const fmt = (n: number, decimals?: number): string => (decimals === undefined ? 
 const rangeText = (domain: Domain): string => {
   if (domain.kind === "enum") return domain.values.join(", ");
   if (domain.kind === "boolean") return "true, false";
-  if (domain.kind === "lookup" || domain.kind === "text") return domain.display;
+  if (domain.kind === "lookup") return domain.display;
   const signedMax = domain.min < 0 && domain.max > 0 ? `+${fmt(domain.max, domain.decimals)}` : fmt(domain.max, domain.decimals);
   const base = `${fmt(domain.min, domain.decimals)}-${signedMax}`;
   let out = base;
@@ -51,22 +51,16 @@ const rangeText = (domain: Domain): string => {
   return out;
 };
 
-const domainValues = (domain: Domain): readonly string[] | undefined =>
-  domain.kind === "enum" || domain.kind === "lookup" ? domain.values : undefined;
-
-/** Builds a ParamSpec from a name + domain + description, deriving range / values / min / max. */
+/** Builds a ParamSpec from a name + domain + description, deriving range / values / bounds. */
 const def = (name: string, domain: Domain, description: string): ParamSpec => {
-  const spec: ParamSpec = { name, range: rangeText(domain), description };
-  const values = domainValues(domain);
-  if (values !== undefined) spec.values = values;
-  if (domain.kind === "range") {
-    spec.min = domain.min;
-    spec.max = domain.max;
-    if (domain.decimals !== undefined) spec.decimals = domain.decimals;
-  }
-  if (domain.kind === "boolean") spec.boolean = true;
-  return spec;
+  const base = { name, range: rangeText(domain), description };
+  if (domain.kind === "boolean") return { ...base, kind: "boolean" };
+  if (domain.kind === "enum" || domain.kind === "lookup") return { ...base, kind: "discrete", values: domain.values };
+
+  const numeric: NumericParam = { ...base, kind: "numeric", min: domain.min, max: domain.max };
+  if (domain.decimals !== undefined) numeric.decimals = domain.decimals;
+  return numeric;
 };
 
-export { num, oneOf, lookupOf, bool, text, def, rangeText };
+export { num, oneOf, lookupOf, bool, def, rangeText };
 export type { Domain };

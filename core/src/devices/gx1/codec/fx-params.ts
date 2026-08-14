@@ -7,7 +7,7 @@ import {
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 } from "../common";
 import type { FxParams } from "../types";
-import { hexFromBytes, lookupName, lookupIndex } from "./primitives";
+import { hexFromBytes, byteAt, lookupName, lookupIndex } from "./primitives";
 import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 
 // ── FX type encode / decode ───────────────────────────────────────────────────
@@ -45,7 +45,10 @@ const indexTable = (name: string, offset: number, table: readonly (string | numb
   name,
   kind: "indexTable",
   table,
-  decode: bytes => table[bytes[offset]],
+  decode: bytes => {
+    const index = byteAt(bytes, offset, name);
+    return table[index] ?? `UNKNOWN_${name}${index}`;
+  },
   encode: (value, bytes) => {
     const index = table.indexOf(value as string | number);
     if (index < 0) throw new Error(`Unknown ${name} value: ${JSON.stringify(value)}`);
@@ -53,8 +56,11 @@ const indexTable = (name: string, offset: number, table: readonly (string | numb
   },
 });
 
-// Byte offset where each type's param block begins within the 251-byte FX block.
+// Byte offset where each type's param block begins within the 251-byte FX block. OVERTONE is the
+// exception: its 5 bytes are the whole of MEMORY%FX3A, so offset 0 there is its own block rather
+// than a window into a shared one.
 const FX_PARAM_OFFSETS: Partial<Record<string, number>> = {
+  "OVERTONE":     0,
   "COMPRESSOR":   0,
   "LIMITER":      10,
   "SLOW GEAR":    16,
@@ -305,48 +311,57 @@ const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
 
 // ── Public decode / encode ────────────────────────────────────────────────────
 
-/** DELAY selects its field map by sub-algorithm; every other type has one flat map. */
+/** The one FX type that selects its field map by sub-algorithm rather than having one flat map. */
+const PER_SUB_ALGORITHM_TYPE = "DELAY";
+
 const fieldMapFor = (fxType: string, delaySubType: string): FieldCodec[] | undefined => {
-  if (fxType === "DELAY") return FX_DELAY_TYPE_MAPS[delaySubType];
+  if (fxType === PER_SUB_ALGORITHM_TYPE) return FX_DELAY_TYPE_MAPS[delaySubType];
   return FX_PARAM_MAPS[fxType];
 };
 
-/** How many bytes of an unrecognized type's block to stash for the round trip. */
-const UNKNOWN_BYTES_KEPT = 32;
+const unmappedTypeMessage = (fxType: string, delaySubType: string): string => {
+  if (fxType !== PER_SUB_ALGORITHM_TYPE) return `FX type "${fxType}" has no param layout to write to`;
+  return `Unknown DELAY subType: "${delaySubType}". Expected one of: ${FX_DLY_TYPES.join(", ")}`;
+};
 
 /**
- * Decodes the 251-byte FX parameter block for a given effect type. An unrecognized type yields
- * `{ unknownBytes: rawBytes }`, which the encoder writes back untouched rather than losing.
+ * Decodes the 251-byte FX parameter block for a given effect type. A type this codec has no field
+ * map for reads as no params at all; its bytes are still in the block, which is what the encoder
+ * writes back.
  */
 const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
   const paramBytes = bytes.slice(offset);
-  const fields = fieldMapFor(fxType, lookupName(FX_DLY_TYPES, paramBytes[0]));
-  if (!fields) return { unknownBytes: bytes.slice(0, UNKNOWN_BYTES_KEPT) };
+  const subAlgo = lookupName(FX_DLY_TYPES, byteAt(paramBytes, 0, `${fxType} params`));
+  const fields = fieldMapFor(fxType, subAlgo);
+  if (!fields) return {};
 
   return decodeFields(fields, paramBytes);
 };
 
 /**
  * Encodes FX params back into the 251-byte hex block, always starting from `originalBytes` so
- * unmapped positions survive. Params carrying `unknownBytes` return those bytes unchanged.
+ * unmapped positions survive. A type with no field map has nowhere to put params, so it keeps
+ * those bytes when there are none to place and throws when there are: writing nothing and
+ * reporting success is how an edit goes missing.
  */
 const encodeFxParams = (
   fxType: string,
   params: FxParams,
   originalBytes: number[],
 ): string[] => {
-  if ("unknownBytes" in params) return hexFromBytes(originalBytes);
-
   const bytes = [...originalBytes];
   const delaySubType = typeof params.subType === "string" ? params.subType : "";
   const fields = fieldMapFor(fxType, delaySubType);
-  if (fields) {
-    const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
-    const paramBytes = bytes.slice(offset);
-    encodeFields(fields, params, paramBytes);
-    bytes.splice(offset, paramBytes.length, ...paramBytes);
+  const offset = FX_PARAM_OFFSETS[fxType];
+  if (fields === undefined || offset === undefined) {
+    if (Object.keys(params).length === 0) return hexFromBytes(originalBytes);
+    throw new Error(unmappedTypeMessage(fxType, delaySubType));
   }
+
+  const paramBytes = bytes.slice(offset);
+  encodeFields(fields, params, paramBytes);
+  bytes.splice(offset, paramBytes.length, ...paramBytes);
   return hexFromBytes(bytes);
 };
 

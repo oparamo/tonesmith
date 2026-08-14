@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { CapabilityGroup, CapabilityItem, DeviceCapabilities } from "@tonesmith/core";
 import { capabilityUtils, registry } from "@tonesmith/core";
-import { ok, err } from "../common";
+import { attempt, deviceField, messageOf, ok } from "../common";
 
 /**
  * A group listing is an index, not a data dump: every item's full param specs would run to tens of
@@ -95,10 +95,28 @@ const viewsForEntries = (
     try {
       views[entry] = viewForEntry(capabilities, entry, includeParams);
     } catch (error) {
-      throw new Error(`items entry "${entry}": ${(error as Error).message}`);
+      throw new Error(`items entry "${entry}": ${messageOf(error)}`);
     }
   }
   return views;
+};
+
+/**
+ * An `items` list drawn from the device in hand: a group id and a couple of "<group>/<item>"
+ * entries it really has. Written out by hand it named one device's groups and effects, which on
+ * every other device is an example that fails the call it is showing how to make.
+ */
+const exampleEntries = (capabilities: DeviceCapabilities): string[] => {
+  const bareGroup = capabilities.groups.slice(0, 1).map(group => group.id);
+  const namedItems = capabilities.groups
+    .slice(1)
+    .flatMap(group => {
+      const [item] = group.items;
+      const entry = item === undefined ? [] : [`${group.id}/${item.id}`];
+      return entry;
+    })
+    .slice(0, 2);
+  return ["chain", ...bareGroup, ...namedItems];
 };
 
 const deviceSummary = (capabilities: DeviceCapabilities): object => ({
@@ -113,7 +131,7 @@ const deviceSummary = (capabilities: DeviceCapabilities): object => ({
     description: capGroup.description,
     itemCount: capGroup.items.length,
   })),
-  help: 'e.g. items: ["chain", "amp", "fx/CHORUS", "reverb/HALL M"].',
+  help: `e.g. items: ${JSON.stringify(exampleEntries(capabilities))}.`,
 });
 
 const registerDescribeDevice = (server: McpServer): void => {
@@ -126,15 +144,15 @@ const registerDescribeDevice = (server: McpServer): void => {
         "returns an `example`: that block's spec at the device's factory defaults, showing where " +
         "each param is written. Copy it into generate_patch and change the values you care about.",
       inputSchema: z.object({
-        device: z.string().describe("Device ID (e.g. 'gx1'). Use list_devices to enumerate IDs."),
+        device: deviceField,
         items: z.array(z.string()).optional().describe(
           "What to look up, as a list. Each entry is one of: \"chain\" for the signal-chain model " +
-            "(default block order, reordering, and how blocks are bypassed); a group id such as " +
-            '"amp", "fx", "odds", "delay", "reverb", "cab", "mic", "ns", "fv" for that group\'s ' +
-            'index; or "<group>/<item>" such as "fx/CHORUS", "amp/JC-120", "reverb/HALL M" for one ' +
-            "item's full params. List every entry you need in a single call, which is what this " +
-            "input is for. Omit to list all groups plus a chain summary. An unknown entry fails " +
-            "the whole call and names itself."
+            "(default block order, reordering, and how blocks are bypassed); a group id for that " +
+            'group\'s index; or "<group>/<item>" for one item\'s full params, split on the first ' +
+            "slash so an item id containing one still resolves. Omit `items` to list every group " +
+            "id this device has, which is where the ids come from. List every entry you need in a " +
+            "single call, which is what this input is for. An unknown entry fails the whole call " +
+            "and names itself."
         ),
         includeParams: z.boolean().optional().describe(
           "Include every item's full param specs for bare-group entries. Off by default, since a " +
@@ -142,20 +160,17 @@ const registerDescribeDevice = (server: McpServer): void => {
             "\"<group>/<item>\" entries."
         ),
       }),
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ device, items, includeParams }) => {
-      try {
-        const { capabilities } = registry.getDriver(device);
+    ({ device, items, includeParams }) => attempt(() => {
+      const { capabilities } = registry.getDriver(device);
 
-        if (!items || items.length === 0) {
-          return ok(JSON.stringify(deviceSummary(capabilities)));
-        }
-
-        return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams)));
-      } catch (error) {
-        return err(error);
+      if (!items || items.length === 0) {
+        return ok(JSON.stringify(deviceSummary(capabilities)));
       }
-    }
+
+      return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams)));
+    })
   );
 };
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/devices/gx1";
+import { DEFAULT_CHAIN, moveBefore } from "../../../../src/devices/gx1/builder";
 
 describe("buildPatch", () => {
   it("builds every block the spec names, defaults filled in", () => {
@@ -13,7 +14,7 @@ describe("buildPatch", () => {
     expect(patch.name).toBe("Ojitos Lindos");
     expect(patch.delay.time).toBe(400);
     expect(patch.reverb.pitch).toBe(12);
-    expect(patch.chain).toEqual(gx1.DEFAULT_CHAIN);
+    expect(patch.chain).toEqual(DEFAULT_CHAIN);
   });
 
   // A sub-model goes in under one name and has to come back out under the same one. Pedal WAH read
@@ -58,7 +59,7 @@ describe("buildPatch", () => {
   });
 
   it("takes a chain the spec supplies over the default order", () => {
-    const reordered = gx1.moveBefore(gx1.DEFAULT_CHAIN, "REV", "DLY");
+    const reordered = moveBefore(DEFAULT_CHAIN, "REV", "DLY");
     const patch = gx1.driver.buildPatch({
       name: "Reordered",
       chain: reordered,
@@ -90,5 +91,28 @@ describe("buildPatch", () => {
     });
 
     expect(build).toThrow(/time/);
+  });
+
+  // FX1 and FX2 have no MEMORY%FX3A block, so OVERTONE's params landed at offset 0 of the shared
+  // 251-byte block, on top of COMPRESSOR's window and the factory defaults living in it.
+  it("rejects OVERTONE in an fx slot that cannot hold it, naming the one that can", () => {
+    const build = (): unknown => gx1.driver.buildPatch({
+      name: "Overtone",
+      amp: { type: "TWIN" },
+      fx1: { type: "OVERTONE", params: { lower: 60 } },
+    });
+
+    expect(build).toThrow(/OVERTONE/);
+    expect(build).toThrow(/fx3/);
+  });
+
+  it("accepts OVERTONE in fx3", () => {
+    const patch = gx1.driver.buildPatch({
+      name: "Overtone",
+      amp: { type: "TWIN" },
+      fx3: { type: "OVERTONE", params: { lower: 60 } },
+    });
+
+    expect(patch.fx3.params.lower).toBe(60);
   });
 });

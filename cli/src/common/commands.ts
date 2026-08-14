@@ -1,26 +1,37 @@
 import type { Command } from "commander";
+import { InvalidArgumentError } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
+import type { PrintPatch } from "../types";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
-/** Splits "amp.gain=72" at the first "=", so a value containing one survives intact. */
+/**
+ * Splits "amp.gain=72" at the first "=", so a value containing one survives intact. Without the
+ * separator there is nothing to split on, and slicing at -1 quietly drops the argument's last
+ * character, which sent "amp.gain" on as the path "amp.gai" and reported it as an unknown field.
+ */
 const parseFieldAssignment = (assignment: string): [string, string] => {
   const separatorIndex = assignment.indexOf("=");
+  if (separatorIndex < 1) {
+    throw new Error(`Cannot read "${assignment}" as a field edit: write each one as path=value.`);
+  }
   return [assignment.slice(0, separatorIndex), assignment.slice(separatorIndex + 1)];
 };
 
+/**
+ * Runs one command's work, turning a throw into a printed message and a failing exit code. Setting
+ * the code rather than calling process.exit lets the runtime finish flushing stdout, so a failure
+ * piped into another command arrives whole.
+ */
 const run = (action: () => void): void => {
   try {
     action();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
-    process.exit(1);
+    process.exitCode = 1;
   }
 };
-
-/** Printing a patch is the one command that needs the device's own formatter. */
-type PrintPatch<T extends Patch> = (patch: T, index: number) => void;
 
 const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPatch: PrintPatch<T>): void => {
   cmd
@@ -29,9 +40,10 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPat
     .action((file: string, ref?: string) => {
       run(() => {
         const patchFile = driver.readFile(file);
-        console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${patchFile.device}`);
-        for (const index of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
-          printPatch(patchView.presentPatch(patchFile.patches[index]), index);
+        // The driver's own name, not the file's `device` id, since this line is for a person.
+        console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${driver.name}`);
+        for (const { index, patch } of patchUtils.resolvePatches(patchFile.patches, ref)) {
+          printPatch(patchView.presentPatch(patch), index);
         }
         console.info();
       });
@@ -41,13 +53,13 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPat
 const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("write <file> <ref> <fields...>")
-    .description("update patch fields by dot-path (e.g. amp.gain=72, key=G)")
+    .description("update patch fields by dot-path (block.param=value); see `capabilities` for the names")
     .action((file: string, ref: string, fields: string[]) => {
       run(() => {
+        const edits = fields.map(parseFieldAssignment);
         const patchFile = driver.readFile(file);
-        const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-        const patch = patchFile.patches[index] as unknown as Record<string, unknown>;
-        patchUtils.applyFieldEdits(patch, fields.map(parseFieldAssignment));
+        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
+        patchUtils.applyFieldEdits(driver, patch, edits);
         driver.writeFile(patchFile, file);
         console.info(`Wrote ${file}, patch ${index} updated: ${fields.join(", ")}`);
       });
@@ -67,14 +79,30 @@ const addCopy = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =>
     });
 };
 
+/**
+ * Commander hands every option through as a string, and a count that isn't one is a mistake.
+ * InvalidArgumentError is what routes it through commander's own usage error rather than out of
+ * the parse as an unhandled throw.
+ */
+const parseCount = (value: string): number => {
+  if (!/^\d+$/.test(value.trim())) {
+    throw new InvalidArgumentError(`--count takes a whole number of patches (got "${value}").`);
+  }
+  return Number(value.trim());
+};
+
 const addNew = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
-    .command("new <file> [setName] [nPatches]")
+    .command("new <file>")
     .description("create a blank patch file")
-    .action((file: string, setName?: string, patchCountStr?: string) => {
+    .option("--set-name <name>", "name for the patch set stored in the file (default: the filename)")
+    .option("--count <n>", "how many blank patches it opens with", parseCount)
+    .action((file: string, options: { setName?: string; count?: number }) => {
       run(() => {
-        const patchCount = patchCountStr === undefined ? undefined : parseInt(patchCountStr, 10);
-        const patchFile = patchUtils.createPatchFile(driver, file, { setName, patchCount });
+        const patchFile = patchUtils.createPatchFile(driver, file, {
+          setName: options.setName,
+          patchCount: options.count,
+        });
         console.info(
           `Created ${file} with ${patchFile.patches.length} blank patch(es), set name '${patchFile.name}'`
         );
@@ -95,7 +123,11 @@ const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>):
           return;
         }
 
-        if (groupId === "chain") {
+        // The chain sits alongside the groups in the listing, so it answers to the same
+        // case-insensitive match they do, and to a second argument the same way: there is nothing
+        // under it to name.
+        if (groupId.toLowerCase() === "chain") {
+          if (item) throw new Error(`The chain has no items, so there is no "${item}" to show.`);
           printChain(caps.chain);
           return;
         }

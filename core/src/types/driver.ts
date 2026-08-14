@@ -1,5 +1,11 @@
-import type { Patch, PatchFile, RawPatch } from "./patch";
+import type { Encodable, Patch, PatchFile, RawPatch } from "./patch";
 import type { DeviceCapabilities } from "./capabilities";
+
+/** What a field can be set to, on any surface that expresses an edit as a path and a value. */
+type FieldValue = string | number | boolean;
+
+/** Dot-path to the value written there, as `write_fields` and the CLI's `write` both express it. */
+type FieldEdits = Record<string, unknown>;
 
 interface PatchDriver<T extends Patch = Patch> {
   readonly id: string;
@@ -15,8 +21,19 @@ interface PatchDriver<T extends Patch = Patch> {
    * type it would already have to know the device, which is what this method exists to avoid.
    */
   buildPatch(spec: unknown): T;
+  /**
+   * Every problem with a set of dot-path edits already applied to `patch`, checked against this
+   * device's capability catalog; empty when they are all usable. Reading the selection off the
+   * patch rather than off the edits is what lets an edit changing a block's type and an edit
+   * setting a param of that new type validate as one consistent state.
+   *
+   * `setByPath` establishes only that a field exists, which is why this is separate: a real field
+   * handed a value of the wrong kind or outside the param's range still encodes to a byte the
+   * device cannot mean.
+   */
+  validateFields(patch: T, edits: FieldEdits): string[];
   decodePatch(raw: RawPatch): T;
-  encodePatch(patch: T): RawPatch;
+  encodePatch(patch: Encodable<T>): RawPatch;
 }
 
-export type { PatchDriver };
+export type { FieldValue, FieldEdits, PatchDriver };

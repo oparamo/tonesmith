@@ -10,10 +10,7 @@
  */
 import { typeSurface } from "./validate";
 import type { TypeSurface } from "./validate";
-import { SUB_TYPE_FIELD } from "../common";
-
-const TYPE_FIELD = "type";
-const PARAMS_FIELD = "params";
+import { PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD } from "../common";
 
 /** The block a rejected input was addressing, as far as the input itself reveals. */
 interface BlockContext {

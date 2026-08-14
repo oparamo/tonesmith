@@ -1,5 +1,7 @@
 import { findGroup, findItem } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
+import { onlyBlockFor } from "../common";
+import type { BlockName } from "../common";
 import type { CapabilityGroup, CapabilityItem, ParamSpec } from "../../../types";
 
 /** Every problem found with one block, empty when the block is usable. */
@@ -109,6 +111,45 @@ const checkSubType = (issues: Issues, check: SubTypeCheck): void => {
   issues.push(`${group} ${type} has no subType "${subType}". Valid subTypes: ${valid}`);
 };
 
+const typeChoices = (capGroup: CapabilityGroup): string => capGroup.items.map(item => item.id).join(", ");
+
+/** Names what the group does offer, since a rejected `type` leaves the caller with no next step. */
+const unknownTypeIssue = (capGroup: CapabilityGroup, type: unknown): string =>
+  `${capGroup.id} has no type ${JSON.stringify(type)}. Types: ${typeChoices(capGroup)}`;
+
+/**
+ * Rejects a type in a block the device does not offer it in. The block that does offer it is named
+ * because moving the block there is the whole fix. Without this the type is accepted, and its
+ * params are written over whatever the block it landed in keeps at those byte offsets.
+ */
+const checkTypeBelongsInBlock = (issues: Issues, name: BlockName, type: unknown): void => {
+  if (typeof type !== "string") return;
+  const onlyBlock = onlyBlockFor(type);
+  if (onlyBlock === undefined || onlyBlock === name) return;
+  issues.push(`${name} has no ${type}: this device offers it in ${onlyBlock} only.`);
+};
+
+/** A block's shape selectors, as they arrive from a caller: unvalidated, and each one optional. */
+interface Selectors {
+  group: string;
+  on?: unknown;
+  subType?: unknown;
+}
+
+/**
+ * `on` and `subType` pick a block's shape rather than set one of its controls, so they are filtered
+ * out of the param check and would otherwise reach the builder on nothing but a cast.
+ */
+const checkSelectors = (issues: Issues, selectors: Selectors): void => {
+  const { group, on, subType } = selectors;
+  if (on !== undefined && typeof on !== "boolean") {
+    issues.push(`${group} on takes true or false (got ${JSON.stringify(on)})`);
+  }
+  if (subType !== undefined && typeof subType !== "string") {
+    issues.push(`${group} subType takes the name of a variant (got ${JSON.stringify(subType)})`);
+  }
+};
+
 /** One param's value alongside the spec and selection it is checked against. */
 interface ParamCheck {
   group: string;
@@ -125,45 +166,39 @@ const paramLabel = (check: ParamCheck): string => {
 };
 
 /**
- * What kind of value a spec takes, or undefined where its domain names no kind to check against.
- * `boolean` and `values` each identify a kind outright; bounds identify a number but not whether a
- * fraction is legal, which is what `decimals` settles.
+ * What kind of value a spec takes, in the words the rejection uses. Bounds say a param is numeric
+ * but not whether a fraction is legal, which is what `decimals` settles.
  */
-const expectedKind = (spec: ParamSpec): string | undefined => {
-  if (spec.boolean === true) return "true or false";
-  if (spec.values !== undefined) return `one of: ${spec.values.join(", ")}`;
-  if (spec.min === undefined || spec.max === undefined) return undefined;
+const expectedKind = (spec: ParamSpec): string => {
+  if (spec.kind === "boolean") return "true or false";
+  if (spec.kind === "discrete") return `one of: ${spec.values.join(", ")}`;
   const numeric = spec.decimals === undefined ? "a whole number" : "a number";
   return numeric;
 };
 
 /** True when the value is the kind this spec takes at all, before asking whether it is in range. */
 const isRightKind = (spec: ParamSpec, value: unknown): boolean => {
-  if (spec.boolean === true) return typeof value === "boolean";
-  if (spec.values !== undefined) return typeof value === "string";
+  if (spec.kind === "boolean") return typeof value === "boolean";
+  if (spec.kind === "discrete") return typeof value === "string";
   if (typeof value !== "number" || !Number.isFinite(value)) return false;
   return spec.decimals !== undefined || Number.isInteger(value);
 };
 
 /**
  * Checks one value against one spec: that it is the kind the param takes, then that it is in range
- * or a member of the value list. The kind check leads because a value of the wrong kind passes both
- * of the others by falling through them, which is how a string threshold used to reach the codec.
+ * or a member of the value list. The kind check leads because a value of the wrong kind passes the
+ * range check by falling through it, which is how a string threshold used to reach the codec.
  */
 const checkValue = (issues: Issues, check: ParamCheck): void => {
   const { spec, value } = check;
-  const kind = expectedKind(spec);
-  if (kind !== undefined && !isRightKind(spec, value)) {
-    issues.push(`${paramLabel(check)} takes ${kind} (got ${JSON.stringify(value)})`);
+  if (!isRightKind(spec, value)) {
+    issues.push(`${paramLabel(check)} takes ${expectedKind(spec)} (got ${JSON.stringify(value)})`);
     return;
   }
-  if (typeof value === "number" && spec.min !== undefined && spec.max !== undefined) {
-    if (value < spec.min || value > spec.max) {
-      issues.push(`${paramLabel(check)} must be ${spec.min}–${spec.max} (got ${value})`);
-    }
-    return;
+  if (spec.kind === "numeric" && typeof value === "number" && (value < spec.min || value > spec.max)) {
+    issues.push(`${paramLabel(check)} must be ${spec.min}–${spec.max} (got ${value})`);
   }
-  if (typeof value === "string" && spec.values !== undefined && !spec.values.includes(value)) {
+  if (spec.kind === "discrete" && typeof value === "string" && !spec.values.includes(value)) {
     issues.push(`${paramLabel(check)} must be one of: ${spec.values.join(", ")} (got "${value}")`);
   }
 };
@@ -227,5 +262,8 @@ const typeSurface = (selected: Selected): TypeSurface | undefined => {
   };
 };
 
-export { validateTypeParams, typeSurface };
-export type { Issues, TypeParams, TypeSurface };
+export {
+  checkSelectors, checkTypeBelongsInBlock, resolveSelection, typeChoices, unknownTypeIssue,
+  validateTypeParams, typeSurface,
+};
+export type { Issues, Selection, Selectors, TypeParams, TypeSurface };

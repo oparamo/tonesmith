@@ -1,8 +1,9 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
+import { writeFileAtomic } from "../../atomic-write";
 import { decodePatch, encodePatch, hexFromBytes } from "./codec";
 import { encodeName } from "./codec/blocks";
 import { RAW, NAME_BYTES } from "./common";
+import type { PatchFile as BasePatchFile } from "../../types";
 import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types";
 
 /** Byte length of each block that opens zero-filled. */
@@ -13,9 +14,6 @@ const BLOCK_BYTES = {
   delay: 29,
   reverb: 20,
   pfx: 14,
-  other: 7,
-  ctl: 32,
-  assign: 15,
 } as const;
 
 const ASSIGN_SLOTS = 8;
@@ -30,11 +28,11 @@ const NAME_PAD = 0x20;
  */
 const DEFAULT_CHAIN_BYTES = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
 
-// The four blocks whose bytes are one fixed shape, so a blank patch can carry the device's own
-// factory values for them outright. Each array is `default-init.tsl`'s bytes for that block, which
-// agree with the device's official parameter table field for field. The other blocks open
-// zero-filled: their bytes mean different things per type, so there is no one value to open at, and
-// the builder fills each type's own defaults from DEFAULTS_BY_TYPE instead.
+// The blocks whose bytes are one fixed shape, so a blank patch can carry the device's own factory
+// values for them outright. Each array is `default-init.tsl`'s bytes for that block, which agree
+// with the device's official parameter table field for field. The rest open zero-filled: their
+// bytes mean different things per type, so there is no one value to open at, and the builder fills
+// each type's own defaults from DEFAULTS_BY_TYPE instead.
 
 /** Off, NATURAL, gain 50, level 50, bass/mid/treble 50, ORIGINAL speaker, DYN421 mic, solo off at 50. */
 const AMP_DEFAULT_BYTES = [0, 1, 0, 50, 50, 50, 50, 50, 1, 1, 1, 0, 50];
@@ -47,6 +45,26 @@ const FV_DEFAULT_BYTES = [100, 0, 100, 2];
 
 /** Off, threshold 30, release 30, INPUT detect. */
 const NS_DEFAULT_BYTES = [0, 30, 30, 0];
+
+/**
+ * Memory level 100 and BPM 120, each a byte split across two nibbles, then key of C, carryover on,
+ * tempo hold off. Zeros are a setting rather than an absence here: they trim the patch's output to
+ * silence and put the tempo below the 40 the device accepts.
+ */
+const OTHER_DEFAULT_BYTES = [6, 4, 7, 8, 0, 1, 0];
+
+/**
+ * The footswitch assignments the device ships a patch with, a function index and a mode per switch.
+ * FORMAT.md documents the shape and leaves the block undecoded, so these are the fixture's bytes
+ * rather than a field-by-field reading of them.
+ */
+const CTL_DEFAULT_BYTES = [
+  1, 0, 2, 0, 3, 0, 0, 0, 0, 0, 5, 0, 5, 2, 5, 0,
+  17, 0, 4, 0, 3, 17, 0, 4, 0, 7, 0, 16, 0, 11, 0, 3,
+];
+
+/** An assign slot at rest. Undecoded like MEMORY%CTL, so this is the fixture's bytes as they are. */
+const ASSIGN_DEFAULT_BYTES = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 // A fresh array per call: RAW is a public escape hatch, and callers are free to mutate
 // patch[RAW]["MEMORY%FXn"] in place (e.g. to probe undecoded byte offsets). A shared array would
@@ -72,11 +90,11 @@ const blankParamSet = (): RawParamSet => {
     "MEMORY%PFX":     zeroBytes(BLOCK_BYTES.pfx),
     "MEMORY%FV":      hexFromBytes(FV_DEFAULT_BYTES),
     "MEMORY%NS":      hexFromBytes(NS_DEFAULT_BYTES),
-    "MEMORY%OTHER":   zeroBytes(BLOCK_BYTES.other),
-    "MEMORY%CTL":     zeroBytes(BLOCK_BYTES.ctl),
+    "MEMORY%OTHER":   hexFromBytes(OTHER_DEFAULT_BYTES),
+    "MEMORY%CTL":     hexFromBytes(CTL_DEFAULT_BYTES),
   };
   for (let slot = 1; slot <= ASSIGN_SLOTS; slot++) {
-    paramSet[`MEMORY%ASGN${slot}`] = zeroBytes(BLOCK_BYTES.assign);
+    paramSet[`MEMORY%ASGN${slot}`] = hexFromBytes(ASSIGN_DEFAULT_BYTES);
   }
   return paramSet;
 };
@@ -87,37 +105,101 @@ const blankPatch = (name = "NEW PATCH"): Patch => {
   return decodePatch({ memo: "", paramSet });
 };
 
+/** The `device` field of the file format itself: what this driver writes, and the only one it reads. */
+const FILE_DEVICE = "GX-1";
+
+/** This driver's id in the registry, which is what a decoded file names as its device. */
+const DRIVER_ID = "gx1";
+
+const FORMAT_REV = "0000";
+
 const newFile = (setName: string, patchCount = 1): PatchFile => {
   const patches = Array.from({ length: patchCount }, () => blankPatch());
-  const envelope: TslEnvelope = { name: setName, formatRev: "0000", device: "GX-1", data: [[], []] };
-  return { name: setName, formatRev: "0000", device: "GX-1", patches, [RAW]: envelope };
+  const envelope: TslEnvelope = { name: setName, formatRev: FORMAT_REV, device: FILE_DEVICE, data: [[], []] };
+  return { name: setName, formatRev: FORMAT_REV, device: DRIVER_ID, patches, [RAW]: envelope };
+};
+
+/**
+ * Every block a patch has to carry, read off the blank patch so the list cannot fall behind the
+ * codec: a block the codec learns to write is a block a file has to hold.
+ */
+const REQUIRED_BLOCKS = Object.keys(blankParamSet());
+
+const isHexList = (value: unknown): boolean =>
+  Array.isArray(value) && value.every(entry => typeof entry === "string");
+
+const paramSetOf = (patch: unknown): Record<string, unknown> | undefined => {
+  if (patch === null || typeof patch !== "object") return undefined;
+  const { paramSet } = patch as { paramSet?: unknown };
+  if (paramSet === null || typeof paramSet !== "object") return undefined;
+  return paramSet as Record<string, unknown>;
+};
+
+const checkPatch = (path: string, index: number, patch: unknown): void => {
+  const paramSet = paramSetOf(patch);
+  if (paramSet === undefined) {
+    throw new Error(`Cannot read ${path}: patch ${index} carries no paramSet.`);
+  }
+  const missing = REQUIRED_BLOCKS.filter(block => !isHexList(paramSet[block]));
+  if (missing.length > 0) {
+    throw new Error(`Cannot read ${path}: patch ${index} is missing ${missing.join(", ")}.`);
+  }
+};
+
+/**
+ * Narrows what `JSON.parse` handed back to an envelope this device wrote. Anything at all can be
+ * pointed at a tool that takes a path, and without this the first field the codec reached for threw
+ * a TypeError naming neither the file nor what was wrong with it.
+ */
+const parseEnvelope = (path: string, parsed: unknown): TslEnvelope => {
+  const envelope = (parsed ?? {}) as Partial<TslEnvelope>;
+  if (typeof envelope !== "object" || typeof envelope.device !== "string") {
+    throw new Error(`Cannot read ${path}: it is not a patch file.`);
+  }
+  if (envelope.device !== FILE_DEVICE) {
+    throw new Error(`Cannot read ${path}: it holds a ${envelope.device} patch set, not a ${FILE_DEVICE} one.`);
+  }
+  if (!Array.isArray(envelope.data) || !Array.isArray(envelope.data[0])) {
+    throw new Error(`Cannot read ${path}: its "data" field holds no list of patches.`);
+  }
+  envelope.data[0].forEach((patch, index) => { checkPatch(path, index, patch); });
+  return envelope as TslEnvelope;
 };
 
 const readFile = (path: string): PatchFile => {
-  const envelope = JSON.parse(readFileSync(path, "utf8")) as TslEnvelope;
+  const envelope = parseEnvelope(path, JSON.parse(readFileSync(path, "utf8")));
   return {
     name:      envelope.name,
     formatRev: envelope.formatRev,
-    device:    envelope.device,
-    patches:   envelope.data[0].map(rawPatch =>
-      decodePatch(rawPatch as unknown as { memo?: string; paramSet: RawParamSet })
-    ),
+    device:    DRIVER_ID,
+    patches:   envelope.data[0].map(decodePatch),
     [RAW]: envelope,
   };
 };
 
-const writeFile = (file: PatchFile, path: string): void => {
+/**
+ * The device-agnostic `PatchFile` a caller may hand `PatchDriver.writeFile` is not one this writer
+ * can start from. Every write begins at the envelope the file was read as and overwrites the byte
+ * indices this codec knows, which is what leaves the format's undecoded fields intact, so a file
+ * assembled by hand has nothing to write back.
+ */
+const asWritable = (file: BasePatchFile<Patch>, path: string): PatchFile => {
+  const candidate = file as Partial<PatchFile>;
+  if (candidate[RAW] === undefined || candidate.formatRev === undefined) {
+    throw new Error(`Cannot write ${path}: this patch file did not come from readFile or newFile, so it carries none of the original bytes a write starts from.`);
+  }
+  return file as PatchFile;
+};
+
+const writeFile = (input: BasePatchFile<Patch>, path: string): void => {
+  const file = asWritable(input, path);
   const envelope: TslEnvelope = {
     ...file[RAW],
     name:      file.name,
     formatRev: file.formatRev,
-    data: [
-      file.patches.map(patch => encodePatch(patch) as unknown as RawParamSet),
-      file[RAW].data[1],
-    ],
+    data: [file.patches.map(encodePatch), file[RAW].data[1]],
   };
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(envelope));
+  writeFileAtomic(path, JSON.stringify(envelope));
 };
 
 export { blankPatch, newFile, readFile, writeFile };

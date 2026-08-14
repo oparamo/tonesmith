@@ -7,22 +7,51 @@ import {
   REV_TYPES, REV_TYPE_IDX,
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
-  NS_DETECT, FV_CURVE, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
-  FREQ_HIGH_CUT, NAME_BYTES, RAW,
+  NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
+  FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW,
 } from "../common";
 import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
-import { bytesFromHex, hexFromBytes, lookupName, lookupIndex, toSigned, toUnsigned } from "./primitives";
+import {
+  bytesFromHex, hexFromBytes, byteReader, lookupName, lookupIndex, toSigned, toUnsigned,
+} from "./primitives";
 import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";
 
 // ── Name block ────────────────────────────────────────────────────────────────
 
+/**
+ * The device writes ASCII, but "ascii" masks bit 7 in both directions, so a byte above 0x7F comes
+ * back as a different character and is written back as that one. "latin1" is the same encoding
+ * below 0x80 and byte-exact above it, which is what leaves a name this codec did not author alone.
+ */
+const NAME_ENCODING = "latin1";
+
+/**
+ * Why the block cannot hold this name, or undefined when it can. The ceiling is one byte per
+ * character rather than ASCII: a name read out of a file may carry any byte, and the encoder's job
+ * is to put it back as it was found. What a caller may *author* is narrower, and the spec validator
+ * is where that is decided.
+ */
+const nameIssue = (name: string): string | undefined => {
+  const unstorable = charsAbove(LAST_STORABLE_CHAR, name);
+  if (unstorable.length > 0) {
+    return `Patch name "${name}" uses characters this device has no byte for: ${unstorable.join(" ")}`;
+  }
+  if (name.length > NAME_BYTES) {
+    return `Patch name "${name}" is ${name.length} characters; this device stores ${NAME_BYTES}.`;
+  }
+  return undefined;
+};
+
 const decodeName = (hexList: string[]): string =>
-  Buffer.from(hexList.join(""), "hex").toString("ascii").trimEnd();
+  Buffer.from(hexList.join(""), "hex").toString(NAME_ENCODING).trimEnd();
 
 const encodeName = (name: string): string[] => {
+  const issue = nameIssue(name);
+  if (issue !== undefined) throw new Error(issue);
+
   const buffer = Buffer.alloc(NAME_BYTES, 0x20);
-  buffer.write(name.slice(0, NAME_BYTES), "ascii");
+  buffer.write(name, NAME_ENCODING);
   return hexFromBytes(Array.from(buffer));
 };
 
@@ -47,12 +76,14 @@ const encodeBlockFields = (
 // key is: HARMONIST_HR's scale-degree entries are diatonic, so this is what the device
 // uses to resolve them to actual semitones.
 
+const KEY_OFFSET = 4;
+
 const decodeKey = (hexList: string[]): string =>
-  lookupName(KEY_NAMES, bytesFromHex(hexList)[4]);
+  lookupName(KEY_NAMES, byteReader(bytesFromHex(hexList), "MEMORY%OTHER")(KEY_OFFSET));
 
 const encodeKey = (key: string, originalHex: string[]): string[] => {
   const bytes = bytesFromHex(originalHex);
-  bytes[4] = lookupIndex(KEY_IDX, key, "key");
+  bytes[KEY_OFFSET] = lookupIndex(KEY_IDX, key, "key");
   return hexFromBytes(bytes);
 };
 
@@ -60,22 +91,25 @@ const encodeKey = (key: string, originalHex: string[]): string[] => {
 // ── Chain block ───────────────────────────────────────────────────────────────
 //
 // A linked list, not a positional array: byte 0 holds the firmware value of whichever
-// block comes first; byte CHAIN_NEXT_SLOT[name] holds the firmware value of whatever
-// comes immediately after that block. CHAIN_TERMINATOR means "connects to OUTPUT."
+// block comes first; each block's own slot holds the firmware value of whatever comes
+// immediately after it. CHAIN_TERMINATOR means "connects to OUTPUT."
 
-const CHAIN_NEXT_SLOT: Record<string, number> = Object.fromEntries(
-  CHAIN_BLOCK_ORDER.map((name, index) => [name, index + 1])
-);
+/** Byte holding what follows `name`. Byte 0 names the first block, so a block's slot is its position + 1. */
+const nextSlotFor = (name: string): number => {
+  const position = (CHAIN_BLOCK_ORDER as readonly string[]).indexOf(name);
+  if (position < 0) throw new Error(`Unknown chain block "${name}": valid blocks are ${CHAIN_BLOCK_ORDER.join(", ")}`);
+  return position + 1;
+};
 
 const decodeChain = (hexList: string[]): string[] => {
   const bytes = bytesFromHex(hexList);
   const order: string[] = [];
   let value = bytes[0];
-  while (value !== CHAIN_TERMINATOR && order.length < CHAIN_BLOCK_ORDER.length) {
+  while (value !== undefined && value !== CHAIN_TERMINATOR && order.length < CHAIN_BLOCK_ORDER.length) {
     const name = CHAIN_VALUE_TO_NAME[value];
     if (name === undefined) break;
     order.push(name);
-    value = bytes[CHAIN_NEXT_SLOT[name]];
+    value = bytes[nextSlotFor(name)];
   }
   return order;
 };
@@ -125,7 +159,7 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
 
   bytes[0] = valueOf(names[0]);
   names.forEach((name, index) => {
-    bytes[CHAIN_NEXT_SLOT[name]] = valueOf(names[index + 1]);
+    bytes[nextSlotFor(name)] = valueOf(names[index + 1]);
   });
   return hexFromBytes(bytes);
 };
@@ -140,18 +174,19 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
 
 const decodeAmp = (hexList: string[]): AmpBlock => {
   const bytes = bytesFromHex(hexList);
+  const at = byteReader(bytes, "AMP");
   return {
-    on:        Boolean(bytes[0]),
-    type:      lookupName(AMP_TYPES, bytes[1]),
-    gain:      bytes[3],
-    level:     bytes[4],
-    bass:      bytes[5],
-    middle:    bytes[6],
-    treble:    bytes[7],
-    speaker:   lookupName(SP_TYPES,  bytes[8]),
-    mic:       lookupName(MIC_TYPES, bytes[10]),
-    solo:      Boolean(bytes[11]),
-    soloLevel: bytes[12],
+    on:        Boolean(at(0)),
+    type:      lookupName(AMP_TYPES, at(1)),
+    gain:      at(3),
+    level:     at(4),
+    bass:      at(5),
+    middle:    at(6),
+    treble:    at(7),
+    speaker:   lookupName(SP_TYPES,  at(8)),
+    mic:       lookupName(MIC_TYPES, at(10)),
+    solo:      Boolean(at(11)),
+    soloLevel: at(12),
     [RAW]:     bytes,
   };
 };
@@ -179,15 +214,16 @@ const encodeAmp = (block: AmpBlock): string[] => {
 
 const decodeOdDs = (hexList: string[]): OdDsBlock => {
   const bytes = bytesFromHex(hexList);
+  const at = byteReader(bytes, "OD/DS");
   return {
-    on:        Boolean(bytes[0]),
-    type:      lookupName(ODDS_TYPES, bytes[1]),
-    drive:     bytes[2],
-    tone:      toSigned(bytes[3]),
-    level:     bytes[4],
-    direct:    bytes[5],
-    solo:      Boolean(bytes[6]),
-    soloLevel: bytes[7],
+    on:        Boolean(at(0)),
+    type:      lookupName(ODDS_TYPES, at(1)),
+    drive:     at(2),
+    tone:      toSigned(at(3)),
+    level:     at(4),
+    direct:    at(5),
+    solo:      Boolean(at(6)),
+    soloLevel: at(7),
     [RAW]:     bytes,
   };
 };
@@ -210,11 +246,12 @@ const encodeOdDs = (block: OdDsBlock): string[] => {
 
 const decodeNs = (hexList: string[]): NsBlock => {
   const bytes = bytesFromHex(hexList);
+  const at = byteReader(bytes, "NS");
   return {
-    on:        Boolean(bytes[0]),
-    threshold: bytes[1],
-    release:   bytes[2],
-    detect:    lookupName(NS_DETECT, bytes[3]) as typeof NS_DETECT[number],
+    on:        Boolean(at(0)),
+    threshold: at(1),
+    release:   at(2),
+    detect:    lookupName(NS_DETECT, at(3)),
     [RAW]:     bytes,
   };
 };
@@ -224,8 +261,7 @@ const encodeNs = (block: NsBlock): string[] => {
   bytes[0] = Number(block.on);
   bytes[1] = block.threshold;
   bytes[2] = block.release;
-  const detectIndex = NS_DETECT.indexOf(block.detect);
-  if (detectIndex >= 0) bytes[3] = detectIndex;
+  bytes[3] = lookupIndex(NS_DETECT_IDX, block.detect, "NS detect");
   return hexFromBytes(bytes);
 };
 
@@ -234,11 +270,12 @@ const encodeNs = (block: NsBlock): string[] => {
 
 const decodeFv = (hexList: string[]): FvBlock => {
   const bytes = bytesFromHex(hexList);
-  const curve = bytes.length > 3 ? lookupName(FV_CURVE, bytes[3]) as typeof FV_CURVE[number] : "NORMAL";
+  const at = byteReader(bytes, "FV");
+  const curve = bytes.length > 3 ? lookupName(FV_CURVE, at(3)) : "NORMAL";
   return {
-    position: bytes[0],
-    min:      bytes[1],
-    max:      bytes[2],
+    position: at(0),
+    min:      at(1),
+    max:      at(2),
     curve,
     [RAW]:    bytes,
   };
@@ -249,10 +286,8 @@ const encodeFv = (block: FvBlock): string[] => {
   bytes[0] = block.position;
   bytes[1] = block.min;
   bytes[2] = block.max;
-  if (bytes.length > 3) {
-    const curveIndex = FV_CURVE.indexOf(block.curve);
-    if (curveIndex >= 0) bytes[3] = curveIndex;
-  }
+  // A 3-byte FV block predates the curve control and has no byte to write it to.
+  if (bytes.length > 3) bytes[3] = lookupIndex(FV_CURVE_IDX, block.curve, "FV curve");
   return hexFromBytes(bytes);
 };
 
@@ -267,8 +302,9 @@ const encodeFv = (block: FvBlock): string[] => {
 
 const decodeFxCom = (hexList: string[]): Omit<FxBlock, "params"> => {
   const bytes = bytesFromHex(hexList);
-  const fxType = decodeFxType(bytes[1]);
-  return { on: Boolean(bytes[0]), type: fxType, subType: null, [RAW]: bytes };
+  const at = byteReader(bytes, "FX_COM");
+  const fxType = decodeFxType(at(1));
+  return { on: Boolean(at(0)), type: fxType, subType: null, [RAW]: bytes };
 };
 
 const encodeFxCom = (block: FxBlock): string[] => {
@@ -333,8 +369,9 @@ const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
 
 const decodeDelay = (hexList: string[]): DelayBlock => {
   const bytes = bytesFromHex(hexList);
-  const delayType = lookupName(DLY_TYPES, bytes[1]);
-  const block: DelayBlock = { on: Boolean(bytes[0]), type: delayType, [RAW]: bytes };
+  const at = byteReader(bytes, "DELAY");
+  const delayType = lookupName(DLY_TYPES, at(1));
+  const block: DelayBlock = { on: Boolean(at(0)), type: delayType, [RAW]: bytes };
 
   const fields = DELAY_TYPE_MAPS[delayType];
   if (fields) Object.assign(block, decodeFields(fields, bytes));
@@ -387,8 +424,9 @@ const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
 
 const decodeReverb = (hexList: string[]): ReverbBlock => {
   const bytes = bytesFromHex(hexList);
-  const reverbType = lookupName(REV_TYPES, bytes[1]);
-  const block: ReverbBlock = { on: Boolean(bytes[0]), type: reverbType, [RAW]: bytes };
+  const at = byteReader(bytes, "REVERB");
+  const reverbType = lookupName(REV_TYPES, at(1));
+  const block: ReverbBlock = { on: Boolean(at(0)), type: reverbType, [RAW]: bytes };
 
   const fields = reverbFields(reverbType);
   if (fields) Object.assign(block, decodeFields(fields, bytes));
@@ -425,8 +463,9 @@ const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
 
 const decodePfx = (hexList: string[]): PfxBlock => {
   const bytes = bytesFromHex(hexList);
-  const pfxType = lookupName(PFX_TYPES, bytes[1]);
-  const block: PfxBlock = { on: Boolean(bytes[0]), type: pfxType, [RAW]: bytes };
+  const at = byteReader(bytes, "PFX");
+  const pfxType = lookupName(PFX_TYPES, at(1));
+  const block: PfxBlock = { on: Boolean(at(0)), type: pfxType, [RAW]: bytes };
 
   const fields = PFX_TYPE_MAPS[pfxType];
   if (fields) Object.assign(block, decodeFields(fields, bytes));

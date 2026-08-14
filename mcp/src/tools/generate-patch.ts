@@ -2,10 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, registry } from "@tonesmith/core";
-import { ok, err } from "../common";
+import { attempt, deviceField, ok } from "../common";
 
 const inputSchema = z.object({
-  device: z.string().describe("Device ID. Use list_devices to enumerate IDs."),
+  device: deviceField,
   outPath: z.string().describe(
     "Output file path. Parent directories are created if missing. Saving upserts by patch name: " +
     "an existing patch of the same name is replaced, any other patch is appended, and a missing " +
@@ -50,16 +50,6 @@ const buildAll = (driver: PatchDriver, specs: PatchSpec[]): Patch[] =>
 const asStored = (driver: PatchDriver, patch: Patch): Patch =>
   driver.decodePatch(driver.encodePatch(patch));
 
-/** Patch names already saved at `path`, or undefined when the file doesn't exist yet. */
-const existingPatchNames = (driver: PatchDriver, path: string): string[] | undefined => {
-  try {
-    return driver.readFile(path).patches.map(patch => patch.name);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
-  }
-};
-
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
     "generate_patch",
@@ -75,40 +65,47 @@ save rather than calling this once per patch. The array's order is the order the
 and the file is written once. Unset params take the device's factory default for the chosen type,
 and the patch echoed back is the complete resulting state, so no follow-up read is needed.`,
       inputSchema,
+      // A patch whose name is already in the file replaces it, so a save can overwrite work.
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
-    ({ device, outPath, setName, patches }) => {
-      try {
-        const driver = registry.getDriver(device);
-        const built = buildAll(driver, patches);
+    ({ device, outPath, setName, patches }) => attempt(() => {
+      const driver = registry.getDriver(device);
+      const built = buildAll(driver, patches);
+      // Every round trip happens before the write, so a patch this codec cannot store fails the
+      // call with the file untouched rather than after it has already been replaced on disk.
+      const stored = built.map(patch => asStored(driver, patch));
 
-        const namesBefore = existingPatchNames(driver, outPath);
-        const alreadySaved = new Set(namesBefore ?? []);
-        const file = patchUtils.upsertPatches(driver, { path: outPath, patches: built, setName });
+      const { file, created, saved } = patchUtils.upsertPatches(driver, {
+        path: outPath, patches: built, setName,
+      });
 
-        const results = built.map(patch => {
-          const stored = asStored(driver, patch);
-          const action = alreadySaved.has(stored.name) ? "replaced" : "appended";
-          return {
-            name: stored.name,
-            action,
-            // State the stored order outright, so a caller that omitted `chain` sees the default
-            // it took rather than having to look it up.
-            chain: stored.chain,
-            // Echo back the stored patch so the caller can confirm every field the builder
-            // defaulted, without a follow-up read_patch.
-            patch: patchView.presentPatch(stored),
-          };
-        });
+      const results = stored.map((patch, index) => {
+        const entry = saved[index];
+        if (entry === undefined) {
+          throw new Error(`The save reported ${saved.length} patches for the ${stored.length} built.`);
+        }
+        return {
+          name: patch.name,
+          action: entry.action,
+          // State the stored order outright, so a caller that omitted `chain` sees the default
+          // it took rather than having to look it up.
+          chain: patch.chain,
+          // Echo back the stored patch so the caller can confirm every field the builder
+          // defaulted, without a follow-up read_patch.
+          patch: patchView.presentPatch(patch),
+        };
+      });
 
-        const fileVerb = namesBefore === undefined ? "Created" : "Updated";
-        const summary =
+      const fileVerb = created ? "Created" : "Updated";
+      const response = {
+        summary:
           `${fileVerb} ${outPath}: saved ${built.length} patch(es), ` +
-          `${file.patches.length} total in set "${file.name}"`;
-        return ok(`${summary}\n\n${JSON.stringify(results)}`);
-      } catch (error) {
-        return err(error);
-      }
-    }
+          `${file.patches.length} total in set "${file.name}"`,
+        file: { path: outPath, setName: file.name, total: file.patches.length, created },
+        patches: results,
+      };
+      return ok(JSON.stringify(response));
+    })
   );
 };
 

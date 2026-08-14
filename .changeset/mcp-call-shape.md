@@ -16,6 +16,13 @@ consumers into one call per item just to see what exists. Each item keeps its id
 description and subtype ids, and the block's own controls stay attached. Pass `includeParams: true`
 for the full payload, or name the items you want.
 
+Nothing in the tool schemas names a device any more. `describe_device` carried one device's id as
+the example device, listed that device's group ids as though every device had them, and printed a
+hand-written `items` example naming its effects, which on any other device demonstrates a call that
+fails. The summary's example is built from the catalog in hand, and the descriptions say what an
+entry is shaped like. Two other tools pointed at "the device's generate tool", which has not existed
+since `generate_patch` replaced it.
+
 **Naming an item returns an `example`**: a spec fragment for that block at factory defaults, keyed
 by the block's own name, ready to copy into `generate_patch` and edit. A list of param keys says
 what a control is called but not where it goes, and the answer differs by block, so a caller
@@ -29,7 +36,12 @@ device the server supports: a whole set goes out in one call and lands in one fi
 order becoming the order in the file rather than something the caller has to get right across N
 calls. Each patch is echoed back complete with its defaults filled in and the chain it was stored
 with, so the response is the confirmation and no follow-up read is needed. `setName` names the patch
-set stored in the file, distinct from `outPath`, the filename on disk. A block's shape, meaning the
+set stored in the file, distinct from `outPath`, the filename on disk.
+
+The response is one JSON object, `{ summary, file: { path, setName, total, created }, patches }`,
+rather than a prose line with a JSON array stuck to the end of it, which a consumer could only read
+by finding the first `[`. `file` says where the set stands after the write without reading it back,
+and each entry in `patches` says whether it replaced a same-named patch or was appended. A block's shape, meaning the
 fields it takes and their bounds, is validated by the device's own driver against its capability
 catalog rather than declared in the tool schema, so `describe_device` is where that detail lives.
 

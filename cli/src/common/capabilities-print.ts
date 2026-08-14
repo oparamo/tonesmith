@@ -1,11 +1,16 @@
 import type { DeviceCapabilities, CapabilityGroup, CapabilityItem, ChainSpec } from "@tonesmith/core";
 
-const RESET  = "\x1b[0m";
-const BOLD   = "\x1b[1m";
-const DIM    = "\x1b[2m";
-const CYAN   = "\x1b[36m";
-const YELLOW = "\x1b[33m";
-const GREEN  = "\x1b[32m";
+// Redirected into a file or piped into another command, an escape sequence is literal garbage in
+// the destination rather than color, so ask the same two questions every colored CLI asks.
+const colored = process.stdout.isTTY && !process.env.NO_COLOR;
+const sgr = (code: string): string => (colored ? `\x1b[${code}m` : "");
+
+const RESET  = sgr("0");
+const BOLD   = sgr("1");
+const DIM    = sgr("2");
+const CYAN   = sgr("36");
+const YELLOW = sgr("33");
+const GREEN  = sgr("32");
 
 /** Print the device's signal-chain model: default order, plus how ordering and bypass work. */
 const printChain = (chain: ChainSpec): void => {
@@ -68,8 +73,9 @@ const printGroup = (group: CapabilityGroup): void => {
   printGroupItems(group.items);
 };
 
-// Most subtypes are pure model variants with no params of their own. FX-slot DELAY is the
-// exception, since each sub-algorithm carries a distinct param set, so print those inline.
+// Most subtypes are pure model variants and carry no params. Where one does carry its own set,
+// picking that subtype is what puts those params in reach, so they belong under it rather than in
+// the type's shared list.
 const printSubTypeParams = (params: CapabilityItem["params"]): void => {
   if (!params || params.length === 0) return;
   for (const param of params) {
@@ -97,7 +103,7 @@ const printItemParams = (params: CapabilityItem["params"]): void => {
     const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
     console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
     console.info(`  ${"".padEnd(14)} ${param.description}`);
-    if (param.values) {
+    if (param.kind === "discrete") {
       console.info(`  ${"".padEnd(14)} ${DIM}Values: ${param.values.join(", ")}${RESET}`);
     }
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
 import { join } from "node:path";
-import { connectClient, withTempDir } from "./helpers";
+import { connectClient, withTempDir, patchAt, present } from "./helpers";
 
 describe("copy_patch", () => {
   let close: () => Promise<void>;
@@ -21,7 +21,8 @@ describe("copy_patch", () => {
 
     expect(result.isError).toBe(false);
     const after = gx1.driver.readFile(temp.fixture);
-    expect(after.patches[1].name).toBe(before.patches[0].name);
+    expect(present(after.patches[1], "the copy's destination slot").name)
+      .toBe(present(before.patches[0], "the copy's source slot").name);
     expect(after.patches).toHaveLength(before.patches.length);
   });
 
@@ -32,14 +33,14 @@ describe("copy_patch", () => {
     close = client.close;
     const destination = join(temp.dir, "destination.tsl");
     gx1.driver.writeFile(gx1.driver.newFile("destination", 1), destination);
-    const sourceName = gx1.driver.readFile(temp.fixture).patches[0].name;
+    const sourceName = patchAt(temp.fixture).name;
 
     const result = await client.callTool("copy_patch", {
       device: "gx1", src: temp.fixture, srcRef: "0", dst: destination, dstRef: "0",
     });
 
     expect(result.isError).toBe(false);
-    expect(gx1.driver.readFile(destination).patches[0].name).toBe(sourceName);
+    expect(patchAt(destination).name).toBe(sourceName);
   });
 
   it("resolves the source by patch name", async () => {
@@ -47,14 +48,14 @@ describe("copy_patch", () => {
     cleanup = temp.cleanup;
     const client = await connectClient();
     close = client.close;
-    const named = gx1.driver.readFile(temp.fixture).patches[2].name;
+    const named = patchAt(temp.fixture, 2).name;
 
     const result = await client.callTool("copy_patch", {
       device: "gx1", src: temp.fixture, srcRef: named, dst: temp.fixture, dstRef: "0",
     });
 
     expect(result.isError).toBe(false);
-    expect(gx1.driver.readFile(temp.fixture).patches[0].name).toBe(named);
+    expect(patchAt(temp.fixture).name).toBe(named);
   });
 
   // An unchecked index would write past the end of the array, and the hole that leaves encodes as

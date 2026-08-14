@@ -64,13 +64,15 @@ core/                       @tonesmith/core
       driver.ts             PatchDriver<T> interface (includes capabilities field)
       capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec
     registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
-    patch-utils.ts          patch-file operations every surface shares: resolvePatchIndices,
-                            applyFieldEdits, coerceValue, setByPath, upsertPatches, copyPatch,
-                            createPatchFile
+    patch-utils.ts          patch-file operations every surface shares: resolvePatch /
+                            resolvePatches, applyFieldEdits, coerceValue, setByPath, upsertPatches,
+                            copyPatch, createPatchFile
     patch-view.ts           presentPatch: the consumer-facing view of a decoded patch, dropping
                             the model selector that decode mirrors onto both subType and
                             params.type so a consumer isn't left guessing which to set
     capability-utils.ts     findGroup / findItem
+    atomic-write.ts         writeFileAtomic: sibling file then rename, so a driver's writeFile can
+                            never truncate a patch library it fails partway through
     devices/index.ts        driver roster, one line per device
     devices/<id>/           per-device driver, always this shape:
       types/                device type definitions split by domain (barrel: index.ts)
@@ -120,7 +122,10 @@ cli/                        @tonesmith/cli  (bin: tonesmith)
 
 mcp/                        @tonesmith/mcp  (bin: tonesmith-mcp)
   src/
-    common/                 response.ts, the ok / err MCP response helpers (barrel: common/index.ts)
+    common/                 pieces every tool registration shares (barrel: common/index.ts):
+                            response.ts (ok / err), attempt.ts (runs a handler's work, turning a
+                            throw into an error response), errors.ts (messageOf), schemas.ts (the
+                            shared `device` input field)
     instructions.ts         server-onboarding text sent to every client at initialize, written as
                             the two-call path for building patches rather than a tool inventory
     tools/                  tool registrations, all device-agnostic (barrel: tools/index.ts):
@@ -235,12 +240,12 @@ repository.
 | Tool                  | Inputs                                                             | Notes                                                                                                                                                                                                                                                     |
 |-----------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `list_devices`        | none                                                               | Returns `[{ id, name }]`                                                                                                                                                                                                                                  |
-| `read_patch`          | `device`, `file`, `ref?`                                           | `ref` = index or name; omit for all patches                                                                                                                                                                                                               |
+| `read_patch`          | `device`, `file`, `ref?`, `limit?`, `offset?`                      | `ref` = index or name. Omit it to page through the file: 20 patches by default (`limit` up to 100), plus `total` and a `more` line naming the offset to continue from                                                                                      |
 | `generate_patch`      | `device`, `outPath`, `setName?`, `patches[]`                       | One tool for every device: the per-patch spec comes from `describe_device`, not from this tool's schema. Builds every patch in `patches` and upserts them by name into `outPath` in array order, in one file write (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed). The response echoes each patch complete with defaults plus its resolved chain, so no follow-up read is needed |
 | `write_fields`        | `device`, `file`, `ref`, `fields`                                  | Dot-path mutations as a `{path: value}` record, same as CLI `write`. The batch applies atomically: a rejected edit leaves the file untouched                                                                                                              |
 | `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<item>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). Omit `items` for all groups plus a chain summary. A bare-group entry is an index with no per-item params, so name the items instead, or pass `includeParams` for the full set. A named item also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
 | `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use `generate_patch`, which appends by name                                                        |
-| `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                                                     |
+| `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults, `patchCount` from 1 to 500. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                          |
 
 ## CLI capabilities command
 

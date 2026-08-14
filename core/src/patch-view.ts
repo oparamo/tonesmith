@@ -1,3 +1,5 @@
+import type { PatchView } from "./types";
+
 /**
  * A decoded block whose sub-model selection lives inside its params bag and is also mirrored onto
  * the block's own `subType`, so both carry the identical value under the identical name.
@@ -18,9 +20,9 @@ const isMirrorBlock = (value: unknown): value is MirrorBlock => {
  * bag of every block that mirrors it onto the block itself. A device is free to store the
  * selection among the params, but emitting it twice leaves a consumer guessing which copy to set.
  * Keys on the mirror relationship itself rather than on any device's block names. Returns a
- * shallow copy.
+ * shallow copy, typed as the view it is: what it drops is what an encoder reads.
  */
-const presentPatch = <T extends object>(patch: T): T => {
+const presentPatch = <T extends object>(patch: T): PatchView<T> => {
   const view: Record<string, unknown> = { ...(patch as Record<string, unknown>) };
   for (const [key, block] of Object.entries(view)) {
     if (!isMirrorBlock(block)) continue;
@@ -28,7 +30,7 @@ const presentPatch = <T extends object>(patch: T): T => {
     delete params.subType;
     view[key] = { ...block, params };
   }
-  return view as T;
+  return view as PatchView<T>;
 };
 
 export { presentPatch };

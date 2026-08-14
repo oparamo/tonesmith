@@ -1,10 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, unlinkSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { driver } from "../../../src/devices/gx1/driver";
-
-const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tones.tsl");
+import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../helpers";
 
 describe("gx1 driver", () => {
   it("exposes its id, name, and capabilities", () => {
@@ -34,7 +33,7 @@ describe("gx1 driver", () => {
 
   it("encodePatch/decodePatch round-trip a patch through the driver", () => {
     const file = driver.readFile(FIXTURE);
-    const patch = file.patches[0];
+    const patch = present(file.patches[0], "patch 0 of the fixture");
 
     const encoded = driver.encodePatch(patch);
     const decoded = driver.decodePatch(encoded);

@@ -1,6 +1,6 @@
 import type { Patch, FxParams } from "./types";
-import { blankPatch, newFile, writeFile } from "./tsl";
-import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD } from "./common";
+import { blankPatch } from "./tsl";
+import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, onlyBlockFor } from "./common";
 import { DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS, type FieldCodec } from "./codec";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES, type ParamDefaults } from "./defaults";
 
@@ -208,6 +208,10 @@ const selectedSubType = (type: string, subType: string | null, params: FxParams)
 
 const fx = (patch: Patch, options: FxOptions): void => {
   const { slot, type, subType = null, params = {}, on = true } = options;
+  const onlySlot = onlyBlockFor(type);
+  if (onlySlot !== undefined && onlySlot !== slot) {
+    throw new Error(`${type} is a ${onlySlot} effect; this device has nowhere to store it in ${slot}.`);
+  }
   const selected = selectedSubType(type, subType, params);
   const block = patch[slot];
   block.on = on;
@@ -352,7 +356,7 @@ const delay = (patch: Patch, options: DelayOptions): void => {
     label: "delay",
     type,
     fields: DELAY_TYPE_MAPS[type],
-    defaults: DEFAULTS_BY_TYPE.delay[type],
+    defaults: DEFAULTS_BY_TYPE.delay[type] ?? {},
   };
   assignExtra(block, mergeBlockParams(named, params, typeSpec.label), typeSpec);
 };
@@ -383,21 +387,14 @@ const reverb = (patch: Patch, options: ReverbOptions): void => {
     label: "reverb",
     type,
     fields,
-    defaults: DEFAULTS_BY_TYPE.reverb[type],
+    defaults: DEFAULTS_BY_TYPE.reverb[type] ?? {},
   };
   assignExtra(block, mergeBlockParams(named, params, typeSpec.label), typeSpec);
 };
 
-const saveTsl = (patches: Patch[], setName: string, outPath: string): void => {
-  const file = newFile(setName, 0);
-  file.patches = patches;
-  writeFile(file, outPath);
-  console.info(`Saved ${outPath} (${patches.length} patches)`);
-};
-
 export {
   DEFAULT_CHAIN, moveBefore, validateChain, defaultFxParams,
-  basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, saveTsl,
+  basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb,
 };
 export type {
   AmpOptions, OddsOptions, FxOptions, NsOptions, FvOptions, PfxOptions, DelayOptions, ReverbOptions,

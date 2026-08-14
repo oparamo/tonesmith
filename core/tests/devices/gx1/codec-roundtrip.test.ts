@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { readFile } from "../../../src/devices/gx1/tsl";
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { RAW } from "../../../src/devices/gx1/common";
-
-const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tones.tsl");
+import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../helpers";
 
 const file = readFile(FIXTURE);
 const rawFileContents = readFileSync(FIXTURE, "utf8");
@@ -24,7 +22,7 @@ interface PatchCase {
 const patchCases: PatchCase[] = file.patches.map((patch, index) => ({
   index,
   patch,
-  original: raw.data[0][index],
+  original: present(raw.data[0][index], `raw patch ${index}`),
 }));
 
 describe("GX-1 round-trip", () => {
@@ -39,7 +37,7 @@ describe("GX-1 round-trip", () => {
 
 describe("decodePatch", () => {
   it("defaults memo to an empty string when the raw envelope omits it", () => {
-    const paramSet = file.patches[0][RAW];
+    const paramSet = present(file.patches[0], "patch 0 of the fixture")[RAW];
 
     const decoded = decodePatch({ paramSet });
 

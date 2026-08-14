@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
-import { connectClient } from "./helpers";
+import { connectClient, present } from "./helpers";
 
 /** Pulls one entry's view out of a batched response, which is keyed by the requested entry string. */
 const viewOf = (text: string, entry: string): unknown => (JSON.parse(text) as Record<string, unknown>)[entry];
@@ -25,6 +25,23 @@ describe("describe_device", () => {
     expect(summary.chain.defaultOrder, "no-items summary carries a chain pointer").toContain("AMP");
   });
 
+  // The summary's example was written out by hand against one device, so on any other it would name
+  // groups and items that do not exist.
+  it("shows an example `items` list built from this device's own catalog", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const { text } = await client.callTool("describe_device", { device: "gx1" });
+    const { help } = JSON.parse(text) as { help: string };
+    const entries = JSON.parse(help.slice(help.indexOf("["), help.lastIndexOf("]") + 1)) as string[];
+
+    const { isError, text: reply } = await client.callTool("describe_device", { device: "gx1", items: entries });
+
+    expect(entries.length, help).toBeGreaterThan(1);
+    expect(isError, reply).toBe(false);
+    expect(Object.keys(JSON.parse(reply) as object)).toEqual(entries);
+  });
+
   it("returns the full chain model for the chain entry", async () => {
     const client = await connectClient();
     close = client.close;
@@ -33,7 +50,7 @@ describe("describe_device", () => {
 
     expect(isError, text).toBe(false);
     const chain = viewOf(text, "chain") as { defaultOrder: string[] };
-    expect(chain.defaultOrder, "chain view lists the default block order").toEqual(gx1.DEFAULT_CHAIN);
+    expect(chain.defaultOrder, "chain view lists the default block order").toEqual(gx1.driver.capabilities.chain.defaultOrder);
   });
 
   // The whole point of the batch form: a patch's worth of lookups in one round trip.
@@ -47,11 +64,13 @@ describe("describe_device", () => {
     expect(isError, text).toBe(false);
     const views = JSON.parse(text) as Record<string, { id?: string; defaultOrder?: string[] }>;
     expect(Object.keys(views), "every requested entry comes back").toEqual(items);
-    expect(views.chain.defaultOrder).toEqual(gx1.DEFAULT_CHAIN);
-    expect(views.amp.id).toBe("amp");
-    expect(views["fx/CHORUS"].id).toBe("CHORUS");
-    expect(views["reverb/HALL M"].id).toBe("HALL M");
-    expect(views["delay/ANALOG"].id).toBe("ANALOG");
+    const requested = (item: string): { id?: string; defaultOrder?: string[] } =>
+      present(views[item], `the ${item} view`);
+    expect(requested("chain").defaultOrder).toEqual(gx1.driver.capabilities.chain.defaultOrder);
+    expect(requested("amp").id).toBe("amp");
+    expect(requested("fx/CHORUS").id).toBe("CHORUS");
+    expect(requested("reverb/HALL M").id).toBe("HALL M");
+    expect(requested("delay/ANALOG").id).toBe("ANALOG");
   });
 
   // "OD/DS" is a real fx effect type, so an entry is split on its FIRST slash only.

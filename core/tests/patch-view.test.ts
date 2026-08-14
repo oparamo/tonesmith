@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { presentPatch } from "../src/patch-view";
+import { driver } from "../src/devices/gx1/driver";
 
 describe("presentPatch", () => {
+  // Type-level, so the build is what enforces it: an unused @ts-expect-error is itself an error.
+  it("gives back a view the encoder will not take", () => {
+    const view = presentPatch(driver.blankPatch("P"));
+
+    // @ts-expect-error the view drops the mirrored selector the encoder reads for its field map
+    expect(() => driver.encodePatch(view)).toBeDefined();
+  });
+
   it("drops the duplicate subType from inside a block that mirrors it", () => {
     const view = presentPatch({
       name: "P",
