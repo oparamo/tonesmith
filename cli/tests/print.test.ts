@@ -8,17 +8,6 @@ const capturedOutput = (info: MockInstance<(message?: unknown) => void>): string
 describe("printPatch", () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it("omits the bracketed index label when index is not given", () => {
-    const patch = gx1.driver.blankPatch("Solo Patch");
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
-
-    printPatch(patch);
-
-    const output = capturedOutput(info);
-    expect(output).toContain("Solo Patch");
-    expect(output).not.toMatch(/\[\d+\] Solo Patch/);
-  });
-
   // A bypassed block keeps its settings on the device, so the printer shows them rather than
   // hiding the block, matching every other block and matching read_patch.
   it("prints the OD/DS line with its params when odds is off", () => {
@@ -77,8 +66,8 @@ describe("printPatch", () => {
 
   it("omits the params line for a block whose type has no known fields", () => {
     const patch = gx1.driver.blankPatch("Test");
-    // A pfx type outside PFX_TYPE_MAPS decodes to a bare { on, type } block, so
-    // printParams should print nothing beyond the PFX header line for it.
+    // A pfx type outside PFX_TYPE_MAPS decodes to a bare { on, type } block, which leaves the
+    // header line with nothing to print under it.
     patch.pfx = { on: true, type: "BOGUS TYPE" } as unknown as gx1.Patch["pfx"];
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 

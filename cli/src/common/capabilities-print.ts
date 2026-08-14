@@ -73,8 +73,9 @@ const printGroup = (group: CapabilityGroup): void => {
   printGroupItems(group.items);
 };
 
-// Most subtypes are pure model variants with no params of their own. FX-slot DELAY is the
-// exception, since each sub-algorithm carries a distinct param set, so print those inline.
+// Most subtypes are pure model variants and carry no params. Where one does carry its own set,
+// picking that subtype is what puts those params in reach, so they belong under it rather than in
+// the type's shared list.
 const printSubTypeParams = (params: CapabilityItem["params"]): void => {
   if (!params || params.length === 0) return;
   for (const param of params) {

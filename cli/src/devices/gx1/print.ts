@@ -9,8 +9,12 @@ const formatParams = (params: Record<string, unknown>): string =>
 // among the knobs.
 const SELECTORS = ["on", "type", "subType"];
 
-const printParams = (block: Record<string, unknown>): void => {
-  const params = Object.fromEntries(Object.entries(block).filter(([key]) => !SELECTORS.includes(key)));
+/** A block's own knobs: its fields minus the ones its header line already carries. */
+const blockKnobs = (block: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(block).filter(([key]) => !SELECTORS.includes(key)));
+
+/** The indented knob line under a block header, skipped for a type that has no knobs. */
+const printParamLine = (params: Record<string, unknown>): void => {
   if (Object.keys(params).length > 0) console.info(`    ${formatParams(params)}`);
 };
 
@@ -20,10 +24,19 @@ const blockLabel = (block: { type: string; subType?: unknown }): string => {
   return block.type + suffix;
 };
 
-const printHeader = (patch: gx1.Patch, index?: number): void => {
-  const label = index !== undefined ? `[${index}] ` : "";
+/** A block that selects a type: header line naming what it is set to, then that type's knobs. */
+const printTypedBlock = (
+  label: string,
+  block: { on: boolean; type: string; subType?: unknown },
+  params: Record<string, unknown>,
+): void => {
+  console.info(`\n  ${label} [${onOff(block.on)}]  ${blockLabel(block)}`);
+  printParamLine(params);
+};
+
+const printHeader = (patch: gx1.Patch, index: number): void => {
   console.info(`\n${"━".repeat(52)}`);
-  console.info(`  ${label}${patch.name}`);
+  console.info(`  [${index}] ${patch.name}`);
   console.info("━".repeat(52));
   console.info(`  Chain: ${patch.chain.join(", ")}`);
   console.info(`  Key: ${patch.key}`);
@@ -44,36 +57,24 @@ const printOdds = (odds: gx1.Patch["odds"]): void => {
   console.info(`\n  OD/DS [${onOff(odds.on)}]  ${odds.type}  Drive=${odds.drive}  Tone=${odds.tone}  Level=${odds.level}  Direct=${odds.direct}  Solo=${soloLabel}`);
 };
 
-const printFxSlot = (slot: "fx1" | "fx2" | "fx3", block: gx1.Patch["fx1"]): void => {
-  console.info(`\n  ${slot.toUpperCase()} [${onOff(block.on)}]  ${blockLabel(block)}`);
-  if (Object.keys(block.params).length > 0) {
-    console.info(`    ${formatParams(block.params)}`);
-  }
-};
-
-const printPatch = (patch: gx1.Patch, index?: number): void => {
+const printPatch = (patch: gx1.Patch, index: number): void => {
   printHeader(patch, index);
   printAmp(patch.amp);
   printOdds(patch.odds);
 
-  const pfx = patch.pfx;
-  console.info(`\n  PFX [${onOff(pfx.on)}]  ${blockLabel(pfx)}`);
-  printParams(pfx);
+  printTypedBlock("PFX", patch.pfx, blockKnobs(patch.pfx));
 
   const ns = patch.ns;
   console.info(`\n  NS [${onOff(ns.on)}]  Threshold=${ns.threshold}  Release=${ns.release}  Detect=${ns.detect}`);
 
+  // An fx slot keeps its knobs in a params bag rather than on the block, since one slot takes any
+  // effect type and they would otherwise collide with the block's own fields.
   for (const slot of ["fx1", "fx2", "fx3"] as const) {
-    printFxSlot(slot, patch[slot]);
+    printTypedBlock(slot.toUpperCase(), patch[slot], patch[slot].params);
   }
 
-  const delay = patch.delay;
-  console.info(`\n  DELAY [${onOff(delay.on)}]  ${delay.type}`);
-  printParams(delay);
-
-  const reverb = patch.reverb;
-  console.info(`\n  REVERB [${onOff(reverb.on)}]  ${reverb.type}`);
-  printParams(reverb);
+  printTypedBlock("DELAY", patch.delay, blockKnobs(patch.delay));
+  printTypedBlock("REVERB", patch.reverb, blockKnobs(patch.reverb));
 
   const fv = patch.fv;
   console.info(`\n  FV  Position=${fv.position}  Min=${fv.min}  Max=${fv.max}  Curve=${fv.curve}`);

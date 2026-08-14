@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
+import type { PrintPatch } from "../types";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
 /**
@@ -32,9 +33,6 @@ const run = (action: () => void): void => {
   }
 };
 
-/** Printing a patch is the one command that needs the device's own formatter. */
-type PrintPatch<T extends Patch> = (patch: T, index: number) => void;
-
 const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPatch: PrintPatch<T>): void => {
   cmd
     .command("read <file> [ref]")
@@ -55,7 +53,7 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPat
 const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("write <file> <ref> <fields...>")
-    .description("update patch fields by dot-path (e.g. amp.gain=72, key=G)")
+    .description("update patch fields by dot-path (block.param=value); see `capabilities` for the names")
     .action((file: string, ref: string, fields: string[]) => {
       run(() => {
         const edits = fields.map(parseFieldAssignment);

@@ -1,10 +1,12 @@
 import type { Command } from "commander";
-import type { PatchDriver } from "@tonesmith/core";
+import type { Patch, PatchDriver } from "@tonesmith/core";
+
+/** Printing a patch is the one command that needs the device's own formatter. */
+type PrintPatch<T extends Patch> = (patch: T, index: number) => void;
 
 interface CliDescriptor {
   id: string;
-  description: string;
   configure: (cmd: Command, driver: PatchDriver) => void;
 }
 
-export type { CliDescriptor };
+export type { CliDescriptor, PrintPatch };

@@ -12,7 +12,7 @@ const buildProgram = (): Command => {
 
   for (const device of devices) {
     const driver = registry.getDriver(device.id);
-    const cmd = program.command(device.id).description(device.description);
+    const cmd = program.command(device.id).description(driver.name);
     device.configure(cmd, driver);
   }
 
