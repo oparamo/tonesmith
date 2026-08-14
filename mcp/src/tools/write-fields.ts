@@ -73,8 +73,8 @@ const registerWriteFields = (server: McpServer): void => {
       const changes: string[] = [];
 
       if (fields !== undefined && ref !== undefined) {
-        const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-        changes.push(`patch ${index}: ${editPatch(driver, patchFile.patches[index], fields)}`);
+        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
+        changes.push(`patch ${index}: ${editPatch(driver, patch, fields)}`);
       }
 
       if (setName !== undefined) {

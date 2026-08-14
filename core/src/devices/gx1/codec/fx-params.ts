@@ -7,7 +7,7 @@ import {
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 } from "../common";
 import type { FxParams } from "../types";
-import { hexFromBytes, lookupName, lookupIndex } from "./primitives";
+import { hexFromBytes, byteAt, lookupName, lookupIndex } from "./primitives";
 import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 
 // ── FX type encode / decode ───────────────────────────────────────────────────
@@ -45,7 +45,10 @@ const indexTable = (name: string, offset: number, table: readonly (string | numb
   name,
   kind: "indexTable",
   table,
-  decode: bytes => table[bytes[offset]],
+  decode: bytes => {
+    const index = byteAt(bytes, offset, name);
+    return table[index] ?? `UNKNOWN_${name}${index}`;
+  },
   encode: (value, bytes) => {
     const index = table.indexOf(value as string | number);
     if (index < 0) throw new Error(`Unknown ${name} value: ${JSON.stringify(value)}`);
@@ -329,7 +332,8 @@ const unmappedTypeMessage = (fxType: string, delaySubType: string): string => {
 const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
   const paramBytes = bytes.slice(offset);
-  const fields = fieldMapFor(fxType, lookupName(FX_DLY_TYPES, paramBytes[0]));
+  const subAlgo = lookupName(FX_DLY_TYPES, byteAt(paramBytes, 0, `${fxType} params`));
+  const fields = fieldMapFor(fxType, subAlgo);
   if (!fields) return {};
 
   return decodeFields(fields, paramBytes);

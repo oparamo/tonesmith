@@ -79,8 +79,13 @@ const CHAIN_VALUE_TO_NAME: Record<number, string | undefined> = {
 
 const CHAIN_TERMINATOR = 0;
 
-const indexMap = (list: readonly string[]): Record<string, number> =>
-  Object.fromEntries(list.map((name, index) => [name, index]));
+/**
+ * The reverse of a lookup list, typed over that list's own members, which is exactly what the line
+ * below puts in it. A name taken from the list resolves without a check; a name from anywhere else
+ * (a file, a caller) still goes through `lookupIndex`, which is where the miss is handled.
+ */
+const indexMap = <T extends string>(list: readonly T[]): Record<T, number> =>
+  Object.fromEntries(list.map((name, index) => [name, index])) as Record<T, number>;
 
 const FX_TYPE_IDX  = indexMap(FX_TYPES);
 const ODDS_IDX     = indexMap(ODDS_TYPES);

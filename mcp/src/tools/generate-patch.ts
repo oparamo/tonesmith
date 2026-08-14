@@ -79,16 +79,22 @@ and the patch echoed back is the complete resulting state, so no follow-up read 
         path: outPath, patches: built, setName,
       });
 
-      const results = stored.map((patch, index) => ({
-        name: patch.name,
-        action: saved[index].action,
-        // State the stored order outright, so a caller that omitted `chain` sees the default
-        // it took rather than having to look it up.
-        chain: patch.chain,
-        // Echo back the stored patch so the caller can confirm every field the builder
-        // defaulted, without a follow-up read_patch.
-        patch: patchView.presentPatch(patch),
-      }));
+      const results = stored.map((patch, index) => {
+        const entry = saved[index];
+        if (entry === undefined) {
+          throw new Error(`The save reported ${saved.length} patches for the ${stored.length} built.`);
+        }
+        return {
+          name: patch.name,
+          action: entry.action,
+          // State the stored order outright, so a caller that omitted `chain` sees the default
+          // it took rather than having to look it up.
+          chain: patch.chain,
+          // Echo back the stored patch so the caller can confirm every field the builder
+          // defaulted, without a follow-up read_patch.
+          patch: patchView.presentPatch(patch),
+        };
+      });
 
       const fileVerb = created ? "Created" : "Updated";
       const response = {

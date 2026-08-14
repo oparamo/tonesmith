@@ -10,20 +10,18 @@
  * and paste it into defaults.ts.
  */
 import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
-import { readFile, blankPatch } from "../../../src/devices/gx1/tsl";
+import { blankPatch } from "../../../src/devices/gx1/tsl";
 import { decodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import { decodeDelay, decodeReverb, decodePfx } from "../../../src/devices/gx1/codec/blocks";
-import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
+import { bytesFromHex, hexFromBytes, lookupIndex } from "../../../src/devices/gx1/codec/primitives";
 import {
   FX_TYPES, FX_DLY_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
-  DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW,
+  DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD,
 } from "../../../src/devices/gx1/common";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../../../src/devices/gx1/defaults";
 import type { Patch } from "../../../src/devices/gx1/types";
-
-const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
 // The FX-slot DELAY's sub-algorithm selector, at absolute offset 212 within the FX block (FORMAT.md).
 const FX_DELAY_SUBALGO_OFFSET = 212;
@@ -48,7 +46,7 @@ const harvestByTypeByte = (block: TypeByteBlock): BlockDefaults => {
   const out: BlockDefaults = {};
   for (const type of types) {
     const swapped = [...bytes];
-    swapped[1] = typeIndex[type];
+    swapped[1] = lookupIndex(typeIndex, type, "block type");
     out[type] = omit(decode(hexFromBytes(swapped)), ["on", "type"]);
   }
   return out;
@@ -75,20 +73,20 @@ const harvestFxDelay = (fx1: number[]): BlockDefaults => {
 };
 
 const harvestDefaults = (patch: Patch): Record<string, BlockDefaults> => {
-  const fx1 = bytesFromHex(patch[RAW]["MEMORY%FX1"]);
+  const fx1 = bytesFromHex(rawBlock(patch, "MEMORY%FX1"));
   return {
-    fx: harvestFx(fx1, bytesFromHex(patch[RAW]["MEMORY%FX3A"])),
+    fx: harvestFx(fx1, bytesFromHex(rawBlock(patch, "MEMORY%FX3A"))),
     fxDelay: harvestFxDelay(fx1),
     delay: harvestByTypeByte({
-      bytes: bytesFromHex(patch[RAW]["MEMORY%DLY"]),
+      bytes: bytesFromHex(rawBlock(patch, "MEMORY%DLY")),
       types: DLY_TYPES, typeIndex: DLY_TYPE_IDX, decode: decodeDelay,
     }),
     reverb: harvestByTypeByte({
-      bytes: bytesFromHex(patch[RAW]["MEMORY%REV"]),
+      bytes: bytesFromHex(rawBlock(patch, "MEMORY%REV")),
       types: REV_TYPES, typeIndex: REV_TYPE_IDX, decode: decodeReverb,
     }),
     pfx: harvestByTypeByte({
-      bytes: bytesFromHex(patch[RAW]["MEMORY%PFX"]),
+      bytes: bytesFromHex(rawBlock(patch, "MEMORY%PFX")),
       types: PFX_TYPES, typeIndex: PFX_TYPE_IDX, decode: decodePfx,
     }),
   };
@@ -115,7 +113,7 @@ const harvestPfxSubTypes = (pfx: number[]): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const type of PFX_SUBTYPE_EFFECTS) {
     const swapped = [...pfx];
-    swapped[1] = PFX_TYPE_IDX[type];
+    swapped[1] = lookupIndex(PFX_TYPE_IDX, type, "PFX type");
     const decoded = decodePfx(hexFromBytes(swapped)) as Record<string, unknown>;
     const selected = decoded[SUB_TYPE_FIELD];
     if (typeof selected === "string") out[type] = selected;
@@ -124,8 +122,8 @@ const harvestPfxSubTypes = (pfx: number[]): Record<string, string> => {
 };
 
 const harvestSubTypes = (patch: Patch): Record<string, Record<string, string>> => ({
-  fx: harvestFxSubTypes(bytesFromHex(patch[RAW]["MEMORY%FX1"])),
-  pfx: harvestPfxSubTypes(bytesFromHex(patch[RAW]["MEMORY%PFX"])),
+  fx: harvestFxSubTypes(bytesFromHex(rawBlock(patch, "MEMORY%FX1"))),
+  pfx: harvestPfxSubTypes(bytesFromHex(rawBlock(patch, "MEMORY%PFX"))),
 });
 
 /** The single-shape blocks are their own default: no type to swap, so the decoded block is it. */
@@ -135,7 +133,7 @@ const harvestBlockDefaults = (patch: Patch): Record<string, ParamDefaults> =>
   );
 
 describe("GX-1 defaults ↔ fixture drift guard", () => {
-  const patch = readFile(FIXTURE).patches[0];
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
 
   it("DEFAULTS_BY_TYPE matches the factory defaults harvested from default-init.tsl", () => {
     expect(DEFAULTS_BY_TYPE).toEqual(harvestDefaults(patch));
@@ -168,7 +166,8 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
     const assignSlots = Array.from({ length: 8 }, (_, slot) => `MEMORY%ASGN${slot + 1}`);
 
     for (const key of ["MEMORY%OTHER", "MEMORY%CTL", ...assignSlots]) {
-      expect(blank[RAW][key], `${key} should open at its factory bytes`).toEqual(patch[RAW][key]);
+      expect(rawBlock(blank, key), `${key} should open at its factory bytes`)
+        .toEqual(rawBlock(patch, key));
     }
   });
 });

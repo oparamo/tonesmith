@@ -29,28 +29,39 @@ const paramBlockKey = (slot: FxSlot, type: string): string => {
 };
 
 /**
+ * A raw block this codec reads. `readFile` checks the same list at the file boundary, but decoding
+ * is public on the driver, so a param set assembled by hand arrives here having passed no check.
+ */
+const blockAt = (paramSet: RawParamSet, key: string): string[] => {
+  const block = paramSet[key];
+  if (block === undefined) throw new Error(`Patch has no ${key} block.`);
+  return block;
+};
+
+/**
  * Decode a raw GX-1 param set (the map of hex-array fields from the TSL JSON
  * envelope) into a fully typed Patch. The original param set is preserved under
  * the RAW symbol so encodePatch can start from it and overwrite only known fields.
  */
 const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
   const paramSet = raw.paramSet;
+  const rawBlock = (key: string): string[] => blockAt(paramSet, key);
 
   const patch: Patch = {
-    name:   decodeName(paramSet["MEMORY%COM"]),
+    name:   decodeName(rawBlock("MEMORY%COM")),
     memo:   raw.memo ?? "",
-    chain:  decodeChain(paramSet["MEMORY%CHAIN"]),
-    key:    decodeKey(paramSet["MEMORY%OTHER"]),
-    amp:    decodeAmp(paramSet["MEMORY%AMP"]),
-    odds:   decodeOdDs(paramSet["MEMORY%ODDS"]),
-    ns:     decodeNs(paramSet["MEMORY%NS"]),
-    fv:     decodeFv(paramSet["MEMORY%FV"]),
-    pfx:    decodePfx(paramSet["MEMORY%PFX"]),
-    delay:  decodeDelay(paramSet["MEMORY%DLY"]),
-    reverb: decodeReverb(paramSet["MEMORY%REV"]),
-    fx1: { ...decodeFxCom(paramSet["MEMORY%FX1_COM"]), params: {} },
-    fx2: { ...decodeFxCom(paramSet["MEMORY%FX2_COM"]), params: {} },
-    fx3: { ...decodeFxCom(paramSet["MEMORY%FX3_COM"]), params: {} },
+    chain:  decodeChain(rawBlock("MEMORY%CHAIN")),
+    key:    decodeKey(rawBlock("MEMORY%OTHER")),
+    amp:    decodeAmp(rawBlock("MEMORY%AMP")),
+    odds:   decodeOdDs(rawBlock("MEMORY%ODDS")),
+    ns:     decodeNs(rawBlock("MEMORY%NS")),
+    fv:     decodeFv(rawBlock("MEMORY%FV")),
+    pfx:    decodePfx(rawBlock("MEMORY%PFX")),
+    delay:  decodeDelay(rawBlock("MEMORY%DLY")),
+    reverb: decodeReverb(rawBlock("MEMORY%REV")),
+    fx1: { ...decodeFxCom(rawBlock("MEMORY%FX1_COM")), params: {} },
+    fx2: { ...decodeFxCom(rawBlock("MEMORY%FX2_COM")), params: {} },
+    fx3: { ...decodeFxCom(rawBlock("MEMORY%FX3_COM")), params: {} },
     [RAW]: paramSet,
   };
 
@@ -59,7 +70,7 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
   // layer can show e.g. "COMPRESSOR (D-COMP)".
   for (const slot of FX_SLOTS) {
     const block = patch[slot];
-    const paramBlockBytes = bytesFromHex(paramSet[paramBlockKey(slot, block.type)]);
+    const paramBlockBytes = bytesFromHex(rawBlock(paramBlockKey(slot, block.type)));
     const params = decodeFxParams(block.type, paramBlockBytes);
     if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params.subType === "string") {
       block.subType = params.subType;
@@ -76,10 +87,11 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
  */
 const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
   const paramSet: RawParamSet = { ...patch[RAW] };
+  const rawBlock = (key: string): string[] => blockAt(patch[RAW], key);
 
   paramSet["MEMORY%COM"]   = encodeName(patch.name);
-  paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain, patch[RAW]["MEMORY%CHAIN"]);
-  paramSet["MEMORY%OTHER"] = encodeKey(patch.key, patch[RAW]["MEMORY%OTHER"]);
+  paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain, rawBlock("MEMORY%CHAIN"));
+  paramSet["MEMORY%OTHER"] = encodeKey(patch.key, rawBlock("MEMORY%OTHER"));
   paramSet["MEMORY%AMP"]   = encodeAmp(patch.amp);
   paramSet["MEMORY%ODDS"]  = encodeOdDs(patch.odds);
   paramSet["MEMORY%NS"]    = encodeNs(patch.ns);
@@ -92,7 +104,7 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
     const block = patch[slot];
     paramSet[`MEMORY%${slot.toUpperCase()}_COM`] = encodeFxCom(block);
     const blockKey = paramBlockKey(slot, block.type);
-    const originalParamBytes = bytesFromHex(patch[RAW][blockKey]);
+    const originalParamBytes = bytesFromHex(rawBlock(blockKey));
     paramSet[blockKey] = encodeFxParams(block.type, block.params, originalParamBytes);
   }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
-import { connectClient } from "./helpers";
+import { connectClient, present } from "./helpers";
 
 /** Pulls one entry's view out of a batched response, which is keyed by the requested entry string. */
 const viewOf = (text: string, entry: string): unknown => (JSON.parse(text) as Record<string, unknown>)[entry];
@@ -64,11 +64,13 @@ describe("describe_device", () => {
     expect(isError, text).toBe(false);
     const views = JSON.parse(text) as Record<string, { id?: string; defaultOrder?: string[] }>;
     expect(Object.keys(views), "every requested entry comes back").toEqual(items);
-    expect(views.chain.defaultOrder).toEqual(gx1.driver.capabilities.chain.defaultOrder);
-    expect(views.amp.id).toBe("amp");
-    expect(views["fx/CHORUS"].id).toBe("CHORUS");
-    expect(views["reverb/HALL M"].id).toBe("HALL M");
-    expect(views["delay/ANALOG"].id).toBe("ANALOG");
+    const requested = (item: string): { id?: string; defaultOrder?: string[] } =>
+      present(views[item], `the ${item} view`);
+    expect(requested("chain").defaultOrder).toEqual(gx1.driver.capabilities.chain.defaultOrder);
+    expect(requested("amp").id).toBe("amp");
+    expect(requested("fx/CHORUS").id).toBe("CHORUS");
+    expect(requested("reverb/HALL M").id).toBe("HALL M");
+    expect(requested("delay/ANALOG").id).toBe("ANALOG");
   });
 
   // "OD/DS" is a real fx effect type, so an entry is split on its FIRST slash only.

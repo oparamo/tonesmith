@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import { mkdtempSync, rmSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { gx1 } from "@tonesmith/core";
 import { buildProgram } from "../src/program";
 
 const FIXTURE = join(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
@@ -73,4 +74,18 @@ const emptyTempDir = (): { dir: string; cleanup: () => void } => {
   return { dir, cleanup: () => { rmSync(dir, { recursive: true, force: true }); } };
 };
 
-export { runCli, withTempDir, emptyTempDir, FIXTURE };
+/**
+ * A value the test has already established is there: the patch a command just wrote, the slot a
+ * copy just filled. Failing here says which one was missing, where the alternative is a cascade of
+ * assertions against `undefined`.
+ */
+const present = <T>(value: T | undefined, what: string): T => {
+  if (value === undefined) throw new Error(`Expected ${what}, got nothing`);
+  return value;
+};
+
+/** The patch at `index` of the file at `path`, read back through the driver. */
+const patchAt = (path: string, index = 0): gx1.Patch =>
+  present(gx1.driver.readFile(path).patches[index], `patch ${index} of ${path}`);
+
+export { runCli, withTempDir, emptyTempDir, present, patchAt, FIXTURE };

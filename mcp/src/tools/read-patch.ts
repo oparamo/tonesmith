@@ -59,11 +59,11 @@ const registerReadPatch = (server: McpServer): void => {
       const patchFile = driver.readFile(file);
 
       if (ref !== undefined) {
-        const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
+        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
         const patchWithIndex = {
           setName: patchFile.name,
           index,
-          ...patchView.presentPatch(patchFile.patches[index]),
+          ...patchView.presentPatch(patch),
         };
         return ok(JSON.stringify(patchWithIndex));
       }

@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
-import { readFile } from "../../../src/devices/gx1/tsl";
 import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
-import { FX_TYPES, FX_DLY_TYPES, RAW } from "../../../src/devices/gx1/common";
-const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
+import { FX_TYPES, FX_DLY_TYPES } from "../../../src/devices/gx1/common";
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
 // ── Per-effect-type symmetry tests ────────────────────────────────────────────
 //
@@ -120,11 +118,10 @@ describe("Unknown FX type handling", () => {
 // exercises genuine device data for every field checked below.
 
 describe("Real device values (default-init.tsl)", () => {
-  const file = readFile(DEFAULT_INIT_FIXTURE);
-  const patch = file.patches[0];
-  const fx1Bytes = bytesFromHex(patch[RAW]["MEMORY%FX1"]);
-  const fx2Bytes = bytesFromHex(patch[RAW]["MEMORY%FX2"]);
-  const fx3aBytes = bytesFromHex(patch[RAW]["MEMORY%FX3A"]);
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const fx1Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX1"));
+  const fx2Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX2"));
+  const fx3aBytes = bytesFromHex(rawBlock(patch, "MEMORY%FX3A"));
 
   it("decodes FX1 (active type: COMPRESSOR)", () => {
     expect(patch.fx1.type).toBe("COMPRESSOR");

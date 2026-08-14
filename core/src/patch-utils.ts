@@ -15,11 +15,12 @@ const indicesNamed = (patches: Patch[], ref: string): number[] => {
 
 /** The single patch a name picks out, or why it picks out none or several. */
 const soleIndexNamed = (matches: number[], ref: string): number => {
-  if (matches.length === 0) throw new Error(`No patch named "${ref}"`);
+  const [only] = matches;
+  if (only === undefined) throw new Error(`No patch named "${ref}"`);
   if (matches.length > 1) {
     throw new Error(`Ambiguous name "${ref}": matches indices ${matches.join(", ")}`);
   }
-  return matches[0];
+  return only;
 };
 
 /**
@@ -97,8 +98,9 @@ interface Field {
  */
 const fieldAt = (target: Record<string, unknown>, dottedPath: string): Field => {
   const parts = dottedPath.split(".");
+  const key = parts.pop() ?? dottedPath;
   let current = target;
-  for (const [depth, part] of parts.slice(0, -1).entries()) {
+  for (const [depth, part] of parts.entries()) {
     const next = current[part];
     if (next === null || typeof next !== "object") {
       throw unknownPathError(dottedPath, parts.slice(0, depth + 1).join("."), current);
@@ -106,7 +108,6 @@ const fieldAt = (target: Record<string, unknown>, dottedPath: string): Field => 
     current = next as Record<string, unknown>;
   }
 
-  const key = parts[parts.length - 1];
   if (!(key in current)) throw unknownPathError(dottedPath, key, current);
   return { holder: current, key };
 };
@@ -121,11 +122,31 @@ const setByPath = (
   holder[key] = value;
 };
 
-/** A single index when `ref` is given, every index in file order when it is omitted. */
-const resolvePatchIndices = (patches: Patch[], ref?: string): number[] =>
+/** A patch and the slot it sits in, which is what a surface reports an edit or a copy against. */
+interface SelectedPatch<T extends Patch> {
+  index: number;
+  patch: T;
+}
+
+/**
+ * The patch a ref names, together with its index. Resolving and reading are one step because they
+ * are one question: `resolvePatchIndex` has already bounded the index against this same array, and
+ * splitting them leaves every caller to re-establish that for itself.
+ */
+const resolvePatch = <T extends Patch>(patches: T[], ref: string): SelectedPatch<T> => {
+  const index = resolvePatchIndex(patches, ref);
+  const patch = patches[index];
+  if (patch === undefined) {
+    throw new Error(`No patch at index ${index}: the file holds ${patches.length} patch(es).`);
+  }
+  return { index, patch };
+};
+
+/** A single patch when `ref` is given, every patch in file order when it is omitted. */
+const resolvePatches = <T extends Patch>(patches: T[], ref?: string): SelectedPatch<T>[] =>
   ref !== undefined
-    ? [resolvePatchIndex(patches, ref)]
-    : patches.map((_, index) => index);
+    ? [resolvePatch(patches, ref)]
+    : patches.map((patch, index) => ({ index, patch }));
 
 /**
  * Applies dot-path edits to a patch in place, then checks the result against the device's catalog
@@ -223,10 +244,11 @@ const requireDistinctNames = (patches: Patch[]): void => {
  */
 const upsertPatches = <T extends Patch>(driver: PatchDriver<T>, request: UpsertRequest<T>): UpsertReport<T> => {
   const { path, patches, setName } = request;
-  if (patches.length === 0) throw new Error("No patches to save: `patches` must hold at least one patch.");
+  const [first] = patches;
+  if (first === undefined) throw new Error("No patches to save: `patches` must hold at least one patch.");
   requireDistinctNames(patches);
 
-  const { file, created } = readExistingOrNew(driver, path, setName ?? patches[0].name);
+  const { file, created } = readExistingOrNew(driver, path, setName ?? first.name);
   if (setName !== undefined) file.name = setName;
 
   const saved = patches.map((patch): SavedPatch => {
@@ -266,9 +288,8 @@ interface CopyRequest {
 const copyPatch = <T extends Patch>(driver: PatchDriver<T>, request: CopyRequest): CopiedPatch => {
   const srcFile = driver.readFile(request.src);
   const dstFile = driver.readFile(request.dst);
-  const fromIndex = resolvePatchIndex(srcFile.patches, request.srcRef);
+  const { index: fromIndex, patch } = resolvePatch(srcFile.patches, request.srcRef);
   const toIndex = resolvePatchIndex(dstFile.patches, request.dstRef);
-  const patch = srcFile.patches[fromIndex];
 
   dstFile.patches[toIndex] = patch;
   driver.writeFile(dstFile, request.dst);
@@ -322,10 +343,13 @@ export {
   resolvePatchIndex,
   coerceValue,
   setByPath,
-  resolvePatchIndices,
+  resolvePatch,
+  resolvePatches,
   applyFieldEdits,
   upsertPatches,
   copyPatch,
   createPatchFile,
 };
-export type { UpsertRequest, UpsertReport, SavedPatch, CopiedPatch, CopyRequest, NewFileOptions };
+export type {
+  SelectedPatch, UpsertRequest, UpsertReport, SavedPatch, CopiedPatch, CopyRequest, NewFileOptions,
+};

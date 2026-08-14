@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
-  resolvePatchIndex, coerceValue, setByPath, resolvePatchIndices, applyFieldEdits,
+  resolvePatchIndex, coerceValue, setByPath, resolvePatches, applyFieldEdits,
   upsertPatches, copyPatch, createPatchFile, MAX_NEW_PATCHES,
 } from "../src/patch-utils";
 
@@ -298,21 +298,24 @@ describe("coerceValue", () => {
   });
 });
 
-describe("resolvePatchIndices", () => {
+describe("resolvePatches", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Metal")];
 
-  it("returns every index in file order when ref is omitted", () => {
-    expect(resolvePatchIndices(patches)).toEqual([0, 1, 2]);
+  it("returns every patch in file order when ref is omitted", () => {
+    const selected = resolvePatches(patches);
+
+    expect(selected.map(entry => entry.index)).toEqual([0, 1, 2]);
+    expect(selected.map(entry => entry.patch)).toEqual(patches);
   });
 
-  it("returns a single resolved index when ref is given", () => {
-    const indices = resolvePatchIndices(patches, "1");
+  it("returns the one patch a ref names, with the index it sits at", () => {
+    const selected = resolvePatches(patches, "1");
 
-    expect(indices).toEqual([1]);
+    expect(selected).toEqual([{ index: 1, patch: patches[1] }]);
   });
 
   it("propagates resolvePatchIndex's not-found error", () => {
-    const resolveMissingName = () => resolvePatchIndices(patches, "Bogus");
+    const resolveMissingName = () => resolvePatches(patches, "Bogus");
 
     expect(resolveMissingName).toThrow('No patch named "Bogus"');
   });

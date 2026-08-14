@@ -1,11 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, unlinkSync, readFileSync, writeFileSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
-
-const FIXTURE = resolve(import.meta.dirname, "../../../../fixtures/gx1/rock-tones.tsl");
+import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../helpers";
 
 describe("blankPatch", () => {
   it("uses 'NEW PATCH' as the default name", () => {
@@ -164,7 +163,7 @@ describe("writeFile + readFile round-trip", () => {
     const writtenRaw = JSON.parse(writtenFileContents) as typeof origRaw;
 
     for (const [index, originalPatch] of origRaw.data[0].entries()) {
-      const writtenParamSet = writtenRaw.data[0][index].paramSet;
+      const writtenParamSet = present(writtenRaw.data[0][index], `written patch ${index}`).paramSet;
       for (const key of Object.keys(originalPatch.paramSet)) {
         expect(writtenParamSet[key], `patch ${index} key ${key}`).toEqual(originalPatch.paramSet[key]);
       }

@@ -18,6 +18,17 @@ Cannot read /tmp/set.tsl: patch 2 is missing MEMORY%FV, MEMORY%NS.
 The list of blocks a patch must carry is read off the blank patch rather than written out a second
 time, so a block the codec learns is a block a file is checked for.
 
+A block that is present but shorter than the layout the codec reads it under is refused the same
+way, naming the block and what it actually holds:
+
+```
+AMP: no byte 12, the block holds 9
+```
+
+A decoder that ran on past the end of a short block read every missing byte as `undefined`, which
+`Boolean` and the lookup tables turned into a plausible-looking patch of zeros and defaults. Writing
+that back would have replaced a damaged block with a confidently wrong one.
+
 The envelope type said `data` held two arrays of parameter sets, which is not its shape: each entry
 is a patch, carrying the device's `memo` field alongside its `paramSet`. Two casts existed to bridge
 the difference, one on each side of the file. `TslPatch` is now a type of its own, both casts are

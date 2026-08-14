@@ -29,7 +29,8 @@ interface EditedField {
   value: unknown;
 }
 
-const isBlockName = (name: string): name is BlockName => name in BLOCK_GROUPS;
+const isBlockName = (name: string | undefined): name is BlockName =>
+  name !== undefined && name in BLOCK_GROUPS;
 
 /**
  * Which block and field a path addresses, or undefined for a path that names no block at all
@@ -43,11 +44,12 @@ const editTarget = (path: string): { block: BlockName; field: Omit<EditedField, 
   if (!isBlockName(head)) return undefined;
 
   const nested = NESTED_PARAMS.has(head);
-  if (nested && rest.length === 2 && rest[0] === PARAMS_FIELD) {
-    return { block: head, field: { leaf: rest[1], isParam: true } };
+  const [leaf, nestedLeaf, ...deeper] = rest;
+  if (nested && leaf === PARAMS_FIELD && nestedLeaf !== undefined && deeper.length === 0) {
+    return { block: head, field: { leaf: nestedLeaf, isParam: true } };
   }
-  if (rest.length !== 1) return undefined;
-  return { block: head, field: { leaf: rest[0], isParam: !nested && !SELECTION_FIELDS.has(rest[0]) } };
+  if (leaf === undefined || nestedLeaf !== undefined) return undefined;
+  return { block: head, field: { leaf, isParam: !nested && !SELECTION_FIELDS.has(leaf) } };
 };
 
 /** A path addressing no block is dropped rather than reported: the codec still has its say on it. */

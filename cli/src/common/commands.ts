@@ -42,8 +42,8 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPat
         const patchFile = driver.readFile(file);
         // The driver's own name, not the file's `device` id, since this line is for a person.
         console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${driver.name}`);
-        for (const index of patchUtils.resolvePatchIndices(patchFile.patches, ref)) {
-          printPatch(patchView.presentPatch(patchFile.patches[index]), index);
+        for (const { index, patch } of patchUtils.resolvePatches(patchFile.patches, ref)) {
+          printPatch(patchView.presentPatch(patch), index);
         }
         console.info();
       });
@@ -58,8 +58,8 @@ const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =
       run(() => {
         const edits = fields.map(parseFieldAssignment);
         const patchFile = driver.readFile(file);
-        const index = patchUtils.resolvePatchIndex(patchFile.patches, ref);
-        patchUtils.applyFieldEdits(driver, patchFile.patches[index], edits);
+        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
+        patchUtils.applyFieldEdits(driver, patch, edits);
         driver.writeFile(patchFile, file);
         console.info(`Wrote ${file}, patch ${index} updated: ${fields.join(", ")}`);
       });

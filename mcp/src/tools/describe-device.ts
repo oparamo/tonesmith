@@ -110,9 +110,12 @@ const exampleEntries = (capabilities: DeviceCapabilities): string[] => {
   const bareGroup = capabilities.groups.slice(0, 1).map(group => group.id);
   const namedItems = capabilities.groups
     .slice(1)
-    .filter(group => group.items.length > 0)
-    .slice(0, 2)
-    .map(group => `${group.id}/${group.items[0].id}`);
+    .flatMap(group => {
+      const [item] = group.items;
+      const entry = item === undefined ? [] : [`${group.id}/${item.id}`];
+      return entry;
+    })
+    .slice(0, 2);
   return ["chain", ...bareGroup, ...namedItems];
 };
 

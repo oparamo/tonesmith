@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
-import { connectClient, withTempDir } from "./helpers";
+import { connectClient, withTempDir, patchAt, present } from "./helpers";
 
 describe("write_fields", () => {
   let close: () => Promise<void>;
@@ -17,7 +17,7 @@ describe("write_fields", () => {
 
     expect(isError).toBe(false);
     const file = gx1.driver.readFile(temp.fixture);
-    expect(file.patches[0].amp.gain).toBe(88);
+    expect(present(file.patches[0], "patch 0").amp.gain).toBe(88);
   });
 
   it("applies every field in one call", async () => {
@@ -30,7 +30,7 @@ describe("write_fields", () => {
     const { isError, text } = await client.callTool("write_fields", input);
 
     expect(isError, text).toBe(false);
-    const patch = gx1.driver.readFile(temp.fixture).patches[0];
+    const patch = patchAt(temp.fixture);
     expect(patch.amp.gain).toBe(77);
     expect(patch.ns.threshold).toBe(31);
     expect(patch.delay.highCut).toBe("2.5kHz");
@@ -41,14 +41,14 @@ describe("write_fields", () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
-    const before = gx1.driver.readFile(temp.fixture).patches[0].amp.gain;
+    const before = patchAt(temp.fixture).amp.gain;
     const fields = { "amp.gain": "99", "delay.highCut": "2.6kHz" };
     const input = { device: "gx1", file: temp.fixture, ref: "0", fields };
 
     const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(true);
-    const after = gx1.driver.readFile(temp.fixture).patches[0].amp.gain;
+    const after = patchAt(temp.fixture).amp.gain;
     expect(after).toBe(before);
   });
 
@@ -61,7 +61,7 @@ describe("write_fields", () => {
     await client.callTool("write_fields", input);
 
     const file = gx1.driver.readFile(temp.fixture);
-    expect(file.patches[0].amp.solo).toBe(true);
+    expect(present(file.patches[0], "patch 0").amp.solo).toBe(true);
   });
 
   it("takes a value that arrives as a number, which is how read_patch returns it", async () => {
@@ -73,7 +73,7 @@ describe("write_fields", () => {
     const { isError, text } = await client.callTool("write_fields", input);
 
     expect(isError, text).toBe(false);
-    const patch = gx1.driver.readFile(temp.fixture).patches[0];
+    const patch = patchAt(temp.fixture);
     expect(patch.amp.gain).toBe(88);
     expect(patch.amp.solo).toBe(true);
   });
@@ -87,7 +87,7 @@ describe("write_fields", () => {
     const { isError, text } = await client.callTool("write_fields", input);
 
     expect(isError, text).toBe(false);
-    expect(gx1.driver.readFile(temp.fixture).patches[0].name).toBe("1984");
+    expect(patchAt(temp.fixture).name).toBe("1984");
   });
 
   it("errors for an unknown device", async () => {
@@ -122,7 +122,7 @@ describe("write_fields", () => {
 
     expect(isError).toBe(false);
     const file = gx1.driver.readFile(temp.fixture);
-    expect(file.patches[0].delay.highCut).toBe("2.5kHz");
+    expect(present(file.patches[0], "patch 0").delay.highCut).toBe("2.5kHz");
   });
 
   it("rejects a label not in the field's table", async () => {
@@ -170,7 +170,7 @@ describe("write_fields", () => {
     expect(isError, text).toBe(false);
     const file = gx1.driver.readFile(temp.fixture);
     expect(file.name).toBe("Both");
-    expect(file.patches[0].amp.gain).toBe(55);
+    expect(present(file.patches[0], "patch 0").amp.gain).toBe(55);
   });
 
   it("errors when neither fields nor setName is given", async () => {

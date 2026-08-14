@@ -20,11 +20,28 @@ const hexFromBytes = (byteList: number[]): string[] =>
   });
 
 /**
+ * A byte the reading decoder's layout says is there. A block shorter than its layout is a truncated
+ * file rather than a block of zeros, so defaulting the read would decode the damage into a patch
+ * that looks intact; naming the block and what it actually holds is what makes the file the answer.
+ */
+const byteAt = (bytes: number[], index: number, label: string): number => {
+  const byte = bytes[index];
+  if (byte === undefined) {
+    throw new RangeError(`${label}: no byte ${index}, the block holds ${bytes.length}`);
+  }
+  return byte;
+};
+
+/** `byteAt` bound to one block, for a decoder reading a dozen offsets out of it. */
+const byteReader = (bytes: number[], label: string) =>
+  (index: number): number => byteAt(bytes, index, label);
+
+/**
  * Falls back to an "UNKNOWN_<label><index>" sentinel for an out-of-range index, so malformed
  * device data survives a decode/encode round trip instead of throwing.
  */
 const lookupName = (table: readonly string[], index: number, label = ""): string =>
-  (index >= 0 && index < table.length) ? table[index] : `UNKNOWN_${label}${index}`;
+  table[index] ?? `UNKNOWN_${label}${index}`;
 
 /** Matches a `lookupName` sentinel and captures the index it was built from. */
 const SENTINEL_INDEX = /^UNKNOWN_.*?(-?\d+)$/;
@@ -35,10 +52,11 @@ const SENTINEL_INDEX = /^UNKNOWN_.*?(-?\d+)$/;
  * other unknown name throws, since there is no byte to write for it.
  */
 const lookupIndex = (tableMap: Record<string, number>, name: string, label = ""): number => {
-  if (name in tableMap) return tableMap[name];
-  const sentinel = SENTINEL_INDEX.exec(name);
-  if (sentinel === null) throw new Error(`Unknown ${label}: "${name}"`);
-  return Number(sentinel[1]);
+  const index = tableMap[name];
+  if (index !== undefined) return index;
+  const sentinel = SENTINEL_INDEX.exec(name)?.[1];
+  if (sentinel === undefined) throw new Error(`Unknown ${label}: "${name}"`);
+  return Number(sentinel);
 };
 
 /**
@@ -50,4 +68,7 @@ const toSigned = (raw: number, center = 50): number => raw - center;
 
 const toUnsigned = (value: number, center = 50): number => value + center;
 
-export { bytesFromHex, hexFromBytes, lookupName, lookupIndex, shownValue, toSigned, toUnsigned };
+export {
+  bytesFromHex, hexFromBytes, byteAt, byteReader,
+  lookupName, lookupIndex, shownValue, toSigned, toUnsigned,
+};

@@ -6,9 +6,10 @@ import type { Patch } from "../../../../src/devices/gx1";
 const validateAfter = (patch: Patch, edits: Record<string, unknown>): string[] => {
   for (const [path, value] of Object.entries(edits)) {
     const parts = path.split(".");
+    const leaf = parts.pop() ?? path;
     let target = patch as unknown as Record<string, unknown>;
-    for (const part of parts.slice(0, -1)) target = target[part] as Record<string, unknown>;
-    target[parts[parts.length - 1]] = value;
+    for (const part of parts) target = target[part] as Record<string, unknown>;
+    target[leaf] = value;
   }
   return gx1.driver.validateFields(patch, edits);
 };

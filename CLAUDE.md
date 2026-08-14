@@ -64,9 +64,9 @@ core/                       @tonesmith/core
       driver.ts             PatchDriver<T> interface (includes capabilities field)
       capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec
     registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
-    patch-utils.ts          patch-file operations every surface shares: resolvePatchIndices,
-                            applyFieldEdits, coerceValue, setByPath, upsertPatches, copyPatch,
-                            createPatchFile
+    patch-utils.ts          patch-file operations every surface shares: resolvePatch /
+                            resolvePatches, applyFieldEdits, coerceValue, setByPath, upsertPatches,
+                            copyPatch, createPatchFile
     patch-view.ts           presentPatch: the consumer-facing view of a decoded patch, dropping
                             the model selector that decode mirrors onto both subType and
                             params.type so a consumer isn't left guessing which to set

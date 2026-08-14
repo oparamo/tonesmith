@@ -356,7 +356,7 @@ const delay = (patch: Patch, options: DelayOptions): void => {
     label: "delay",
     type,
     fields: DELAY_TYPE_MAPS[type],
-    defaults: DEFAULTS_BY_TYPE.delay[type],
+    defaults: DEFAULTS_BY_TYPE.delay[type] ?? {},
   };
   assignExtra(block, mergeBlockParams(named, params, typeSpec.label), typeSpec);
 };
@@ -387,7 +387,7 @@ const reverb = (patch: Patch, options: ReverbOptions): void => {
     label: "reverb",
     type,
     fields,
-    defaults: DEFAULTS_BY_TYPE.reverb[type],
+    defaults: DEFAULTS_BY_TYPE.reverb[type] ?? {},
   };
   assignExtra(block, mergeBlockParams(named, params, typeSpec.label), typeSpec);
 };

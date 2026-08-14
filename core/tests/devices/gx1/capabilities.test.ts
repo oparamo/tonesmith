@@ -33,6 +33,7 @@ import {
 import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import type { CapabilityItem, ParamSpec, PatchSpecExample } from "../../../src/types";
 import type { FieldCodec } from "../../../src/devices/gx1/codec/fields";
+import { present } from "../../helpers";
 
 const groupItems = (groupId: string): CapabilityItem[] =>
   gx1Capabilities.groups.find(group => group.id === groupId)?.items ?? [];
@@ -149,7 +150,7 @@ describe("GX-1 catalog id coverage", () => {
 const assertTypeParity = (block: PerTypeBlock, type: string): void => {
   const fields = block.codecFields(type);
   const codecNames = codecFieldNames(fields);
-  const catalog = PARAMS_BY_TYPE[block.block][type];
+  const catalog = present(PARAMS_BY_TYPE[block.block][type], `the ${block.block} ${type} catalog`);
   const catalogNames = catalogParamNames(catalog);
   const aliases = block.aliases[type] ?? {};
   const aliasTargets = new Set(Object.values(aliases).map(normalize));
@@ -307,8 +308,9 @@ const representationChecks = [...PER_TYPE_BLOCKS, FX_DELAY_BLOCK].flatMap(block 
 
 const assertRepresentationParity = (block: PerTypeBlock, type: string, field: FieldCodec): void => {
   const aliases = block.aliases[type] ?? {};
-  const catalogLabel = field.name in aliases ? aliases[field.name] : field.name;
-  const param = PARAMS_BY_TYPE[block.block][type].find(candidate => normalize(candidate.name) === normalize(catalogLabel));
+  const catalogLabel = aliases[field.name] ?? field.name;
+  const catalog = present(PARAMS_BY_TYPE[block.block][type], `the ${block.block} ${type} catalog`);
+  const param = catalog.find(candidate => normalize(candidate.name) === normalize(catalogLabel));
   expect(param, `${block.block} "${type}" catalog has no param for codec field "${field.name}"`).toBeDefined();
   if (!param) return;
 
@@ -487,7 +489,7 @@ describe("GX-1 spec examples", () => {
     const [block] = Object.keys(example ?? {});
     const body = Object.values(example ?? {})[0] as Record<string, unknown>;
 
-    expect("params" in body).toBe(NESTED_PARAMS.has(block));
+    expect("params" in body).toBe(NESTED_PARAMS.has(present(block, "the example's block key")));
   });
 
   it("fills the values from the device's own factory defaults, not a guess", () => {

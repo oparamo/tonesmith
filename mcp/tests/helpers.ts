@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/server";
 import { mkdtempSync, rmSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { gx1 } from "@tonesmith/core";
 import { buildServer } from "../src/server";
 
 const FIXTURE = join(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
@@ -20,6 +21,20 @@ const emptyTempDir = (): { dir: string; cleanup: () => void } => {
   const dir = mkdtempSync(join(tmpdir(), "tonesmith-mcp-"));
   return { dir, cleanup: () => { rmSync(dir, { recursive: true, force: true }); } };
 };
+
+/**
+ * A value the test has already established is there: the patch a tool just wrote, the entry a
+ * response just reported. Failing here says which one was missing, where the alternative is a
+ * cascade of assertions against `undefined`.
+ */
+const present = <T>(value: T | undefined, what: string): T => {
+  if (value === undefined) throw new Error(`Expected ${what}, got nothing`);
+  return value;
+};
+
+/** The patch at `index` of the file at `path`, read back through the driver. */
+const patchAt = (path: string, index = 0): gx1.Patch =>
+  present(gx1.driver.readFile(path).patches[index], `patch ${index} of ${path}`);
 
 interface ToolResult {
   text: string;
@@ -43,7 +58,7 @@ const connectClient = async (): Promise<{
   const callTool = async (name: string, args: Record<string, unknown>): Promise<ToolResult> => {
     const result = await client.callTool({ name, arguments: args });
     const [block] = result.content as { type: string; text: string }[];
-    return { text: block.text, isError: result.isError === true };
+    return { text: present(block, "a content block").text, isError: result.isError === true };
   };
 
   /** Fetches one tool's client-visible definition (name/description/inputSchema) by name. */
@@ -61,4 +76,4 @@ const connectClient = async (): Promise<{
   return { callTool, getToolSchema, close };
 };
 
-export { connectClient, withTempDir, emptyTempDir, FIXTURE };
+export { connectClient, withTempDir, emptyTempDir, present, patchAt, FIXTURE };

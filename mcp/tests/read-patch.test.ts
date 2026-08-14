@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
 import { gx1 } from "@tonesmith/core";
-import { connectClient, emptyTempDir, FIXTURE } from "./helpers";
+import { connectClient, emptyTempDir, present, FIXTURE } from "./helpers";
 
 const expected = gx1.driver.readFile(FIXTURE);
 
@@ -45,7 +45,7 @@ describe("read_patch", () => {
     expect(isError, text).toBe(false);
     const body = JSON.parse(text) as { index: number; name: string };
     expect(body.index).toBe(0);
-    expect(body.name).toBe(expected.patches[0].name);
+    expect(body.name).toBe(present(expected.patches[0], "patch 0 of the fixture").name);
   });
 
   // The all-patches read has always carried setName; a single-patch read left the caller unable to

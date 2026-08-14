@@ -1,6 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
-import { readFile } from "../../../src/devices/gx1/tsl";
 import {
   decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePfx,
   decodeKey, encodeKey, decodeNs, encodeNs, decodeFv, encodeFv, decodeName, encodeName,
@@ -9,8 +7,7 @@ import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primi
 import {
   DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW, CHAIN_BLOCK_ORDER,
 } from "../../../src/devices/gx1/common";
-
-const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
 // ── Delay block symmetry tests ────────────────────────────────────────────────
 
@@ -343,11 +340,10 @@ describe("Values the device has no byte for", () => {
 // still exercises genuine device data for every field checked below.
 
 describe("Real device values (default-init.tsl)", () => {
-  const file = readFile(DEFAULT_INIT_FIXTURE);
-  const patch = file.patches[0];
-  const dlyBytes = bytesFromHex(patch[RAW]["MEMORY%DLY"]);
-  const revBytes = bytesFromHex(patch[RAW]["MEMORY%REV"]);
-  const pfxBytes = bytesFromHex(patch[RAW]["MEMORY%PFX"]);
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const dlyBytes = bytesFromHex(rawBlock(patch, "MEMORY%DLY"));
+  const revBytes = bytesFromHex(rawBlock(patch, "MEMORY%REV"));
+  const pfxBytes = bytesFromHex(rawBlock(patch, "MEMORY%PFX"));
 
   it("decodes the active chain order", () => {
     expect(patch.chain).toEqual(["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);

@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
 import {
   DEFAULT_CHAIN,
   moveBefore,
@@ -17,9 +16,9 @@ import {
 } from "../../../src/devices/gx1/builder";
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
-import { readFile } from "../../../src/devices/gx1/tsl";
 import { BLOCK_DEFAULTS, DEFAULTS_BY_TYPE, DEFAULT_SUBTYPES } from "../../../src/devices/gx1/defaults";
 import { PARAM_SUBTYPE_EFFECTS } from "../../../src/devices/gx1/common";
+import { DEFAULT_INIT_FIXTURE, present, patchAt } from "../../helpers";
 
 describe("basePatch", () => {
   it("defaults to DEFAULT_CHAIN and key C", () => {
@@ -66,7 +65,7 @@ describe("moveBefore", () => {
     const patch = basePatch("Test", chain);
 
     const encoded = encodePatch(patch);
-    const chainBytes = bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]);
+    const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
 
     expect(chainBytes).toEqual([1, 2, 3, 4, 5, 7, 9, 8, 6, 10, 0, 11, 12]);
   });
@@ -76,7 +75,7 @@ describe("moveBefore", () => {
     const patch = basePatch("Test", chain);
 
     const encoded = encodePatch(patch);
-    const chainBytes = bytesFromHex(encoded.paramSet["MEMORY%CHAIN"]);
+    const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
 
     expect(chainBytes).toEqual([1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]);
   });
@@ -150,7 +149,7 @@ describe("amp", () => {
 
     amp(patch, { type: "TWIN", gain: 90, mic: "CND87" });
 
-    expect(patch.amp).toMatchObject({ gain: 90, mic: "CND87", level: BLOCK_DEFAULTS.amp.level });
+    expect(patch.amp).toMatchObject({ gain: 90, mic: "CND87", level: present(BLOCK_DEFAULTS.amp, "the amp defaults").level });
   });
 
   // The block is mutated in place call after call, so a control the second call leaves out has to
@@ -161,7 +160,7 @@ describe("amp", () => {
     amp(patch, { type: "TWIN", gain: 90 });
     amp(patch, { type: "JC-120" });
 
-    expect(patch.amp.gain).toBe(BLOCK_DEFAULTS.amp.gain);
+    expect(patch.amp.gain).toBe(present(BLOCK_DEFAULTS.amp, "the amp defaults").gain);
   });
 });
 
@@ -230,7 +229,7 @@ describe("fx", () => {
     fx(patch, { slot: "fx1", type: "DELAY" });
 
     expect(patch.fx1.subType).toBe("STANDARD");
-    expect(patch.fx1.params).toMatchObject(DEFAULTS_BY_TYPE.fxDelay.STANDARD);
+    expect(patch.fx1.params).toMatchObject(present(DEFAULTS_BY_TYPE.fxDelay.STANDARD, "the STANDARD fx-delay defaults"));
   });
 
   it("fx DELAY with a WARP sub-algorithm defaults that sub-algorithm's own fields", () => {
@@ -612,9 +611,7 @@ describe("reverb", () => {
 // Had defaultFxParams existed and drifted from reality, this is what would have caught
 // the class of bug where an unset GEQ band decoded to -20 dB instead of 0 dB.
 describe("defaultFxParams (anchored to default-init.tsl)", () => {
-  const FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/default-init.tsl");
-  const file = readFile(FIXTURE);
-  const patch = file.patches[0];
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
 
   it("matches the fixture's real COMPRESSOR params (fx1)", () => {
     const compressorDefaults = defaultFxParams("COMPRESSOR");
