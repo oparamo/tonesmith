@@ -115,8 +115,10 @@ describe("validatePatchSpec", () => {
     expect(issue).toContain("é");
   });
 
-  it("requires an amp block, which every patch sounds through", () => {
-    expect(validatePatchSpec({ name: "Test" })).not.toEqual([]);
+  // The device gives the amp an on/off byte like every other bypassable block, so a patch that
+  // doesn't sound through one is a patch the hardware runs.
+  it("accepts a spec that names no amp", () => {
+    expect(validatePatchSpec({ name: "Test" })).toEqual([]);
   });
 
   it("rejects a value of the wrong kind, naming the param", () => {

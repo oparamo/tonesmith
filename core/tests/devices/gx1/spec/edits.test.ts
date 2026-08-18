@@ -14,7 +14,7 @@ const validateAfter = (patch: Patch, edits: Record<string, unknown>): string[] =
   return gx1.driver.validateFields(patch, edits);
 };
 
-/** Every patch needs an amp, so a case about another block still names one. */
+/** A built patch these cases can edit, with an amp on it so an amp edit has somewhere to land. */
 const patchWith = (spec: Record<string, unknown>): Patch =>
   gx1.driver.buildPatch({ name: "Edits", amp: { type: "TRNSPRNT" }, ...spec });
 

@@ -32,20 +32,18 @@ import type { BlockContext } from "./errors";
 /** Patch-level fields that are not blocks. Every other key must name one. */
 const PATCH_FIELDS = ["name", "chain", "key"];
 
-/** The one block the device can't bypass, so it takes no `on`. */
+/** The one block the device can't bypass: FV has no on/off byte to write. */
 const ALWAYS_ON = new Set<string>(["fv"]);
-
-/** The one block every patch must set: the signal sounds through it and it has no off state. */
-const REQUIRED_BLOCK = "amp";
 
 /**
  * Blocks where `{ on: false }` on its own says what leaving the block out says, off at factory
  * defaults. The builder writes the same bytes for both, so the two are folded together here rather
  * than left as a second path that could drift from the first.
+ *
+ * Every block the device gives an on/off byte belongs here. What a patch with a given block off
+ * would be *for* is the player's call, not this validator's.
  */
-const BYPASSABLE = new Set<string>(
-  BLOCK_NAMES.filter(name => name !== REQUIRED_BLOCK && !ALWAYS_ON.has(name))
-);
+const BYPASSABLE = new Set<string>(BLOCK_NAMES.filter(name => !ALWAYS_ON.has(name)));
 
 /** True when a block spec carries nothing but `on: false`. */
 const isBareBypass = (value: unknown): boolean => {
@@ -189,9 +187,6 @@ const checkBlockNames = (issues: Issues, spec: Record<string, unknown>): void =>
   if (unknown.length > 0) {
     const quoted = unknown.map(key => `"${key}"`).join(", ");
     issues.push(`${quoted} is not a block on this device. Blocks: ${BLOCK_NAMES.join(", ")}`);
-  }
-  if (spec[REQUIRED_BLOCK] === undefined) {
-    issues.push(`Every patch needs an ${REQUIRED_BLOCK} block: it is what the signal sounds through.`);
   }
 };
 
