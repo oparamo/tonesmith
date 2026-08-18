@@ -115,4 +115,33 @@ describe("buildPatch", () => {
 
     expect(patch.fx3.params.lower).toBe(60);
   });
+
+  // The amp carries its own on/off byte, so the device runs a patch with it bypassed. What such a
+  // patch is for is the player's business.
+  describe("an amp the patch does not sound through", () => {
+    const delayOnly = { name: "Delay Only", delay: { type: "ANALOG", time: 400, feedback: 30, level: 48 } };
+
+    it("builds a patch with no amp block at all, leaving it off at factory defaults", () => {
+      const patch = gx1.driver.buildPatch(delayOnly);
+
+      expect(patch.amp).toMatchObject({ on: false, type: "NATURAL" });
+      expect(patch.delay).toMatchObject({ on: true, time: 400 });
+    });
+
+    // `{ on: false }` alone and leaving the block out say the same thing, so they have to produce
+    // the same patch rather than the second one demanding a type for a block it is switching off.
+    it("treats a bare `on: false` as leaving the block out", () => {
+      const omitted = gx1.driver.buildPatch(delayOnly);
+      const bypassed = gx1.driver.buildPatch({ ...delayOnly, amp: { on: false } });
+
+      expect(bypassed.amp).toEqual(omitted.amp);
+    });
+
+    it("still requires a type from an amp the patch does sound through", () => {
+      const build = () => gx1.driver.buildPatch({ ...delayOnly, amp: { on: true } });
+
+      expect(build, "names the block that needs one").toThrow(/amp/);
+      expect(build, "and the models it offers").toThrow(/JC-120/);
+    });
+  });
 });
