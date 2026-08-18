@@ -344,8 +344,8 @@ interface DelayOptions {
 /**
  * Sets the delay block. Every control is optional because the types disagree about which they have:
  * TWIST has no TIME or FEEDBACK, GLITCH has no FEEDBACK or LEVEL, and WARP has no FEEDBACK or HIGH
- * CUT. Requiring them forced a caller building those types to invent values that encode then
- * dropped, so a control the chosen type has no field for is now rejected by name.
+ * CUT. Requiring every control would force a caller building those types to invent values the
+ * encoder silently drops, so a control the chosen type has no field for is rejected by name instead.
  */
 const delay = (patch: Patch, options: DelayOptions): void => {
   const { type, on = true, params = {}, ...named } = options;

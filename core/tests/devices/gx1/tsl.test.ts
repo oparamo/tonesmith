@@ -91,8 +91,9 @@ describe("readFile", () => {
     expect(file.device).toBe("gx1");
   });
 
-  // Anything can be handed to a tool that takes a path, and what came back was a TypeError from
-  // whichever field the codec reached for first, naming neither the file nor what was wrong with it.
+  // Anything can be handed to a tool that takes a path, and without this check what comes back is
+  // a TypeError from whichever field the codec reaches for first, naming neither the file nor
+  // what is wrong with it.
   describe("a file that is not one of this device's", () => {
     const badPath = withTempFile("not-a-patch-file.tsl");
 

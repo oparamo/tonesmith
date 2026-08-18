@@ -83,10 +83,10 @@ describe("generate_patch", () => {
 
   /**
    * The echo is documented as the confirmation that replaces a follow-up read_patch, so it has to
-   * agree with the file. It did not, and still would not if taken from the built patch: the builder
-   * mutates one block in place, so fields belonging to whichever type occupied it before survive in
-   * memory. A TERA ECHO reverb, which has no TIME, DENSITY or PRE-DELAY, kept all three from the
-   * blank patch's reverb and reported settings the device never stored.
+   * agree with the file. Taking it from the built patch would not: the builder mutates one block in
+   * place, so fields belonging to whichever type occupied it before survive in memory. A TERA ECHO
+   * reverb, which has no TIME, DENSITY or PRE-DELAY, would keep all three from the blank patch's
+   * reverb and report settings the device never stored.
    */
   it("echoes a patch as the file stores it, not as the builder assembled it", async () => {
     temp = emptyTempDir();
@@ -716,8 +716,8 @@ describe("generate_patch", () => {
 
   /**
    * The other half of the per-type range rule. Bounding a flat field by one representative type
-   * rejected these before validateTypeParams could judge them against the type actually chosen, so
-   * each was a documented value the device accepts and the tool could not express.
+   * would reject each of these before validateTypeParams could judge it against the type actually
+   * chosen, even though each is a documented value the device accepts.
    */
   it("accepts values only some types allow, which one representative type's bounds excluded", async () => {
     temp = emptyTempDir();
@@ -823,9 +823,9 @@ describe("generate_patch", () => {
     expect(text).toContain("100");
   });
 
-  // A variant sent through a field the effect doesn't have is the one bad input that used to
-  // produce a file: it encoded nowhere, so the patch saved clean and played at the default stage
-  // count. The rejection has to name the param that does carry it, or the caller has nowhere to go.
+  // A variant sent through a field the effect doesn't have encodes nowhere: without this check the
+  // patch would save clean and play at the default stage count. The rejection has to name the param
+  // that does carry it, or the caller has nowhere to go.
   it("rejects a subType on an effect whose variant is an ordinary param, naming that param", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "phaser-subtype.tsl");
@@ -878,7 +878,7 @@ describe("generate_patch", () => {
 
   // Every block's fields are the ones its type actually has, so an invented one is a param in the
   // wrong place (`rate` belongs in `params`) or a guess. Either way the byte it meant to set stays
-  // at its default, which is the same silent miss a stray subType used to produce.
+  // at its default, the same silent miss a stray subType produces.
   it("rejects a field a block does not have, rather than ignoring it", async () => {
     temp = emptyTempDir();
     const client = await connectClient();
@@ -910,7 +910,7 @@ describe("generate_patch", () => {
 
   // The decoded patch carries a per-type param flat on the block, which is the shape read_patch
   // returns and generate echoes back, so a caller mirroring what it just read sends it flat too.
-  // That used to be rejected. Now it is the accepted shape, and this is the round trip proving it.
+  // This is the round trip proving that shape is accepted.
   it("takes a type-specific param as a field on the block and encodes it", async () => {
     temp = emptyTempDir();
     const outPath = join(temp.dir, "shimmer.tsl");
@@ -968,8 +968,9 @@ describe("generate_patch", () => {
     for (const typeId of ["STANDARD", "SPACE ECHO", "GLITCH"]) expect(text).toContain(typeId);
   });
 
-  // An unknown subType on a type that has them used to reach the codec's lookup and come back as
-  // `Unknown type value: "wobble"`, naming neither the block, nor the field, nor the valid values.
+  // Without this check, an unknown subType on a type that has them would reach the codec's lookup
+  // and come back as `Unknown type value: "wobble"`, naming neither the block, nor the field, nor
+  // the valid values.
   it("rejects an unknown subType on a type that has subTypes, naming the valid ones", async () => {
     temp = emptyTempDir();
     const client = await connectClient();

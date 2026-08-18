@@ -238,7 +238,7 @@ describe("resolvePatchIndex", () => {
   });
 
   // Every surface takes the ref as a bare string, so an omitted one arrives here as "". Read as a
-  // number it is 0, which selected the first patch and, on a write, overwrote it.
+  // number it is 0, which would select the first patch and, on a write, overwrite it.
   it.each(["", "   "])("rejects %o rather than selecting the first patch", (ref) => {
     const resolveEmpty = () => resolvePatchIndex(patches, ref);
 
@@ -251,7 +251,7 @@ describe("resolvePatchIndex", () => {
     expect(index).toBe(1);
   });
 
-  // Number() accepts both of these and rounds them into an index, so each used to select a patch
+  // Number() accepts both of these and rounds them into an index, which would select a patch
   // the caller never spelled out.
   it.each(["0x1", "2.0"])("does not read %o as an index", (ref) => {
     const resolveNonIndex = () => resolvePatchIndex(patches, ref);

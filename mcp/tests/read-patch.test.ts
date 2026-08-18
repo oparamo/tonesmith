@@ -48,8 +48,8 @@ describe("read_patch", () => {
     expect(body.name).toBe(present(expected.patches[0], "patch 0 of the fixture").name);
   });
 
-  // The all-patches read has always carried setName; a single-patch read left the caller unable to
-  // see the set they were working in, or to confirm a rename landed.
+  // The all-patches read carries setName; this guards that a single-patch read does too, so the
+  // caller can see the set they are working in, or confirm a rename landed.
   it("reports the set name on a single-patch read too", async () => {
     const client = await connectClient();
     close = client.close;

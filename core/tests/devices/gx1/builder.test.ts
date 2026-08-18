@@ -197,12 +197,12 @@ describe("fx", () => {
     expect(patch.fx1.params).toMatchObject({ rate: 50, depth: 60, level: 100, preDelay: 4, direct: 100 });
   });
 
-  // A type with sub-models is always set to one, so an omitted subType has to mean the model the
-  // device opens on. It used to mean raw byte 0, which for OD/DS is a different pedal entirely.
   // Read through `present` rather than `?.`: an effect dropping out of the defaults would otherwise
   // make the assertion `expect(undefined).toBe(undefined)` and pass on the regression it guards.
   const fxSubModelDefaults = present(DEFAULT_SUBTYPES.fx, "the fx block's default sub-models");
 
+  // A type with sub-models is always set to one, so an omitted subType has to mean the model the
+  // device opens on, not raw byte 0, which for OD/DS is a different pedal entirely.
   it.each([...PARAM_SUBTYPE_EFFECTS].map(
     type => [type, present(fxSubModelDefaults[type], `a default sub-model for fx ${type}`)]
   ))(
@@ -227,8 +227,8 @@ describe("fx", () => {
     expect(patch.fx3).toMatchObject({ on: false, type: "DELAY", subType: "STANDARD" });
   });
 
-  // The sub-algorithm picks the field set, so with none named there was nothing to default from
-  // and the block came out with every param at 0. It opens on the factory sub-algorithm instead.
+  // The sub-algorithm picks the field set, so with none named there would be nothing to default
+  // from and every param would come out at 0. Opening on the factory sub-algorithm avoids that.
   it("fx DELAY with no sub-algorithm opens on the factory one, at its own defaults", () => {
     const patch = basePatch("Test");
 
@@ -504,8 +504,8 @@ describe("delay", () => {
     expect(setTwice).toThrow(/feedback/);
   });
 
-  // The named controls are not universal: requiring them made a caller invent values for a type
-  // that has no such field, which encode then dropped without a word.
+  // The named controls are not universal: requiring them outright would force a caller to invent
+  // a value for a type that has no such field, which encode would then drop without a word.
   it("rejects a named control the chosen type has no field for, naming what it does take", () => {
     const patch = basePatch("Test");
     const setAbsentControl = () => {
@@ -555,7 +555,7 @@ describe("reverb", () => {
   });
 
   // Unset controls take the type's factory value, the same rule the params bag follows. PRE-DELAY
-  // is the one that shows it: the builder used to hardcode 0, which is not what the device ships.
+  // is the one that shows it: hardcoding 0 would not match what the device ships.
   it("defaults the unset named controls to the type's factory values", () => {
     const patch = basePatch("Test");
 

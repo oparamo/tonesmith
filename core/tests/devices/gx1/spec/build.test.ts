@@ -17,9 +17,9 @@ describe("buildPatch", () => {
     expect(patch.chain).toEqual(DEFAULT_CHAIN);
   });
 
-  // A sub-model goes in under one name and has to come back out under the same one. Pedal WAH read
-  // back as the codec's own field name, so a caller mirroring what it just read was rejected for
-  // sending a key the block had no field for.
+  // A sub-model goes in under one name and has to come back out under the same one. Pedal WAH reads
+  // back as the codec's own field name, so a caller mirroring what it just read would otherwise be
+  // rejected for sending a key the block has no field for.
   it("accepts a block's sub-model spelled the way reading it back spells it", () => {
     const built = gx1.driver.buildPatch({
       name: "Wah",
@@ -93,8 +93,8 @@ describe("buildPatch", () => {
     expect(build).toThrow(/time/);
   });
 
-  // FX1 and FX2 have no MEMORY%FX3A block, so OVERTONE's params landed at offset 0 of the shared
-  // 251-byte block, on top of COMPRESSOR's window and the factory defaults living in it.
+  // FX1 and FX2 have no MEMORY%FX3A block, so OVERTONE's params would land at offset 0 of the
+  // shared 251-byte block, on top of COMPRESSOR's window and the factory defaults living in it.
   it("rejects OVERTONE in an fx slot that cannot hold it, naming the one that can", () => {
     const build = (): unknown => gx1.driver.buildPatch({
       name: "Overtone",

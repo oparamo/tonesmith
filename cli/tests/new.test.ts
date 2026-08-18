@@ -20,8 +20,7 @@ describe("gx1 new", () => {
     expect(created.name).toBe("my-tones");
   });
 
-  // Each option stands alone: a count used to sit in the second positional slot, so asking for
-  // three patches meant naming the set as well.
+  // Each option stands alone, so asking for a count doesn't also require naming the set.
   it("creates N blank patches when given a count, with no set name", async () => {
     temp = emptyTempDir();
     const file = join(temp.dir, "multi.tsl");

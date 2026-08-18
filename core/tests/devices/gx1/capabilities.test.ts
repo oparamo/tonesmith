@@ -277,11 +277,12 @@ describe("GX-1 single-shape block param keys name a real decoded field", () => {
 // every per-type codec field and asserts its *representation* agrees with the catalog's authored
 // kind: a boolean toggle is a `bool` field; a discrete param is a `lookup` whose table equals its
 // `values` verbatim; a numeric one is a numeric field. It catches a catalog enum backed by a
-// hand-rolled numeric codec (how PHASER `stage` shipped a raw index) and the trigger/solo drift
-// between strings, numbers, and booleans. Without a hand-maintained list, so a new effect/field
-// can't silently reintroduce the class. An `indexTable` field is the one exception, since its
-// mixed string/number table answers to no single kind. (amp/odds/ns/fv are hand-decoded, not
-// FieldCodec maps, so they're covered by their own round-trip guards above rather than here.)
+// hand-rolled numeric codec (PHASER `stage` as a raw index instead of a lookup is that shape of
+// bug) and the trigger/solo drift between strings, numbers, and booleans, all without a
+// hand-maintained list, so a new effect/field can't silently reintroduce the class. An
+// `indexTable` field is the one exception, since its mixed string/number table answers to no
+// single kind. (amp/odds/ns/fv are hand-decoded, not FieldCodec maps, so they're covered by their
+// own round-trip guards above rather than here.)
 
 const NUMERIC_KINDS = new Set(["u8", "signed", "scaled", "nibblePair", "nibbleQuad"]);
 
@@ -429,9 +430,9 @@ describe("GX-1 chain capability", () => {
 
 // ── patch-name capability: the advertised limit is the encoded one ──
 //
-// These were two numbers until 2026-08-06: the generate schema capped names at 13 while the format
-// stores 16. Nothing caught it, because both were internally consistent and the longest name in the
-// committed exports happened to be 13 characters.
+// The two numbers can drift silently: a generate schema capped at 13 while the format stores 16
+// is internally consistent either way, and the committed exports' longest name happening to be 13
+// characters would not surface the mismatch.
 
 describe("GX-1 patch-name capability", () => {
   it("advertises the limit the codec actually encodes", () => {
