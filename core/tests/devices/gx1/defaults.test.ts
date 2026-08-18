@@ -148,8 +148,8 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
   });
 
   // A blank patch is documented as opening at the device's factory defaults, and create_patch_file
-  // hands that straight to a caller. It had drifted: the amp opened on at TRNSPRNT with LEVEL 100,
-  // and the OD/DS block opened all-zeroed, which decodes as MID BOOST at drive 0 and tone -50.
+  // hands that straight to a caller. A drift here would have the amp open on at TRNSPRNT with LEVEL
+  // 100, and the OD/DS block open all-zeroed, which decodes as MID BOOST at drive 0 and tone -50.
   it("blankPatch opens the single-shape blocks at those same defaults", () => {
     const blank = blankPatch("Blank");
 

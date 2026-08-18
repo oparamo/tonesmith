@@ -15,9 +15,6 @@ interface CliResult {
   errorMessage?: string;
 }
 
-/** Runs the CLI program in-process, capturing console output and reporting the exit code the run
- * settled on, whether the program set it or commander threw its own exit (exitOverride). The
- * process's own code is cleared afterward so one failing case can't fail the test run. */
 /** Commander hands exitOverride down only to subcommands added after the call, and buildProgram
  * has already added every device by the time a test gets the program, so set it on the whole tree. */
 const exitOverrideAll = (command: Command): void => {
@@ -25,6 +22,9 @@ const exitOverrideAll = (command: Command): void => {
   for (const child of command.commands) exitOverrideAll(child);
 };
 
+/** Runs the CLI program in-process, capturing console output and reporting the exit code the run
+ * settled on, whether the program set it or commander threw its own exit (exitOverride). The
+ * process's own code is cleared afterward so one failing case can't fail the test run. */
 const runCli = async (argv: string[]): Promise<CliResult> => {
   const program = buildProgram();
   exitOverrideAll(program);

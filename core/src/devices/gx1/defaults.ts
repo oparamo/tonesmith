@@ -114,10 +114,10 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
  * thing whatever else the patch does). The block's `on` and `type` selectors are left out, as they
  * are for the per-type blocks, since the builder sets both from what the caller asked for.
  *
- * The builder fills any control the caller doesn't set from here. Before this existed those
- * controls were required, which made a caller invent a value for every knob on a block it only
- * wanted switched on, and the ones that did have a hardcoded default disagreed with the device:
- * amp LEVEL opened at 100 against the device's 50 and amp MIC at DYN57 against DYN421.
+ * The builder fills any control the caller doesn't set from here, rather than requiring the caller
+ * to invent a value for every knob on a block it only wanted switched on. A single hardcoded
+ * default per field would also disagree with the device on some of them: amp LEVEL's real default
+ * is 50, not 100, and amp MIC's is DYN421, not DYN57.
  */
 const BLOCK_DEFAULTS: Record<string, ParamDefaults> = {
   amp: { gain: 50, level: 50, bass: 50, middle: 50, treble: 50, speaker: "ORIGINAL", mic: "DYN421", solo: false, soloLevel: 50 },

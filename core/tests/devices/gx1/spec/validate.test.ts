@@ -49,8 +49,8 @@ describe("validateTypeParams", () => {
     expect(issues[0]).toContain("PEDAL BEND");
   });
 
-  // Only the "declares none" case used to be caught, so a wrong value on a type that does have
-  // variants fell through to the codec's lookup and came back as `Unknown type value: "WOBBLE"`,
+  // Checking only the "declares none" case would let a wrong value on a type that does have
+  // variants fall through to the codec's lookup and come back as `Unknown type value: "WOBBLE"`,
   // naming neither the block, nor the field, nor what it could have been.
   it("rejects a subType the item doesn't declare, listing the ones it does", () => {
     const issues = validateTypeParams({ group: "fx", type: "COMPRESSOR", subType: "WOBBLE", values: {} });
@@ -156,8 +156,8 @@ describe("validatePatchSpec", () => {
   });
 
   // Every block fills what the caller leaves unset from the device's own factory values, so naming
-  // the type is the whole obligation. These four used to demand their controls outright, which made
-  // a caller invent a value for every knob on a block it only wanted switched on.
+  // the type is the whole obligation. Demanding the controls outright would make a caller invent a
+  // value for every knob on a block it only wanted switched on.
   it("accepts a block that names only its type, leaving the rest to default", () => {
     expect(validatePatchSpec({ name: "Test", amp: { type: "TWIN" } })).toEqual([]);
   });

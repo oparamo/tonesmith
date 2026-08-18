@@ -187,7 +187,8 @@ const isRightKind = (spec: ParamSpec, value: unknown): boolean => {
 /**
  * Checks one value against one spec: that it is the kind the param takes, then that it is in range
  * or a member of the value list. The kind check leads because a value of the wrong kind passes the
- * range check by falling through it, which is how a string threshold used to reach the codec.
+ * range check by falling through it, letting something like a string threshold reach the codec
+ * unchecked.
  */
 const checkValue = (issues: Issues, check: ParamCheck): void => {
   const { spec, value } = check;
