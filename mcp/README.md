@@ -17,7 +17,7 @@ elsewhere.
 ## Install
 
 ```bash
-npm install -g @tonesmith/mcp
+pnpm add -g @tonesmith/mcp
 tonesmith-mcp   # runs over stdio
 ```
 

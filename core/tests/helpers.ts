@@ -37,8 +37,11 @@ const rawBlock = (patch: Patch, key: string): string[] =>
  * A scratch directory of its own for every test in the calling suite, cleaned up after each one.
  * Call it in a `describe` body: it registers hooks against the suite being collected, and returns
  * a getter because the directory cannot exist until the test it belongs to starts.
+ *
+ * Named apart from cli's and mcp's `withTempDir`, which hand back a directory plus a `cleanup` the
+ * caller has to run. Two helpers with one name and opposite contracts is worse than two names.
  */
-const withTempDir = (): (() => string) => {
+const scratchDir = (): (() => string) => {
   let dir = "";
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "tonesmith-")); });
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
@@ -47,14 +50,14 @@ const withTempDir = (): (() => string) => {
 
 /**
  * A path in a scratch directory for every test in the calling suite, whether or not the test
- * writes anything there. Same call-in-a-`describe` rule as `withTempDir`.
+ * writes anything there. Same call-in-a-`describe` rule as `scratchDir`.
  */
-const withTempFile = (basename: string): (() => string) => {
-  const dir = withTempDir();
+const scratchFile = (basename: string): (() => string) => {
+  const dir = scratchDir();
   return () => join(dir(), basename);
 };
 
 export {
   ROCK_TONES_FIXTURE, DEFAULT_INIT_FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
-  present, patchAt, rawBlock, withTempDir, withTempFile,
+  present, patchAt, rawBlock, scratchDir, scratchFile,
 };

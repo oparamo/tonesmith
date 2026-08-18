@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeFileAtomic } from "../src/atomic-write";
-import { withTempDir } from "./helpers";
+import { scratchDir } from "./helpers";
 
 describe("writeFileAtomic", () => {
-  const scratch = withTempDir();
+  const scratch = scratchDir();
 
   it("writes the contents, creating any missing parent directories", () => {
     const path = join(scratch(), "nested", "deeper", "set.tsl");

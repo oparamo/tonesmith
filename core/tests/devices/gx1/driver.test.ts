@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { driver } from "../../../src/devices/gx1/driver";
 import {
-  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_PATCH_NAMES, present, withTempFile,
+  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_PATCH_NAMES, present, scratchFile,
 } from "../../helpers";
 
 describe("gx1 driver", () => {
@@ -41,7 +41,7 @@ describe("gx1 driver", () => {
   });
 
   describe("writeFile", () => {
-    const tmpPath = withTempFile("driver-set.tsl");
+    const tmpPath = scratchFile("driver-set.tsl");
 
     it("writes a file that can be read back", () => {
       const file = driver.newFile("Driver Set");

@@ -5,7 +5,7 @@ import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/g
 import { RAW } from "../../../src/devices/gx1/common";
 import {
   ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
-  present, withTempDir, withTempFile,
+  present, scratchDir, scratchFile,
 } from "../../helpers";
 
 describe("blankPatch", () => {
@@ -95,7 +95,7 @@ describe("readFile", () => {
   // a TypeError from whichever field the codec reaches for first, naming neither the file nor
   // what is wrong with it.
   describe("a file that is not one of this device's", () => {
-    const badPath = withTempFile("not-a-patch-file.tsl");
+    const badPath = scratchFile("not-a-patch-file.tsl");
 
     const readWritten = (contents: unknown) => {
       writeFileSync(badPath(), JSON.stringify(contents));
@@ -124,7 +124,7 @@ describe("readFile", () => {
 });
 
 describe("writeFile + readFile round-trip", () => {
-  const scratch = withTempDir();
+  const scratch = scratchDir();
   const tmpPath = (): string => join(scratch(), "written-set.tsl");
 
   it("written file can be read back with identical patch names", () => {
