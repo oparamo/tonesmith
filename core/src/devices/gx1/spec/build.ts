@@ -32,18 +32,12 @@ import type { BlockContext } from "./errors";
 /** Patch-level fields that are not blocks. Every other key must name one. */
 const PATCH_FIELDS = ["name", "chain", "key"];
 
-/** The one block the device can't bypass: FV has no on/off byte to write. */
-const ALWAYS_ON = new Set<string>(["fv"]);
-
 /**
- * Blocks where `{ on: false }` on its own says what leaving the block out says, off at factory
- * defaults. The builder writes the same bytes for both, so the two are folded together here rather
- * than left as a second path that could drift from the first.
- *
- * Every block the device gives an on/off byte belongs here. What a patch with a given block off
- * would be *for* is the player's call, not this validator's.
+ * The one block the device can't bypass: FV has no on/off byte to write. Every other block has one,
+ * so every other block can be left off. What a patch with a given block off would be *for* is the
+ * player's call, not this validator's.
  */
-const BYPASSABLE = new Set<string>(BLOCK_NAMES.filter(name => !ALWAYS_ON.has(name)));
+const ALWAYS_ON = new Set<string>(["fv"]);
 
 /** True when a block spec carries nothing but `on: false`. */
 const isBareBypass = (value: unknown): boolean => {
@@ -51,10 +45,15 @@ const isBareBypass = (value: unknown): boolean => {
   return entries.length > 0 && entries.every(([key, entry]) => (key === ON_FIELD ? entry === false : entry === undefined));
 };
 
-/** The blocks a spec actually sets, with the ones written off folded into the ones left out. */
+/**
+ * The blocks a spec actually sets, with the ones written off folded into the ones left out.
+ * `{ on: false }` on its own says what leaving the block out says, off at factory defaults, and the
+ * builder writes the same bytes for both, so folding them here keeps one path rather than a second
+ * that could drift from it.
+ */
 const setBlocks = (spec: Record<string, unknown>): BlockName[] =>
   BLOCK_NAMES.filter(name =>
-    spec[name] !== undefined && !(BYPASSABLE.has(name) && isBareBypass(spec[name])));
+    spec[name] !== undefined && !(!ALWAYS_ON.has(name) && isBareBypass(spec[name])));
 
 /**
  * A block's controls, wherever it keeps them: an fx slot nests them in `params` the way the decoded

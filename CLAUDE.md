@@ -76,8 +76,10 @@ core/                       @tonesmith/core
     devices/index.ts        driver roster, one line per device
     devices/<id>/           per-device driver, always this shape:
       types/                device type definitions split by domain (barrel: index.ts)
-      common/               constants.ts (ordered lookup arrays + reverse-index maps) + raw.ts
-                            (unique symbol attaching original raw bytes to decoded objects), barrel
+      common/               constants.ts (ordered lookup arrays + reverse-index maps), blocks.ts
+                            (which blocks a spec may name, and where each keeps its controls, read
+                            by both the spec validator and capabilities), raw.ts (unique symbol
+                            attaching original raw bytes to decoded objects), barrel
       codec/                encode/decode pipeline: primitives, then field codecs, then per-block
                             codecs, then top-level decodePatch/encodePatch (barrel: index.ts)
       <format>.ts           file I/O (readFile / writeFile / blankPatch / newFile), named after the
@@ -97,10 +99,14 @@ core/                       @tonesmith/core
                             builds it: validate.ts checks blocks, types and values; errors.ts
                             composes the rejection messages; build.ts assembles the validated spec
                             via builder.ts (barrel: index.ts). Backs PatchDriver.buildPatch
-      index.ts              device barrel: driver, patch types, builder helpers
+      index.ts              device barrel, and the whole published surface for the device: driver,
+                            patch and block types, RAW. Nothing else leaves the device folder
     index.ts                registers the roster; public re-exports + one namespace per device
   tests/                    mirrors src/: shared-util suites + devices/<id>/ suites (codec
                             round-trip, plus the codec-to-catalog and defaults drift guards)
+    helpers.ts              fixture paths and contents off one anchor, `present`, and
+                            scratchDir / scratchFile, which register their own cleanup hooks. Named
+                            apart from cli's and mcp's withTempDir, which return a manual `cleanup`
     fixtures/<id>/          supplementary per-device fixtures (gx1: default-init.tsl, a
                             factory-default clean baseline complementing the root fixture)
   docs/<id>/                captured manuals as subject-sized Markdown + FORMAT.md (the
@@ -112,6 +118,8 @@ cli/                        @tonesmith/cli  (bin: tonesmith)
       commands.ts           configureDeviceCommands: shared read / write / copy / new /
                             capabilities, one registrar per command
       capabilities-print.ts color printer for DeviceCapabilities
+      device.ts             cliDevice: one roster entry from an id and a printer, holding in one
+                            place the cast that says an id yields that device's own patch type
     devices/index.ts        CLI device roster, one CliDescriptor per device
     devices/<id>/           per device: print.ts (patch pretty-printer) + barrel index.ts
                             (descriptor handing driver + printer to the shared commands)
@@ -162,11 +170,12 @@ patch file (device-native format)
   reverse-index maps (`AMP_TYPE_IDX`, etc.) are derived with
   `Object.fromEntries(list.map((v,i) => [v,i]))`.
 
-- **Builder functions:** named after the block they configure, no "set" prefix; scaffolding and
-  file-save helpers (gx1's `basePatch` and `saveTsl`) are the naming exceptions. Each takes the
-  patch plus one options object, and any block whose params vary by type carries them in a
-  `params` bag. That bag is validated against the current type's known fields, so an unknown key
-  throws rather than silently writing a byte that means something else for this type.
+- **Builder functions:** named after the block they configure, no "set" prefix; scaffolding helpers
+  (gx1's `basePatch`) are the naming exception. Each takes the patch plus one options object, and
+  any block whose params vary by type carries them in a `params` bag. That bag is validated against
+  the current type's known fields, so an unknown key throws rather than silently writing a byte
+  that means something else for this type. The builders are internal: a consumer builds a patch
+  from a spec through `PatchDriver.buildPatch`.
 
 - **`write` dot-notation:** `fx1.params.rate=50` walks the decoded patch object; each segment
   after splitting on `.` navigates one level deeper.

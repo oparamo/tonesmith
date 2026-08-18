@@ -12,7 +12,7 @@ files, and browse what a device can do.
 ## Install
 
 ```bash
-npm install -g @tonesmith/cli
+pnpm add -g @tonesmith/cli
 ```
 
 ## Usage

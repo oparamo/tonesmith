@@ -13,7 +13,22 @@ CLI, and MCP server, so the surfaces below work identically for any supported de
 New devices are onboarded with the `add-device` skill (`.claude/skills/add-device/SKILL.md`),
 which walks from format reverse-engineering to CLI/MCP wiring.
 
-## Quick start
+## Packages
+
+Three packages, published from this repo. Take the one that matches how you want to work.
+
+| Package                                                              | What it is                                             | Install                       |
+|----------------------------------------------------------------------|--------------------------------------------------------|-------------------------------|
+| [`@tonesmith/cli`](https://www.npmjs.com/package/@tonesmith/cli)      | Command line: read a patch, edit a field, copy one      | `pnpm add -g @tonesmith/cli`  |
+| [`@tonesmith/mcp`](https://www.npmjs.com/package/@tonesmith/mcp)      | MCP server, so an agent can build patches for you       | `pnpm add -g @tonesmith/mcp`  |
+| [`@tonesmith/core`](https://www.npmjs.com/package/@tonesmith/core)    | The library the other two are built on                  | `pnpm add @tonesmith/core`    |
+
+```bash
+tonesmith gx1 read my-tones.tsl   # from @tonesmith/cli
+tonesmith-mcp                     # from @tonesmith/mcp, speaks MCP over stdio
+```
+
+## Working on tonesmith
 
 ```bash
 git clone <repo>
@@ -22,7 +37,7 @@ pnpm install
 pnpm build
 ```
 
-After building, the CLI is available at `node cli/dist/index.js`. For a global alias:
+After building, the CLI runs at `node cli/dist/index.js`. For a global alias to the working copy:
 
 ```bash
 pnpm link --global --dir cli   # makes `tonesmith` available in your PATH
@@ -73,7 +88,8 @@ of parameter keys, ranges, and values; patch generation echoes back the resolved
 a connected agent can build a patch without any extra setup.
 
 ```bash
-node mcp/dist/index.js   # runs the server over stdio
+tonesmith-mcp            # installed: runs the server over stdio
+node mcp/dist/index.js   # from a working copy, after pnpm build
 ```
 
 **Claude Desktop config** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -82,12 +98,14 @@ node mcp/dist/index.js   # runs the server over stdio
 {
   "mcpServers": {
     "tonesmith": {
-      "command": "node",
-      "args": ["/path/to/tonesmith/mcp/dist/index.js"]
+      "command": "tonesmith-mcp"
     }
   }
 }
 ```
+
+From a working copy instead, use `"command": "node"` with
+`"args": ["/path/to/tonesmith/mcp/dist/index.js"]`.
 
 MCP tools:
 

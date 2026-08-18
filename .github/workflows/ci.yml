@@ -11,9 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # pnpm's version comes from `packageManager` in the root package.json. That field and this
+      # action's `version` input are mutually exclusive: setting both fails the job.
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - uses: actions/setup-node@v6
         with:

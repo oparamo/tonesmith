@@ -16,7 +16,7 @@ and utilities here are the same whichever device a file came from. This package 
 ## Install
 
 ```bash
-npm install @tonesmith/core
+pnpm add @tonesmith/core
 ```
 
 ## Usage

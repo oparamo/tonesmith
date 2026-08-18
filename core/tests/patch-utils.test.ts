@@ -6,7 +6,7 @@ import {
   resolvePatchIndex, coerceValue, setByPath, resolvePatches, applyFieldEdits,
   upsertPatches, copyPatch, createPatchFile, MAX_NEW_PATCHES,
 } from "../src/patch-utils";
-import { withTempDir } from "./helpers";
+import { scratchDir } from "./helpers";
 
 const makePatch = (name: string): Patch =>
   ({ name });
@@ -519,7 +519,7 @@ describe("copyPatch", () => {
 });
 
 describe("createPatchFile", () => {
-  const dir = withTempDir();
+  const dir = scratchDir();
 
   it("names the set after the file and opens with one blank patch by default", () => {
     const files = new Map<string, PatchFile>();
