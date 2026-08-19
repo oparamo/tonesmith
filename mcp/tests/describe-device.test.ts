@@ -33,8 +33,8 @@ describe("describe_device", () => {
     expect(summary.chain.defaultOrder, "no-items summary carries a chain pointer").toContain("AMP");
   });
 
-  // The summary's example was written out by hand against one device, so on any other it would name
-  // groups and items that do not exist.
+  // The example has to come from the catalog the call is answering about. Any hand-written list
+  // names groups and items that exist on one device and not on the next.
   it("shows an example `items` list built from this device's own catalog", async () => {
     const client = await connectClient();
     close = client.close;
@@ -120,10 +120,10 @@ describe("describe_device", () => {
     expect(chorus?.subTypes, "subtypes are listed by id").toContain("STEREO");
   });
 
-  // The listing exists to be read in one call. Inlining every item's params put fx past 70k
-  // characters, which some clients refuse outright. This is the ceiling that regression would hit.
-  // The full/listing comparison is a ratio rather than a byte count so that changing how the
-  // response is serialized can't quietly turn this guard into a formatting assertion.
+  // The listing exists to be read in one call, and inlining every item's params pushes fx past 70k
+  // characters, which some clients refuse outright. The full/listing comparison is a ratio rather
+  // than a byte count, so changing how the response is serialized cannot quietly turn this guard
+  // into a formatting assertion.
   it("keeps the largest group's listing small enough to consume in one call", async () => {
     const client = await connectClient();
     close = client.close;
