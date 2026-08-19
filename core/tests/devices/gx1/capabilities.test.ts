@@ -16,19 +16,18 @@ import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, ODDS_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   FX_DLY_TYPES, FX_REV_TYPES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES,
-  PARAM_SUBTYPE_EFFECTS, NAME_BYTES, SUB_TYPE_FIELD,
-  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS,
+  PARAM_SUBTYPE_EFFECTS, NAME_BYTES, SUB_TYPE_FIELD, DEFAULT_CHAIN,
+  BLOCK_GROUPS, BLOCK_NAMES,
 } from "../../../src/devices/gx1/common";
 import type { BlockName } from "../../../src/devices/gx1/common";
 import { DEFAULTS_BY_TYPE } from "../../../src/devices/gx1/defaults";
 import { gx1Capabilities } from "../../../src/devices/gx1/capabilities";
 import { driver } from "../../../src/devices/gx1/driver";
-import { DEFAULT_CHAIN } from "../../../src/devices/gx1/builder";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../src/devices/gx1/param-catalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../src/devices/gx1/codec/fx-params";
 import {
   PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES,
-  decodeAmp, decodeOdDs, decodeNs, decodeFv,
+  decodeAmp, decodeDrive, decodeNoiseGate, decodeVolume,
 } from "../../../src/devices/gx1/codec/blocks";
 import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import type { CapabilityItem, ParamSpec, PatchSpecExample } from "../../../src/types";
@@ -52,7 +51,7 @@ const catalogParamNames = (params: readonly ParamSpec[] | undefined): Set<string
 
 interface PerTypeBlock {
   /** capabilities/catalog block id. */
-  block: "fx" | "pfx" | "delay" | "reverb" | "fxDelay";
+  block: "fx" | "pedalFx" | "delay" | "reverb" | "fxDelay";
   /** authoritative codec type list from constants.ts. */
   types: readonly string[];
   /** the type's codec field map (undefined = not yet modeled). */
@@ -83,11 +82,11 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
     },
   },
   {
-    block: "pfx",
+    block: "pedalFx",
     types: PFX_TYPES,
     codecFields: (type) => PFX_TYPE_MAPS[type],
     reverseSkip: new Set([SUB_TYPE_FIELD]),
-    aliases: FIELD_LABEL_ALIASES.pfx,
+    aliases: FIELD_LABEL_ALIASES.pedalFx,
     paramOnly: {},
   },
   {
@@ -135,7 +134,7 @@ describe("GX-1 catalog id coverage", () => {
     { block: "amp", types: AMP_TYPES },
     { block: "cab", types: SP_TYPES },
     { block: "mic", types: MIC_TYPES },
-    { block: "odds", types: ODDS_TYPES },
+    { block: "drive", types: ODDS_TYPES },
   ])("$block: capabilities lists every codec model id", ({ block, types }) => {
     const capabilityIds = new Set(groupItems(block).map(item => item.id));
 
@@ -207,10 +206,10 @@ describe("GX-1 FX-slot DELAY per-sub-algorithm parity", () => {
 // FieldCodec table, so decoding placeholder bytes and reading the object's keys gets the
 // field-name set without duplicating a list that could drift from blocks.ts.
 
-const decodedFieldNames = (decoded: object, exceptions: Set<string>): Set<string> =>
-  new Set(Object.keys(decoded).filter(key => !exceptions.has(key)).map(normalize));
+const decodedParamNames = (decoded: { params: object }): Set<string> =>
+  new Set(Object.keys(decoded.params).map(normalize));
 
-const assertBlockParity = (block: "amp" | "odds" | "ns" | "fv", codecNames: Set<string>): void => {
+const assertBlockParity = (block: "amp" | "drive" | "noiseGate" | "volume", codecNames: Set<string>): void => {
   const catalogNames = catalogParamNames(PARAMS_BY_BLOCK[block]);
   for (const name of codecNames) {
     expect(catalogNames, `"${block}" codec field "${name}" is missing from the catalog`).toContain(name);
@@ -224,28 +223,28 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
   // speaker and mic are ordinary amp params, cab and mic groups notwithstanding: a group of its own
   // does not make the amp block's own field discoverable from an amp lookup, and a field outside the
   // catalog is invisible to describe_device and the CLI alike.
-  it("amp (excluding on/type)", () => {
+  it("amp", () => {
     const decoded = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
 
-    assertBlockParity("amp", decodedFieldNames(decoded, new Set(["on", "type"])));
+    assertBlockParity("amp", decodedParamNames(decoded));
   });
 
-  it("odds (excluding on/type, covered elsewhere)", () => {
-    const decoded = decodeOdDs(hexFromBytes(new Array<number>(8).fill(0)));
+  it("drive", () => {
+    const decoded = decodeDrive(hexFromBytes(new Array<number>(8).fill(0)));
 
-    assertBlockParity("odds", decodedFieldNames(decoded, new Set(["on", "type"])));
+    assertBlockParity("drive", decodedParamNames(decoded));
   });
 
-  it("ns (excluding on)", () => {
-    const decoded = decodeNs(hexFromBytes(new Array<number>(4).fill(0)));
+  it("noiseGate", () => {
+    const decoded = decodeNoiseGate(hexFromBytes(new Array<number>(4).fill(0)));
 
-    assertBlockParity("ns", decodedFieldNames(decoded, new Set(["on"])));
+    assertBlockParity("noiseGate", decodedParamNames(decoded));
   });
 
-  it("fv", () => {
-    const decoded = decodeFv(hexFromBytes(new Array<number>(4).fill(0)));
+  it("volume", () => {
+    const decoded = decodeVolume(hexFromBytes(new Array<number>(4).fill(0)));
 
-    assertBlockParity("fv", decodedFieldNames(decoded, new Set()));
+    assertBlockParity("volume", decodedParamNames(decoded));
   });
 });
 
@@ -255,14 +254,14 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
 describe("GX-1 single-shape block param keys name a real decoded field", () => {
   const decodedBlocks = {
     amp: decodeAmp(hexFromBytes(new Array<number>(13).fill(0))),
-    odds: decodeOdDs(hexFromBytes(new Array<number>(8).fill(0))),
-    ns: decodeNs(hexFromBytes(new Array<number>(4).fill(0))),
-    fv: decodeFv(hexFromBytes(new Array<number>(4).fill(0))),
+    drive: decodeDrive(hexFromBytes(new Array<number>(8).fill(0))),
+    noiseGate: decodeNoiseGate(hexFromBytes(new Array<number>(4).fill(0))),
+    volume: decodeVolume(hexFromBytes(new Array<number>(4).fill(0))),
   };
 
   it.each(Object.keys(decodedBlocks))("%s", (blockId) => {
     const group = gx1Capabilities.groups.find(candidate => candidate.id === blockId);
-    const fields = Object.keys(decodedBlocks[blockId as keyof typeof decodedBlocks]);
+    const fields = Object.keys(decodedBlocks[blockId as keyof typeof decodedBlocks].params);
 
     expect(group?.params, `"${blockId}" should expose block params`).toBeDefined();
     for (const param of group?.params ?? []) {
@@ -371,7 +370,7 @@ describe("GX-1 param key stamping", () => {
     groupId === "fx" && item === "HARMONIST" && name === "KEY";
 
   it("stamps a key on every per-type capability param (except paramOnly HARMONIST KEY)", () => {
-    for (const groupId of ["fx", "pfx", "delay", "reverb"]) {
+    for (const groupId of ["fx", "pedalFx", "delay", "reverb"]) {
       for (const { item, param } of keyedParams(groupId)) {
         if (isParamOnly(groupId, item, param.name)) continue;
         expect(param.key, `${groupId} "${item}" param "${param.name}"`).toBeDefined();
@@ -479,8 +478,7 @@ describe("GX-1 spec examples", () => {
     const body = bodyOf(example);
 
     expect(BLOCK_GROUPS[block as BlockName], "written under a real block key").toBe(group);
-    expect("params" in body, "nests its controls where the spec keeps them")
-      .toBe(NESTED_PARAMS.has(present(block, "the example's block key")));
+    expect(body.params, "carries its controls under the one key every block uses").toBeDefined();
 
     // A type with sub-models opens on one, so an example leaving subType out shows a shape the
     // caller has to work out for itself. Naming one is only truthful if it is the model the device

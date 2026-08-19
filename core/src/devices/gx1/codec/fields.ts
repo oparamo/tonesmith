@@ -1,5 +1,6 @@
 import { toSigned, toUnsigned, byteAt, lookupName, shownValue } from "./primitives";
-import type { FxParams } from "../types";
+import { SUB_TYPE_FIELD } from "../common";
+import type { BlockParams } from "../types";
 
 // ── Value guards ──────────────────────────────────────────────────────────────
 
@@ -159,19 +160,41 @@ const nibbleQuad = (name: string, offset: number): FieldCodec => ({
 
 // ── Generic walkers ───────────────────────────────────────────────────────────
 
-const decodeFields = (fields: FieldCodec[], bytes: number[]): FxParams =>
+const decodeFields = (fields: FieldCodec[], bytes: number[]): BlockParams =>
   Object.fromEntries(fields.map(field => [field.name, field.decode(bytes)]));
 
 /**
  * Writes into a byte array that already holds the original bytes, touching only the positions
  * the field list covers, so unknown fields survive untouched.
  */
-const encodeFields = (fields: FieldCodec[], params: FxParams, bytes: number[]): void => {
+const encodeFields = (fields: FieldCodec[], params: BlockParams, bytes: number[]): void => {
   for (const field of fields) {
     const value = params[field.name];
     if (value !== undefined) field.encode(value, bytes);
   }
 };
 
+/**
+ * Splits what a field map read into the block's sub-model selection and the params proper. Several
+ * types keep their selector in an ordinary param byte, so it decodes as a field like any other; a
+ * decoded block carries that selection once, under `subType`, so a consumer is never left choosing
+ * between two copies. Whether a type has the byte at all is read off its own field map, which means
+ * no second list can disagree with the bytes.
+ */
+const liftSubType = (stored: BlockParams): { subType: string | null; params: BlockParams } => {
+  const { [SUB_TYPE_FIELD]: selector, ...params } = stored;
+  const subType = typeof selector === "string" ? selector : null;
+  return { subType, params };
+};
+
+/** The inverse: a field map writes that byte from the same record as every other param. */
+const withStoredSubType = (params: BlockParams, subType: string | null): BlockParams => {
+  if (subType === null) return params;
+  return { ...params, [SUB_TYPE_FIELD]: subType };
+};
+
 export type { FieldCodec };
-export { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields };
+export {
+  u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad,
+  decodeFields, encodeFields, liftSubType, withStoredSubType,
+};

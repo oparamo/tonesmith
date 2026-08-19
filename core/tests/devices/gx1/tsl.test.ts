@@ -27,8 +27,8 @@ describe("blankPatch", () => {
     const patch = blankPatch();
 
     expect(patch.amp).toMatchObject({ on: false, type: "NATURAL" });
-    expect(patch.ns.on).toBe(false);
-    expect(patch.odds).toMatchObject({ on: false, type: "OVERDRIVE" });
+    expect(patch.noiseGate.on).toBe(false);
+    expect(patch.drive).toMatchObject({ on: false, type: "OVERDRIVE" });
   });
 });
 

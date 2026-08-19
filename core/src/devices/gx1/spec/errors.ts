@@ -2,11 +2,10 @@
  * What a block says when it is handed a key it doesn't declare.
  *
  * Naming the rejected keys and stopping there leaves the caller to work out whether a key was wrong
- * or only in the wrong place. Both happen, because the blocks are not shaped alike: delay, reverb
- * and pfx carry their type's params as fields, while an fx slot carries its own in a `params`
- * record, so a caller working by analogy from one lands here on the other. Printing the accepted
- * shape answers both cases at once, and printing it per type means the caller reads the fields that
- * type really has rather than a generic outline.
+ * or only in the wrong place. Both happen: a control written beside the block's own selectors
+ * rather than inside `params` is the commonest mistake, and it reads identically to a typo unless
+ * the message says which it was. Printing the accepted shape answers both at once, and printing it
+ * per type means the caller reads the fields that type really has rather than a generic outline.
  */
 import { typeSurface } from "./validate";
 import type { TypeSurface } from "./validate";
@@ -78,8 +77,14 @@ const unknownLine = (keys: string[]): string => {
   return `${noun} ${quoted(keys)} on this block.`;
 };
 
+/** Keys inside `params` that the chosen type has no control for. */
+const unknownParamLine = (keys: string[], block: BlockContext): string => {
+  const noun = keys.length === 1 ? "is not a param" : "are not params";
+  return `${quoted(keys)} ${noun} of ${block.group} ${block.type ?? ""}`.trimEnd() + ".";
+};
+
 export {
-  asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine,
+  asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine, unknownParamLine,
   PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
 };
 export type { BlockContext };

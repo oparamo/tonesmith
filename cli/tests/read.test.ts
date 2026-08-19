@@ -74,7 +74,7 @@ describe("gx1 read", () => {
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const output = info.join("\n");
-    const expectedHighCut = String(firstPatch.delay.highCut);
+    const expectedHighCut = String(firstPatch.delay.params.highCut);
     expect(output).toContain(`highCut=${expectedHighCut}`);
   });
 });

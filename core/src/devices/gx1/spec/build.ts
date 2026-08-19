@@ -11,33 +11,33 @@
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import {
-  BLOCK_GROUPS, BLOCK_NAMES, NESTED_PARAMS, SELECTION_FIELDS, ON_FIELD, KEY_NAMES,
+  BLOCK_GROUPS, BLOCK_NAMES, ON_FIELD, KEY_NAMES, DEFAULT_CHAIN,
   LAST_NAMEABLE_CHAR, charsAbove,
 } from "../common";
 import type { BlockName } from "../common";
-import { basePatch, amp, odds, fx, ns, fv, pfx, delay, reverb, validateChain, DEFAULT_CHAIN } from "../builder";
-import type { AmpOptions, OddsOptions } from "../builder";
+import { validateChain } from "../codec";
+import { basePatch, amp, drive, fx, noiseGate, volume, pedalFx, delay, reverb } from "../builder";
 import type { CapabilityGroup } from "../../../types";
-import type { Patch, FxParams } from "../types";
+import type { Patch, BlockParams } from "../types";
 import {
   checkSelectors, checkTypeBelongsInBlock, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface,
 } from "./validate";
 import type { Issues } from "./validate";
 import {
-  asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine,
+  asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine, unknownParamLine,
   PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
 } from "./errors";
 import type { BlockContext } from "./errors";
 
 /** Patch-level fields that are not blocks. Every other key must name one. */
-const PATCH_FIELDS = ["name", "chain", "key"];
+const PATCH_FIELDS = ["name", "memo", "chain", "key"];
 
 /**
- * The one block the device can't bypass: FV has no on/off byte to write. Every other block has one,
- * so every other block can be left off. What a patch with a given block off would be *for* is the
- * player's call, not this validator's.
+ * The one block the device can't bypass: the volume block has no on/off byte to write. Every other
+ * block has one, so every other block can be left off. What a patch with a given block off would be
+ * *for* is the player's call, not this validator's.
  */
-const ALWAYS_ON = new Set<string>(["fv"]);
+const ALWAYS_ON = new Set<string>(["volume"]);
 
 /** True when a block spec carries nothing but `on: false`. */
 const isBareBypass = (value: unknown): boolean => {
@@ -55,22 +55,12 @@ const setBlocks = (spec: Record<string, unknown>): BlockName[] =>
   BLOCK_NAMES.filter(name =>
     spec[name] !== undefined && !(!ALWAYS_ON.has(name) && isBareBypass(spec[name])));
 
-/**
- * A block's controls, wherever it keeps them: an fx slot nests them in `params` the way the decoded
- * patch does, and every other block carries them flat, again as the decoded patch does.
- */
-const blockControls = (name: BlockName, block: Record<string, unknown>): Record<string, unknown> => {
-  if (NESTED_PARAMS.has(name)) return asRecord(block[PARAMS_FIELD]);
-  return Object.fromEntries(Object.entries(block).filter(([key]) => !SELECTION_FIELDS.has(key)));
-};
-
-/** Every field name a block accepts: what selects its shape, then what sets its controls. */
+/** Every field name a block accepts: what selects its shape, then the one key its controls go under. */
 const acceptedFields = (name: BlockName, context: BlockContext): string[] => {
   const capGroup = findGroup(gx1Capabilities, context.group);
   const selectors = capGroup.items.length > 0 ? [TYPE_FIELD, SUB_TYPE_FIELD] : [];
   const bypass = ALWAYS_ON.has(name) ? [] : [ON_FIELD];
-  const controls = NESTED_PARAMS.has(name) ? [PARAMS_FIELD] : context.surface?.paramKeys ?? [];
-  return [...selectors, ...bypass, ...controls];
+  return [...selectors, ...bypass, PARAMS_FIELD];
 };
 
 /** One block's rejected keys, alongside the block they were sent to. */
@@ -96,6 +86,19 @@ const checkKeys = (issues: Issues, block: Record<string, unknown>, check: KeyChe
   const misplacedText = misplaced.length > 0 ? [misplacedLine(misplaced, context)] : [];
   const unknownText = unknown.length > 0 ? [unknownLine(unknown)] : [];
   issues.push([...misplacedText, ...unknownText, shapeSkeleton(fields, context)].join("\n"));
+};
+
+/**
+ * Rejects a control the chosen type has no field for, before the builder does. The builder throws on
+ * the first one it meets, and reporting them here puts them alongside every other problem the spec
+ * has rather than costing a round trip each.
+ */
+const checkParamKeys = (issues: Issues, params: Record<string, unknown>, context: BlockContext): void => {
+  const paramKeys = context.surface?.paramKeys;
+  if (paramKeys === undefined) return;
+  const unknown = Object.keys(params).filter(key => !paramKeys.includes(key));
+  if (unknown.length === 0) return;
+  issues.push([unknownParamLine(unknown, context), shapeSkeleton([PARAMS_FIELD], context)].join("\n"));
 };
 
 /**
@@ -128,11 +131,12 @@ const checkBlock = (issues: Issues, name: BlockName, input: unknown): void => {
   const selected = typeof block[SUB_TYPE_FIELD] === "string" ? block[SUB_TYPE_FIELD] : undefined;
   checkSelectors(issues, { group, on: block[ON_FIELD], subType: block[SUB_TYPE_FIELD] });
   checkKeys(issues, block, { fields: acceptedFields(name, context), context });
+  checkParamKeys(issues, asRecord(block[PARAMS_FIELD]), context);
   issues.push(...validateTypeParams({
     group,
     type: context.type,
     subType: selected,
-    values: blockControls(name, block),
+    values: asRecord(block[PARAMS_FIELD]),
   }));
 };
 
@@ -172,6 +176,14 @@ const checkChain = (issues: Issues, spec: Record<string, unknown>): void => {
   }
 };
 
+/** The device's own note field, which a patch read back carries and so must be able to send back. */
+const checkMemo = (issues: Issues, spec: Record<string, unknown>): void => {
+  const memo = spec.memo;
+  if (memo !== undefined && typeof memo !== "string") {
+    issues.push(`Patch memo takes text (got ${JSON.stringify(memo)})`);
+  }
+};
+
 const checkKey = (issues: Issues, spec: Record<string, unknown>): void => {
   const key = spec.key;
   if (key === undefined) return;
@@ -194,6 +206,7 @@ const validatePatchSpec = (input: unknown): Issues => {
   const spec = asRecord(input);
   const issues: Issues = [];
   checkName(issues, spec);
+  checkMemo(issues, spec);
   checkChain(issues, spec);
   checkKey(issues, spec);
   checkBlockNames(issues, spec);
@@ -204,28 +217,26 @@ const validatePatchSpec = (input: unknown): Issues => {
 /**
  * Hands a validated block to its builder.
  *
- * The blocks with named options pass their spec straight through, since each was shaped to its
- * builder's options. AMP and OD/DS still need a cast for it: they require a `type`, which is
- * something `validatePatchSpec` has just established rather than something TypeScript can see, and
- * that gap is all the cast covers. The rest hand their controls over as one bag, which is how a
- * block whose fields follow from its `type` is built.
+ * Every block reaches this the same way, since every block takes the same shape: a `type` where the
+ * device offers one, an optional `subType` and `on`, and one `params` bag. The `type` cast covers
+ * only what `validatePatchSpec` has just established and TypeScript cannot see.
  */
 const applyBlock = (patch: Patch, name: BlockName, block: Record<string, unknown>): void => {
   const type = block[TYPE_FIELD] as string;
   const on = block[ON_FIELD] as boolean | undefined;
-  const subType = block[SUB_TYPE_FIELD] as string | undefined;
-  const params = blockControls(name, block);
+  const subType = (block[SUB_TYPE_FIELD] ?? undefined) as string | undefined;
+  const params = asRecord(block[PARAMS_FIELD]) as BlockParams;
 
   switch (name) {
-    case "amp": amp(patch, block as unknown as AmpOptions); return;
-    case "odds": odds(patch, block as unknown as OddsOptions); return;
-    case "ns": ns(patch, block); return;
-    case "fv": fv(patch, block); return;
-    case "pfx": pfx(patch, { type, subType, on, params }); return;
+    case "amp": amp(patch, { type, on, params }); return;
+    case "drive": drive(patch, { type, on, params }); return;
+    case "noiseGate": noiseGate(patch, { on, params }); return;
+    case "volume": volume(patch, { params }); return;
+    case "pedalFx": pedalFx(patch, { type, subType, on, params }); return;
     case "delay": delay(patch, { type, on, params }); return;
     case "reverb": reverb(patch, { type, on, params }); return;
     // The three fx slots take the same spec and differ only in which slot it lands in.
-    default: fx(patch, { slot: name, type, subType, on, params: params as FxParams }); return;
+    default: fx(patch, { slot: name, type, subType, on, params }); return;
   }
 };
 
@@ -238,8 +249,9 @@ const buildPatch = (input: unknown): Patch => {
   if (issues.length > 0) throw new Error(issues.join("\n"));
 
   const spec = asRecord(input);
-  const chain = spec.chain === undefined ? undefined : validateChain(spec.chain as string[]);
+  const chain = spec.chain as string[] | undefined;
   const patch = basePatch(spec.name as string, chain, spec.key as string | undefined);
+  if (typeof spec.memo === "string") patch.memo = spec.memo;
   for (const name of setBlocks(spec)) applyBlock(patch, name, asRecord(spec[name]));
   return patch;
 };

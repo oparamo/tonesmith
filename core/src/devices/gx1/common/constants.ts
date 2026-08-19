@@ -67,15 +67,27 @@ const charsAbove = (ceiling: number, name: string): string[] =>
   Array.from(name).filter(char => (char.codePointAt(0) ?? 0) > ceiling);
 
 // MEMORY%CHAIN is a linked list, not a positional array: byte 0 holds the firmware
-// value of whichever block comes first, and byte (1 + CHAIN_BLOCK_ORDER.indexOf(name))
+// value of whichever block comes first, and byte (1 + CHAIN_SLOT_ORDER.indexOf(block))
 // holds the firmware value of whatever comes immediately after that block. A firmware
 // value of 0 (CHAIN_TERMINATOR) means "connects to OUTPUT". OUTPUT is a fixed endpoint,
-// not itself a reorderable block, so it has no entry in CHAIN_BLOCK_ORDER.
-const CHAIN_BLOCK_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "FX2", "FX3", "NS", "FV", "DLY", "REV"] as const;
+// not itself a reorderable block, so it has no entry in CHAIN_SLOT_ORDER. Slot order is
+// not signal order: DEFAULT_CHAIN below is the order the signal actually runs in.
+const CHAIN_SLOT_ORDER = [
+  "pedalFx", "fx1", "drive", "amp", "fx2", "fx3", "noiseGate", "volume", "delay", "reverb",
+] as const;
 
-const CHAIN_VALUE_TO_NAME: Record<number, string | undefined> = {
-  1: "PFX", 2: "FX1", 3: "OD/DS", 4: "AMP", 5: "FX2", 6: "FX3", 7: "NS", 8: "FV", 9: "DLY", 10: "REV",
+const CHAIN_VALUE_TO_BLOCK: Record<number, string | undefined> = {
+  1: "pedalFx", 2: "fx1", 3: "drive", 4: "amp", 5: "fx2",
+  6: "fx3", 7: "noiseGate", 8: "volume", 9: "delay", 10: "reverb",
 };
+
+/**
+ * The order the signal runs in when a patch doesn't rearrange it. Every rejection message lists the
+ * blocks in this order rather than in slot order, since this is the one a caller copies and edits.
+ */
+const DEFAULT_CHAIN: string[] = [
+  "pedalFx", "fx1", "drive", "amp", "noiseGate", "volume", "fx2", "fx3", "delay", "reverb",
+];
 
 const CHAIN_TERMINATOR = 0;
 
@@ -95,10 +107,10 @@ const MIC_TYPE_IDX = indexMap(MIC_TYPES);
 const DLY_TYPE_IDX = indexMap(DLY_TYPES);
 const REV_TYPE_IDX = indexMap(REV_TYPES);
 const PFX_TYPE_IDX = indexMap(PFX_TYPES);
-const CHAIN_NAME_TO_VALUE: Record<string, number> = Object.fromEntries(
-  Object.entries(CHAIN_VALUE_TO_NAME)
+const CHAIN_BLOCK_TO_VALUE: Record<string, number> = Object.fromEntries(
+  Object.entries(CHAIN_VALUE_TO_BLOCK)
     .filter((entry): entry is [string, string] => entry[1] !== undefined)
-    .map(([value, name]) => [name, Number(value)])
+    .map(([value, block]) => [block, Number(value)])
 );
 
 const COMP_TYPES   = ["BOSS COMP", "D-COMP", "ORANGE", "X-COMP", "STEREO"] as const;
@@ -193,7 +205,7 @@ const PFX_SUBTYPE_EFFECTS = new Set(["WAH"]);
 export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   FX_DLY_TYPES, FX_REV_TYPES, NAME_BYTES, LAST_STORABLE_CHAR, LAST_NAMEABLE_CHAR, charsAbove,
-  CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
+  CHAIN_SLOT_ORDER, CHAIN_VALUE_TO_BLOCK, CHAIN_BLOCK_TO_VALUE, CHAIN_TERMINATOR, DEFAULT_CHAIN,
   FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, SBEND_PITCH, FB_MODE,

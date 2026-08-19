@@ -43,7 +43,7 @@ describe("validateTypeParams", () => {
   });
 
   it("rejects a subType on a type with no variant at all", () => {
-    const issues = validateTypeParams({ group: "pfx", type: "PEDAL BEND", subType: "CRY WAH", values: {} });
+    const issues = validateTypeParams({ group: "pedalFx", type: "PEDAL BEND", subType: "CRY WAH", values: {} });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toContain("PEDAL BEND");
@@ -87,7 +87,7 @@ describe("validateTypeParams", () => {
 });
 
 describe("validatePatchSpec", () => {
-  const amp = { type: "TWIN", gain: 20, bass: 50, middle: 50, treble: 50 };
+  const amp = { type: "TWIN", params: { gain: 20, bass: 50, middle: 50, treble: 50 } };
   const valid = { name: "Test", amp };
 
   it("accepts a minimal usable spec", () => {
@@ -122,26 +122,26 @@ describe("validatePatchSpec", () => {
   });
 
   it("rejects a value of the wrong kind, naming the param", () => {
-    const [issue] = validatePatchSpec({ ...valid, ns: { threshold: "loud", release: 40 } });
+    const [issue] = validatePatchSpec({ ...valid, noiseGate: { params: { threshold: "loud", release: 40 } } });
 
     expect(issue).toContain("THRESHOLD");
     expect(issue, "should quote back what it was given").toContain("loud");
   });
 
   it("rejects a fraction for a param the catalog gives no decimals", () => {
-    const spec = { ...valid, delay: { type: "STANDARD", time: 400.5 } };
+    const spec = { ...valid, delay: { type: "STANDARD", params: { time: 400.5 } } };
 
     expect(validatePatchSpec(spec)).not.toEqual([]);
   });
 
   it("accepts a fraction where the catalog gives decimals", () => {
-    const spec = { ...valid, reverb: { type: "HALL S", time: 4.5 } };
+    const spec = { ...valid, reverb: { type: "HALL S", params: { time: 4.5 } } };
 
     expect(validatePatchSpec(spec)).toEqual([]);
   });
 
   it("rejects a block that names no type, listing the types it has", () => {
-    const [issue] = validatePatchSpec({ ...valid, reverb: { time: 4 } });
+    const [issue] = validatePatchSpec({ ...valid, reverb: { params: { time: 4 } } });
 
     expect(issue).toContain("HALL S");
   });
@@ -149,7 +149,7 @@ describe("validatePatchSpec", () => {
   // Without this the type is left unresolved, so every param the caller sent alongside it reads as
   // an unknown key and nothing in the response says the type was the problem.
   it("rejects a type the block doesn't have, listing the ones it does", () => {
-    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "HALL XL", time: 4 } });
+    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "HALL XL", params: { time: 4 } } });
 
     expect(issue).toContain("HALL XL");
     expect(issue).toContain("HALL S");
@@ -163,12 +163,12 @@ describe("validatePatchSpec", () => {
   });
 
   it("rejects a control the chosen type has no field for", () => {
-    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "TERA ECHO", time: 4, level: 50 } });
+    const issues = validatePatchSpec({ ...valid, reverb: { type: "TERA ECHO", params: { time: 4, level: 50 } } });
 
-    expect(issue).toContain("time");
+    expect(issues.join("\n")).toContain("time");
   });
 
-  it("names a flat fx param as a param of its type rather than an unknown key", () => {
+  it("names a param sent one level too high as a param of its type, not an unknown key", () => {
     const spec = { ...valid, fx1: { type: "CHORUS", rate: 16 } };
     const [issue] = validatePatchSpec(spec);
 
@@ -177,7 +177,7 @@ describe("validatePatchSpec", () => {
   });
 
   it("reports every problem it finds rather than stopping at the first", () => {
-    const spec = { ...valid, reverb: { type: "HALL S", time: 99, tone: 999 } };
+    const spec = { ...valid, reverb: { type: "HALL S", params: { time: 99, tone: 999 } } };
 
     expect(validatePatchSpec(spec)).toHaveLength(2);
   });
@@ -194,7 +194,7 @@ describe("validatePatchSpec", () => {
   });
 
   it.each([
-    { label: "a chain that is not an array", spec: { chain: "PFX" } },
+    { label: "a chain that is not an array", spec: { chain: "pedalFx" } },
     { label: "a chain naming a block twice", spec: { chain: ["amp", "amp"] } },
     { label: "a key the device has no name for", spec: { key: "Am" } },
     { label: "a key that is not a string", spec: { key: 5 } },

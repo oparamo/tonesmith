@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { blankPatch } from "../../../src/devices/gx1/tsl";
 import { decodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
-import { decodeDelay, decodeReverb, decodePfx } from "../../../src/devices/gx1/codec/blocks";
+import { decodeDelay, decodeReverb, decodePedalFx } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes, lookupIndex } from "../../../src/devices/gx1/codec/primitives";
 import {
   FX_TYPES, FX_DLY_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
@@ -26,7 +26,7 @@ import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 // The FX-slot DELAY's sub-algorithm selector, at absolute offset 212 within the FX block (FORMAT.md).
 const FX_DELAY_SUBALGO_OFFSET = 212;
 
-type ParamDefaults = Record<string, string | number>;
+type ParamDefaults = Record<string, string | number | boolean>;
 type BlockDefaults = Record<string, ParamDefaults>;
 
 const omit = (obj: object, keys: string[]): ParamDefaults =>
@@ -37,7 +37,7 @@ interface TypeByteBlock {
   bytes: number[];
   types: readonly string[];
   typeIndex: Record<string, number>;
-  decode: (hex: string[]) => object;
+  decode: (hex: string[]) => { params: ParamDefaults };
 }
 
 // Swap byte 1 to each type in turn and decode the shadow bytes behind it.
@@ -47,7 +47,7 @@ const harvestByTypeByte = (block: TypeByteBlock): BlockDefaults => {
   for (const type of types) {
     const swapped = [...bytes];
     swapped[1] = lookupIndex(typeIndex, type, "block type");
-    out[type] = omit(decode(hexFromBytes(swapped)), ["on", "type"]);
+    out[type] = { ...decode(hexFromBytes(swapped)).params };
   }
   return out;
 };
@@ -85,9 +85,9 @@ const harvestDefaults = (patch: Patch): Record<string, BlockDefaults> => {
       bytes: bytesFromHex(rawBlock(patch, "MEMORY%REV")),
       types: REV_TYPES, typeIndex: REV_TYPE_IDX, decode: decodeReverb,
     }),
-    pfx: harvestByTypeByte({
+    pedalFx: harvestByTypeByte({
       bytes: bytesFromHex(rawBlock(patch, "MEMORY%PFX")),
-      types: PFX_TYPES, typeIndex: PFX_TYPE_IDX, decode: decodePfx,
+      types: PFX_TYPES, typeIndex: PFX_TYPE_IDX, decode: decodePedalFx,
     }),
   };
 };
@@ -109,28 +109,29 @@ const harvestFxSubTypes = (fx1: number[]): Record<string, string> => {
 };
 
 /** PFX carries its sub-model as an ordinary field, on the types PFX_SUBTYPE_EFFECTS names. */
-const harvestPfxSubTypes = (pfx: number[]): Record<string, string> => {
+const harvestPedalFxSubTypes = (pfx: number[]): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const type of PFX_SUBTYPE_EFFECTS) {
     const swapped = [...pfx];
     swapped[1] = lookupIndex(PFX_TYPE_IDX, type, "PFX type");
-    const decoded = decodePfx(hexFromBytes(swapped)) as Record<string, unknown>;
-    const selected = decoded[SUB_TYPE_FIELD];
-    if (typeof selected === "string") out[type] = selected;
+    const { subType } = decodePedalFx(hexFromBytes(swapped));
+    if (typeof subType === "string") out[type] = subType;
   }
   return out;
 };
 
 const harvestSubTypes = (patch: Patch): Record<string, Record<string, string>> => ({
   fx: harvestFxSubTypes(bytesFromHex(rawBlock(patch, "MEMORY%FX1"))),
-  pfx: harvestPfxSubTypes(bytesFromHex(rawBlock(patch, "MEMORY%PFX"))),
+  pedalFx: harvestPedalFxSubTypes(bytesFromHex(rawBlock(patch, "MEMORY%PFX"))),
 });
 
-/** The single-shape blocks are their own default: no type to swap, so the decoded block is it. */
+/** The single-shape blocks are their own default: no type to swap, so the decoded params are it. */
 const harvestBlockDefaults = (patch: Patch): Record<string, ParamDefaults> =>
   Object.fromEntries(
-    (["amp", "odds", "ns", "fv"] as const).map(block => [block, omit(patch[block], ["on", "type"])])
+    SINGLE_SHAPE_BLOCKS.map(block => [block, { ...patch[block].params }])
   );
+
+const SINGLE_SHAPE_BLOCKS = ["amp", "drive", "noiseGate", "volume"] as const;
 
 describe("GX-1 defaults ↔ fixture drift guard", () => {
   const patch = patchAt(DEFAULT_INIT_FIXTURE);
@@ -153,7 +154,7 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
   it("blankPatch opens the single-shape blocks at those same defaults", () => {
     const blank = blankPatch("Blank");
 
-    for (const block of ["amp", "odds", "ns", "fv"] as const) {
+    for (const block of SINGLE_SHAPE_BLOCKS) {
       expect(blank[block], `${block} should open at its factory default`).toEqual(patch[block]);
     }
   });

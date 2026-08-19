@@ -6,7 +6,7 @@ for (const driver of drivers) {
 }
 
 export type {
-  Patch, PatchFile, RawPatch, FieldValue, FieldEdits, PatchDriver,
+  FieldValue, PatchBlock, Patch, PatchFile, RawPatch, FieldEdits, PatchDriver,
   DeviceCapabilities, CapabilityGroup, CapabilityItem, ChainSpec, PatchNameSpec, PatchSpecExample,
   ParamSpec, NumericParam, DiscreteParam, BooleanParam,
 } from "./types";

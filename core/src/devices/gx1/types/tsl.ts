@@ -1,3 +1,5 @@
+import type { FieldValue } from "../../../types";
+
 /** Sparse lookup map of named parameter lists as stored in the TSL JSON envelope. */
 type RawParamSet = Record<string, string[]>;
 
@@ -16,10 +18,10 @@ interface TslEnvelope {
 }
 
 /**
- * FX parameter values. String fields are lookup names (e.g. "SLOW" for rotary speed); boolean
- * fields are on/off toggles (e.g. a delay `trigger`). An effect type this codec has no field map
+ * One block's control values. String fields are lookup names (e.g. "SLOW" for rotary speed);
+ * boolean fields are on/off toggles (e.g. a delay `trigger`). A type this codec has no field map
  * for carries none of them, since there is nothing named to read its bytes as.
  */
-type FxParams = Record<string, string | number | boolean>;
+type BlockParams = Record<string, FieldValue>;
 
-export type { RawParamSet, TslPatch, TslEnvelope, FxParams };
+export type { RawParamSet, TslPatch, TslEnvelope, BlockParams };

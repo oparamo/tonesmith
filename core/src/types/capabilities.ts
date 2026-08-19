@@ -117,6 +117,12 @@ interface ChainSpec {
   description: string;
   /** The canonical block order used when a patch doesn't specify one. */
   defaultOrder: string[];
+  /**
+   * Each block name mapped to what the device's own panel calls it. A patch spec always writes the
+   * name; the label is what a manual, a photo of the unit, or a printout shows, and the two differ
+   * whenever a device's label is an abbreviation nobody would guess a key from.
+   */
+  blocks: Record<string, string>;
 }
 
 /**

@@ -22,19 +22,19 @@ describe("validateFields", () => {
   it("accepts an edit in range", () => {
     const patch = patchWith({ amp: { type: "TRNSPRNT" } });
 
-    expect(validateAfter(patch, { "amp.gain": 72 })).toEqual([]);
+    expect(validateAfter(patch, { "amp.params.gain": 72 })).toEqual([]);
   });
 
   it("accepts an edit to a block that has no types of its own", () => {
-    const patch = patchWith({ ns: { threshold: 20 } });
+    const patch = patchWith({ noiseGate: { params: { threshold: 20 } } });
 
-    expect(validateAfter(patch, { "ns.threshold": 40 })).toEqual([]);
+    expect(validateAfter(patch, { "noiseGate.params.threshold": 40 })).toEqual([]);
   });
 
   it("rejects a string where the param takes a number, naming the param", () => {
     const patch = patchWith({ amp: { type: "TRNSPRNT" } });
 
-    const issues = validateAfter(patch, { "amp.gain": "abc" });
+    const issues = validateAfter(patch, { "amp.params.gain": "abc" });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatch(/gain/i);
@@ -42,9 +42,9 @@ describe("validateFields", () => {
   });
 
   it("rejects a value below the param's range, naming the range", () => {
-    const patch = patchWith({ odds: { type: "BLUES OD" } });
+    const patch = patchWith({ drive: { type: "BLUES OD" } });
 
-    const issues = validateAfter(patch, { "odds.tone": -500 });
+    const issues = validateAfter(patch, { "drive.params.tone": -500 });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatch(/tone/i);
@@ -110,7 +110,7 @@ describe("validateFields", () => {
   it("reports every bad edit in one pass rather than stopping at the first", () => {
     const patch = patchWith({ amp: { type: "TRNSPRNT" } });
 
-    const issues = validateAfter(patch, { "amp.gain": 900, "amp.level": -1 });
+    const issues = validateAfter(patch, { "amp.params.gain": 900, "amp.params.level": -1 });
 
     expect(issues).toHaveLength(2);
   });

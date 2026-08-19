@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
-  decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePfx,
-  decodeKey, encodeKey, decodeNs, encodeNs, decodeFv, encodeFv, decodeName, encodeName,
+  decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePedalFx,
+  decodeKey, encodeKey, decodeNoiseGate, encodeNoiseGate, decodeVolume, encodeVolume, decodeName, encodeName,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import {
-  DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW, CHAIN_BLOCK_ORDER,
+  DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW, DEFAULT_CHAIN,
 } from "../../../src/devices/gx1/common";
 import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
@@ -47,19 +47,19 @@ describe("Reverb block symmetry (all types)", () => {
 
 // ── Chain block (real device values) ─────────────────────────────────────────
 //
-// MEMORY%CHAIN is a linked list (see CHAIN_BLOCK_ORDER in common/constants.ts), not a
+// MEMORY%CHAIN is a linked list (see CHAIN_SLOT_ORDER in common/constants.ts), not a
 // positional array: byte 0 is whichever block comes first, and byte
-// (1 + CHAIN_BLOCK_ORDER.indexOf(name)) is the firmware value of whatever follows that
+// (1 + CHAIN_SLOT_ORDER.indexOf(name)) is the firmware value of whatever follows that
 // specific block. These byte arrays are real values read off a GX-1 after performing
 // each reorder on the device itself, not self-consistency round-trips.
 
 describe("Chain block (real device values)", () => {
   const DEFAULT_BYTES = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
-  const DEFAULT_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"];
+  const DEFAULT_ORDER = ["pedalFx", "fx1", "drive", "amp", "noiseGate", "volume", "fx2", "fx3", "delay", "reverb"];
   const FX2_FX3_SWAP_BYTES = [1, 2, 3, 4, 7, 9, 5, 8, 6, 10, 0, 11, 12];
-  const FX2_FX3_SWAP_ORDER = ["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX3", "FX2", "DLY", "REV"];
+  const FX2_FX3_SWAP_ORDER = ["pedalFx", "fx1", "drive", "amp", "noiseGate", "volume", "fx3", "fx2", "delay", "reverb"];
   const AMP_OD_DS_SWAP_BYTES = [1, 2, 4, 7, 3, 6, 9, 8, 5, 10, 0, 11, 12];
-  const AMP_OD_DS_SWAP_ORDER = ["PFX", "FX1", "AMP", "OD/DS", "NS", "FV", "FX2", "FX3", "DLY", "REV"];
+  const AMP_OD_DS_SWAP_ORDER = ["pedalFx", "fx1", "amp", "drive", "noiseGate", "volume", "fx2", "fx3", "delay", "reverb"];
 
   it("decodes the untouched default chain", () => {
     const hexList = hexFromBytes(DEFAULT_BYTES);
@@ -127,24 +127,24 @@ describe("Chain block (real device values)", () => {
   // silently losing blocks, so it has to be refused outright.
   it("refuses a chain that repeats a block", () => {
     const originalHex = hexFromBytes(DEFAULT_BYTES);
-    const duplicated = ["AMP", ...DEFAULT_ORDER];
+    const duplicated = ["amp", ...DEFAULT_ORDER];
 
-    expect(() => { encodeChain(duplicated, originalHex); }).toThrow(/AMP/);
+    expect(() => { encodeChain(duplicated, originalHex); }).toThrow(/amp/);
   });
 
   it("refuses a chain that drops a block", () => {
     const originalHex = hexFromBytes(DEFAULT_BYTES);
-    const missingNs = DEFAULT_ORDER.filter(name => name !== "NS");
+    const missingGate = DEFAULT_ORDER.filter(name => name !== "noiseGate");
 
-    expect(() => { encodeChain(missingNs, originalHex); }).toThrow(/NS/);
+    expect(() => { encodeChain(missingGate, originalHex); }).toThrow(/noiseGate/);
   });
 
   it("names every valid block when refusing an unknown one", () => {
     const originalHex = hexFromBytes(DEFAULT_BYTES);
-    const bogus = DEFAULT_ORDER.map(name => (name === "NS" ? "DELAY" : name));
+    const bogus = DEFAULT_ORDER.map(name => (name === "noiseGate" ? "gate" : name));
 
     expect(() => { encodeChain(bogus, originalHex); })
-      .toThrow(new RegExp(CHAIN_BLOCK_ORDER.join(", ")));
+      .toThrow(new RegExp(DEFAULT_CHAIN.join(", ")));
   });
 
   // write_fields and the CLI both hand through whatever a dot-path edit produced, so a caller who
@@ -152,7 +152,7 @@ describe("Chain block (real device values)", () => {
   it("refuses a chain that isn't a list", () => {
     const originalHex = hexFromBytes(DEFAULT_BYTES);
 
-    expect(() => { encodeChain("FX1,AMP" as unknown as string[], originalHex); }).toThrow();
+    expect(() => { encodeChain("fx1,amp" as unknown as string[], originalHex); }).toThrow();
   });
 });
 
@@ -200,7 +200,7 @@ describe("Key", () => {
 
 describe("Malformed/unmapped byte handling", () => {
   it("decodeChain stops and returns a partial order when it hits an unmapped chain value", () => {
-    // byte 0 = 99 doesn't correspond to any block in CHAIN_VALUE_TO_NAME
+    // byte 0 = 99 doesn't correspond to any block in CHAIN_VALUE_TO_BLOCK
     const bytes = [99, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     const hexList = hexFromBytes(bytes);
 
@@ -209,46 +209,46 @@ describe("Malformed/unmapped byte handling", () => {
     expect(decoded).toEqual([]);
   });
 
-  it("encodeNs preserves an out-of-range detect byte instead of overwriting it", () => {
+  it("encodeNoiseGate preserves an out-of-range detect byte instead of overwriting it", () => {
     const bytes = [1, 30, 30, 99]; // byte 3 = 99, outside NS_DETECT's 2-entry range
     const hexList = hexFromBytes(bytes);
 
-    const decoded = decodeNs(hexList);
-    const encodedHex = encodeNs(decoded);
+    const decoded = decodeNoiseGate(hexList);
+    const encodedHex = encodeNoiseGate(decoded);
     const reencoded = bytesFromHex(encodedHex);
 
-    expect(decoded.detect).toBe("UNKNOWN_99");
+    expect(decoded.params.detect).toBe("UNKNOWN_99");
     expect(reencoded[3]).toBe(99);
   });
 
-  it("decodeFv defaults curve to NORMAL when the raw array has no 4th byte", () => {
+  it("decodeVolume defaults curve to NORMAL when the raw array has no 4th byte", () => {
     const hexList = hexFromBytes([100, 0, 100]);
 
-    const decoded = decodeFv(hexList);
+    const decoded = decodeVolume(hexList);
 
-    expect(decoded.curve).toBe("NORMAL");
+    expect(decoded.params.curve).toBe("NORMAL");
   });
 
-  it("encodeFv leaves a 3-byte raw array untouched (no curve byte to write)", () => {
+  it("encodeVolume leaves a 3-byte raw array untouched (no curve byte to write)", () => {
     const bytes = [100, 0, 100];
     const hexList = hexFromBytes(bytes);
-    const decoded = decodeFv(hexList);
+    const decoded = decodeVolume(hexList);
 
-    const encodedHex = encodeFv(decoded);
+    const encodedHex = encodeVolume(decoded);
     const result = bytesFromHex(encodedHex);
 
     expect(result).toEqual(bytes);
   });
 
-  it("encodeFv preserves an out-of-range curve byte instead of overwriting it", () => {
+  it("encodeVolume preserves an out-of-range curve byte instead of overwriting it", () => {
     const bytes = [100, 0, 100, 99]; // byte 3 = 99, outside FV_CURVE's 4-entry range
     const hexList = hexFromBytes(bytes);
-    const decoded = decodeFv(hexList);
+    const decoded = decodeVolume(hexList);
 
-    const encodedHex = encodeFv(decoded);
+    const encodedHex = encodeVolume(decoded);
     const result = bytesFromHex(encodedHex);
 
-    expect(decoded.curve).toBe("UNKNOWN_99");
+    expect(decoded.params.curve).toBe("UNKNOWN_99");
     expect(result[3]).toBe(99);
   });
 
@@ -259,7 +259,7 @@ describe("Malformed/unmapped byte handling", () => {
 
     const decoded = decodeDelay(hexList);
 
-    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", [RAW]: bytes });
+    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
   });
 
   it("decodeReverb returns a bare on/type block for a byte outside the known REV_TYPES range", () => {
@@ -269,17 +269,17 @@ describe("Malformed/unmapped byte handling", () => {
 
     const decoded = decodeReverb(hexList);
 
-    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", [RAW]: bytes });
+    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
   });
 
-  it("decodePfx returns a bare on/type block for a byte outside the known PFX_TYPES range", () => {
+  it("decodePedalFx returns a bare on/type block for a byte outside the known PFX_TYPES range", () => {
     const bytes = new Array<number>(14).fill(0);
     bytes[1] = 250;
     const hexList = hexFromBytes(bytes);
 
-    const decoded = decodePfx(hexList);
+    const decoded = decodePedalFx(hexList);
 
-    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", [RAW]: bytes });
+    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", subType: null, params: {}, [RAW]: bytes });
   });
 });
 
@@ -312,18 +312,18 @@ describe("Name block", () => {
 // ── Values the device has no byte for ─────────────────────────────────────────
 
 describe("Values the device has no byte for", () => {
-  it("encodeNs throws on a detect the device does not name", () => {
-    const block = { on: true, threshold: 30, release: 30, detect: "BOGUS", [RAW]: [1, 30, 30, 0] };
+  it("encodeNoiseGate throws on a detect the device does not name", () => {
+    const block = { on: true, params: { threshold: 30, release: 30, detect: "BOGUS" }, [RAW]: [1, 30, 30, 0] };
 
-    const encodeBadDetect = () => encodeNs(block);
+    const encodeBadDetect = () => encodeNoiseGate(block);
 
     expect(encodeBadDetect).toThrow(/BOGUS/);
   });
 
-  it("encodeFv throws on a curve the device does not name", () => {
-    const block = { position: 100, min: 0, max: 100, curve: "BOGUS", [RAW]: [100, 0, 100, 2] };
+  it("encodeVolume throws on a curve the device does not name", () => {
+    const block = { params: { position: 100, min: 0, max: 100, curve: "BOGUS" }, [RAW]: [100, 0, 100, 2] };
 
-    const encodeBadCurve = () => encodeFv(block);
+    const encodeBadCurve = () => encodeVolume(block);
 
     expect(encodeBadCurve).toThrow(/BOGUS/);
   });
@@ -346,43 +346,46 @@ describe("Real device values (default-init.tsl)", () => {
   const pfxBytes = bytesFromHex(rawBlock(patch, "MEMORY%PFX"));
 
   it("decodes the active chain order", () => {
-    expect(patch.chain).toEqual(["PFX", "FX1", "OD/DS", "AMP", "NS", "FV", "FX2", "FX3", "DLY", "REV"]);
+    expect(patch.chain).toEqual(DEFAULT_CHAIN);
   });
 
-  it("decodes ODDS", () => {
-    expect(patch.odds).toMatchObject({
-      type: "OVERDRIVE", drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50,
+  it("decodes the drive block", () => {
+    expect(patch.drive.type).toBe("OVERDRIVE");
+    expect(patch.drive.params).toMatchObject({
+      drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50,
     });
   });
 
   it("decodes AMP", () => {
-    expect(patch.amp).toMatchObject({
-      type: "NATURAL", speaker: "ORIGINAL", gain: 50, level: 50,
+    expect(patch.amp.type).toBe("NATURAL");
+    expect(patch.amp.params).toMatchObject({
+      speaker: "ORIGINAL", gain: 50, level: 50,
       bass: 50, middle: 50, treble: 50, mic: "DYN421", solo: false, soloLevel: 50,
     });
   });
 
   it("decodes PFX (active type: WAH)", () => {
-    expect(patch.pfx).toMatchObject({
-      on: false, type: "WAH", subType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100,
-    });
+    expect(patch.pedalFx).toMatchObject({ on: false, type: "WAH", subType: "CRY WAH" });
+    expect(patch.pedalFx.params).toMatchObject({ level: 100, direct: 0, position: 100, min: 0, max: 100 });
   });
 
   it("decodes NS", () => {
-    expect(patch.ns).toMatchObject({ threshold: 30, release: 30 });
+    expect(patch.noiseGate.params).toMatchObject({ threshold: 30, release: 30 });
   });
 
   it("decodes FV", () => {
-    expect(patch.fv).toMatchObject({ position: 100, min: 0, max: 100 });
+    expect(patch.volume.params).toMatchObject({ position: 100, min: 0, max: 100 });
   });
 
   it("decodes the dedicated DLY block (active type: STANDARD)", () => {
-    expect(patch.delay).toMatchObject({ type: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz" });
+    expect(patch.delay.type).toBe("STANDARD");
+    expect(patch.delay.params).toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz" });
   });
 
   it("decodes the dedicated REV block (active type: HALL M)", () => {
-    expect(patch.reverb).toMatchObject({
-      type: "HALL M", time: 2.6, tone: 0, density: 5, level: 25, preDelay: 30, direct: 100,
+    expect(patch.reverb.type).toBe("HALL M");
+    expect(patch.reverb.params).toMatchObject({
+      time: 2.6, tone: 0, density: 5, level: 25, preDelay: 30, direct: 100,
     });
   });
 
@@ -393,7 +396,7 @@ describe("Real device values (default-init.tsl)", () => {
   // The following decode the SAME real device bytes above, but under a different
   // type selector, to reach fields the default patch's active type doesn't cover.
   // Every byte read is still a genuine device default. Only the type string passed
-  // to decodeDelay/decodeReverb/decodePfx is synthetic.
+  // to decodeDelay/decodeReverb/decodePedalFx is synthetic.
 
   it("decodes DLY shadow bytes for MODULATE (shares time/feedback/level/highCut with STANDARD)", () => {
     const modulateBytes = [...dlyBytes.slice(0, 1), DLY_TYPE_IDX.MODULATE, ...dlyBytes.slice(2)];
@@ -401,7 +404,7 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeDelay(hexList);
 
-    expect(decoded).toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 30 });
+    expect(decoded.params).toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 30 });
   });
 
   it("decodes DLY shadow bytes for ANALOG (its own 4-byte time at offset 13)", () => {
@@ -412,7 +415,7 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeDelay(hexList);
 
-    expect(decoded).toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz" });
+    expect(decoded.params).toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz" });
   });
 
   it("decodes DLY shadow bytes for WARP (time shared at offset 2, trigger/level at 21/25)", () => {
@@ -421,7 +424,8 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeDelay(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "WARP", time: 400, trigger: false, level: 50 });
+    expect(decoded).toMatchObject({ on: false, type: "WARP" });
+    expect(decoded.params).toMatchObject({ time: 400, trigger: false, level: 50 });
   });
 
   it("decodes DLY shadow bytes for GLITCH (own 1-byte time at offset 26, not the shared 4-byte field)", () => {
@@ -430,7 +434,8 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeDelay(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "GLITCH", trigger: false, time: 50, glitch: 50, balance: 100 });
+    expect(decoded).toMatchObject({ on: false, type: "GLITCH" });
+    expect(decoded.params).toMatchObject({ trigger: false, time: 50, glitch: 50, balance: 100 });
   });
 
   it("decodes REV shadow bytes for SHIMMER (LEVEL is the shared EFFECT_LEVEL at 5; its own PITCH LVL is at offset 10)", () => {
@@ -439,8 +444,9 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeReverb(hexList);
 
-    expect(decoded).toMatchObject({
-      on: false, type: "SHIMMER", time: 2.6, tone: 0, level: 25, preDelay: 30, pitch: 12, pitchLevel: 100,
+    expect(decoded).toMatchObject({ on: false, type: "SHIMMER" });
+    expect(decoded.params).toMatchObject({
+      time: 2.6, tone: 0, level: 25, preDelay: 30, pitch: 12, pitchLevel: 100,
     });
   });
 
@@ -450,7 +456,8 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeReverb(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "SUB DELAY", time: 400, level: 50, feedback: 30, highCut: "6.3kHz" });
+    expect(decoded).toMatchObject({ on: false, type: "SUB DELAY" });
+    expect(decoded.params).toMatchObject({ time: 400, level: 50, feedback: 30, highCut: "6.3kHz" });
   });
 
   it("decodes REV shadow bytes for TERA ECHO (spreadTime at 18, not a shared time field)", () => {
@@ -459,15 +466,17 @@ describe("Real device values (default-init.tsl)", () => {
 
     const decoded = decodeReverb(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "TERA ECHO", tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: false });
+    expect(decoded).toMatchObject({ on: false, type: "TERA ECHO" });
+    expect(decoded.params).toMatchObject({ tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: false });
   });
 
   it("decodes PFX shadow bytes for PEDAL BEND (its own pitchMin/pitchMax at offset 9/10)", () => {
     const pedalBendBytes = [...pfxBytes.slice(0, 1), PFX_TYPE_IDX["PEDAL BEND"], ...pfxBytes.slice(2)];
     const hexList = hexFromBytes(pedalBendBytes);
 
-    const decoded = decodePfx(hexList);
+    const decoded = decodePedalFx(hexList);
 
-    expect(decoded).toMatchObject({ on: false, type: "PEDAL BEND", pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 });
+    expect(decoded).toMatchObject({ on: false, type: "PEDAL BEND" });
+    expect(decoded.params).toMatchObject({ pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 });
   });
 });
