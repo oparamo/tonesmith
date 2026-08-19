@@ -1,4 +1,4 @@
-import type { Encodable, Patch, PatchFile, RawPatch } from "./patch";
+import type { Patch, PatchFile, RawPatch } from "./patch";
 import type { DeviceCapabilities } from "./capabilities";
 
 /** What a field can be set to, on any surface that expresses an edit as a path and a value. */
@@ -33,7 +33,7 @@ interface PatchDriver<T extends Patch = Patch> {
    */
   validateFields(patch: T, edits: FieldEdits): string[];
   decodePatch(raw: RawPatch): T;
-  encodePatch(patch: Encodable<T>): RawPatch;
+  encodePatch(patch: T): RawPatch;
 }
 
 export type { FieldValue, FieldEdits, PatchDriver };

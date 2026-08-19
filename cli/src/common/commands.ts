@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
-import { patchUtils, patchView, capabilityUtils } from "@tonesmith/core";
+import { patchUtils, capabilityUtils } from "@tonesmith/core";
 import type { PrintPatch } from "../types";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
@@ -43,7 +43,7 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPat
         // The driver's own name, not the file's `device` id, since this line is for a person.
         console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${driver.name}`);
         for (const { index, patch } of patchUtils.resolvePatches(patchFile.patches, ref)) {
-          printPatch(patchView.presentPatch(patch), index);
+          printPatch(patch, index);
         }
         console.info();
       });

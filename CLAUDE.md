@@ -67,9 +67,6 @@ core/                       @tonesmith/core
     patch-utils.ts          patch-file operations every surface shares: resolvePatch /
                             resolvePatches, applyFieldEdits, coerceValue, setByPath, upsertPatches,
                             copyPatch, createPatchFile
-    patch-view.ts           presentPatch: the consumer-facing view of a decoded patch, dropping
-                            the model selector that decode mirrors onto both subType and
-                            params.type so a consumer isn't left guessing which to set
     capability-utils.ts     findGroup / findItem
     atomic-write.ts         writeFileAtomic: sibling file then rename, so a driver's writeFile can
                             never truncate a patch library it fails partway through
@@ -200,9 +197,10 @@ dashes, ternaries assigned before use, cognitive complexity 10), so they are not
   same capability data through MCP already.
 - **`type` and `subType` each mean one thing, everywhere.** `type` is the block's own selector, and
   `subType` is the model within it, in a patch spec, on a decoded block, and in the codec's field
-  maps. Where a device stores the selection among a type's params, the codec still names it
-  `subType` and the decode mirrors it onto the block, which is the only reason `presentPatch` has a
-  duplicate to drop. Which selectors get to be a `subType` at all is decided by what
+  maps. Where a device stores the selection in a param byte, the codec's field map still names that
+  byte `subType`, and decode lifts it onto the block so the decoded patch carries the selection once
+  rather than in two places a consumer has to keep in agreement. Which selectors get to be a
+  `subType` at all is decided by what
   `describe_device` can carry: a `subType` gets a name, a description and a real-world `models`
   string per value, so a selector qualifies when its values are named variants worth describing one
   by one, and stays an ordinary param when it sets one aspect of a single effect and the value names

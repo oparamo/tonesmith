@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { PatchFile } from "@tonesmith/core";
-import { patchUtils, patchView, registry } from "@tonesmith/core";
+import { patchUtils, registry } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
 /**
@@ -19,7 +19,7 @@ const page = (file: PatchFile, offset: number, limit: number): object => {
   const window = file.patches.slice(offset, offset + limit);
   const patches = window.map((patch, position) => ({
     index: offset + position,
-    ...patchView.presentPatch(patch),
+    ...patch,
   }));
 
   const next = offset + window.length;
@@ -63,7 +63,7 @@ const registerReadPatch = (server: McpServer): void => {
         const patchWithIndex = {
           setName: patchFile.name,
           index,
-          ...patchView.presentPatch(patch),
+          ...patch,
         };
         return ok(JSON.stringify(patchWithIndex));
       }

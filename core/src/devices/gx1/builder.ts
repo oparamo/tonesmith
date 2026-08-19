@@ -197,13 +197,33 @@ interface FxOptions {
  * The sub-model to build with: the caller's, or the one the device opens on. A type that has
  * sub-models is always set to one, so leaving it out has to mean the factory model rather than
  * whatever byte the slot happened to be carrying, which is a different model for OD/DS and leaves
- * DELAY with no param defaults at all. Resolving to nothing when the caller wrote the selection
- * into the params bag keeps `withSubType` from reporting a conflict against a value never sent.
+ * DELAY with no param defaults at all.
  */
-const selectedSubType = (type: string, subType: string | null, params: FxParams): string | null => {
+const selectedSubType = (type: string, subType: string | null): string | null => {
   if (subType != null) return subType;
-  if (!PARAM_SUBTYPE_EFFECTS.has(type) || SUB_TYPE_FIELD in params) return null;
+  if (!PARAM_SUBTYPE_EFFECTS.has(type)) return null;
   return DEFAULT_SUBTYPES.fx?.[type] ?? null;
+};
+
+/**
+ * Rejects a sub-model an fx slot cannot store, before it silently does nothing. A type with no
+ * sub-model rejects the value rather than dropping it: nothing downstream would encode it, so the
+ * patch saves without complaint and plays as the default, which is the one failure a caller cannot
+ * see. Naming the selector among the params is rejected on the same terms: a decoded block carries
+ * the selection once, under `subType`, and that is the only copy the codec writes from.
+ */
+const checkFxSubType = (params: FxParams, spec: SubTypeSpec): void => {
+  const { label, type, subType, field } = spec;
+  if (field !== undefined) {
+    if (!(field in params)) return;
+    throw new Error(`${label} sub-model for type "${type}" is set as params.${field}; set it as subType instead`);
+  }
+  if (subType == null) return;
+  const valid = (spec.fields ?? []).map(codecField => codecField.name).join(", ");
+  throw new Error(
+    `${label} type "${type}" has no subType (got "${subType}"); if that names one of this ` +
+    `type's params, pass it in params instead (valid keys: ${valid})`
+  );
 };
 
 const fx = (patch: Patch, options: FxOptions): void => {
@@ -212,18 +232,16 @@ const fx = (patch: Patch, options: FxOptions): void => {
   if (onlySlot !== undefined && onlySlot !== slot) {
     throw new Error(`${type} is a ${onlySlot} effect; this device has nowhere to store it in ${slot}.`);
   }
-  const selected = selectedSubType(type, subType, params);
+  const selected = selectedSubType(type, subType);
   const block = patch[slot];
   block.on = on;
   block.type = type;
   block.subType = selected;
   const keySpec: ParamKeySpec = { label: slot, type, fields: fxFieldMap(type, selected) };
-  // For these effects the sub-model lives in param-block byte p[0] (not FX_COM byte[2]), so it
-  // rides in the params bag, under the same name it carries everywhere else.
   const field = PARAM_SUBTYPE_EFFECTS.has(type) ? SUB_TYPE_FIELD : undefined;
-  const merged = withSubType(params, { ...keySpec, subType: selected, field });
-  validateParamKeys(Object.keys(merged), keySpec);
-  block.params = { ...defaultFxParams(type, selected), ...merged };
+  checkFxSubType(params, { ...keySpec, subType: selected, field });
+  validateParamKeys(Object.keys(params), keySpec);
+  block.params = { ...defaultFxParams(type, selected), ...params };
 };
 
 interface NsOptions {

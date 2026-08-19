@@ -130,7 +130,8 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX1 (active type: COMPRESSOR)", () => {
     expect(patch.fx1.type).toBe("COMPRESSOR");
-    expect(patch.fx1.params).toMatchObject({ subType: "BOSS COMP", sustain: 50, attack: 50, level: 60 });
+    expect(patch.fx1.subType).toBe("BOSS COMP");
+    expect(patch.fx1.params).toMatchObject({ sustain: 50, attack: 50, level: 60 });
   });
 
   it("decodes FX2 (active type: PARA. EQ) in real UI display order", () => {
@@ -143,7 +144,8 @@ describe("Real device values (default-init.tsl)", () => {
 
   it("decodes FX3 (active type: CHORUS)", () => {
     expect(patch.fx3.type).toBe("CHORUS");
-    expect(patch.fx3.params).toMatchObject({ subType: "MONO", rate: 50, depth: 40, level: 100, preDelay: 4 });
+    expect(patch.fx3.subType).toBe("MONO");
+    expect(patch.fx3.params).toMatchObject({ rate: 50, depth: 40, level: 100, preDelay: 4 });
   });
 
   // The following decode the SAME real device bytes above, but under a different

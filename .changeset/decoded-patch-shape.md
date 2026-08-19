@@ -30,10 +30,10 @@ was named `wahType` and never threaded into the encoded bytes at all, so its mod
 dropped; the FX-slot REVERB picked its algorithm through `params.type`; and pedal WAH's model was
 set as `subType` but read back as `wahType`, so sending back the block you just read was rejected
 for naming a field the block does not have. All of them are `subType` now, on the way in and on the
-way out. `type` means the block's own selector and nothing else. Where the codec still keeps a copy
-among the params, `read_patch`, the CLI's `read`, and the generate tool's echo drop the duplicate
-through the new `patchView.presentPatch`, so an agent sees one selector rather than two it has to
-keep in agreement.
+way out. `type` means the block's own selector and nothing else. A decoded block carries the
+selection exactly once: ten effects keep the selector in a param byte, and the codec lifts it onto
+`subType` on the way out and writes it back on the way in, so nothing downstream is handed two
+copies to keep in agreement.
 
 **Blocks and fields that were undecoded now decode**: the `pfx` block (expression pedal WAH and
 PEDAL BEND), `solo` and `soloLevel` on both the dedicated AMP block and the FX-slot OD/DS, and

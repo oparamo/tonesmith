@@ -213,7 +213,7 @@ describe("fx", () => {
       fx(patch, { slot: "fx1", type });
 
       expect(patch.fx1.subType).toBe(expected);
-      expect(patch.fx1.params.subType).toBe(expected);
+      expect(patch.fx1.params, "the selection is carried once, on the block").not.toHaveProperty("subType");
     }
   );
 
@@ -243,14 +243,14 @@ describe("fx", () => {
 
     fx(patch, { slot: "fx1", type: "DELAY", subType: "WARP", params: { level: 80 } });
 
-    // WARP's fields are time/trigger/level; the selection rides along under the same name it
-    // carries everywhere else, and is not one of the defaulted params.
-    expect(patch.fx1.params).toEqual({ time: 400, trigger: false, level: 80, subType: "WARP" });
+    // WARP's fields are time/trigger/level. The sub-algorithm picks that field set but is not one
+    // of them: it lives on the block, not among the params it selects.
+    expect(patch.fx1.params).toEqual({ time: 400, trigger: false, level: 80 });
   });
 
-  // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS),
-  // not FX_COM byte[2]. This proves both halves of that threading: fx() writing the selection
-  // into the params bag on encode, and decodePatch promoting it back onto the block on decode.
+  // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS), not FX_COM
+  // byte[2]. This proves both halves of that threading: encodePatch putting the block's selection
+  // back into byte p[0], and decodePatch lifting it off the params it read.
   it("round-trips FIXED WAH's subType through encode/decode", () => {
     const patch = basePatch("Test");
     fx(patch, { slot: "fx1", type: "FIXED WAH", subType: "VO WAH", params: { level: 80, direct: 20, manual: 60 } });

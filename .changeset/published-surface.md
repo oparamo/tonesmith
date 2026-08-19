@@ -12,8 +12,7 @@ converters, the spec module's wording helpers, and `NAME_BYTES`, which the devic
 `capabilities.patchName.maxLength` states. None were part of building or editing a patch, all of
 which goes through the driver, and each one published a signature that could not then change
 without a major version. The type barrel gained the names it was missing in exchange: `PatchNameSpec`
-and `PatchSpecExample` had no way to be named, and `FieldEdits`, `PatchView` and `Encodable` come
-with the surface above.
+and `PatchSpecExample` had no way to be named, and `FieldEdits` comes with the surface above.
 
 `PatchFile.device` is specified, and it is the driver's id: a consumer holding a file can hand that
 field to `registry.getDriver` and get the driver that reads it. It was undocumented, and the GX-1
@@ -31,12 +30,6 @@ decoding the whole file a second time first, which is what `generate_patch` was 
 `saveTsl` is gone rather than narrowed. It wrote a file and then called `console.info`, and the MCP
 server speaks JSON-RPC over stdio, so a consumer reaching for it inside a tool corrupted the
 protocol stream. `patchUtils.upsertPatches` is the supported way to save patches to a file.
-
-`presentPatch` returns a `PatchView<T>` rather than a `T`. The view drops the selector copy a device
-mirrors into a block's params, which is a copy the encoder reads to pick that block's field map, so
-handing a view back to `encodePatch` would write the block's old sub-model byte and report the write
-as done. `PatchDriver.encodePatch` takes an `Encodable<T>` and a view is not one, so the round trip
-that would have done it no longer compiles.
 
 `PatchDriver.writeFile` accepts a `PatchFile<T>`, which anyone can assemble by hand, and no driver
 can honor that: a write starts from the envelope the file was read as and overwrites only the byte
