@@ -187,7 +187,10 @@ decoded-patch field lists) directly; don't duplicate any of it into this file.
 
 ## Conventions
 
-Decisions that tooling can't check and that are expensive to relitigate. The mechanical rules are
+Decisions that tooling can't check and that are expensive to relitigate. The structural conventions
+(how a device plugs in, the device-agnostic shared layer, the `driver.ts` / `index.ts` split, domain
+grouping, naming, exports at the bottom) are in README.md's Contributing section and apply here; what
+follows is what that section doesn't carry. The mechanical rules are
 already errors in `eslint.config.js` (at most three parameters, no duplicate function bodies, no em
 dashes, ternaries assigned before use, cognitive complexity 10), so they are not repeated here.
 
@@ -224,9 +227,16 @@ dashes, ternaries assigned before use, cognitive complexity 10), so they are not
 - **Coverage thresholds are floors, not targets.** They sit well below the measured numbers
   deliberately. Don't write tests to raise them, and don't ratchet them toward what the suite
   currently scores: chasing the last uncovered branch is what produced the wording assertions above.
+- **cli and mcp test their own wiring, not core's behavior.** README states the rule; the criterion
+  that makes it decidable is that a surface test earns its place only if it can fail while core is
+  entirely correct. Reading a written file back through the driver to check a command's effect
+  qualifies, since that fails on a miswiring. 86 of 178 surface tests failed the criterion.
 - **Comments earn their line by explaining why.** The constraint that forced this shape, the bug it
   prevents, the reason the obvious approach fails. A comment restating the code teaches nothing and
-  goes stale on the next edit. Match the comment density of the file you're already in.
+  goes stale on the next edit. A comment also states a present property, never history: no "used to",
+  no "before this fix", no "now does X" contrasting with a past, no PR number as the reason. The bug
+  a guard prevents is fair game phrased as a present fact; git owns the rest. Match the comment
+  density of the file you're already in.
 - **Dependency versions are exact.** No `^` or `~` in any `package.json`. `pnpm add` writes a range
   by default, so correct it after adding.
 - **Changesets cover consumer-visible changes only:** a published package's API, behavior, or
