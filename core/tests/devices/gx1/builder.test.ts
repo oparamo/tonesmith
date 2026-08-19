@@ -274,7 +274,7 @@ describe("fx", () => {
   });
 
   // PHASER's variant is its `stage` param, not a subType, so a subType sent here encodes nowhere.
-  // Accepting and dropping it is what let a patch save clean and play at the wrong stage count.
+  // Accepting and dropping it saves a clean patch that plays at a stage count nobody asked for.
   it("throws when given a subType for an effect whose variant is an ordinary param", () => {
     const patch = basePatch("Test");
     const setSubType = () => { fx(patch, { slot: "fx1", type: "PHASER", subType: "4 STAGE" }); };
@@ -613,9 +613,9 @@ describe("reverb", () => {
 
 // Anchors defaultFxParams to the one real captured factory-default source we have:
 // core/tests/fixtures/gx1/default-init.tsl. For each FX type actually present there,
-// defaultFxParams(type) must match what the real device shows for that type's params.
-// Had defaultFxParams existed and drifted from reality, this is what would have caught
-// the class of bug where an unset GEQ band decoded to -20 dB instead of 0 dB.
+// defaultFxParams(type) must match what the real device shows for that type's params. A drift
+// between the two is what puts a wrong value under an unset param, such as a GEQ band decoding
+// to -20 dB where the device ships it at 0.
 describe("defaultFxParams (anchored to default-init.tsl)", () => {
   const patch = patchAt(DEFAULT_INIT_FIXTURE);
 

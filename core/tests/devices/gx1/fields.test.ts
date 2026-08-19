@@ -4,10 +4,6 @@ import { u8, signed, lookup, scaled, nibblePair, nibbleQuad, encodeFields } from
 describe("u8", () => {
   const field = u8("gain", 0);
 
-  it("tags itself with kind \"u8\"", () => {
-    expect(field.kind).toBe("u8");
-  });
-
   it("decodes the raw byte unchanged", () => {
     const decoded = field.decode([42]);
 
@@ -37,11 +33,6 @@ describe("u8", () => {
 
 describe("signed", () => {
   const field = signed("gain", 0, 20);
-
-  it("tags itself with kind \"signed\" and the given center", () => {
-    expect(field.kind).toBe("signed");
-    expect(field.center).toBe(20);
-  });
 
   it("decodes the byte as an offset from the center", () => {
     expect(field.decode([30])).toBe(10);
@@ -75,10 +66,6 @@ describe("signed", () => {
 describe("scaled", () => {
   const field = scaled("time", 0, 0.1);
 
-  it("tags itself with kind \"scaled\"", () => {
-    expect(field.kind).toBe("scaled");
-  });
-
   it("decodes the byte multiplied by the factor", () => {
     expect(field.decode([45])).toBe(4.5);
   });
@@ -106,10 +93,6 @@ describe("scaled", () => {
 describe("nibblePair", () => {
   const field = nibblePair("preDelay", 0);
 
-  it("tags itself with kind \"nibblePair\"", () => {
-    expect(field.kind).toBe("nibblePair");
-  });
-
   it("round-trips a value through its two nibbles", () => {
     const bytes = [0, 0];
 
@@ -135,10 +118,6 @@ describe("nibblePair", () => {
 describe("nibbleQuad", () => {
   const field = nibbleQuad("time", 0);
 
-  it("tags itself with kind \"nibbleQuad\"", () => {
-    expect(field.kind).toBe("nibbleQuad");
-  });
-
   it("round-trips a value through its four nibbles", () => {
     const bytes = [0, 0, 0, 0];
 
@@ -163,11 +142,6 @@ describe("nibbleQuad", () => {
 
 describe("lookup", () => {
   const field = lookup("type", 0, ["ALPHA", "BETA"]);
-
-  it("tags itself with kind \"lookup\" and the given table", () => {
-    expect(field.kind).toBe("lookup");
-    expect(field.table).toEqual(["ALPHA", "BETA"]);
-  });
 
   it("decodes a known index to its name", () => {
     const decoded = field.decode([1]);

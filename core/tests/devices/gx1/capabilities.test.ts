@@ -1,10 +1,10 @@
 /**
  * Drift guards for codec ↔ catalog.
  *
- * capabilities.ts now derives every params list from param-catalog.ts, so the meaningful
- * axis to guard is the catalog (authored from the parameter guide) against the codec field
- * maps (authored from byte reverse-engineering), two independently-authored sources that
- * can drift. These tests assert, for every type of every block:
+ * capabilities.ts derives every params list from param-catalog.ts, so the meaningful axis to
+ * guard is the catalog (authored from the parameter guide) against the codec field maps
+ * (authored from byte reverse-engineering), two independently-authored sources that can drift.
+ * These tests assert, for every type of every block:
  *   - id coverage: the codec's type list, the catalog's keys, and capabilities' item ids
  *     all agree;
  *   - param parity: every codec field maps to a catalog param and vice versa (bidirectional),
@@ -221,9 +221,9 @@ const assertBlockParity = (block: "amp" | "odds" | "ns" | "fv", codecNames: Set<
 };
 
 describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
-  // speaker/mic were once excepted here as "covered by their own groups", but having a cab group does
-  // not make the amp block's own speaker field discoverable from an amp lookup, and leaving them out
-  // of the catalog hid them from describe_device and the CLI alike. They are ordinary amp params.
+  // speaker and mic are ordinary amp params, cab and mic groups notwithstanding: a group of its own
+  // does not make the amp block's own field discoverable from an amp lookup, and a field outside the
+  // catalog is invisible to describe_device and the CLI alike.
   it("amp (excluding on/type)", () => {
     const decoded = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
 
@@ -470,27 +470,27 @@ describe("GX-1 spec examples", () => {
   const bodyOf = (example?: PatchSpecExample): Record<string, unknown> =>
     Object.values(example ?? {})[0] as Record<string, unknown>;
 
-  it.each(examples)("$group $item carries an example", ({ example }) => {
-    expect(example).toBeDefined();
-  });
+  // One case per example, asserting everything an example has to be. A loop per property reports
+  // the same broken example once per property, and counts the suite by properties checked rather
+  // than by examples there are to get right.
+  it.each(examples)("$group $item carries a usable example", ({ group, subTypes, example }) => {
+    expect(example, "every block-backed item shows one").toBeDefined();
+    const [block] = Object.keys(example ?? {});
+    const body = bodyOf(example);
 
-  it.each(examples)("$group $item example builds", ({ example }) => {
+    expect(BLOCK_GROUPS[block as BlockName], "written under a real block key").toBe(group);
+    expect("params" in body, "nests its controls where the spec keeps them")
+      .toBe(NESTED_PARAMS.has(present(block, "the example's block key")));
+
+    // A type with sub-models opens on one, so an example leaving subType out shows a shape the
+    // caller has to work out for itself. Naming one is only truthful if it is the model the device
+    // opens with, which is what DEFAULT_SUBTYPES harvests and the defaults guard pins to the fixture.
+    if (subTypes.length > 0) expect(subTypes, "names one of the type's own sub-models").toContain(body.subType);
+    else expect(body.subType, "names no sub-model, having none").toBeUndefined();
+
+    // The one check covering block key, nesting, defaults and the validator at once, so it goes last.
     const build = (): unknown => driver.buildPatch({ name: "Example", amp: { type: "TWIN" }, ...example });
-
-    expect(build).not.toThrow();
-  });
-
-  it.each(examples)("$group $item example is written under a real block key", ({ group, example }) => {
-    const [block] = Object.keys(example ?? {});
-
-    expect(BLOCK_GROUPS[block as BlockName]).toBe(group);
-  });
-
-  it.each(examples)("$group $item example nests its controls where the spec keeps them", ({ example }) => {
-    const [block] = Object.keys(example ?? {});
-    const body = Object.values(example ?? {})[0] as Record<string, unknown>;
-
-    expect("params" in body).toBe(NESTED_PARAMS.has(present(block, "the example's block key")));
+    expect(build, "and builds as it stands").not.toThrow();
   });
 
   it("fills the values from the device's own factory defaults, not a guess", () => {
@@ -499,23 +499,6 @@ describe("GX-1 spec examples", () => {
 
     expect(example.params).toEqual(DEFAULTS_BY_TYPE.fx.CHORUS);
   });
-
-  // A type with sub-models opens on one, so an example that leaves subType out shows a shape the
-  // caller has to work out for itself. Naming one is only truthful if it is the model the device
-  // opens with, which is what DEFAULT_SUBTYPES harvests and the defaults guard pins to the fixture.
-  it.each(examples.filter(entry => entry.subTypes.length > 0))(
-    "$group $item example names one of the type's own subTypes",
-    ({ subTypes, example }) => {
-      expect(subTypes).toContain(bodyOf(example).subType);
-    }
-  );
-
-  it.each(examples.filter(entry => entry.subTypes.length === 0))(
-    "$group $item example leaves subType out, having no sub-models",
-    ({ example }) => {
-      expect(bodyOf(example).subType).toBeUndefined();
-    }
-  );
 
   it("takes its params from the sub-model where the sub-model owns them", () => {
     const delay = groupItems("fx").find(item => item.id === "DELAY");

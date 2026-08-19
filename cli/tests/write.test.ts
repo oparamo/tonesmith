@@ -27,8 +27,8 @@ describe("gx1 write", () => {
     expect(patch.key).toBe("G");
   });
 
-  // Without the separator there is nothing to split on, and slicing at -1 dropped the argument's
-  // last character, so "amp.gain" was reported as an unknown field "amp.gai".
+  // With no separator there is nothing to split on, and slicing at the index of one drops the
+  // argument's last character, so `amp.gain` reads as the unknown field `amp.gai`.
   it("rejects a field argument with no '=', naming it as typed", async () => {
     temp = withTempDir();
 
