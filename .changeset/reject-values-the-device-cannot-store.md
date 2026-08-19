@@ -42,8 +42,7 @@ throwing from the codec at write time. Four params also carried a bare display s
 `ratio` of `"4:1"` was accepted; each now states the values or bounds the device takes, and
 HARMONIST's `KEY` names the patch key's own values rather than a form the codec cannot encode.
 
-**Breaking.** `PatchDriver` gains `validateFields(patch, edits)`, which every driver must implement,
-and `patchUtils.applyFieldEdits(driver, patch, edits)` takes the driver as its first argument. The
-edits are applied to the patch before the check, so a batch that switches a block's type and sets a
-param of the new type is validated as the one state it describes rather than against the type the
-patch held beforehand.
+**Breaking.** `PatchDriver` gains `applyEdits(patch, edits)`, which every driver must implement.
+The edits are applied to the patch before the check, so a batch that sets a block's type and its
+sub-model is judged as the one state it describes rather than against the type the patch held
+beforehand.

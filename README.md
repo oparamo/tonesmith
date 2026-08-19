@@ -72,7 +72,7 @@ mirror the writable paths) and use `capabilities` for the valid types and value 
 For example, editing a GX-1 patch:
 
 ```bash
-tonesmith gx1 write my.tsl 0 amp.gain=72 fx1.params.rate=50 fx1.on=true key=G
+tonesmith gx1 write my.tsl 0 amp.params.gain=72 fx1.params.rate=50 fx1.on=true key=G
 ```
 
 ## MCP server

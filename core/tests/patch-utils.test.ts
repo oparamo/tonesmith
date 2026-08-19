@@ -3,8 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
-  resolvePatchIndex, coerceValue, setByPath, resolvePatches, applyFieldEdits,
-  upsertPatches, copyPatch, createPatchFile, MAX_NEW_PATCHES,
+  resolvePatchIndex, resolvePatches, upsertPatches, copyPatch, createPatchFile, MAX_NEW_PATCHES,
 } from "../src/patch-utils";
 import { scratchDir } from "./helpers";
 
@@ -32,7 +31,7 @@ const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   }),
   blankPatch: (name = "blank") => makePatch(name),
   buildPatch: (spec) => makePatch((spec as { name: string }).name),
-  validateFields: () => [],
+  applyEdits: (_, edits) => Object.fromEntries(edits),
   decodePatch: (raw) => raw as unknown as Patch,
   encodePatch: (patch) => patch as unknown as Record<string, unknown>,
 });
@@ -266,38 +265,6 @@ describe("resolvePatchIndex", () => {
   });
 });
 
-describe("coerceValue", () => {
-  it.each([
-    { input: "0", expected: 0 },
-    { input: "72", expected: 72 },
-    { input: "-5", expected: -5 },
-    { input: "3.14", expected: 3.14 },
-    { input: "0.5", expected: 0.5 },
-    { input: "", expected: 0 },
-    { input: "hello", expected: "hello" },
-    { input: "NaN", expected: "NaN" },
-    { input: "FLAT", expected: "FLAT" },
-    { input: "true", expected: true },
-    { input: "false", expected: false },
-  ])("coerces \"$input\" to $expected where the field holds a number", ({ input, expected }) => {
-    const result = coerceValue(input, 0);
-
-    expect(result).toBe(expected);
-  });
-
-  it.each(["1984", "true", "0"])("leaves %o alone where the field already holds a string", (input) => {
-    const result = coerceValue(input, "Rock Lead");
-
-    expect(result).toBe(input);
-  });
-
-  it.each([88, true, "FLAT"])("passes %o through when it is not a string to interpret", (input) => {
-    const result = coerceValue(input, 0);
-
-    expect(result).toBe(input);
-  });
-});
-
 describe("resolvePatches", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Metal")];
 
@@ -318,143 +285,6 @@ describe("resolvePatches", () => {
     const resolveMissingName = () => resolvePatches(patches, "Bogus");
 
     expect(resolveMissingName).toThrow(/Bogus/);
-  });
-});
-
-describe("applyFieldEdits", () => {
-  const editable = (fields: Record<string, unknown>): Patch =>
-    ({ name: "Edit me", ...fields });
-
-  /** Accepts everything, so these cases exercise the shared half rather than a device's catalog. */
-  const permissive = makeFakeDriver(new Map());
-
-  /** Stands in for a device rejecting a value its catalog does not allow. */
-  const rejecting = (issues: string[]): PatchDriver =>
-    ({ ...permissive, validateFields: () => issues });
-
-  it("applies a single edit with coercion", () => {
-    const patch = editable({ amp: { gain: 0 } });
-
-    applyFieldEdits(permissive, patch, [["amp.gain", "72"]]);
-
-    const amp = (patch as unknown as Record<string, unknown>).amp as Record<string, unknown>;
-    expect(amp.gain).toBe(72);
-  });
-
-  it("applies multiple edits in order, including booleans", () => {
-    const patch = editable({ key: "C", amp: { solo: false, gain: 0 } });
-
-    applyFieldEdits(permissive, patch, [["key", "G"], ["amp.solo", "true"], ["amp.gain", "50"]]);
-
-    const fields = patch as unknown as Record<string, unknown>;
-    const amp = fields.amp as Record<string, unknown>;
-    expect(fields.key).toBe("G");
-    expect(amp.solo).toBe(true);
-    expect(amp.gain).toBe(50);
-  });
-
-  it("does nothing given an empty edit list", () => {
-    const patch = editable({ key: "C" });
-
-    applyFieldEdits(permissive, patch, []);
-
-    expect((patch as unknown as Record<string, unknown>).key).toBe("C");
-  });
-
-  it("keeps a numeric-looking name a string, since the field it lands in holds one", () => {
-    const patch = editable({});
-
-    applyFieldEdits(permissive, patch, [["name", "1984"]]);
-
-    expect(patch.name).toBe("1984");
-  });
-
-  it("takes a value that arrives already typed, not only its string form", () => {
-    const patch = editable({ amp: { solo: false, gain: 0 } });
-
-    applyFieldEdits(permissive, patch, [["amp.gain", 72], ["amp.solo", true]]);
-
-    const amp = (patch as unknown as Record<string, unknown>).amp as Record<string, unknown>;
-    expect(amp.gain).toBe(72);
-    expect(amp.solo).toBe(true);
-  });
-
-  it("returns each landed value keyed by path, so a caller can report what it wrote", () => {
-    const patch = editable({ amp: { gain: 0 } });
-
-    const applied = applyFieldEdits(permissive, patch, [["name", "1984"], ["amp.gain", "72"]]);
-
-    expect(applied).toEqual({ name: "1984", "amp.gain": 72 });
-  });
-
-  it("hands the driver every edit it applied, keyed by path", () => {
-    const seen: Record<string, unknown>[] = [];
-    const recording: PatchDriver = { ...permissive, validateFields: (_, edits) => { seen.push(edits); return []; } };
-
-    applyFieldEdits(recording, editable({ amp: { gain: 0 } }), [["amp.gain", "72"]]);
-
-    expect(seen).toEqual([{ "amp.gain": 72 }]);
-  });
-
-  it("throws with every issue the driver reports rather than the first", () => {
-    const applyRejectedEdits = () =>
-      { applyFieldEdits(rejecting(["gain is too high", "level is too low"]), editable({ amp: { gain: 0 } }), [["amp.gain", "900"]]); };
-
-    expect(applyRejectedEdits).toThrow(/gain is too high/);
-    expect(applyRejectedEdits).toThrow(/level is too low/);
-  });
-});
-
-describe("setByPath", () => {
-  it("sets a top-level key", () => {
-    const obj: Record<string, unknown> = { x: 1 };
-
-    setByPath(obj, "x", 99);
-
-    expect(obj.x).toBe(99);
-  });
-
-  it("walks to a nested key, overwriting it and leaving its siblings alone", () => {
-    const obj: Record<string, unknown> = { fx1: { on: true, params: { rate: 10, depth: 20 } } };
-
-    setByPath(obj, "fx1.params.rate", 50);
-
-    expect(obj.fx1).toEqual({ on: true, params: { rate: 50, depth: 20 } });
-  });
-
-  // A decoded patch already carries every field its device supports, so an absent field means the
-  // device has no such control. Accepting the write would strand it, since the encoder only emits known
-  // byte indices, so it would vanish while the caller believed it landed.
-  it("rejects an unknown leaf instead of creating it", () => {
-    const obj: Record<string, unknown> = { amp: { gain: 10, level: 100 } };
-
-    expect(() => { setByPath(obj, "amp.notAField", 1); }).toThrow(/notAField/);
-    expect(obj.amp).toEqual({ gain: 10, level: 100 });
-  });
-
-  it("rejects an unknown top-level field", () => {
-    const obj: Record<string, unknown> = { amp: { gain: 10 } };
-
-    expect(() => { setByPath(obj, "setName", "x"); }).toThrow(/setName/);
-    expect(Object.keys(obj)).toEqual(["amp"]);
-  });
-
-  it("rejects a path that walks through a field the object doesn't have", () => {
-    const obj: Record<string, unknown> = { amp: { gain: 10 } };
-
-    expect(() => { setByPath(obj, "nope.nested.path", 1); }).toThrow(/nope/);
-  });
-
-  it("rejects a path that walks through a non-object value", () => {
-    const obj: Record<string, unknown> = { amp: { gain: 10 } };
-
-    expect(() => { setByPath(obj, "amp.gain.deeper", 1); }).toThrow(/amp\.gain/);
-  });
-
-  it("names the available fields when a path is rejected", () => {
-    const obj: Record<string, unknown> = { amp: { gain: 10, level: 100, treble: 50 } };
-
-    expect(() => { setByPath(obj, "amp.middle", 1); }).toThrow(/gain, level, treble/);
   });
 });
 

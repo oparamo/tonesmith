@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { basename, extname } from "node:path";
-import type { FieldEdits, FieldValue, Patch, PatchFile, PatchDriver } from "./types";
+import type { Patch, PatchFile, PatchDriver } from "./types";
 
 /** A reference that names a slot rather than a patch: digits, optionally signed. */
 const INDEX_REF = /^-?\d+$/;
@@ -51,77 +51,6 @@ const resolvePatchIndex = (patches: Patch[], ref: string): number => {
   return soleIndexNamed(named, trimmed);
 };
 
-/**
- * Interprets a field value against the field it is going into: "72" becomes the number 72 and
- * "true" becomes a boolean, but only where `existing` shows the field is not itself a string. A
- * command line can express a number no other way, so the coercion has to happen somewhere; doing it
- * blind turns a patch named "1984" into the number 1984, which the name encoder cannot pad to the
- * block's width. A value that arrives already typed is taken as it is.
- */
-const coerceValue = (value: FieldValue, existing: unknown): FieldValue => {
-  if (typeof value !== "string" || typeof existing === "string") return value;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  const asNumber = Number(value);
-  const result = Number.isNaN(asNumber) ? value : asNumber;
-  return result;
-};
-
-/**
- * Names what is actually available at the level a dot-path went wrong, so a caller who guessed a
- * field name is told the real ones rather than left to guess again.
- */
-const unknownPathError = (
-  dottedPath: string,
-  segment: string,
-  available: Record<string, unknown>,
-): Error => {
-  const valid = Object.keys(available).sort().join(", ");
-  return new Error(
-    `Unknown field path "${dottedPath}": "${segment}" is not a field here. Valid fields at this level: ${valid}`
-  );
-};
-
-/** Where a dot-path ends up: the record its last segment lives in, and that segment. */
-interface Field {
-  holder: Record<string, unknown>;
-  key: string;
-}
-
-/**
- * Walks a dot-path to the field it names, so a caller can read what is there before writing over it.
- *
- * Every segment must already exist: a decoded patch carries the complete set of fields its device
- * supports, so a path that isn't there names a field the device doesn't have. Writing it anyway
- * would be silently dropped by the encoder (which only emits known byte indices), leaving the
- * caller believing an edit landed when nothing changed.
- */
-const fieldAt = (target: Record<string, unknown>, dottedPath: string): Field => {
-  const parts = dottedPath.split(".");
-  const key = parts.pop() ?? dottedPath;
-  let current = target;
-  for (const [depth, part] of parts.entries()) {
-    const next = current[part];
-    if (next === null || typeof next !== "object") {
-      throw unknownPathError(dottedPath, parts.slice(0, depth + 1).join("."), current);
-    }
-    current = next as Record<string, unknown>;
-  }
-
-  if (!(key in current)) throw unknownPathError(dottedPath, key, current);
-  return { holder: current, key };
-};
-
-/** Sets a nested value by dot-notation path: setByPath(patch, "amp.gain", 72) sets patch.amp.gain. */
-const setByPath = (
-  target: Record<string, unknown>,
-  dottedPath: string,
-  value: unknown,
-): void => {
-  const { holder, key } = fieldAt(target, dottedPath);
-  holder[key] = value;
-};
-
 /** A patch and the slot it sits in, which is what a surface reports an edit or a copy against. */
 interface SelectedPatch<T extends Patch> {
   index: number;
@@ -147,33 +76,6 @@ const resolvePatches = <T extends Patch>(patches: T[], ref?: string): SelectedPa
   ref !== undefined
     ? [resolvePatch(patches, ref)]
     : patches.map((patch, index) => ({ index, patch }));
-
-/**
- * Applies dot-path edits to a patch in place, then checks the result against the device's catalog
- * and throws with every problem at once. Returns what actually landed, keyed by path, so a caller
- * can report the written values without re-deriving the coercion each one went through.
- *
- * The edits land before the check because a block's type is one of the things an edit can set, and
- * the driver reads each block's type off the patch. Nothing is written to disk on a rejection: the
- * caller throws before its `writeFile`, so the patch that was mutated is the one being discarded.
- */
-const applyFieldEdits = <T extends Patch>(
-  driver: PatchDriver<T>,
-  patch: T,
-  edits: readonly (readonly [path: string, rawValue: FieldValue])[],
-): FieldEdits => {
-  const applied: FieldEdits = {};
-  for (const [path, rawValue] of edits) {
-    const { holder, key } = fieldAt(patch as unknown as Record<string, unknown>, path);
-    const value = coerceValue(rawValue, holder[key]);
-    holder[key] = value;
-    applied[path] = value;
-  }
-
-  const issues = driver.validateFields(patch, applied);
-  if (issues.length > 0) throw new Error(issues.join("\n"));
-  return applied;
-};
 
 /** Reads `path`, or starts a fresh empty file named `setName` when it doesn't exist yet. */
 const readExistingOrNew = <T extends Patch>(
@@ -341,11 +243,8 @@ const createPatchFile = <T extends Patch>(
 export {
   MAX_NEW_PATCHES,
   resolvePatchIndex,
-  coerceValue,
-  setByPath,
   resolvePatch,
   resolvePatches,
-  applyFieldEdits,
   upsertPatches,
   copyPatch,
   createPatchFile,

@@ -6,9 +6,10 @@ import type { PrintPatch } from "../types";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
 
 /**
- * Splits "amp.gain=72" at the first "=", so a value containing one survives intact. Without the
- * separator there is nothing to split on, and slicing at an index of -1 drops the argument's last
- * character, sending "amp.gain" on as the path "amp.gai" to be reported as an unknown field.
+ * Splits "amp.params.gain=72" at the first "=", so a value containing one survives intact. Without
+ * the separator there is nothing to split on, and slicing at an index of -1 drops the argument's
+ * last character, sending "amp.params.gain" on as the path "amp.params.gai" to be reported as an
+ * unknown field.
  */
 const parseFieldAssignment = (assignment: string): [string, string] => {
   const separatorIndex = assignment.indexOf("=");
@@ -59,7 +60,7 @@ const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =
         const edits = fields.map(parseFieldAssignment);
         const patchFile = driver.readFile(file);
         const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
-        patchUtils.applyFieldEdits(driver, patch, edits);
+        driver.applyEdits(patch, edits);
         driver.writeFile(patchFile, file);
         console.info(`Wrote ${file}, patch ${index} updated: ${fields.join(", ")}`);
       });

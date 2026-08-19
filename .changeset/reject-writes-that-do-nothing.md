@@ -8,9 +8,9 @@ A dot-path naming a field the device does not have used to be accepted: the valu
 the decoded patch, the caller was told `Updated ... = <value>`, and the encoder then dropped it
 silently because it only emits known byte indices. `write_fields setName` and `amp.notARealField`
 both looked like successful edits while changing nothing, and a path whose root did not exist at
-all crashed with a raw `TypeError` instead of a usable message. `setByPath` requires every segment
-to exist and names the valid fields at whichever level the path went wrong, so a near miss like
-`amp.mid` points at `middle`.
+all crashed with a raw `TypeError` instead of a usable message. Every segment of a path must now
+exist, and a path that goes wrong names the valid fields at the level it went wrong, so a near miss
+like `amp.params.mid` points at `middle`.
 
 `resolvePatchIndex` rejects an index past the end of the file rather than returning it. Callers
 index straight into the patch array with the result, so an unchecked index read as `undefined` or,

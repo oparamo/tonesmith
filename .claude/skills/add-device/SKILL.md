@@ -279,7 +279,10 @@ step, since that data isn't in the repo and so can't be a CI dependency.
   `buildPatch` is in place, verify `generate_patch` works for the new device through the MCP
   server (per CLAUDE.md's Conventions, that means calling the tool, not checking the CLI). The
   response echoes each built patch plus its resolved chain, so a caller never needs a follow-up
-  read to confirm a write.
+  read to confirm a write. `write_fields` and the CLI's `write` ask for the driver's other
+  method, `applyEdits(patch, edits)`: a dot-path's segments are the device's own field names, so
+  resolving one, reading the value into the field it names, and reporting every problem at once
+  are all the driver's to answer.
 - **Tests**: behavior tests in `cli/tests/` and `mcp/tests/`, exercising every CLI command and
   MCP tool against the fixture from step 4, including error paths (bad ref, bad field path,
   unknown device).
