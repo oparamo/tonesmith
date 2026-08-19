@@ -1,8 +1,11 @@
-import type { Patch, PatchFile, RawPatch } from "./patch";
+import type { FieldValue, Patch, PatchFile, RawPatch } from "./patch";
 import type { DeviceCapabilities } from "./capabilities";
 
-/** Dot-path to the value written there, as `write_fields` and the CLI's `write` both express it. */
-type FieldEdits = Record<string, unknown>;
+/** One requested edit: a dot-path, and the value to write there. */
+type FieldEdit = readonly [path: string, value: FieldValue];
+
+/** What a batch of edits wrote, keyed by the path that wrote it. */
+type FieldEdits = Record<string, FieldValue>;
 
 interface PatchDriver<T extends Patch = Patch> {
   readonly id: string;
@@ -19,18 +22,18 @@ interface PatchDriver<T extends Patch = Patch> {
    */
   buildPatch(spec: unknown): T;
   /**
-   * Every problem with a set of dot-path edits already applied to `patch`, checked against this
-   * device's capability catalog; empty when they are all usable. Reading the selection off the
-   * patch rather than off the edits is what lets an edit changing a block's type and an edit
-   * setting a param of that new type validate as one consistent state.
+   * Applies dot-path edits to `patch` in place, in the order given, and returns what each one
+   * actually wrote so a caller can report the values without re-deriving them. Throws naming every
+   * problem at once: a path the device has no field for, and a field handed a value outside what
+   * its param accepts, are the same kind of answer to the caller and arrive together.
    *
-   * `setByPath` establishes only that a field exists, which is why this is separate: a real field
-   * handed a value of the wrong kind or outside the param's range still encodes to a byte the
-   * device cannot mean.
+   * What a path means is the device's own knowledge, which is why resolving one is the driver's
+   * job rather than a walk over the decoded object from outside. A rejection leaves the patch
+   * partly edited, so a caller writes the file only once this returns.
    */
-  validateFields(patch: T, edits: FieldEdits): string[];
+  applyEdits(patch: T, edits: readonly FieldEdit[]): FieldEdits;
   decodePatch(raw: RawPatch): T;
   encodePatch(patch: T): RawPatch;
 }
 
-export type { FieldEdits, PatchDriver };
+export type { FieldEdit, FieldEdits, PatchDriver };

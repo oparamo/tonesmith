@@ -1,4 +1,4 @@
-import type { RawPatch, PatchDriver } from "../../types";
+import type { FieldEdit, FieldEdits, RawPatch, PatchDriver } from "../../types";
 import type { Patch, PatchFile, RawParamSet } from "./types";
 import { decodePatch as codecDecodePatch, encodePatch as codecEncodePatch } from "./codec";
 import {
@@ -8,7 +8,7 @@ import {
   writeFile as tslWriteFile,
 } from "./tsl";
 import { gx1Capabilities } from "./capabilities";
-import { buildPatch as specBuildPatch, validateFieldEdits } from "./spec";
+import { buildPatch as specBuildPatch, applyEdits as specApplyEdits } from "./spec";
 
 // Arrow wrappers pair the PatchDriver contract with the concrete GX-1 file type, keeping the driver
 // fully typed without widening the file I/O functions underneath it.
@@ -32,8 +32,8 @@ const driver: PatchDriver<Patch> = {
   buildPatch: (spec: unknown): Patch =>
     specBuildPatch(spec),
 
-  validateFields: (patch: Patch, edits: Record<string, unknown>): string[] =>
-    validateFieldEdits(patch, edits),
+  applyEdits: (patch: Patch, edits: readonly FieldEdit[]): FieldEdits =>
+    specApplyEdits(patch, edits),
 
   decodePatch: (raw: RawPatch): Patch =>
     codecDecodePatch(raw as { memo?: string; paramSet: RawParamSet }),

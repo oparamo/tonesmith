@@ -10,14 +10,15 @@ second slot behind a set name, so `new tones.tsl 8` named the set "8" and asking
 patches meant naming the set as well. A `--count` that is not a whole number is a usage error now,
 rather than a `NaN` that opened the file with no patches in it.
 
-`coerceValue` silently corrupted boolean field writes (`amp.on`, `amp.solo`, `pfx.on`). A `"true"`
-or `"false"` string passed straight through to `Number()` and landed as `NaN`. Both coerce to real
-booleans now.
+Boolean field writes (`amp.on`, `amp.params.solo`, `pedalFx.on`) were silently corrupted: a
+`"true"` or `"false"` string passed straight through to `Number()` and landed as `NaN`. Both coerce
+to real booleans now.
 
 `write` takes fully qualified `field=value` pairs (`key=G`) instead of a separate `<block>`
 argument, so it can target top-level `Patch` scalars, matching what the MCP tool always accepted.
-A pair with no `=` in it is rejected naming the argument as typed: `write f.tsl 0 amp.gain` sliced
-at index -1 and reported `amp.gai` as an unknown field while listing `gain` among the valid ones.
+A pair with no `=` in it is rejected naming the argument as typed: `write f.tsl 0 amp.params.gain`
+sliced at index -1 and reported `amp.params.gai` as an unknown field while listing `gain` among the
+valid ones.
 
 `read` no longer hides a bypassed OD/DS block. Every other block prints with `[OFF]` and its
 settings, and the device keeps a bypassed block's settings, so hiding it concealed the sound parked

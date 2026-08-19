@@ -65,8 +65,8 @@ core/                       @tonesmith/core
       capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec
     registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
     patch-utils.ts          patch-file operations every surface shares: resolvePatch /
-                            resolvePatches, applyFieldEdits, coerceValue, setByPath, upsertPatches,
-                            copyPatch, createPatchFile
+                            resolvePatches, upsertPatches, copyPatch, createPatchFile. Editing a
+                            patch is not among them: what a dot-path means is the driver's
     capability-utils.ts     findGroup / findItem
     atomic-write.ts         writeFileAtomic: sibling file then rename, so a driver's writeFile can
                             never truncate a patch library it fails partway through
@@ -95,7 +95,10 @@ core/                       @tonesmith/core
       spec/                 validates a patch spec against the device's own capability catalog and
                             builds it: validate.ts checks blocks, types and values; errors.ts
                             composes the rejection messages; build.ts assembles the validated spec
-                            via builder.ts (barrel: index.ts). Backs PatchDriver.buildPatch
+                            via builder.ts (barrel: index.ts). Backs PatchDriver.buildPatch.
+                            paths.ts + edits.ts are the dot-path edit surface behind
+                            PatchDriver.applyEdits: where a path lands, and whether what landed
+                            is something the device can store
       index.ts              device barrel, and the whole published surface for the device: driver,
                             patch and block types, RAW. Nothing else leaves the device folder
     index.ts                registers the roster; public re-exports + one namespace per device
@@ -175,7 +178,9 @@ patch file (device-native format)
   from a spec through `PatchDriver.buildPatch`.
 
 - **`write` dot-notation:** `fx1.params.rate=50` walks the decoded patch object; each segment
-  after splitting on `.` navigates one level deeper.
+  after splitting on `.` navigates one level deeper. The walk belongs to the driver
+  (`PatchDriver.applyEdits`), since a path's segments are the device's own field names, and a
+  device free to present them some other way needs somewhere to say so.
 
 Device-specific byte layouts, field names, and value tables do **not** live here. They would bloat
 this file and go stale as devices are added. When you need that detail for a device, read its
