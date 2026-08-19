@@ -19,18 +19,10 @@ describe("gx1 capabilities", () => {
     }
   });
 
-  it("prints the full default block order for the chain argument", async () => {
-    const output = await capabilitiesOutput("chain");
-
-    for (const block of gx1.driver.capabilities.chain.defaultOrder) {
-      expect(output).toContain(block);
-    }
-  });
-
   // Every real group matches case-insensitively, so the chain pointer printed alongside them has
-  // to as well, or the one argument the group listing recommends is the one that needs exact case.
-  it("takes the chain argument in any case", async () => {
-    const output = await capabilitiesOutput("CHAIN");
+  // to as well, or the one argument the group listing recommends is the one needing exact case.
+  it.each(["chain", "CHAIN"])("prints the full default block order for %o", async (argument) => {
+    const output = await capabilitiesOutput(argument);
 
     for (const block of gx1.driver.capabilities.chain.defaultOrder) {
       expect(output).toContain(block);
@@ -92,20 +84,9 @@ describe("gx1 capabilities", () => {
     expect(keyLine).toBeDefined();
   });
 
-  it("exits with an error for an unknown group", async () => {
-    const { exitCode } = await runCli(["gx1", "capabilities", "nonexistent"]);
-
-    expect(exitCode).toBe(1);
-  });
-
-  it("exits with an error for an unknown item", async () => {
-    const { exitCode } = await runCli(["gx1", "capabilities", "amp", "nonexistent"]);
-
-    expect(exitCode).toBe(1);
-  });
-
   // The chain is one view with nothing under it. Printing it anyway would answer a question the
-  // caller did not ask, and every other group rejects a second argument it cannot resolve.
+  // caller did not ask, and every other group rejects a second argument it cannot resolve. Also
+  // the command's one error case: which group and item ids resolve is core's lookup, proven there.
   it("exits with an error when the chain is given a second argument", async () => {
     const { error, exitCode } = await runCli(["gx1", "capabilities", "chain", "bogus"]);
 
