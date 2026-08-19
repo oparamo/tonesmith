@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/devices/gx1";
 import { DEFAULT_CHAIN, moveBefore } from "../../../../src/devices/gx1/builder";
+import { BLOCK_NAMES } from "../../../../src/devices/gx1/common";
 
 describe("buildPatch", () => {
   it("builds every block the spec names, defaults filled in", () => {
@@ -142,6 +143,20 @@ describe("buildPatch", () => {
 
       expect(build, "names the block that needs one").toThrow(/amp/);
       expect(build, "and the models it offers").toThrow(/JC-120/);
+    });
+  });
+
+  // The amp case above states the rule; this holds it for every block the device can bypass.
+  // Compared through the codec rather than the built objects, since the bytes are what a caller
+  // ends up with: whichever of the two spellings an agent picks must not change the file.
+  describe("a block written off and a block left out", () => {
+    const bypassable = BLOCK_NAMES.filter(name => name !== "fv");
+
+    it.each(bypassable)("%s encodes identically either way", (block) => {
+      const omitted = gx1.driver.buildPatch({ name: "Bypass" });
+      const bypassed = gx1.driver.buildPatch({ name: "Bypass", [block]: { on: false } });
+
+      expect(gx1.driver.encodePatch(bypassed)).toEqual(gx1.driver.encodePatch(omitted));
     });
   });
 });
