@@ -1,3 +1,11 @@
+/**
+ * What this tool does with a batch of edits, not which edits a device accepts.
+ *
+ * Which dot-paths exist, what each field holds, and how a value is coerced into it are
+ * `@tonesmith/core`'s, proven in `core/tests/patch-utils.test.ts` and the gx1 edit validator's
+ * suite. What is left here, and all `write-fields.ts` holds, is the tool's own input rule, the
+ * two things it can change in one call, and that nothing reaches disk when an edit is refused.
+ */
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
 import { connectClient, withTempDir, patchAt, present } from "./helpers";
@@ -7,7 +15,7 @@ describe("write_fields", () => {
   let temp: ReturnType<typeof withTempDir>;
   afterEach(async () => { await close(); temp.cleanup(); });
 
-  it("writes a numeric field to the file", async () => {
+  it("applies an edit through the driver and writes the file back", async () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
@@ -37,6 +45,9 @@ describe("write_fields", () => {
     expect(patch.key).toBe("G");
   });
 
+  // Every edit lands in memory before the write, so a refusal anywhere in the batch has to leave
+  // the file as it was rather than half-applied. Which value gets refused is core's business; that
+  // one does is what this needs.
   it("writes nothing when any field in the batch is rejected", async () => {
     temp = withTempDir();
     const client = await connectClient();
@@ -50,101 +61,6 @@ describe("write_fields", () => {
     expect(isError).toBe(true);
     const after = patchAt(temp.fixture).amp.gain;
     expect(after).toBe(before);
-  });
-
-  it("coerces a boolean field", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.solo": "true" } };
-
-    await client.callTool("write_fields", input);
-
-    const file = gx1.driver.readFile(temp.fixture);
-    expect(present(file.patches[0], "patch 0").amp.solo).toBe(true);
-  });
-
-  it("takes a value that arrives as a number, which is how read_patch returns it", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.gain": 88, "amp.solo": true } };
-
-    const { isError, text } = await client.callTool("write_fields", input);
-
-    expect(isError, text).toBe(false);
-    const patch = patchAt(temp.fixture);
-    expect(patch.amp.gain).toBe(88);
-    expect(patch.amp.solo).toBe(true);
-  });
-
-  it("keeps a numeric-looking patch name a name", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { name: "1984" } };
-
-    const { isError, text } = await client.callTool("write_fields", input);
-
-    expect(isError, text).toBe(false);
-    expect(patchAt(temp.fixture).name).toBe("1984");
-  });
-
-  it("errors for an unknown device", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "nonexistent", file: temp.fixture, ref: "0", fields: { "amp.gain": "1" } };
-
-    const { isError } = await client.callTool("write_fields", input);
-
-    expect(isError).toBe(true);
-  });
-
-  it("errors for a bad ref", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "No Such Patch", fields: { "amp.gain": "1" } };
-
-    const { isError } = await client.callTool("write_fields", input);
-
-    expect(isError).toBe(true);
-  });
-
-  it("writes a lookup field by label and reads it back as that label", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "delay.highCut": "2.5kHz" } };
-
-    const { isError } = await client.callTool("write_fields", input);
-
-    expect(isError).toBe(false);
-    const file = gx1.driver.readFile(temp.fixture);
-    expect(present(file.patches[0], "patch 0").delay.highCut).toBe("2.5kHz");
-  });
-
-  it("rejects a label not in the field's table", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "delay.highCut": "2.6kHz" } };
-
-    const { isError } = await client.callTool("write_fields", input);
-
-    expect(isError).toBe(true);
-  });
-
-  it("rejects a field the device doesn't have", async () => {
-    temp = withTempDir();
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.notAField": "9" } };
-
-    const { isError } = await client.callTool("write_fields", input);
-
-    expect(isError).toBe(true);
   });
 
   it("renames the patch set without needing a ref", async () => {

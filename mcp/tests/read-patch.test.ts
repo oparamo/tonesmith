@@ -1,3 +1,10 @@
+/**
+ * The window this tool puts over a file, not what a decoded patch holds.
+ *
+ * Decoding, patch refs and the presented view are `@tonesmith/core`'s and are proven there. What
+ * `read-patch.ts` owns is the paging: how many patches one call returns, where it starts, and how
+ * a caller reaches the rest.
+ */
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
 import { gx1 } from "@tonesmith/core";
@@ -109,30 +116,13 @@ describe("read_patch", () => {
     expect(body.more).toBeDefined();
   });
 
-  it("errors for an unknown device", async () => {
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "nonexistent", file: FIXTURE };
-
-    const { isError } = await client.callTool("read_patch", input);
-
-    expect(isError).toBe(true);
-  });
-
-  it("errors for a missing file", async () => {
+  // The one error case this tool needs: proof the handler's work runs inside `attempt`, so a
+  // driver throw becomes a tool error rather than reaching the transport. Which refs and files the
+  // driver refuses is core's, and it is proven there.
+  it("answers a driver throw with an error rather than letting it escape", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", file: "/no/such/file.tsl" };
-
-    const { isError } = await client.callTool("read_patch", input);
-
-    expect(isError).toBe(true);
-  });
-
-  it("errors for a bad ref", async () => {
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", file: FIXTURE, ref: "No Such Patch" };
 
     const { isError } = await client.callTool("read_patch", input);
 
