@@ -152,6 +152,50 @@ pnpm coverage     # tests with coverage thresholds (what CI gates on)
 pnpm clean        # remove dist/ directories
 ```
 
+## Contributing
+
+The conventions below aren't checked by lint, and they're what makes a change look like it belongs.
+
+**Devices plug in; nothing else changes.** Adding one means a `core/src/devices/<id>/` driver, a
+`cli/src/devices/<id>/` printer, one roster line per package, and a fixture. No entry-point file
+and no shared module is edited to make room for it. Drivers don't self-register: `core/src/index.ts`
+is the composition root and iterates the roster. Consumers call through the `PatchDriver` interface
+rather than importing a device's own functions.
+
+**The shared layer stays device-agnostic.** `Patch`, `PatchFile`, `PatchDriver` and `RawPatch` are
+the vocabulary everywhere outside `devices/<id>/`. One device's block names and file extension never
+reach core's shared modules, the CLI's shared commands, or an MCP tool.
+
+**A device folder publishes two files.** `driver.ts` holds the `PatchDriver<T>` implementation and
+nothing else. `index.ts` is the packaging file and the device's entire published surface: the driver,
+the patch and block types, and `RAW`. Builders, codec helpers and spec internals stay inside the
+folder.
+
+**Files group by domain, not by file type,** and are named for their role rather than the type inside
+them: `driver.ts`, `builder.ts`, `constants.ts`, never `Gx1Driver.ts`. Types live beside the runtime
+code they describe.
+
+**Exports go at the bottom,** as one trailing `export { … }` / `export type { … }` block, so a file's
+public surface reads without skimming the whole file. Barrel files are the exception.
+
+**Names are camelCase and spelled out.** Every variable, parameter and property gets a name that says
+what it is: `highCut`, not `high_cut`; `ampParams`, not `a`. The only single letters are generic type
+parameters (`T`, `K`, `V`) and a loop index. Compounds on "sub" capitalize the noun: `subType`,
+`subTypes`. Builder helpers take the name of what they configure, with no verb prefix: `amp()`,
+`delay()`, not `setAmp()`.
+
+**Tests live in each package's `tests/` directory,** mirroring `src/`. `cli` and `mcp` treat
+`@tonesmith/core` as an external library: they test that they call it correctly and that their own
+contract holds, never re-testing what core does.
+
+**Dependency versions are exact.** No `^` or `~` in any `package.json`. `pnpm add` writes a range by
+default, so correct it after adding.
+
+**Consumer-visible changes need a changeset:** a published package's API, behavior, or output. Tests,
+lint config, and repo docs don't.
+
+`pnpm lint`, `pnpm build`, `pnpm test` and `pnpm coverage` should all be green before a pull request.
+
 ## Roadmap
 
 Additional devices, onboarded via the add-device skill (`.claude/skills/add-device/SKILL.md`).
