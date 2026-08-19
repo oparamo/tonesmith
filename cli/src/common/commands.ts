@@ -7,8 +7,8 @@ import { printChain, printGroups, printGroup, printItem } from "./capabilities-p
 
 /**
  * Splits "amp.gain=72" at the first "=", so a value containing one survives intact. Without the
- * separator there is nothing to split on, and slicing at -1 quietly drops the argument's last
- * character, which sent "amp.gain" on as the path "amp.gai" and reported it as an unknown field.
+ * separator there is nothing to split on, and slicing at an index of -1 drops the argument's last
+ * character, sending "amp.gain" on as the path "amp.gai" to be reported as an unknown field.
  */
 const parseFieldAssignment = (assignment: string): [string, string] => {
   const separatorIndex = assignment.indexOf("=");

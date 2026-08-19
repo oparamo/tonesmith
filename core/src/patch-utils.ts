@@ -27,9 +27,9 @@ const soleIndexNamed = (matches: number[], ref: string): number => {
  * Resolves an index string or an exact patch name to an array index.
  *
  * Which of the two a ref is comes from its shape, not from `Number`, whose idea of an index is wide
- * enough to be dangerous: it reads `""` as 0, so a ref left out by a caller selected the first
- * patch and, on a write, overwrote it, and it rounds `"0x1"` and `"2.0"` into indices the caller
- * never spelled out.
+ * enough to be dangerous: it reads `""` as 0, so a ref a caller leaves out selects the first patch
+ * and, on a write, overwrites it, and it rounds `"0x1"` and `"2.0"` into indices the caller never
+ * spelled out.
  *
  * An index past the end is rejected rather than passed through: callers index straight into
  * `patches` with the result, so an unchecked one reads as `undefined` or, on a write, leaves a hole
@@ -55,8 +55,8 @@ const resolvePatchIndex = (patches: Patch[], ref: string): number => {
  * Interprets a field value against the field it is going into: "72" becomes the number 72 and
  * "true" becomes a boolean, but only where `existing` shows the field is not itself a string. A
  * command line can express a number no other way, so the coercion has to happen somewhere; doing it
- * blind turned a patch named "1984" into the number 1984, which the name encoder then could not pad
- * to the block's width. A value that arrives already typed is taken as it is.
+ * blind turns a patch named "1984" into the number 1984, which the name encoder cannot pad to the
+ * block's width. A value that arrives already typed is taken as it is.
  */
 const coerceValue = (value: FieldValue, existing: unknown): FieldValue => {
   if (typeof value !== "string" || typeof existing === "string") return value;
