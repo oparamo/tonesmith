@@ -21,21 +21,6 @@ describe("blankPatch", () => {
     expect(patch.name).toBe("Test Patch");
   });
 
-  it("returns a decoded patch with all required block fields", () => {
-    const patch = blankPatch();
-
-    expect(patch).toHaveProperty("chain");
-    expect(patch).toHaveProperty("fx1");
-    expect(patch).toHaveProperty("fx2");
-    expect(patch).toHaveProperty("fx3");
-    expect(patch).toHaveProperty("odds");
-    expect(patch).toHaveProperty("amp");
-    expect(patch).toHaveProperty("ns");
-    expect(patch).toHaveProperty("fv");
-    expect(patch).toHaveProperty("delay");
-    expect(patch).toHaveProperty("reverb");
-  });
-
   // Every block opens off, at the values the device's own factory-init patch carries. The blocks
   // this covers are pinned field by field against that patch in the defaults drift guard.
   it("opens with every block off, at the device's factory settings", () => {

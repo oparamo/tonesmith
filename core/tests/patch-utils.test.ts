@@ -414,33 +414,12 @@ describe("setByPath", () => {
     expect(obj.x).toBe(99);
   });
 
-  it("sets a nested key", () => {
-    const obj: Record<string, unknown> = { a: { b: { c: 0 } } };
-
-    setByPath(obj, "a.b.c", 42);
-
-    const a = obj.a as Record<string, unknown>;
-    expect(a.b).toEqual({ c: 42 });
-  });
-
-  it("sets a two-level nested key", () => {
-    const obj: Record<string, unknown> = { amp: { gain: 0, level: 0 } };
-
-    setByPath(obj, "amp.gain", 80);
-
-    const amp = obj.amp as Record<string, unknown>;
-    expect(amp.gain).toBe(80);
-    expect(amp.level).toBe(0);
-  });
-
-  it("overwrites an existing nested value", () => {
-    const obj: Record<string, unknown> = { fx1: { params: { rate: 10 } } };
+  it("walks to a nested key, overwriting it and leaving its siblings alone", () => {
+    const obj: Record<string, unknown> = { fx1: { on: true, params: { rate: 10, depth: 20 } } };
 
     setByPath(obj, "fx1.params.rate", 50);
 
-    const fx1 = obj.fx1 as Record<string, unknown>;
-    const params = fx1.params as Record<string, unknown>;
-    expect(params.rate).toBe(50);
+    expect(obj.fx1).toEqual({ on: true, params: { rate: 50, depth: 20 } });
   });
 
   // A decoded patch already carries every field its device supports, so an absent field means the
