@@ -1,5 +1,5 @@
-import { RAW, PARAM_SUBTYPE_EFFECTS } from "../common";
-import type { Patch, RawParamSet } from "../types";
+import { RAW, SUB_TYPE_FIELD } from "../common";
+import type { FxBlock, FxParams, Patch, RawParamSet } from "../types";
 import { bytesFromHex } from "./primitives";
 import { decodeFxParams, encodeFxParams } from "./fx-params";
 import {
@@ -26,6 +26,25 @@ type FxSlot = typeof FX_SLOTS[number];
 const paramBlockKey = (slot: FxSlot, type: string): string => {
   if (slot === "fx3" && type === "OVERTONE") return "MEMORY%FX3A";
   return `MEMORY%${slot.toUpperCase()}`;
+};
+
+/**
+ * Splits what the byte layer read into the block's sub-model selection and its params proper. Nine
+ * effects and DELAY's five sub-algorithms store the selector in param-block byte p[0], so it comes
+ * back as an ordinary field; a decoded block carries that selection once, under `subType`, so a
+ * consumer is never left choosing which of two copies to set. Whether a type has the byte at all is
+ * read off its field map rather than a separate list, so the two cannot disagree.
+ */
+const liftSubType = (stored: FxParams): { subType: string | null; params: FxParams } => {
+  const { [SUB_TYPE_FIELD]: selector, ...params } = stored;
+  const subType = typeof selector === "string" ? selector : null;
+  return { subType, params };
+};
+
+/** The inverse: the byte layer writes p[0] from the same record as every other param. */
+const storedParams = (block: FxBlock): FxParams => {
+  if (block.subType === null) return block.params;
+  return { ...block.params, [SUB_TYPE_FIELD]: block.subType };
 };
 
 /**
@@ -65,17 +84,12 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     [RAW]: paramSet,
   };
 
-  // Effects in this set store their sub-model in param-block byte p[0] rather than in FX_COM
-  // byte[2]. After decoding, promote it from the params bag onto block.subType, so the display
-  // layer can show e.g. "COMPRESSOR (D-COMP)".
   for (const slot of FX_SLOTS) {
     const block = patch[slot];
     const paramBlockBytes = bytesFromHex(rawBlock(paramBlockKey(slot, block.type)));
-    const params = decodeFxParams(block.type, paramBlockBytes);
-    if (PARAM_SUBTYPE_EFFECTS.has(block.type) && typeof params.subType === "string") {
-      block.subType = params.subType;
-    }
-    block.params = params;
+    const lifted = liftSubType(decodeFxParams(block.type, paramBlockBytes));
+    block.subType = lifted.subType;
+    block.params = lifted.params;
   }
 
   return patch;
@@ -105,7 +119,7 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
     paramSet[`MEMORY%${slot.toUpperCase()}_COM`] = encodeFxCom(block);
     const blockKey = paramBlockKey(slot, block.type);
     const originalParamBytes = bytesFromHex(rawBlock(blockKey));
-    paramSet[blockKey] = encodeFxParams(block.type, block.params, originalParamBytes);
+    paramSet[blockKey] = encodeFxParams(block.type, storedParams(block), originalParamBytes);
   }
 
   return { memo: patch.memo, paramSet };

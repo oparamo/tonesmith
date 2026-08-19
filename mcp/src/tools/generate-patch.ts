@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { Patch, PatchDriver } from "@tonesmith/core";
-import { patchUtils, patchView, registry } from "@tonesmith/core";
+import { patchUtils, registry } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
 const inputSchema = z.object({
@@ -92,7 +92,7 @@ and the patch echoed back is the complete resulting state, so no follow-up read 
           chain: patch.chain,
           // Echo back the stored patch so the caller can confirm every field the builder
           // defaulted, without a follow-up read_patch.
-          patch: patchView.presentPatch(patch),
+          patch,
         };
       });
 

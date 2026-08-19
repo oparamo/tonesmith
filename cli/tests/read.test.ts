@@ -56,17 +56,15 @@ describe("gx1 read", () => {
     expect(output).not.toContain("→");
   });
 
-  it("hides the duplicate inner selection, so the model shows once as the subType label", async () => {
+  it("prints an fx slot's sub-model as its label rather than among its params", async () => {
     const { info, error, exitCode } = await runCli(["gx1", "read", FIXTURE, "0"]);
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const output = info.join("\n");
-    const mirror = [firstPatch.fx1, firstPatch.fx2, firstPatch.fx3].find(
-      block => block.subType !== null && block.params.subType === block.subType,
-    );
-    expect(mirror, "fixture patch 0 has no subtype fx block to prove the mirror is hidden").toBeDefined();
-    expect(output).toContain(`(${mirror?.subType})`);
+    const selected = [firstPatch.fx1, firstPatch.fx2, firstPatch.fx3].find(block => block.subType !== null);
+    expect(selected, "fixture patch 0 has no fx block with a sub-model to print").toBeDefined();
+    expect(output).toContain(`(${selected?.subType})`);
     expect(output).not.toContain("subType=");
   });
 
