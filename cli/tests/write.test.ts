@@ -1,3 +1,10 @@
+/**
+ * What the command does with its arguments, not which edits a device accepts.
+ *
+ * Dot-paths, value coercion and every rejection are `@tonesmith/core`'s, proven in
+ * `core/tests/patch-utils.test.ts` and the gx1 edit validator's suite. What `addWrite` owns is
+ * reading `path=value` off the argv, and turning a driver throw into a message and exit 1.
+ */
 import { describe, it, expect, afterEach } from "vitest";
 import { runCli, withTempDir, patchAt } from "./helpers";
 
@@ -5,77 +12,23 @@ describe("gx1 write", () => {
   let temp: ReturnType<typeof withTempDir>;
   afterEach(() => { temp.cleanup(); });
 
-  it("writes a single numeric field, coercing it from its string form", async () => {
+  it("applies every field it was given and writes the file back", async () => {
     temp = withTempDir();
 
-    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain=99"]);
-
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const patch = patchAt(temp.fixture);
-    expect(patch.amp.gain).toBe(99);
-  });
-
-  it("writes multiple fields in one call", async () => {
-    temp = withTempDir();
-
-    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain=10", "amp.level=20"]);
+    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0",
+      "amp.gain=10", "amp.solo=true", "key=G",
+    ]);
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const patch = patchAt(temp.fixture);
     expect(patch.amp.gain).toBe(10);
-    expect(patch.amp.level).toBe(20);
-  });
-
-  it("coerces boolean field writes", async () => {
-    temp = withTempDir();
-
-    const written = await runCli(["gx1", "write", temp.fixture, "0", "amp.solo=true"]);
-
-    const writeErrorOutput = written.error.join("\n");
-    expect(written.exitCode, writeErrorOutput).toBeUndefined();
-    const patch = patchAt(temp.fixture);
     expect(patch.amp.solo).toBe(true);
-  });
-
-  it("writes multiple block states in one call", async () => {
-    temp = withTempDir();
-
-    const written = await runCli(["gx1", "write", temp.fixture, "0",
-      "amp.on=false", "delay.on=true", "reverb.on=false", "pfx.on=true", "ns.on=false",
-    ]);
-
-    const writeErrorOutput = written.error.join("\n");
-    expect(written.exitCode, writeErrorOutput).toBeUndefined();
-
-    const patch = patchAt(temp.fixture);
-    expect(patch.amp.on).toBe(false);
-    expect(patch.delay.on).toBe(true);
-    expect(patch.reverb.on).toBe(false);
-    expect(patch.pfx.on).toBe(true);
-    expect(patch.ns.on).toBe(false);
-  });
-
-  it("writes a top-level scalar field", async () => {
-    temp = withTempDir();
-
-    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "key=G"]);
-
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    const patch = patchAt(temp.fixture);
     expect(patch.key).toBe("G");
   });
 
-  it("exits with an error for an unresolvable ref", async () => {
-    temp = withTempDir();
-
-    const { exitCode } = await runCli(["gx1", "write", temp.fixture, "Nonexistent", "key=G"]);
-
-    expect(exitCode).toBe(1);
-  });
-
+  // Without the separator there is nothing to split on, and slicing at -1 dropped the argument's
+  // last character, so "amp.gain" was reported as an unknown field "amp.gai".
   it("rejects a field argument with no '=', naming it as typed", async () => {
     temp = withTempDir();
 
@@ -85,30 +38,14 @@ describe("gx1 write", () => {
     expect(error.join("\n")).toContain("amp.gain");
   });
 
-  it("exits with an error for a bad dot-path", async () => {
+  // The command's one error case: a driver throw becomes a printed message and a failing exit
+  // code rather than an unhandled rejection. Which paths the driver refuses is core's.
+  it("prints a driver rejection and exits 1", async () => {
     temp = withTempDir();
 
-    const { exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "nonexistent.foo=1"]);
+    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "nonexistent.foo=1"]);
 
     expect(exitCode).toBe(1);
-  });
-
-  it("writes a lookup field by label", async () => {
-    temp = withTempDir();
-
-    const written = await runCli(["gx1", "write", temp.fixture, "0", "delay.highCut=2.5kHz"]);
-
-    const writeErrorOutput = written.error.join("\n");
-    expect(written.exitCode, writeErrorOutput).toBeUndefined();
-    const patch = patchAt(temp.fixture);
-    expect(patch.delay.highCut).toBe("2.5kHz");
-  });
-
-  it("exits with an error for a label not in the field's table", async () => {
-    temp = withTempDir();
-
-    const { exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "delay.highCut=2.6kHz"]);
-
-    expect(exitCode).toBe(1);
+    expect(error.join("\n")).toContain("nonexistent");
   });
 });

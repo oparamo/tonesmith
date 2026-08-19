@@ -55,7 +55,9 @@ describe("gx1 new", () => {
     expect(exitCode).toBe(1);
   });
 
-  it("refuses to overwrite an existing file", async () => {
+  // The command's one error case: a driver throw becomes a printed message and a failing exit
+  // code. That an existing file is refused at all is core's, and is proven there.
+  it("prints a driver rejection and exits 1", async () => {
     temp = emptyTempDir();
     const file = join(temp.dir, "exists.tsl");
     const first = await runCli(["gx1", "new", file]);
@@ -65,6 +67,6 @@ describe("gx1 new", () => {
     const { error, exitCode } = await runCli(["gx1", "new", file]);
 
     expect(exitCode).toBe(1);
-    expect(error.length).toBeGreaterThan(0);
+    expect(error.join("\n")).toContain(file);
   });
 });

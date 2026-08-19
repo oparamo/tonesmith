@@ -1,3 +1,9 @@
+/**
+ * A pass-through to `patchUtils.createPatchFile`, which owns the set name, the blank patches, the
+ * parent directories and the refusal to overwrite, all proven in `core/tests/patch-utils.test.ts`.
+ * What this tool adds is the `patchCount` bound declared in its own schema, so an impossible count
+ * is refused by the schema rather than after the server has started building.
+ */
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
 import { existsSync } from "node:fs";
@@ -40,44 +46,7 @@ describe("create_patch_file", () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  it("names the set after the file when setName is omitted", async () => {
-    const temp = emptyTempDir();
-    cleanup = temp.cleanup;
-    const client = await connectClient();
-    close = client.close;
-    const path = join(temp.dir, "my-tones.tsl");
-
-    await client.callTool("create_patch_file", { device: "gx1", file: path });
-
-    expect(gx1.driver.readFile(path).name).toBe("my-tones");
-  });
-
-  it("uses setName for the set label when given", async () => {
-    const temp = emptyTempDir();
-    cleanup = temp.cleanup;
-    const client = await connectClient();
-    close = client.close;
-    const path = join(temp.dir, "my-tones.tsl");
-
-    await client.callTool("create_patch_file", { device: "gx1", file: path, setName: "Live Set" });
-
-    expect(gx1.driver.readFile(path).name).toBe("Live Set");
-  });
-
-  it("creates missing parent directories", async () => {
-    const temp = emptyTempDir();
-    cleanup = temp.cleanup;
-    const client = await connectClient();
-    close = client.close;
-    const path = join(temp.dir, "nested", "deeper", "fresh.tsl");
-
-    const result = await client.callTool("create_patch_file", { device: "gx1", file: path });
-
-    expect(result.isError).toBe(false);
-    expect(existsSync(path)).toBe(true);
-  });
-
-  it("refuses to overwrite an existing file, leaving its patches intact", async () => {
+  it("answers a driver throw with an error rather than letting it escape", async () => {
     const temp = emptyTempDir();
     cleanup = temp.cleanup;
     const client = await connectClient();
@@ -88,19 +57,6 @@ describe("create_patch_file", () => {
     const result = await client.callTool("create_patch_file", { device: "gx1", file: path });
 
     expect(result.isError).toBe(true);
-    expect(gx1.driver.readFile(path).patches).toHaveLength(4);
-  });
-
-  it("errors for an unknown device", async () => {
-    const temp = emptyTempDir();
-    cleanup = temp.cleanup;
-    const client = await connectClient();
-    close = client.close;
-
-    const result = await client.callTool("create_patch_file", {
-      device: "nope", file: join(temp.dir, "fresh.tsl"),
-    });
-
-    expect(result.isError).toBe(true);
+    expect(gx1.driver.readFile(path).patches, "the file it refused is untouched").toHaveLength(4);
   });
 });

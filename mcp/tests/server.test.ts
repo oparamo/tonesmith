@@ -23,8 +23,8 @@ describe("server instructions", () => {
     const { client, close: cleanup } = await connect();
     close = cleanup;
 
-    const instructions = client.getInstructions();
-    expect(instructions, "the server should advertise instructions").toBeTypeOf("string");
+    const instructions = client.getInstructions() ?? "";
+    expect(instructions.length, "the server should advertise instructions").toBeGreaterThan(0);
   });
 
   // Derived from the live tool roster rather than a hardcoded list: if a tool is renamed, added, or

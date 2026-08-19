@@ -1,3 +1,11 @@
+/**
+ * How this tool cuts the catalog up, not what the catalog says.
+ *
+ * The groups, items, params and examples are `@tonesmith/core`'s, and its drift guards are what
+ * hold them to the codec. What `describe-device.ts` owns is the shape of an answer: parsing an
+ * entry, indexing a group against dumping it, the batch resolving or failing whole, and the two
+ * size budgets a client imposes.
+ */
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
 import { connectClient, present } from "./helpers";
@@ -248,36 +256,9 @@ describe("describe_device", () => {
     expect((viewOf(text, "amp/jc-120") as { id: string }).id).toBe("JC-120");
   });
 
-  it("errors for an unknown device", async () => {
-    const client = await connectClient();
-    close = client.close;
-
-    const { isError } = await client.callTool("describe_device", { device: "nonexistent" });
-
-    expect(isError).toBe(true);
-  });
-
-  it("errors for an unknown group", async () => {
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", items: ["nonexistent"] };
-
-    const { isError } = await client.callTool("describe_device", input);
-
-    expect(isError).toBe(true);
-  });
-
-  it("errors for an unknown item", async () => {
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", items: ["amp/nonexistent"] };
-
-    const { isError } = await client.callTool("describe_device", input);
-
-    expect(isError).toBe(true);
-  });
-
   // Atomic like write_fields: a partially resolved batch would leave the caller to spot the hole.
+  // Also the tool's one error case: proof the work runs inside `attempt`, so a lookup throw comes
+  // back as a tool error. Which ids resolve is core's, and its lookups are proven there.
   it("fails the whole batch when any one entry is bad", async () => {
     const client = await connectClient();
     close = client.close;
@@ -289,31 +270,4 @@ describe("describe_device", () => {
     expect(text, "no partial payload comes back alongside the error").not.toContain('"HALL M"');
   });
 
-  it("stamps the machine key on each param (the generate/read field name)", async () => {
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", items: ["fx/CHORUS"] };
-
-    const { text, isError } = await client.callTool("describe_device", input);
-
-    expect(isError, text).toBe(false);
-    const item = viewOf(text, "fx/CHORUS") as { params: { name: string; key?: string }[] };
-    const preDelay = item.params.find(param => param.name === "PRE-DELAY");
-    expect(preDelay?.key, "PRE-DELAY should carry its machine key").toBe("preDelay");
-  });
-
-  it("enumerates the exact valid labels for a frequency-lookup param", async () => {
-    const client = await connectClient();
-    close = client.close;
-    const input = { device: "gx1", items: ["delay/STANDARD"] };
-
-    const { text, isError } = await client.callTool("describe_device", input);
-
-    expect(isError, text).toBe(false);
-    const item = viewOf(text, "delay/STANDARD") as { params: { name: string; values?: string[] }[] };
-    const highCut = item.params.find(param => param.name === "HIGH CUT");
-    expect(highCut?.values, "HIGH CUT should surface its enumerated labels").toBeDefined();
-    expect(highCut?.values).toContain("FLAT");
-    expect(highCut?.values).toContain("2.5kHz");
-  });
 });

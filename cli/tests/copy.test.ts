@@ -1,3 +1,8 @@
+/**
+ * A pass-through to `patchUtils.copyPatch`, which owns resolving both refs, replacing the slot and
+ * refusing an index past the end, all proven in `core/tests/patch-utils.test.ts`. What is left is
+ * that the command wires four operands through in the right order and reports where the patch went.
+ */
 import { describe, it, expect, afterEach } from "vitest";
 import { runCli, withTempDir, patchAt } from "./helpers";
 
@@ -6,49 +11,28 @@ describe("gx1 copy", () => {
   let dst: ReturnType<typeof withTempDir>;
   afterEach(() => { src.cleanup(); dst.cleanup(); });
 
-  it("copies a patch from src into dst at the given index", async () => {
-    src = withTempDir();
-    dst = withTempDir();
-    const srcName = patchAt(src.fixture).name;
-
-    const { error, exitCode } = await runCli(["gx1", "copy", src.fixture, "0", dst.fixture, "1"]);
-
-    const errorOutput = error.join("\n");
-    expect(exitCode, errorOutput).toBeUndefined();
-    expect(patchAt(dst.fixture, 1).name).toBe(srcName);
-  });
-
-  it("overwrites an existing patch at the destination index", async () => {
+  it("copies the named source patch into the named destination slot", async () => {
     src = withTempDir();
     dst = withTempDir();
     const srcName = patchAt(src.fixture, 2).name;
-    const dstOriginalName = patchAt(dst.fixture).name;
-    expect(srcName).not.toBe(dstOriginalName);
+    const displaced = patchAt(dst.fixture).name;
+    expect(srcName, "the fixture must differ at these two slots for the copy to show").not.toBe(displaced);
 
-    const { error, exitCode } = await runCli(["gx1", "copy", src.fixture, "2", dst.fixture, "0"]);
+    const { info, error, exitCode } = await runCli(["gx1", "copy", src.fixture, "2", dst.fixture, "0"]);
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     expect(patchAt(dst.fixture).name).toBe(srcName);
+    expect(info.join("\n"), "says which slot it landed in").toContain(dst.fixture);
   });
 
-  it("exits with an error for a bad source ref", async () => {
+  it("prints a driver rejection and exits 1", async () => {
     src = withTempDir();
     dst = withTempDir();
 
     const { error, exitCode } = await runCli(["gx1", "copy", src.fixture, "No Such Patch", dst.fixture, "0"]);
 
     expect(exitCode).toBe(1);
-    expect(error.length).toBeGreaterThan(0);
-  });
-
-  it("exits with an error for a bad destination ref", async () => {
-    src = withTempDir();
-    dst = withTempDir();
-
-    const { error, exitCode } = await runCli(["gx1", "copy", src.fixture, "0", dst.fixture, "No Such Patch"]);
-
-    expect(exitCode).toBe(1);
-    expect(error.length).toBeGreaterThan(0);
+    expect(error.join("\n")).toContain("No Such Patch");
   });
 });

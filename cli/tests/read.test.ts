@@ -36,18 +36,13 @@ describe("gx1 read", () => {
     expect(output).not.toContain(secondPatch.name);
   });
 
-  it("exits with an error for a patch name that doesn't exist", async () => {
+  // The command's one error case: a driver throw becomes a printed message and a failing exit
+  // code. Which refs and files the driver refuses is core's, and is proven there.
+  it("prints a driver rejection and exits 1", async () => {
     const { error, exitCode } = await runCli(["gx1", "read", FIXTURE, "No Such Patch"]);
 
     expect(exitCode).toBe(1);
-    expect(error.length).toBeGreaterThan(0);
-  });
-
-  it("exits with an error for a missing file", async () => {
-    const { error, exitCode } = await runCli(["gx1", "read", "/no/such/file.tsl"]);
-
-    expect(exitCode).toBe(1);
-    expect(error.length).toBeGreaterThan(0);
+    expect(error.join("\n")).toContain("No Such Patch");
   });
 
   it("prints the chain as a comma-separated list, not arrows", async () => {
