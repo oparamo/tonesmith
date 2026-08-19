@@ -117,8 +117,8 @@ const fxFieldMap = (fxType: string, subType: string | null): FieldCodec[] | unde
 /**
  * The FX param defaults for switching a slot to `fxType`: the device's own factory values from
  * DEFAULTS_BY_TYPE, so any field the caller doesn't set gets a real default instead of inheriting
- * whatever stale raw byte was in the slot before (the class of bug that left unset GEQ bands
- * decoding to -20 dB instead of 0 dB). DELAY is per-sub-algorithm (its defaults live under fxDelay).
+ * whatever stale raw byte the slot was carrying, which for a GEQ band reads as -20 dB rather than
+ * the 0 dB it ships at. DELAY is per-sub-algorithm (its defaults live under fxDelay).
  */
 const defaultFxParams = (fxType: string, subType: string | null = null): Record<string, string | number | boolean> => {
   if (fxType === "DELAY") {

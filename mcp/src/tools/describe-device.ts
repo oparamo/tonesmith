@@ -103,8 +103,8 @@ const viewsForEntries = (
 
 /**
  * An `items` list drawn from the device in hand: a group id and a couple of "<group>/<item>"
- * entries it really has. Written out by hand it named one device's groups and effects, which on
- * every other device is an example that fails the call it is showing how to make.
+ * entries it really has. Written out by hand it names one device's groups and effects, which on
+ * every other device makes it an example that fails the call it is showing how to make.
  */
 const exampleEntries = (capabilities: DeviceCapabilities): string[] => {
   const bareGroup = capabilities.groups.slice(0, 1).map(group => group.id);

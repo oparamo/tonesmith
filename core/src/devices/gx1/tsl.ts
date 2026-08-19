@@ -148,8 +148,8 @@ const checkPatch = (path: string, index: number, patch: unknown): void => {
 
 /**
  * Narrows what `JSON.parse` handed back to an envelope this device wrote. Anything at all can be
- * pointed at a tool that takes a path, and without this the first field the codec reached for threw
- * a TypeError naming neither the file nor what was wrong with it.
+ * pointed at a tool that takes a path, and without this the first field the codec reaches for
+ * throws a TypeError naming neither the file nor what is wrong with it.
  */
 const parseEnvelope = (path: string, parsed: unknown): TslEnvelope => {
   const envelope = (parsed ?? {}) as Partial<TslEnvelope>;

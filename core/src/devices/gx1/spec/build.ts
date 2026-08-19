@@ -208,7 +208,7 @@ const validatePatchSpec = (input: unknown): Issues => {
  * builder's options. AMP and OD/DS still need a cast for it: they require a `type`, which is
  * something `validatePatchSpec` has just established rather than something TypeScript can see, and
  * that gap is all the cast covers. The rest hand their controls over as one bag, which is how a
- * block whose fields follow from its `type` has always been built.
+ * block whose fields follow from its `type` is built.
  */
 const applyBlock = (patch: Patch, name: BlockName, block: Record<string, unknown>): void => {
   const type = block[TYPE_FIELD] as string;
