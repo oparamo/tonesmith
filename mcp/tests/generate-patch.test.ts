@@ -46,7 +46,7 @@ const savedPatches = (text: string): SavedPatch[] => responseOf(text).patches;
 /** The one entry a single-patch call reports. */
 const onlySaved = (text: string): SavedPatch => present(savedPatches(text)[0], "one saved patch");
 
-const AMP = { type: "JC-120", gain: 50, bass: 50, middle: 50, treble: 50 };
+const AMP = { type: "JC-120", params: { gain: 50, bass: 50, middle: 50, treble: 50 } };
 
 describe("generate_patch", () => {
   let close: () => Promise<void>;
@@ -65,7 +65,7 @@ describe("generate_patch", () => {
     expect(isError).toBe(false);
     const patch = patchAt(outPath);
     expect(patch.amp.type).toBe("JC-120");
-    expect(patch.amp.gain).toBe(50);
+    expect(patch.amp.params.gain).toBe(50);
   });
 
   it("echoes the saved decoded patch with its resolved chain in the response", async () => {
@@ -74,8 +74,8 @@ describe("generate_patch", () => {
     const client = await connectClient();
     close = client.close;
     const chain = [...gx1.driver.capabilities.chain.defaultOrder];
-    chain.splice(chain.indexOf("OD/DS"), 1);
-    chain.splice(chain.indexOf("FX1"), 0, "OD/DS");
+    chain.splice(chain.indexOf("drive"), 1);
+    chain.splice(chain.indexOf("fx1"), 0, "drive");
     const patchSpec = { name: "Echo", outPath, chain, amp: AMP };
 
     const { text, isError } = await client.callTool("generate_patch", single(patchSpec));
@@ -107,7 +107,8 @@ describe("generate_patch", () => {
       outPath,
       amp: AMP,
       reverb: {
-        type: "TERA ECHO", level: 60, direct: 100, spreadTime: 50, feedback: 40, trigger: false,
+        type: "TERA ECHO",
+        params: { level: 60, direct: 100, spreadTime: 50, feedback: 40, trigger: false },
       },
     };
 
@@ -164,7 +165,7 @@ describe("generate_patch", () => {
       device: "gx1",
       outPath,
       patches: [
-        { name: "Lead", amp: { ...AMP, gain: 90 } },
+        { name: "Lead", amp: { ...AMP, params: { ...AMP.params, gain: 90 } } },
         { name: "Rhythm", amp: AMP },
       ],
     };
@@ -175,7 +176,7 @@ describe("generate_patch", () => {
     expect(actions).toEqual(["Lead:replaced", "Rhythm:appended"]);
     const file = gx1.driver.readFile(outPath);
     expect(file.patches.map(patch => patch.name.trim())).toEqual(["Lead", "Rhythm"]);
-    expect(present(file.patches[0], "patch 0").amp.gain).toBe(90);
+    expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(90);
   });
 
   it("rejects an empty patches array", async () => {

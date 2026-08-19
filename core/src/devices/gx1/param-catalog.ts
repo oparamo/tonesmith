@@ -484,7 +484,7 @@ const FV_PARAMS: ParamSpec[] = [
 /** Blocks whose params vary by the selected type: `[block][type] -> params`. */
 const PARAMS_BY_TYPE = {
   fx: FX_PARAMS,
-  pfx: PFX_PARAMS,
+  pedalFx: PFX_PARAMS,
   delay: DELAY_PARAMS,
   reverb: REVERB_PARAMS,
   // The FX-slot DELAY's per-sub-algorithm params (fx type "DELAY" is per-subtype, unlike the
@@ -495,9 +495,9 @@ const PARAMS_BY_TYPE = {
 /** Single-shape blocks: `[block] -> params`. */
 const PARAMS_BY_BLOCK = {
   amp: AMP_PARAMS,
-  odds: ODDS_PARAMS,
-  ns: NS_PARAMS,
-  fv: FV_PARAMS,
+  drive: ODDS_PARAMS,
+  noiseGate: NS_PARAMS,
+  volume: FV_PARAMS,
 } as const satisfies Record<string, ParamSpec[]>;
 
 type PerTypeBlockId = keyof typeof PARAMS_BY_TYPE;
@@ -519,7 +519,7 @@ const FIELD_LABEL_ALIASES: Record<PerTypeBlockId, Record<string, Record<string, 
     "OCTAVE": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
     "HEAVY OCT": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },
   },
-  pfx: {},
+  pedalFx: {},
   delay: {},
   reverb: {
     "TERA ECHO": { spreadTime: "S-TIME" },

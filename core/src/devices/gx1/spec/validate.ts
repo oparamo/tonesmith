@@ -139,13 +139,17 @@ interface Selectors {
 /**
  * `on` and `subType` pick a block's shape rather than set one of its controls, so they are filtered
  * out of the param check and would otherwise reach the builder on nothing but a cast.
+ *
+ * `null` is what a decoded block carries for a type with no variants, so it has to mean the same
+ * thing here as leaving the field out. Rejecting it would make the block a caller just read back
+ * un-resendable, which is the whole reason input and output share a shape.
  */
 const checkSelectors = (issues: Issues, selectors: Selectors): void => {
   const { group, on, subType } = selectors;
   if (on !== undefined && typeof on !== "boolean") {
     issues.push(`${group} on takes true or false (got ${JSON.stringify(on)})`);
   }
-  if (subType !== undefined && typeof subType !== "string") {
+  if (subType !== undefined && subType !== null && typeof subType !== "string") {
     issues.push(`${group} subType takes the name of a variant (got ${JSON.stringify(subType)})`);
   }
 };

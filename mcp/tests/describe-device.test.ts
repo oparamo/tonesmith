@@ -30,7 +30,7 @@ describe("describe_device", () => {
     };
     const groupIds = summary.groups.map(group => group.id);
     expect(groupIds).toContain("amp");
-    expect(summary.chain.defaultOrder, "no-items summary carries a chain pointer").toContain("AMP");
+    expect(summary.chain.defaultOrder, "no-items summary carries a chain pointer").toContain("amp");
   });
 
   // The example has to come from the catalog the call is answering about. Any hand-written list
@@ -145,14 +145,14 @@ describe("describe_device", () => {
     const client = await connectClient();
     close = client.close;
     const items = [
-      "chain", "amp", "odds",
+      "chain", "amp", "drive",
       "fx/COMPRESSOR", "fx/ENHANCER", "fx/HIGH GEQ", "fx/CHORUS", "fx/ROTARY", "fx/SCRIPT PH",
       "fx/FLANGER", "fx/PHASER", "fx/TREMOLO", "fx/CLASSIC-VIBE", "fx/VIBRATO",
-      "odds/MUFF FUZZ", "odds/60S FUZZ", "odds/BLUES OD", "odds/T-SCREAM", "odds/TREBLE BST",
-      "odds/LEAD DS",
+      "drive/MUFF FUZZ", "drive/60S FUZZ", "drive/BLUES OD", "drive/T-SCREAM", "drive/TREBLE BST",
+      "drive/LEAD DS",
       "delay/ANALOG", "delay/STANDARD", "delay/MODULATE",
       "reverb/HALL M", "reverb/HALL S", "reverb/ROOM S", "reverb/PLATE", "reverb/SHIMMER",
-      "ns", "fv",
+      "noiseGate", "volume",
     ];
 
     const { text, isError } = await client.callTool("describe_device", { device: "gx1", items });
@@ -210,23 +210,23 @@ describe("describe_device", () => {
     const { text, isError } = await client.callTool("describe_device", input);
 
     expect(isError, text).toBe(false);
-    const amp = viewOf(text, "amp/JC-120") as { example: { amp: Record<string, unknown> } };
-    const fx = viewOf(text, "fx/CHORUS") as { example: { fx1: Record<string, unknown> } };
+    const amp = viewOf(text, "amp/JC-120") as { example: { amp: { type: string; params: Record<string, unknown> } } };
+    const fx = viewOf(text, "fx/CHORUS") as { example: { fx1: { params: Record<string, unknown> } } };
     expect(amp.example.amp.type, "the example selects the item it was asked about").toBe("JC-120");
-    expect(amp.example.amp.gain, "amp carries its controls flat").toBeDefined();
-    expect(fx.example.fx1.params, "an fx slot nests its controls").toBeDefined();
+    expect(amp.example.amp.params.gain, "with its controls under params, like every block").toBeDefined();
+    expect(fx.example.fx1.params.rate, "including an fx slot").toBeDefined();
   });
 
   it("carries the example on a group with no types, its only view", async () => {
     const client = await connectClient();
     close = client.close;
-    const input = { device: "gx1", items: ["ns"] };
+    const input = { device: "gx1", items: ["noiseGate"] };
 
     const { text, isError } = await client.callTool("describe_device", input);
 
     expect(isError, text).toBe(false);
-    const group = viewOf(text, "ns") as { example: { ns: Record<string, unknown> } };
-    expect(group.example.ns.threshold).toBeDefined();
+    const group = viewOf(text, "noiseGate") as { example: { noiseGate: { params: Record<string, unknown> } } };
+    expect(group.example.noiseGate.params.threshold).toBeDefined();
   });
 
   it("leaves examples out of a group index and its full dump", async () => {

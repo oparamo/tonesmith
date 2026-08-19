@@ -26,7 +26,7 @@ interface DefaultsByType {
   fxDelay: BlockDefaults;
   delay: BlockDefaults;
   reverb: BlockDefaults;
-  pfx: BlockDefaults;
+  pedalFx: BlockDefaults;
 }
 
 const DEFAULTS_BY_TYPE: DefaultsByType = {
@@ -102,8 +102,8 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
     "SUB DELAY": { time: 400, level: 50, feedback: 30, highCut: "6.3kHz" },
     "TERA ECHO": { tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: false },
   },
-  pfx: {
-    "WAH": { subType: "CRY WAH", level: 100, direct: 0, position: 100, min: 0, max: 100 },
+  pedalFx: {
+    "WAH": { level: 100, direct: 0, position: 100, min: 0, max: 100 },
     "PEDAL BEND": { pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0 },
   },
 };
@@ -121,17 +121,16 @@ const DEFAULTS_BY_TYPE: DefaultsByType = {
  */
 const BLOCK_DEFAULTS: Record<string, ParamDefaults> = {
   amp: { gain: 50, level: 50, bass: 50, middle: 50, treble: 50, speaker: "ORIGINAL", mic: "DYN421", solo: false, soloLevel: 50 },
-  odds: { drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50 },
-  ns: { threshold: 30, release: 30, detect: "INPUT" },
-  fv: { position: 100, min: 0, max: 100, curve: "NORMAL" },
+  drive: { drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50 },
+  noiseGate: { threshold: 30, release: 30, detect: "INPUT" },
+  volume: { position: 100, min: 0, max: 100, curve: "NORMAL" },
 };
 
 /**
  * The sub-model each type opens on, harvested from the same fixture as the params above. A type
- * with sub-models keeps its selection inside its own param window (FX under the codec name `type`,
- * PFX on the types PFX_SUBTYPE_EFFECTS names), so it is a factory default like any other, but
- * it is not a control: a patch spec sets it as `subType`, which is why the param defaults leave it
- * out. Keyed by catalog block, then by type.
+ * with sub-models keeps its selection in a param byte of its own window, so it is a factory default
+ * like any other, but it is not a control: a decoded block carries it as `subType` and a patch spec
+ * sets it there, which is why the param defaults leave it out. Keyed by catalog block, then by type.
  */
 const DEFAULT_SUBTYPES: Partial<Record<string, Partial<Record<string, string>>>> = {
   fx: {
@@ -146,7 +145,7 @@ const DEFAULT_SUBTYPES: Partial<Record<string, Partial<Record<string, string>>>>
     "DELAY": "STANDARD",
     "REVERB": "HALL M",
   },
-  pfx: { "WAH": "CRY WAH" },
+  pedalFx: { "WAH": "CRY WAH" },
 };
 
 export { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES };

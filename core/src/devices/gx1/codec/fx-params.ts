@@ -6,7 +6,7 @@ import {
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 } from "../common";
-import type { FxParams } from "../types";
+import type { BlockParams } from "../types";
 import { hexFromBytes, byteAt, lookupName, lookupIndex } from "./primitives";
 import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
 
@@ -329,7 +329,7 @@ const unmappedTypeMessage = (fxType: string, delaySubType: string): string => {
  * map for reads as no params at all; its bytes are still in the block, which is what the encoder
  * writes back.
  */
-const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
+const decodeFxParams = (fxType: string, bytes: number[]): BlockParams => {
   const offset = FX_PARAM_OFFSETS[fxType] ?? 0;
   const paramBytes = bytes.slice(offset);
   const subAlgo = lookupName(FX_DLY_TYPES, byteAt(paramBytes, 0, `${fxType} params`));
@@ -347,7 +347,7 @@ const decodeFxParams = (fxType: string, bytes: number[]): FxParams => {
  */
 const encodeFxParams = (
   fxType: string,
-  params: FxParams,
+  params: BlockParams,
   originalBytes: number[],
 ): string[] => {
   const bytes = [...originalBytes];

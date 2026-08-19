@@ -6,15 +6,21 @@ import {
   DLY_TYPES, DLY_TYPE_IDX,
   REV_TYPES, REV_TYPE_IDX,
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
-  CHAIN_BLOCK_ORDER, CHAIN_VALUE_TO_NAME, CHAIN_NAME_TO_VALUE, CHAIN_TERMINATOR,
+  CHAIN_SLOT_ORDER, CHAIN_VALUE_TO_BLOCK, CHAIN_BLOCK_TO_VALUE, CHAIN_TERMINATOR, DEFAULT_CHAIN,
   NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
   FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW,
 } from "../common";
-import type { FxBlock, FxParams, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "../types";
+import type {
+  FxBlock, DriveBlock, AmpBlock, NoiseGateBlock, VolumeBlock, DelayBlock, ReverbBlock,
+  PedalFxBlock,
+} from "../types";
 import {
   bytesFromHex, hexFromBytes, byteReader, lookupName, lookupIndex, toSigned, toUnsigned,
 } from "./primitives";
-import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
+import {
+  u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad,
+  decodeFields, encodeFields, liftSubType, withStoredSubType, type FieldCodec,
+} from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";
 
 // ── Name block ────────────────────────────────────────────────────────────────
@@ -56,20 +62,6 @@ const encodeName = (name: string): string[] => {
 };
 
 
-/**
- * Delay, reverb, and pfx blocks keep their type-specific params as fields on the block itself,
- * so they extend Record<string, unknown>, which isn't assignable to FxParams because of the
- * `on: boolean` field. Encoding only reads the named param fields, so the cast is safe here.
- */
-const encodeBlockFields = (
-  fields: FieldCodec[],
-  block: Record<string, unknown>,
-  bytes: number[],
-): void => {
-  encodeFields(fields, block as unknown as FxParams, bytes);
-};
-
-
 // ── Key (MEMORY%OTHER byte 4 only, the rest of that block is out of scope) ───────
 //
 // memoryLevel/bpm/carryover/tempoHold aren't tied to any modeled effect's output, but
@@ -96,8 +88,8 @@ const encodeKey = (key: string, originalHex: string[]): string[] => {
 
 /** Byte holding what follows `name`. Byte 0 names the first block, so a block's slot is its position + 1. */
 const nextSlotFor = (name: string): number => {
-  const position = (CHAIN_BLOCK_ORDER as readonly string[]).indexOf(name);
-  if (position < 0) throw new Error(`Unknown chain block "${name}": valid blocks are ${CHAIN_BLOCK_ORDER.join(", ")}`);
+  const position = (CHAIN_SLOT_ORDER as readonly string[]).indexOf(name);
+  if (position < 0) throw new Error(`Unknown chain block "${name}": valid blocks are ${DEFAULT_CHAIN.join(", ")}`);
   return position + 1;
 };
 
@@ -105,8 +97,8 @@ const decodeChain = (hexList: string[]): string[] => {
   const bytes = bytesFromHex(hexList);
   const order: string[] = [];
   let value = bytes[0];
-  while (value !== undefined && value !== CHAIN_TERMINATOR && order.length < CHAIN_BLOCK_ORDER.length) {
-    const name = CHAIN_VALUE_TO_NAME[value];
+  while (value !== undefined && value !== CHAIN_TERMINATOR && order.length < CHAIN_SLOT_ORDER.length) {
+    const name = CHAIN_VALUE_TO_BLOCK[value];
     if (name === undefined) break;
     order.push(name);
     value = bytes[nextSlotFor(name)];
@@ -116,8 +108,8 @@ const decodeChain = (hexList: string[]): string[] => {
 
 /** Rejects a chain entry that isn't one of the device's blocks, or that repeats one already seen. */
 const checkChainEntry = (name: unknown, seen: Set<string>): void => {
-  const valid = CHAIN_BLOCK_ORDER.join(", ");
-  if (typeof name !== "string" || !(name in CHAIN_NAME_TO_VALUE)) {
+  const valid = DEFAULT_CHAIN.join(", ");
+  if (typeof name !== "string" || !(name in CHAIN_BLOCK_TO_VALUE)) {
     throw new Error(`Unknown chain block ${JSON.stringify(name)}: valid blocks are ${valid}`);
   }
   if (seen.has(name)) {
@@ -135,7 +127,7 @@ const checkChainEntry = (name: unknown, seen: Set<string>): void => {
 const validateChain = (names: unknown): void => {
   if (!Array.isArray(names)) {
     throw new Error(
-      `Chain must be a list of block names, got ${typeof names}: expected every one of ${CHAIN_BLOCK_ORDER.join(", ")}`
+      `Chain must be a list of block names, got ${typeof names}: expected every one of ${DEFAULT_CHAIN.join(", ")}`
     );
   }
 
@@ -145,7 +137,7 @@ const validateChain = (names: unknown): void => {
     seen.add(name as string);
   }
 
-  const missing = CHAIN_BLOCK_ORDER.filter(block => !seen.has(block));
+  const missing = DEFAULT_CHAIN.filter(block => !seen.has(block));
   if (missing.length > 0) {
     throw new Error(`Chain is missing ${missing.join(", ")}: every block must appear exactly once`);
   }
@@ -155,7 +147,7 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
   validateChain(names);
   const bytes = bytesFromHex(originalHexList);
   const valueOf = (name: string | undefined): number =>
-    name === undefined ? CHAIN_TERMINATOR : lookupIndex(CHAIN_NAME_TO_VALUE, name, "chain block");
+    name === undefined ? CHAIN_TERMINATOR : lookupIndex(CHAIN_BLOCK_TO_VALUE, name, "chain block");
 
   bytes[0] = valueOf(names[0]);
   names.forEach((name, index) => {
@@ -176,34 +168,37 @@ const decodeAmp = (hexList: string[]): AmpBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "AMP");
   return {
-    on:        Boolean(at(0)),
-    type:      lookupName(AMP_TYPES, at(1)),
-    gain:      at(3),
-    level:     at(4),
-    bass:      at(5),
-    middle:    at(6),
-    treble:    at(7),
-    speaker:   lookupName(SP_TYPES,  at(8)),
-    mic:       lookupName(MIC_TYPES, at(10)),
-    solo:      Boolean(at(11)),
-    soloLevel: at(12),
-    [RAW]:     bytes,
+    on:   Boolean(at(0)),
+    type: lookupName(AMP_TYPES, at(1)),
+    params: {
+      gain:      at(3),
+      level:     at(4),
+      bass:      at(5),
+      middle:    at(6),
+      treble:    at(7),
+      speaker:   lookupName(SP_TYPES,  at(8)),
+      mic:       lookupName(MIC_TYPES, at(10)),
+      solo:      Boolean(at(11)),
+      soloLevel: at(12),
+    },
+    [RAW]: bytes,
   };
 };
 
 const encodeAmp = (block: AmpBlock): string[] => {
   const bytes = [...block[RAW]];
+  const { params } = block;
   bytes[0]  = Number(block.on);
-  bytes[1]  = lookupIndex(AMP_TYPE_IDX, block.type,    "AMP type");
-  bytes[3]  = block.gain;
-  bytes[4]  = block.level;
-  bytes[5]  = block.bass;
-  bytes[6]  = block.middle;
-  bytes[7]  = block.treble;
-  bytes[8]  = lookupIndex(SP_TYPE_IDX,  block.speaker, "SP type");
-  bytes[10] = lookupIndex(MIC_TYPE_IDX, block.mic,     "MIC type");
-  bytes[11] = Number(block.solo);
-  bytes[12] = block.soloLevel;
+  bytes[1]  = lookupIndex(AMP_TYPE_IDX, block.type,     "AMP type");
+  bytes[3]  = params.gain;
+  bytes[4]  = params.level;
+  bytes[5]  = params.bass;
+  bytes[6]  = params.middle;
+  bytes[7]  = params.treble;
+  bytes[8]  = lookupIndex(SP_TYPE_IDX,  params.speaker, "SP type");
+  bytes[10] = lookupIndex(MIC_TYPE_IDX, params.mic,     "MIC type");
+  bytes[11] = Number(params.solo);
+  bytes[12] = params.soloLevel;
   return hexFromBytes(bytes);
 };
 
@@ -212,82 +207,91 @@ const encodeAmp = (block: AmpBlock): string[] => {
 //
 // Layout: [on, type, drive, tone(signed), level, direct, solo, soloLevel]
 
-const decodeOdDs = (hexList: string[]): OdDsBlock => {
+const decodeDrive = (hexList: string[]): DriveBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "OD/DS");
   return {
-    on:        Boolean(at(0)),
-    type:      lookupName(ODDS_TYPES, at(1)),
-    drive:     at(2),
-    tone:      toSigned(at(3)),
-    level:     at(4),
-    direct:    at(5),
-    solo:      Boolean(at(6)),
-    soloLevel: at(7),
-    [RAW]:     bytes,
+    on:   Boolean(at(0)),
+    type: lookupName(ODDS_TYPES, at(1)),
+    params: {
+      drive:     at(2),
+      tone:      toSigned(at(3)),
+      level:     at(4),
+      direct:    at(5),
+      solo:      Boolean(at(6)),
+      soloLevel: at(7),
+    },
+    [RAW]: bytes,
   };
 };
 
-const encodeOdDs = (block: OdDsBlock): string[] => {
+const encodeDrive = (block: DriveBlock): string[] => {
   const bytes = [...block[RAW]];
+  const { params } = block;
   bytes[0] = Number(block.on);
   bytes[1] = lookupIndex(ODDS_IDX, block.type, "OD/DS type");
-  bytes[2] = block.drive;
-  bytes[3] = toUnsigned(block.tone);
-  bytes[4] = block.level;
-  bytes[5] = block.direct;
-  bytes[6] = Number(block.solo);
-  bytes[7] = block.soloLevel;
+  bytes[2] = params.drive;
+  bytes[3] = toUnsigned(params.tone);
+  bytes[4] = params.level;
+  bytes[5] = params.direct;
+  bytes[6] = Number(params.solo);
+  bytes[7] = params.soloLevel;
   return hexFromBytes(bytes);
 };
 
 
 // ── NS (noise suppressor) block (4 bytes) ─────────────────────────────────────
 
-const decodeNs = (hexList: string[]): NsBlock => {
+const decodeNoiseGate = (hexList: string[]): NoiseGateBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "NS");
   return {
-    on:        Boolean(at(0)),
-    threshold: at(1),
-    release:   at(2),
-    detect:    lookupName(NS_DETECT, at(3)),
-    [RAW]:     bytes,
+    on: Boolean(at(0)),
+    params: {
+      threshold: at(1),
+      release:   at(2),
+      detect:    lookupName(NS_DETECT, at(3)),
+    },
+    [RAW]: bytes,
   };
 };
 
-const encodeNs = (block: NsBlock): string[] => {
+const encodeNoiseGate = (block: NoiseGateBlock): string[] => {
   const bytes = [...block[RAW]];
+  const { params } = block;
   bytes[0] = Number(block.on);
-  bytes[1] = block.threshold;
-  bytes[2] = block.release;
-  bytes[3] = lookupIndex(NS_DETECT_IDX, block.detect, "NS detect");
+  bytes[1] = params.threshold;
+  bytes[2] = params.release;
+  bytes[3] = lookupIndex(NS_DETECT_IDX, params.detect, "NS detect");
   return hexFromBytes(bytes);
 };
 
 
 // ── FV (foot volume) block (3–4 bytes) ───────────────────────────────────────
 
-const decodeFv = (hexList: string[]): FvBlock => {
+const decodeVolume = (hexList: string[]): VolumeBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "FV");
   const curve = bytes.length > 3 ? lookupName(FV_CURVE, at(3)) : "NORMAL";
   return {
-    position: at(0),
-    min:      at(1),
-    max:      at(2),
-    curve,
-    [RAW]:    bytes,
+    params: {
+      position: at(0),
+      min:      at(1),
+      max:      at(2),
+      curve,
+    },
+    [RAW]: bytes,
   };
 };
 
-const encodeFv = (block: FvBlock): string[] => {
+const encodeVolume = (block: VolumeBlock): string[] => {
   const bytes = [...block[RAW]];
-  bytes[0] = block.position;
-  bytes[1] = block.min;
-  bytes[2] = block.max;
+  const { params } = block;
+  bytes[0] = params.position;
+  bytes[1] = params.min;
+  bytes[2] = params.max;
   // A 3-byte FV block predates the curve control and has no byte to write it to.
-  if (bytes.length > 3) bytes[3] = lookupIndex(FV_CURVE_IDX, block.curve, "FV curve");
+  if (bytes.length > 3) bytes[3] = lookupIndex(FV_CURVE_IDX, params.curve, "FV curve");
   return hexFromBytes(bytes);
 };
 
@@ -371,11 +375,9 @@ const decodeDelay = (hexList: string[]): DelayBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "DELAY");
   const delayType = lookupName(DLY_TYPES, at(1));
-  const block: DelayBlock = { on: Boolean(at(0)), type: delayType, [RAW]: bytes };
-
   const fields = DELAY_TYPE_MAPS[delayType];
-  if (fields) Object.assign(block, decodeFields(fields, bytes));
-  return block;
+  const params = fields ? decodeFields(fields, bytes) : {};
+  return { on: Boolean(at(0)), type: delayType, params, [RAW]: bytes };
 };
 
 const encodeDelay = (block: DelayBlock): string[] => {
@@ -384,7 +386,7 @@ const encodeDelay = (block: DelayBlock): string[] => {
   bytes[1] = lookupIndex(DLY_TYPE_IDX, block.type, "DLY type");
 
   const fields = DELAY_TYPE_MAPS[block.type];
-  if (fields) encodeBlockFields(fields, block, bytes);
+  if (fields) encodeFields(fields, block.params, bytes);
   return hexFromBytes(bytes);
 };
 
@@ -426,11 +428,9 @@ const decodeReverb = (hexList: string[]): ReverbBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "REVERB");
   const reverbType = lookupName(REV_TYPES, at(1));
-  const block: ReverbBlock = { on: Boolean(at(0)), type: reverbType, [RAW]: bytes };
-
   const fields = reverbFields(reverbType);
-  if (fields) Object.assign(block, decodeFields(fields, bytes));
-  return block;
+  const params = fields ? decodeFields(fields, bytes) : {};
+  return { on: Boolean(at(0)), type: reverbType, params, [RAW]: bytes };
 };
 
 const encodeReverb = (block: ReverbBlock): string[] => {
@@ -439,7 +439,7 @@ const encodeReverb = (block: ReverbBlock): string[] => {
   bytes[1] = lookupIndex(REV_TYPE_IDX, block.type, "REV type");
 
   const fields = reverbFields(block.type);
-  if (fields) encodeBlockFields(fields, block, bytes);
+  if (fields) encodeFields(fields, block.params, bytes);
   return hexFromBytes(bytes);
 };
 
@@ -461,38 +461,43 @@ const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
 };
 
-const decodePfx = (hexList: string[]): PfxBlock => {
+const decodePedalFx = (hexList: string[]): PedalFxBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "PFX");
-  const pfxType = lookupName(PFX_TYPES, at(1));
-  const block: PfxBlock = { on: Boolean(at(0)), type: pfxType, [RAW]: bytes };
-
-  const fields = PFX_TYPE_MAPS[pfxType];
-  if (fields) Object.assign(block, decodeFields(fields, bytes));
-  return block;
+  const pedalFxType = lookupName(PFX_TYPES, at(1));
+  const fields = PFX_TYPE_MAPS[pedalFxType];
+  const stored = fields === undefined ? {} : decodeFields(fields, bytes);
+  const lifted = liftSubType(stored);
+  return {
+    on: Boolean(at(0)),
+    type: pedalFxType,
+    subType: lifted.subType,
+    params: lifted.params,
+    [RAW]: bytes,
+  };
 };
 
-const encodePfx = (block: PfxBlock): string[] => {
+const encodePedalFx = (block: PedalFxBlock): string[] => {
   const bytes = [...block[RAW]];
   bytes[0] = Number(block.on);
   bytes[1] = lookupIndex(PFX_TYPE_IDX, block.type, "PFX type");
 
   const fields = PFX_TYPE_MAPS[block.type];
-  if (fields) encodeBlockFields(fields, block, bytes);
+  if (fields) encodeFields(fields, withStoredSubType(block.params, block.subType), bytes);
   return hexFromBytes(bytes);
 };
 
 export {
   decodeName, encodeName,
   decodeKey, encodeKey,
-  decodeChain, encodeChain,
+  decodeChain, encodeChain, validateChain,
   decodeAmp, encodeAmp,
-  decodeOdDs, encodeOdDs,
-  decodeNs, encodeNs,
-  decodeFv, encodeFv,
+  decodeDrive, encodeDrive,
+  decodeNoiseGate, encodeNoiseGate,
+  decodeVolume, encodeVolume,
   decodeFxCom, encodeFxCom,
   decodeDelay, encodeDelay,
   decodeReverb, encodeReverb,
-  decodePfx, encodePfx,
+  decodePedalFx, encodePedalFx,
   DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS,
 };

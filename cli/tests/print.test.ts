@@ -10,11 +10,11 @@ describe("printPatch", () => {
 
   // A bypassed block keeps its settings on the device, so the printer shows them rather than
   // hiding the block, matching every other block and matching read_patch.
-  it("prints the OD/DS line with its params when odds is off", () => {
+  it("prints the OD/DS line with its params when the drive block is off", () => {
     const patch = gx1.driver.buildPatch({
       name: "Test",
       amp: { type: "JC-120" },
-      odds: { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, on: false },
+      drive: { type: "OVERDRIVE", on: false, params: { drive: 50, tone: 0, level: 50 } },
     });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
@@ -35,11 +35,11 @@ describe("printPatch", () => {
     expect(capturedOutput(info)).toContain("Memo: bridge pickup");
   });
 
-  it("shows the solo level when odds solo is enabled", () => {
+  it("shows the solo level when the drive block's solo is enabled", () => {
     const patch = gx1.driver.buildPatch({
       name: "Test",
       amp: { type: "JC-120" },
-      odds: { type: "OVERDRIVE", drive: 50, tone: 0, level: 50, solo: true, soloLevel: 75 },
+      drive: { type: "OVERDRIVE", params: { drive: 50, tone: 0, level: 50, solo: true, soloLevel: 75 } },
     });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
@@ -66,9 +66,9 @@ describe("printPatch", () => {
 
   it("omits the params line for a block whose type has no known fields", () => {
     const patch = gx1.driver.blankPatch("Test");
-    // A pfx type outside PFX_TYPE_MAPS decodes to a bare { on, type } block, which leaves the
-    // header line with nothing to print under it.
-    patch.pfx = { on: true, type: "BOGUS TYPE" } as unknown as gx1.Patch["pfx"];
+    // A pedal-fx type outside PFX_TYPE_MAPS decodes with no params at all, which leaves the header
+    // line with nothing to print under it.
+    patch.pedalFx = { on: true, type: "BOGUS TYPE", subType: null, params: {} } as unknown as gx1.Patch["pedalFx"];
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     printPatch(patch, 0);

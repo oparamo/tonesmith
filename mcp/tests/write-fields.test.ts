@@ -19,29 +19,29 @@ describe("write_fields", () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.gain": "88" } };
+    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.params.gain": "88" } };
 
     const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(false);
     const file = gx1.driver.readFile(temp.fixture);
-    expect(present(file.patches[0], "patch 0").amp.gain).toBe(88);
+    expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(88);
   });
 
   it("applies every field in one call", async () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
-    const fields = { "amp.gain": "77", "ns.threshold": "31", "delay.highCut": "2.5kHz", key: "G" };
+    const fields = { "amp.params.gain": "77", "noiseGate.params.threshold": "31", "delay.params.highCut": "2.5kHz", key: "G" };
     const input = { device: "gx1", file: temp.fixture, ref: "0", fields };
 
     const { isError, text } = await client.callTool("write_fields", input);
 
     expect(isError, text).toBe(false);
     const patch = patchAt(temp.fixture);
-    expect(patch.amp.gain).toBe(77);
-    expect(patch.ns.threshold).toBe(31);
-    expect(patch.delay.highCut).toBe("2.5kHz");
+    expect(patch.amp.params.gain).toBe(77);
+    expect(patch.noiseGate.params.threshold).toBe(31);
+    expect(patch.delay.params.highCut).toBe("2.5kHz");
     expect(patch.key).toBe("G");
   });
 
@@ -52,14 +52,14 @@ describe("write_fields", () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
-    const before = patchAt(temp.fixture).amp.gain;
-    const fields = { "amp.gain": "99", "delay.highCut": "2.6kHz" };
+    const before = patchAt(temp.fixture).amp.params.gain;
+    const fields = { "amp.params.gain": "99", "delay.params.highCut": "2.6kHz" };
     const input = { device: "gx1", file: temp.fixture, ref: "0", fields };
 
     const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(true);
-    const after = patchAt(temp.fixture).amp.gain;
+    const after = patchAt(temp.fixture).amp.params.gain;
     expect(after).toBe(before);
   });
 
@@ -79,14 +79,14 @@ describe("write_fields", () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
-    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.gain": "55" }, setName: "Both" };
+    const input = { device: "gx1", file: temp.fixture, ref: "0", fields: { "amp.params.gain": "55" }, setName: "Both" };
 
     const { isError, text } = await client.callTool("write_fields", input);
 
     expect(isError, text).toBe(false);
     const file = gx1.driver.readFile(temp.fixture);
     expect(file.name).toBe("Both");
-    expect(present(file.patches[0], "patch 0").amp.gain).toBe(55);
+    expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(55);
   });
 
   it("errors when neither fields nor setName is given", async () => {
@@ -103,7 +103,7 @@ describe("write_fields", () => {
     temp = withTempDir();
     const client = await connectClient();
     close = client.close;
-    const input = { device: "gx1", file: temp.fixture, fields: { "amp.gain": "1" } };
+    const input = { device: "gx1", file: temp.fixture, fields: { "amp.params.gain": "1" } };
 
     const { isError } = await client.callTool("write_fields", input);
 

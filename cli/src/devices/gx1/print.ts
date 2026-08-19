@@ -5,15 +5,7 @@ const onOff = (on: boolean): string => (on ? "ON" : "OFF");
 const formatParams = (params: Record<string, unknown>): string =>
   Object.entries(params).map(([key, value]) => `${key}=${String(value)}`).join("  ");
 
-// What a block is set to belongs on its header line, printed by blockLabel below, rather than
-// among the knobs.
-const SELECTORS = ["on", "type", "subType"];
-
-/** A block's own knobs: its fields minus the ones its header line already carries. */
-const blockKnobs = (block: Record<string, unknown>): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(block).filter(([key]) => !SELECTORS.includes(key)));
-
-/** The indented knob line under a block header, skipped for a type that has no knobs. */
+/** The indented param line under a block header, skipped for a type that has no params. */
 const printParamLine = (params: Record<string, unknown>): void => {
   if (Object.keys(params).length > 0) console.info(`    ${formatParams(params)}`);
 };
@@ -24,14 +16,13 @@ const blockLabel = (block: { type: string; subType?: unknown }): string => {
   return block.type + suffix;
 };
 
-/** A block that selects a type: header line naming what it is set to, then that type's knobs. */
+/** A block that selects a type: header line naming what it is set to, then that type's params. */
 const printTypedBlock = (
   label: string,
-  block: { on: boolean; type: string; subType?: unknown },
-  params: Record<string, unknown>,
+  block: { on: boolean; type: string; subType?: unknown; params: Record<string, unknown> },
 ): void => {
   console.info(`\n  ${label} [${onOff(block.on)}]  ${blockLabel(block)}`);
-  printParamLine(params);
+  printParamLine(block.params);
 };
 
 const printHeader = (patch: gx1.Patch, index: number): void => {
@@ -44,40 +35,40 @@ const printHeader = (patch: gx1.Patch, index: number): void => {
 };
 
 const printAmp = (amp: gx1.Patch["amp"]): void => {
+  const { params } = amp;
   console.info(`\n  AMP/CAB [${onOff(amp.on)}]  ${amp.type}`);
-  console.info(`    Gain=${amp.gain}  Level=${amp.level}  Bass=${amp.bass}  Mid=${amp.middle}  Treble=${amp.treble}`);
-  const soloLabel = amp.solo ? `ON(${amp.soloLevel})` : "OFF";
-  console.info(`    Speaker=${amp.speaker}  Mic=${amp.mic}  Solo=${soloLabel}`);
+  console.info(`    Gain=${params.gain}  Level=${params.level}  Bass=${params.bass}  Mid=${params.middle}  Treble=${params.treble}`);
+  const soloLabel = params.solo ? `ON(${params.soloLevel})` : "OFF";
+  console.info(`    Speaker=${params.speaker}  Mic=${params.mic}  Solo=${soloLabel}`);
 };
 
 // Printed even when bypassed, like every other block: the device keeps a bypassed block's settings,
 // so hiding it would conceal the sound parked behind the bypass.
-const printOdds = (odds: gx1.Patch["odds"]): void => {
-  const soloLabel = odds.solo ? `ON(${odds.soloLevel})` : "OFF";
-  console.info(`\n  OD/DS [${onOff(odds.on)}]  ${odds.type}  Drive=${odds.drive}  Tone=${odds.tone}  Level=${odds.level}  Direct=${odds.direct}  Solo=${soloLabel}`);
+const printDrive = (drive: gx1.Patch["drive"]): void => {
+  const { params } = drive;
+  const soloLabel = params.solo ? `ON(${params.soloLevel})` : "OFF";
+  console.info(`\n  OD/DS [${onOff(drive.on)}]  ${drive.type}  Drive=${params.drive}  Tone=${params.tone}  Level=${params.level}  Direct=${params.direct}  Solo=${soloLabel}`);
 };
 
 const printPatch = (patch: gx1.Patch, index: number): void => {
   printHeader(patch, index);
   printAmp(patch.amp);
-  printOdds(patch.odds);
+  printDrive(patch.drive);
 
-  printTypedBlock("PFX", patch.pfx, blockKnobs(patch.pfx));
+  printTypedBlock("PFX", patch.pedalFx);
 
-  const ns = patch.ns;
-  console.info(`\n  NS [${onOff(ns.on)}]  Threshold=${ns.threshold}  Release=${ns.release}  Detect=${ns.detect}`);
+  const gate = patch.noiseGate.params;
+  console.info(`\n  NS [${onOff(patch.noiseGate.on)}]  Threshold=${gate.threshold}  Release=${gate.release}  Detect=${gate.detect}`);
 
-  // An fx slot keeps its knobs in a params bag rather than on the block, since one slot takes any
-  // effect type and they would otherwise collide with the block's own fields.
   for (const slot of ["fx1", "fx2", "fx3"] as const) {
-    printTypedBlock(slot.toUpperCase(), patch[slot], patch[slot].params);
+    printTypedBlock(slot.toUpperCase(), patch[slot]);
   }
 
-  printTypedBlock("DELAY", patch.delay, blockKnobs(patch.delay));
-  printTypedBlock("REVERB", patch.reverb, blockKnobs(patch.reverb));
+  printTypedBlock("DELAY", patch.delay);
+  printTypedBlock("REVERB", patch.reverb);
 
-  const fv = patch.fv;
-  console.info(`\n  FV  Position=${fv.position}  Min=${fv.min}  Max=${fv.max}  Curve=${fv.curve}`);
+  const volume = patch.volume.params;
+  console.info(`\n  FV  Position=${volume.position}  Min=${volume.min}  Max=${volume.max}  Curve=${volume.curve}`);
 };
 
 export { printPatch };

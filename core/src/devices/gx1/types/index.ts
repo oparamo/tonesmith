@@ -1,3 +1,6 @@
-export type { RawParamSet, TslPatch, TslEnvelope, FxParams } from "./tsl";
-export type { FxBlock, OdDsBlock, AmpBlock, NsBlock, FvBlock, DelayBlock, ReverbBlock, PfxBlock } from "./blocks";
+export type { RawParamSet, TslPatch, TslEnvelope, BlockParams } from "./tsl";
+export type {
+  FxBlock, DriveBlock, DriveParams, AmpBlock, AmpParams, NoiseGateBlock, NoiseGateParams,
+  VolumeBlock, VolumeParams, DelayBlock, ReverbBlock, PedalFxBlock,
+} from "./blocks";
 export type { Patch, PatchFile } from "./patch";

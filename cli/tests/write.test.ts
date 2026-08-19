@@ -16,26 +16,26 @@ describe("gx1 write", () => {
     temp = withTempDir();
 
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0",
-      "amp.gain=10", "amp.solo=true", "key=G",
+      "amp.params.gain=10", "amp.params.solo=true", "key=G",
     ]);
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
     const patch = patchAt(temp.fixture);
-    expect(patch.amp.gain).toBe(10);
-    expect(patch.amp.solo).toBe(true);
+    expect(patch.amp.params.gain).toBe(10);
+    expect(patch.amp.params.solo).toBe(true);
     expect(patch.key).toBe("G");
   });
 
   // With no separator there is nothing to split on, and slicing at the index of one drops the
-  // argument's last character, so `amp.gain` reads as the unknown field `amp.gai`.
+  // argument's last character, so `amp.params.gain` reads as the unknown field `amp.params.gai`.
   it("rejects a field argument with no '=', naming it as typed", async () => {
     temp = withTempDir();
 
-    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.gain"]);
+    const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.params.gain"]);
 
     expect(exitCode).toBe(1);
-    expect(error.join("\n")).toContain("amp.gain");
+    expect(error.join("\n")).toContain("amp.params.gain");
   });
 
   // The command's one error case: a driver throw becomes a printed message and a failing exit

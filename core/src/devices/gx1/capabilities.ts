@@ -17,16 +17,15 @@ import type {
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlockId } from "./param-catalog";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "./defaults";
 import type { ParamDefaults, BlockDefaults } from "./defaults";
-import { BLOCK_GROUPS, NESTED_PARAMS, NAME_BYTES, onlyBlockFor } from "./common";
+import { BLOCK_GROUPS, BLOCK_LABELS, DEFAULT_CHAIN, NAME_BYTES, onlyBlockFor } from "./common";
 import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
 import type { FieldCodec } from "./codec/fields";
-import { DEFAULT_CHAIN } from "./builder";
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const PER_TYPE_CODEC_MAPS: Record<PerTypeBlockId, Partial<Record<string, readonly FieldCodec[]>>> = {
-  fx: FX_PARAM_MAPS, pfx: PFX_TYPE_MAPS, delay: DELAY_TYPE_MAPS,
+  fx: FX_PARAM_MAPS, pedalFx: PFX_TYPE_MAPS, delay: DELAY_TYPE_MAPS,
   reverb: REV_TYPE_MAPS, fxDelay: FX_DELAY_TYPE_MAPS,
 };
 
@@ -500,8 +499,7 @@ const exampleFor = (group: CapabilityGroup, item?: CapabilityItem): PatchSpecExa
 
   const typeField = item === undefined ? {} : { type: item.id };
   const subTypeField = selected === undefined ? {} : { subType: selected };
-  const body = NESTED_PARAMS.has(block) ? { params: controls } : controls;
-  return { [block]: { ...typeField, ...subTypeField, ...body } };
+  return { [block]: { ...typeField, ...subTypeField, params: controls } };
 };
 
 // Both leave the key off entirely where the group names no block, rather than carrying an empty one.
@@ -534,6 +532,7 @@ const withExamples = (groups: CapabilityGroup[]): CapabilityGroup[] =>
 const gx1Capabilities: DeviceCapabilities = {
   chain: {
     defaultOrder: [...DEFAULT_CHAIN],
+    blocks: { ...BLOCK_LABELS },
     description:
       "The signal chain is the ordered list of blocks the guitar signal passes through. Every block " +
       "is always in the chain. Its position and its on/off state are separate inputs, set " +
@@ -542,12 +541,15 @@ const gx1Capabilities: DeviceCapabilities = {
       "once. To rearrange, copy the default order and move what you want. Leave the chain out " +
       "entirely to take the default order. A chain missing a block is rejected, since leaving a " +
       "block out is not how it gets switched off.\n" +
-      "• On/off: every block can be turned off except FV (Foot Volume), which is always active. To " +
+      "• On/off: every block can be turned off except volume, the foot-volume pedal, which is " +
+      "always active. To " +
       "leave a block off, leave its spec out of the patch: it takes no params, so you never have " +
       "to invent values for a block that isn't sounding. Pass on: false alongside the block's " +
       "settings when you want it off but those params kept behind the bypass, so it can be " +
       "switched on later with them intact.\n\n" +
-      `Default order: ${DEFAULT_CHAIN.join(", ")}.`,
+      `Default order: ${DEFAULT_CHAIN.join(", ")}.\n\n` +
+      "`blocks` maps each name above to what the device's own front panel calls that block, which " +
+      "is what a manual or a photo of the unit shows. Write the names, not the labels.",
   },
   patchName: { maxLength: NAME_BYTES },
   groups: withExamples([
@@ -558,11 +560,11 @@ const gx1Capabilities: DeviceCapabilities = {
       items: FX_ITEMS,
     },
     {
-      id: "odds",
+      id: "drive",
       name: "OD/DS",
       description: "Dedicated overdrive/distortion block with 35 classic pedal models. This is the block to use for a patch's overdrive. The fx slots offer the same 35 models under their OD/DS type, for stacking a second overdrive in the chain.",
       items: ODDS_ITEMS,
-      params: withBlockKeys(PARAMS_BY_BLOCK.odds),
+      params: withBlockKeys(PARAMS_BY_BLOCK.drive),
     },
     {
       id: "amp",
@@ -584,24 +586,24 @@ const gx1Capabilities: DeviceCapabilities = {
       items: MIC_ITEMS,
     },
     {
-      id: "pfx",
+      id: "pedalFx",
       name: "PFX (Expression Pedal Effect)",
       description: "The effect assigned to the expression pedal input: either a wah pedal or a pitch-bend pedal. Only one is active at a time.",
-      items: withTypeParams("pfx", PFX_META),
+      items: withTypeParams("pedalFx", PFX_META),
     },
     {
-      id: "ns",
+      id: "noiseGate",
       name: "NS (Noise Suppressor)",
       description: "Reduces noise and hum picked up by guitar pickups. Responds to the guitar signal envelope so it doesn't cut sustain unnaturally.",
       items: [],
-      params: withBlockKeys(PARAMS_BY_BLOCK.ns),
+      params: withBlockKeys(PARAMS_BY_BLOCK.noiseGate),
     },
     {
-      id: "fv",
+      id: "volume",
       name: "FV (Foot Volume)",
       description: "Expression-pedal volume control. Typically assigned to the CTL 2/EXP 2 jack. The one chain block that's always active: it can't be bypassed.",
       items: [],
-      params: withBlockKeys(PARAMS_BY_BLOCK.fv),
+      params: withBlockKeys(PARAMS_BY_BLOCK.volume),
     },
     {
       id: "delay",

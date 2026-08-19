@@ -1,9 +1,6 @@
 import type { Patch, PatchFile, RawPatch } from "./patch";
 import type { DeviceCapabilities } from "./capabilities";
 
-/** What a field can be set to, on any surface that expresses an edit as a path and a value. */
-type FieldValue = string | number | boolean;
-
 /** Dot-path to the value written there, as `write_fields` and the CLI's `write` both express it. */
 type FieldEdits = Record<string, unknown>;
 
@@ -36,4 +33,4 @@ interface PatchDriver<T extends Patch = Patch> {
   encodePatch(patch: T): RawPatch;
 }
 
-export type { FieldValue, FieldEdits, PatchDriver };
+export type { FieldEdits, PatchDriver };

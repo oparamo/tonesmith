@@ -10,8 +10,7 @@
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import {
-  BLOCK_GROUPS, NESTED_PARAMS, SELECTION_FIELDS,
-  ON_FIELD, PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
+  BLOCK_GROUPS, SELECTION_FIELDS, ON_FIELD, PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
 } from "../common";
 import type { BlockName } from "../common";
 import type { Patch } from "../types";
@@ -36,20 +35,19 @@ const isBlockName = (name: string | undefined): name is BlockName =>
  * Which block and field a path addresses, or undefined for a path that names no block at all
  * (`name`, `key`, `chain`) or reaches deeper than a block's controls.
  *
- * The fx slots keep their controls one level down in `params`, so the same field name means a
- * control there and a type selector on every other block.
+ * Every block keeps its controls one level down in `params`, so the path says which kind of thing
+ * it touches: `amp.on` is block state and `amp.params.gain` is a control.
  */
 const editTarget = (path: string): { block: BlockName; field: Omit<EditedField, "value"> } | undefined => {
   const [head, ...rest] = path.split(".");
   if (!isBlockName(head)) return undefined;
 
-  const nested = NESTED_PARAMS.has(head);
   const [leaf, nestedLeaf, ...deeper] = rest;
-  if (nested && leaf === PARAMS_FIELD && nestedLeaf !== undefined && deeper.length === 0) {
+  if (leaf === PARAMS_FIELD && nestedLeaf !== undefined && deeper.length === 0) {
     return { block: head, field: { leaf: nestedLeaf, isParam: true } };
   }
-  if (leaf === undefined || nestedLeaf !== undefined) return undefined;
-  return { block: head, field: { leaf, isParam: !nested && !SELECTION_FIELDS.has(leaf) } };
+  if (leaf === undefined || nestedLeaf !== undefined || !SELECTION_FIELDS.has(leaf)) return undefined;
+  return { block: head, field: { leaf, isParam: false } };
 };
 
 /** A path addressing no block is dropped rather than reported: the codec still has its say on it. */

@@ -69,7 +69,7 @@ describe("gx1 capabilities", () => {
   });
 
   it("prints the block controls for a group with no selectable types", async () => {
-    const output = await capabilitiesOutput("ns");
+    const output = await capabilitiesOutput("noiseGate");
 
     expect(output).toContain("THRESHOLD");
     expect(output).toContain("RELEASE");
