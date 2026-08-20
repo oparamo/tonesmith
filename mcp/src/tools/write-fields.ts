@@ -40,10 +40,11 @@ const registerWriteFields = (server: McpServer): void => {
     {
       description:
         "Edit a patch file: one or more fields of a single patch, the name of the patch set, or " +
-        "both. Patch fields use dot-notation, as in 'amp.params.gain', 'fx1.on', 'delay.type'. " +
-        "A path naming a field the device doesn't have is rejected, listing the valid fields at " +
-        "that level. The whole set is applied together, so if any edit is rejected the file is " +
-        "left untouched.",
+        "both. Patch fields use dot-notation, counted from the patch read_patch returns under " +
+        "`patch`: a block's controls sit at '<block>.params.<control>', and a block's own " +
+        "selectors at '<block>.on', '<block>.type' and '<block>.subType'. A path naming a field " +
+        "the device doesn't have is rejected, listing the valid fields at that level. The whole " +
+        "set is applied together, so if any edit is rejected the file is left untouched.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
         device: deviceField,
@@ -52,8 +53,8 @@ const registerWriteFields = (server: McpServer): void => {
             "to rename the set on its own."
         ),
         fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe(
-          'Dot-path → new value, e.g. { "amp.params.gain": 72, "fx1.params.rate": 50 }. ' +
-            "Pass each value as the type read_patch shows for that field; a string spelling a " +
+          "Dot-path → new value, one entry per field. Take each path from what read_patch shows " +
+            "for this patch, and pass the value as the type it shows there; a string spelling a " +
             "number or a boolean is read as one where the field takes one."
         ),
         setName: z.string().optional().describe(

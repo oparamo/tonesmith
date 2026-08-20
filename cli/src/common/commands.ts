@@ -6,9 +6,9 @@ import { printChain, printGroups, printGroup, printItem } from "./capabilities-p
 import { printPatch } from "./patch-print";
 
 /**
- * Splits "amp.params.gain=72" at the first "=", so a value containing one survives intact. Without
- * the separator there is nothing to split on, and slicing at an index of -1 drops the argument's
- * last character, sending "amp.params.gain" on as the path "amp.params.gai" to be reported as an
+ * Splits a "path=value" argument at the first "=", so a value containing one survives intact.
+ * Without the separator there is nothing to split on, and slicing at an index of -1 drops the
+ * argument's last character, sending a bare path on one character short to be reported as an
  * unknown field.
  */
 const parseFieldAssignment = (assignment: string): [string, string] => {
