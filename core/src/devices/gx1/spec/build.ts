@@ -264,5 +264,5 @@ const buildPatch = (input: unknown): Patch => {
   return patch;
 };
 
-export { buildPatch, validatePatchSpec };
+export { applyBlock, buildPatch, validatePatchSpec };
 export type { BlockName };

@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/devices/gx1";
 import type { Patch } from "../../../../src/devices/gx1";
 import type { FieldValue } from "../../../../src/types";
+import { ROCK_TONES_FIXTURE, patchAt } from "../../../helpers";
 
 /** A built patch these cases can edit, with an amp on it so an amp edit has somewhere to land. */
 const patchWith = (spec: Record<string, unknown>): Patch =>
@@ -272,39 +273,123 @@ describe("applyEdits rejects a value the device cannot store", () => {
 
 describe("applyEdits reads each block's selection off the patch it just edited", () => {
   /**
-   * An edit reaches a field the block already carries, and a block carries only its current type's
-   * controls, so TIME has nowhere to land while the slot is a COMPRESSOR: switching an effect is
-   * `buildPatch`'s job, not a dot-path's. The batch is still read as one state, which is what lets
-   * the two selectors below be judged together.
+   * The block is re-seeded as the type lands, so TIME is a field of the slot by the time the path
+   * naming it resolves. Before that it was not, and the batch every caller writes was rejected for
+   * naming a control of the effect it was asking for.
    */
-  it("rejects a param of a type the block is only being switched to in the same batch", () => {
+  it("switches a type and sets a control of the new type in one batch", () => {
     const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
 
     const issues = issuesFrom(patch, {
       "fx1.type": "DELAY", "fx1.subType": "STANDARD", "fx1.params.time": 400,
     });
 
+    expect(issues).toEqual([]);
+    expect(patch.fx1.type).toBe("DELAY");
+    expect(patch.fx1.subType).toBe("STANDARD");
+    expect(valueAt(patch, "fx1.params.time")).toBe(400);
+  });
+
+  /**
+   * The two write paths have to agree about what a block set to a type holds: whatever the switch
+   * leaves behind is what the codec reads back under the new type's field map, which is how a
+   * compressor's sustain byte came back as a delay time nobody chose.
+   */
+  it("leaves the new type's other controls at the values a built patch would have", () => {
+    const built = patchWith({ fx1: { type: "DELAY", subType: "STANDARD", params: { time: 400 } } });
+    const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
+
+    applyTo(patch, { "fx1.type": "DELAY", "fx1.subType": "STANDARD", "fx1.params.time": 400 });
+
+    expect(patch.fx1.params).toEqual(built.fx1.params);
+    expect("sustain" in patch.fx1.params, "a control of the effect it stopped being").toBe(false);
+  });
+
+  it("takes a type change on its own, arriving on the device's factory sub-model", () => {
+    const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
+
+    expect(issuesFrom(patch, { "fx1.type": "DELAY" })).toEqual([]);
+    expect(patch.fx1.subType).toBe("STANDARD");
+  });
+
+  /** One fx type keeps a field map per sub-model, so switching that is a switch of controls too. */
+  it("re-seeds a sub-model that decides which controls the block has", () => {
+    const patch = patchWith({ fx1: { type: "DELAY", subType: "STANDARD" } });
+
+    const issues = issuesFrom(patch, { "fx1.subType": "GLITCH", "fx1.params.glitch": 50 });
+
+    expect(issues).toEqual([]);
+    expect(valueAt(patch, "fx1.params.glitch")).toBe(50);
+    expect("highCut" in patch.fx1.params, "a control of the sub-model it left").toBe(false);
+  });
+
+  /** Every model of an effect shares one set of controls, so picking another has to keep them. */
+  it("keeps the controls a sub-model shares with the rest of its type", () => {
+    const patch = patchWith({ fx1: { type: "COMPRESSOR", params: { sustain: 30 } } });
+
+    applyTo(patch, { "fx1.subType": "D-COMP" });
+
+    expect(valueAt(patch, "fx1.params.sustain")).toBe(30);
+  });
+
+  it("rejects a control of the type the block was switched away from", () => {
+    const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
+
+    const issues = issuesFrom(patch, { "fx1.type": "DELAY", "fx1.params.sustain": 30 });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/sustain/);
+  });
+
+  /** Paths resolve in the order given, which is the honest reading of a sequence of edits. */
+  it("rejects a control of the new type named before the type that has it", () => {
+    const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
+
+    const issues = issuesFrom(patch, { "fx1.params.time": 400, "fx1.type": "DELAY" });
+
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatch(/time/);
   });
 
-  /**
-   * A dot-path edit sets one field at a time, so switching a type leaves the sub-model the previous
-   * type chose. The codec has no field map for that pairing, so the mismatch has to be reported
-   * rather than encoded.
-   */
-  it("rejects a type change that leaves the previous type's sub-model behind", () => {
-    const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
+  /** An amp has the same controls whichever amp it models, so a switch has no controls to discard. */
+  it("keeps a block's controls when its types all share one set", () => {
+    const patch = patchWith({ amp: { type: "TRNSPRNT", params: { gain: 72 } } });
 
-    const issues = issuesFrom(patch, { "fx1.type": "DELAY" });
+    applyTo(patch, { "amp.type": "NATURAL" });
 
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatch(/STANDARD/);
+    expect(valueAt(patch, "amp.params.gain")).toBe(72);
+  });
+
+  it("leaves a block the batch did not switch alone", () => {
+    const patch = patchWith({ amp: { type: "TRNSPRNT", params: { gain: 72 } } });
+
+    applyTo(patch, { "fx1.type": "DELAY" });
+
+    expect(valueAt(patch, "amp.params.gain")).toBe(72);
   });
 
   it("passes over a path the catalog says nothing about, leaving it to the codec", () => {
     const patch = patchWith({});
 
     expect(issuesFrom(patch, { name: "Renamed" })).toEqual([]);
+  });
+});
+
+/**
+ * The check the reinterpreted bytes would have failed: a switched slot has to survive the bytes.
+ * A block keeps the raw param bytes it was decoded from, so a type change that only moved the type
+ * byte read back as the new type's fields over the old effect's values, which is a valid file
+ * carrying values nobody chose.
+ */
+describe("applyEdits survives the round trip through the device's own bytes", () => {
+  it("reads a switched slot back as the type and values the edit asked for", () => {
+    const patch = patchAt(ROCK_TONES_FIXTURE);
+
+    applyTo(patch, { "fx1.type": "DELAY", "fx1.subType": "STANDARD", "fx1.params.time": 400 });
+    const reread = gx1.driver.decodePatch(gx1.driver.encodePatch(patch));
+
+    expect(reread.fx1.type).toBe("DELAY");
+    expect(reread.fx1.subType).toBe("STANDARD");
+    expect(reread.fx1.params).toEqual(patch.fx1.params);
   });
 });

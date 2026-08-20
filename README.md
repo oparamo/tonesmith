@@ -75,6 +75,10 @@ For example, editing a GX-1 patch:
 tonesmith gx1 write my.tsl 0 amp.params.gain=72 fx1.params.rate=50 fx1.on=true key=G
 ```
 
+Writing a block's `type` switches the effect rather than relabeling it: the block arrives at that
+type's factory settings on its factory sub-model, and the controls of the effect it was are gone.
+Name the ones you want after the type in the same command, spelled as the new type spells them.
+
 ## MCP server
 
 `@tonesmith/mcp` exposes the toolkit as an [MCP](https://modelcontextprotocol.io) server so Claude
