@@ -80,6 +80,19 @@ describe("applyEdits reads a value into the field it lands in", () => {
     expect(valueAt(patch, path)).toBe(expected);
   });
 
+  // A tempo-synced control holds a note value where it otherwise holds a number, so reading the
+  // string it currently holds as proof of a text field would strand it there: no command line
+  // could ever set it back to milliseconds.
+  it("syncs a delay time to a note and takes it back off again", () => {
+    const patch = patchWith({ delay: { type: "STANDARD" } });
+
+    applyTo(patch, { "delay.params.time": "1/4" });
+    expect(valueAt(patch, "delay.params.time"), "the note it was synced to").toBe("1/4");
+
+    applyTo(patch, { "delay.params.time": "500" });
+    expect(valueAt(patch, "delay.params.time"), "and a plain time after it").toBe(500);
+  });
+
   it("leaves a numeric-looking name a string, since the field it lands in holds one", () => {
     const patch = patchWith({});
 

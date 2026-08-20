@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/devices/gx1";
 import { moveBefore } from "../../../../src/devices/gx1/builder";
 import { BLOCK_NAMES, DEFAULT_CHAIN } from "../../../../src/devices/gx1/common";
+import { ROCK_TONES_FIXTURE, patchAt } from "../../../helpers";
 
 describe("buildPatch", () => {
   it("builds every block the spec names, defaults filled in", () => {
@@ -56,6 +57,18 @@ describe("buildPatch", () => {
 
     expect(read.fx1.subType, "the case null covers").toBeNull();
     expect(resend).not.toThrow();
+  });
+
+  // The same round trip over a patch the device itself wrote, which is where it first failed: a
+  // tempo-synced delay came back as a code above the param's ceiling and was rejected as a time
+  // nobody could have set.
+  it("takes a patch read off the device back as a spec, tempo-synced values included", () => {
+    const read = patchAt(ROCK_TONES_FIXTURE, 0);
+
+    const rebuilt = gx1.driver.buildPatch({ ...read });
+
+    expect(read.delay.params.time, "the fixture's own synced delay").toBe("1/4");
+    expect(rebuilt.delay.params.time, "survives the rebuild as the note it is").toBe("1/4");
   });
 
   it("puts a block's params where the decoded patch keeps them", () => {

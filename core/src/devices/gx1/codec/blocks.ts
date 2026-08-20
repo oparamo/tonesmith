@@ -8,7 +8,7 @@ import {
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_SLOT_ORDER, CHAIN_VALUE_TO_BLOCK, CHAIN_BLOCK_TO_VALUE, CHAIN_TERMINATOR, DEFAULT_CHAIN,
   NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
-  FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW,
+  FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW, TIME_NOTE_VALUES,
 } from "../common";
 import type {
   FxBlock, DriveBlock, AmpBlock, NoiseGateBlock, VolumeBlock, DelayBlock, ReverbBlock,
@@ -18,7 +18,7 @@ import {
   bytesFromHex, hexFromBytes, byteReader, lookupName, lookupIndex, toSigned, toUnsigned,
 } from "./primitives";
 import {
-  u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad,
+  u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, namedAbove, syncedTime,
   decodeFields, encodeFields, liftSubType, withStoredSubType, type FieldCodec,
 } from "./fields";
 import { decodeFxType, encodeFxType } from "./fx-params";
@@ -330,37 +330,39 @@ const encodeFxCom = (block: FxBlock): string[] => {
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
-    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    syncedTime("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
   ],
   "MODULATE": [
-    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    syncedTime("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
     u8("modRate", 9), u8("modDepth", 10),
   ],
   "PAN": [
-    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    syncedTime("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
     u8("tapTime", 11),
   ],
   "REVERSE": [
-    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    syncedTime("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
     bool("trigger", 12),
   ],
   "ANALOG": [
-    nibbleQuad("time", 13), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    // The one delay time with its own address and its own ceiling; every other type shares byte 2.
+    namedAbove(nibbleQuad("time", 13), 1200, TIME_NOTE_VALUES),
+    u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
   ],
   "ANLG MOD": [
-    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    syncedTime("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
     u8("modRate", 9), u8("modDepth", 10),
   ],
   "SPACE ECHO": [
-    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    syncedTime("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
     lookup("head", 17, SPACE_ECHO_HEAD),
   ],
   "SHIMMER": [
-    nibbleQuad("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
+    syncedTime("time", 2), u8("feedback", 6), u8("level", 7), lookup("highCut", 8, FREQ_HIGH_CUT),
     signed("pitch", 18, 24), u8("balance", 19),
   ],
   "WARP": [
-    nibbleQuad("time", 2), bool("trigger", 21), u8("level", 25),
+    syncedTime("time", 2), bool("trigger", 21), u8("level", 25),
   ],
   "TWIST": [
     lookup("mode", 20, TWIST_MODES), bool("trigger", 21),
@@ -416,7 +418,7 @@ const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("pitch", 9, 24), u8("pitchLevel", 10),
   ],
   "SUB DELAY": [
-    nibbleQuad("time", 11), u8("level", 15), u8("feedback", 16), lookup("highCut", 17, FREQ_HIGH_CUT),
+    syncedTime("time", 11), u8("level", 15), u8("feedback", 16), lookup("highCut", 17, FREQ_HIGH_CUT),
   ],
   "TERA ECHO": [
     signed("tone", 3, 50), u8("level", 5), u8("direct", 8),

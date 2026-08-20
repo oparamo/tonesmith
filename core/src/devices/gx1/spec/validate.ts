@@ -176,6 +176,7 @@ const paramLabel = (check: ParamCheck): string => {
 const expectedKind = (spec: ParamSpec): string => {
   if (spec.kind === "boolean") return "true or false";
   if (spec.kind === "discrete") return `one of: ${spec.values.join(", ")}`;
+  if (spec.kind === "numericOrNamed") return `a whole number or one of: ${spec.values.join(", ")}`;
   const numeric = spec.decimals === undefined ? "a whole number" : "a number";
   return numeric;
 };
@@ -184,8 +185,23 @@ const expectedKind = (spec: ParamSpec): string => {
 const isRightKind = (spec: ParamSpec, value: unknown): boolean => {
   if (spec.kind === "boolean") return typeof value === "boolean";
   if (spec.kind === "discrete") return typeof value === "string";
+  if (spec.kind === "numericOrNamed" && typeof value === "string") return true;
   if (typeof value !== "number" || !Number.isFinite(value)) return false;
-  return spec.decimals !== undefined || Number.isInteger(value);
+  const fractionsAllowed = spec.kind === "numeric" && spec.decimals !== undefined;
+  return fractionsAllowed || Number.isInteger(value);
+};
+
+/** Bounds and value list read off whichever kinds carry them, so one check covers all four kinds. */
+const domainIssue = (spec: ParamSpec, value: unknown): string | undefined => {
+  const bounded = spec.kind === "numeric" || spec.kind === "numericOrNamed";
+  if (bounded && typeof value === "number" && (value < spec.min || value > spec.max)) {
+    return `must be ${spec.min}–${spec.max}`;
+  }
+  const named = spec.kind === "discrete" || spec.kind === "numericOrNamed";
+  if (named && typeof value === "string" && !spec.values.includes(value)) {
+    return `must be one of: ${spec.values.join(", ")}`;
+  }
+  return undefined;
 };
 
 /**
@@ -200,12 +216,8 @@ const checkValue = (issues: Issues, check: ParamCheck): void => {
     issues.push(`${paramLabel(check)} takes ${expectedKind(spec)} (got ${JSON.stringify(value)})`);
     return;
   }
-  if (spec.kind === "numeric" && typeof value === "number" && (value < spec.min || value > spec.max)) {
-    issues.push(`${paramLabel(check)} must be ${spec.min}–${spec.max} (got ${value})`);
-  }
-  if (spec.kind === "discrete" && typeof value === "string" && !spec.values.includes(value)) {
-    issues.push(`${paramLabel(check)} must be one of: ${spec.values.join(", ")} (got "${value}")`);
-  }
+  const issue = domainIssue(spec, value);
+  if (issue !== undefined) issues.push(`${paramLabel(check)} ${issue} (got ${JSON.stringify(value)})`);
 };
 
 /**

@@ -9,7 +9,7 @@ export type {
   FieldValue, PatchBlock, Patch, PatchFile, RawPatch, FieldEdit, FieldEdits, PatchDriver,
   PatchDetail, BlockView, PatchView,
   DeviceCapabilities, CapabilityGroup, CapabilityItem, ChainSpec, PatchNameSpec, PatchSpecExample,
-  ParamSpec, NumericParam, DiscreteParam, BooleanParam,
+  ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam,
 } from "./types";
 export * as patchUtils from "./patch-utils";
 export * as capabilityUtils from "./capability-utils";

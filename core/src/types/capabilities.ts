@@ -45,13 +45,30 @@ interface BooleanParam extends ParamSpecBase {
 }
 
 /**
+ * A param taking either a number within `min`-`max` or one of `values`, which name settings the
+ * device stores above that range instead of more of the same quantity, such as a time it plays
+ * against the patch tempo rather than as a fixed span.
+ *
+ * Both forms are ordinary stored values, so both are what a patch reads back as and what a
+ * consumer may write. A spec that offered only the numeric half would present the named settings
+ * as out-of-range numbers, which reads as a value someone should correct.
+ */
+interface NumericOrNamedParam extends ParamSpecBase {
+  kind: "numericOrNamed";
+  min: number;
+  max: number;
+  values: readonly string[];
+}
+
+/**
  * A single parameter on a capability item or group (informational; not used for encoding).
  *
- * `kind` is what a value is checked and built against, so it is a discriminant rather than a hint:
- * the three kinds are mutually exclusive, and a spec carrying both bounds and a value list would
- * describe nothing a consumer could act on.
+ * `kind` is what a value is checked and built against, so it is a discriminant rather than a hint.
+ * A param that takes a number and a set of named settings alike says so as its own kind, rather
+ * than as a numeric spec carrying an optional value list: an optional list leaves a consumer to
+ * guess whether both forms are legal or whether one of them was authored by mistake.
  */
-type ParamSpec = NumericParam | DiscreteParam | BooleanParam;
+type ParamSpec = NumericParam | DiscreteParam | BooleanParam | NumericOrNamedParam;
 
 /**
  * A patch-spec fragment for one block, keyed by the block's own name in a spec and filled with the
@@ -141,6 +158,6 @@ interface DeviceCapabilities {
 }
 
 export type {
-  ParamSpec, NumericParam, DiscreteParam, BooleanParam, PatchSpecExample, CapabilityItem,
+  ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam, PatchSpecExample, CapabilityItem,
   CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities,
 };

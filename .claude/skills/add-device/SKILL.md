@@ -149,8 +149,9 @@ Create `core/src/devices/<id>/` with:
 - `defaults.ts`: each block type's factory defaults, authored in step 4 from the
   factory-default fixture. The builder fills any param the caller didn't set from here
 - `param-domain.ts`: the value domains a param spec derives from (numeric interval, enum,
-  lookup table, boolean, opaque text), so a param's human range string, machine value list, and
-  numeric bounds are authored once and can't disagree
+  lookup table, boolean, and a numeric interval that also takes a named set of values, for a
+  control the device stores as a name above its ceiling), so a param's human range string,
+  machine value list, and numeric bounds are authored once and can't disagree
 - `param-catalog.ts`: the param surface (per block/type, param name + range + description),
   the in-repo ground truth capabilities derives from and the drift guard checks the codec
   against; authored in step 5 (see there for what it's built from)

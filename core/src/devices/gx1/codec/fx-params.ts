@@ -4,11 +4,14 @@ import {
   SBEND_PITCH, SLICER_PAT, HARMONIST_HR,
   FX_DLY_TYPES, FX_REV_TYPES, TWIST_MODES, PHASER_STAGES,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES,
-  FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
+  FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ, TIME_NOTE_VALUES,
 } from "../common";
 import type { BlockParams } from "../types";
 import { hexFromBytes, byteAt, lookupName, lookupIndex } from "./primitives";
-import { u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, decodeFields, encodeFields, type FieldCodec } from "./fields";
+import {
+  u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, namedAbove, syncedTime, syncedRate,
+  decodeFields, encodeFields, type FieldCodec,
+} from "./fields";
 
 // ── FX type encode / decode ───────────────────────────────────────────────────
 //
@@ -121,7 +124,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "SLICER": [
     lookup("pattern", 0, SLICER_PAT),
-    u8("rate", 1), u8("level", 2), u8("attack", 3), signed("duty", 4, -1), u8("direct", 5),
+    syncedRate("rate", 1), u8("level", 2), u8("attack", 3), signed("duty", 4, -1), u8("direct", 5),
   ],
   "PARA. EQ": [
     signed("lowGain", 0, 20), signed("highGain", 1, 20), signed("level", 2, 20),
@@ -151,7 +154,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
   "AUTO WAH": [
     lookup("filter", 0, WAH_FILTER),
-    u8("freq", 1), u8("rate", 2), u8("depth", 3), u8("reso", 4), u8("level", 5),
+    u8("freq", 1), syncedRate("rate", 2), u8("depth", 3), u8("reso", 4), u8("level", 5),
   ],
   "DEFRETTER": [
     u8("sens", 0), u8("attack", 1), u8("depth", 2), u8("reso", 3),
@@ -196,60 +199,62 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   // preDelay stored as index × 0.5ms (e.g. 8 → 4.0ms).
   "CHORUS": [
     lookup("subType", 0, CHORUS_TYPES),
-    u8("rate", 1), u8("depth", 2), u8("level", 3), scaled("preDelay", 4, 0.5), u8("direct", 5),
+    syncedRate("rate", 1), u8("depth", 2), u8("level", 3), scaled("preDelay", 4, 0.5), u8("direct", 5),
   ],
   "FLANGER": [
-    u8("rate", 0), u8("depth", 1), u8("reso", 2), u8("manual", 3), u8("level", 4), u8("direct", 5),
+    syncedRate("rate", 0), u8("depth", 1), u8("reso", 2), u8("manual", 3), u8("level", 4), u8("direct", 5),
   ],
   // PHASER: p[0] selects the stage count as a plain enum (raw 0/1/2 = 4/8/12 STAGE).
   "PHASER": [
     lookup("stage", 0, PHASER_STAGES),
-    u8("rate", 1), u8("depth", 2), u8("reso", 3), u8("manual", 4), u8("level", 5), u8("direct", 6),
+    syncedRate("rate", 1), u8("depth", 2), u8("reso", 3), u8("manual", 4), u8("level", 5), u8("direct", 6),
   ],
   "SCRIPT PH": [
-    u8("rate", 0), u8("depth", 1), u8("level", 2),
+    syncedRate("rate", 0), u8("depth", 1), u8("level", 2),
   ],
   // CLASSIC-VIBE: p[0]=subType (stored in param block), then params shifted by one. The device's
   // own table labels it MODE; it is a sub-model here because its two values are named variants
   // worth describing, which is what decides the difference (see CLAUDE.md's Conventions).
   "CLASSIC-VIBE": [
     lookup("subType", 0, VIBE_MODES),
-    u8("rate", 1), u8("depth", 2), u8("level", 3),
+    syncedRate("rate", 1), u8("depth", 2), u8("level", 3),
   ],
   "ROTARY": [
     lookup("speed", 0, ROTARY_SPEED),
-    u8("slowRate", 1), u8("fastRate", 2), u8("level", 3),
+    syncedRate("slowRate", 1), syncedRate("fastRate", 2), u8("level", 3),
     u8("balance", 4), u8("drive", 5), u8("direct", 6),
   ],
   "VIBRATO": [
-    u8("rate", 0), u8("depth", 1), u8("riseTime", 2), bool("trigger", 3), u8("level", 4),
+    syncedRate("rate", 0), u8("depth", 1), u8("riseTime", 2), bool("trigger", 3), u8("level", 4),
   ],
   "TREMOLO": [
-    u8("rate", 0), u8("depth", 1), u8("level", 2),
+    syncedRate("rate", 0), u8("depth", 1), u8("level", 2),
   ],
   "PAN": [
-    u8("rate", 0), u8("depth", 1), u8("level", 2),
+    syncedRate("rate", 0), u8("depth", 1), u8("level", 2),
   ],
   "RING MOD": [
     bool("intelligent", 0),
-    u8("freq", 1), u8("modRate", 2), u8("modDepth", 3), u8("level", 4), u8("direct", 5),
+    u8("freq", 1), syncedRate("modRate", 2), u8("modDepth", 3), u8("level", 4), u8("direct", 5),
   ],
   // HUMANIZER: p[0]=subType (stored in param block), then params shifted by one. Labeled MODE by
   // the device, a sub-model here for the same reason as CLASSIC-VIBE above.
   "HUMANIZER": [
     lookup("subType", 0, HUM_MODES),
     lookup("vowel1", 1, HUM_VOWELS), lookup("vowel2", 2, HUM_VOWELS),
-    u8("sens", 3), u8("rate", 4), u8("manual", 5), u8("level", 6),
+    u8("sens", 3), syncedRate("rate", 4), u8("manual", 5), u8("level", 6),
   ],
   // PITCH SHIFT: preDelay is a 16-bit value across 4 bytes (max ~300ms), not a plain u8.
   "PITCH SHIFT": [
     lookup("mode", 0, PITCH_SHIFT_MODES), indexTable("pitch", 1, PITCH_SHIFT_PITCH_TABLE),
-    nibbleQuad("preDelay", 2), u8("level", 6), u8("feedback", 7), u8("direct", 8),
+    namedAbove(nibbleQuad("preDelay", 2), 300, TIME_NOTE_VALUES),
+    u8("level", 6), u8("feedback", 7), u8("direct", 8),
   ],
   // HARMONIST: preDelay is a 16-bit value across 4 bytes, same as PITCH SHIFT.
   "HARMONIST": [
     lookup("harmony", 0, HARMONIST_HR),
-    nibbleQuad("preDelay", 1), u8("level", 5), u8("feedback", 6), u8("direct", 7),
+    namedAbove(nibbleQuad("preDelay", 1), 300, TIME_NOTE_VALUES),
+    u8("level", 5), u8("feedback", 6), u8("direct", 7),
   ],
   "OCTAVE": [
     u8("minus1Oct", 0), u8("minus2Oct", 1), u8("direct", 2),
@@ -286,16 +291,16 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
 // address table. p[0] is promoted to block.subType via PARAM_SUBTYPE_EFFECTS.
 const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
   "STANDARD": [
-    lookup("subType", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    lookup("subType", 0, FX_DLY_TYPES), syncedTime("time", 1),
     u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
   ],
   "MODULATE": [
-    lookup("subType", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    lookup("subType", 0, FX_DLY_TYPES), syncedTime("time", 1),
     u8("feedback", 5), u8("level", 6), lookup("highCut", 7, FREQ_HIGH_CUT),
     u8("modRate", 8), u8("modDepth", 9),
   ],
   "WARP": [
-    lookup("subType", 0, FX_DLY_TYPES), nibbleQuad("time", 1),
+    lookup("subType", 0, FX_DLY_TYPES), syncedTime("time", 1),
     bool("trigger", 11), u8("level", 12),
   ],
   "TWIST": [
