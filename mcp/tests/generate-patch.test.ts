@@ -17,7 +17,6 @@ import { connectClient, emptyTempDir, patchAt, present } from "./helpers";
 interface SavedPatch {
   name: string;
   action: string;
-  chain: string[];
   patch: Record<string, never>;
 }
 
@@ -86,8 +85,9 @@ describe("generate_patch", () => {
     expect(echoed.name).toBe("Echo");
     expect(echoed.amp.type).toBe("JC-120");
     expect(echoed.chain).toEqual(chain);
-    // Stated per patch as well, so the stored order is readable without digging into the patch.
-    expect(saved.chain).toEqual(chain);
+    // The entry says what happened to the patch and carries the patch; nothing of the patch is
+    // lifted out beside it, which is what keeps this shape and read_patch's the same.
+    expect(Object.keys(saved).sort()).toEqual(["action", "name", "patch"]);
   });
 
   /**
@@ -226,9 +226,9 @@ describe("generate_patch", () => {
 
     const read = await client.callTool("read_patch", { device: "gx1", file: outPath, ref: "0" });
     expect(read.isError, read.text).toBe(false);
-    const body = JSON.parse(read.text) as { fx1: Record<string, unknown> };
+    const body = JSON.parse(read.text) as { patch: { fx1: Record<string, unknown> } };
 
-    expect(echoed.fx1).toEqual(body.fx1);
+    expect(echoed.fx1).toEqual(body.patch.fx1);
   });
 
   // A batch is one call, and the same block is present in every patch of it, so a rejection that

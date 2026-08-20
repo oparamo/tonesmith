@@ -17,10 +17,7 @@ const MAX_LIMIT = 100;
 /** One window of a file's patches, with what it took to reach the ones outside it. */
 const page = (file: PatchFile, offset: number, limit: number): object => {
   const window = file.patches.slice(offset, offset + limit);
-  const patches = window.map((patch, position) => ({
-    index: offset + position,
-    ...patch,
-  }));
+  const patches = window.map((patch, position) => ({ index: offset + position, patch }));
 
   const next = offset + window.length;
   const remaining = file.patches.length - next;
@@ -35,8 +32,8 @@ const registerReadPatch = (server: McpServer): void => {
     "read_patch",
     {
       description:
-        "Read decoded patches from a patch file. Returns full patch parameter data as JSON, along " +
-        "with `setName`, the name of the patch set the file holds. Naming a `ref` returns that one " +
+        "Read decoded patches from a patch file. The patch itself arrives under `patch`, beside " +
+        "`setName`, the name of the patch set the file holds. Naming a `ref` returns that one " +
         `patch; omitting it returns the first ${DEFAULT_LIMIT} and says how many the file holds, ` +
         "since a full library is more than a caller usually wants in one response.",
       inputSchema: z.object({
@@ -60,12 +57,9 @@ const registerReadPatch = (server: McpServer): void => {
 
       if (ref !== undefined) {
         const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
-        const patchWithIndex = {
-          setName: patchFile.name,
-          index,
-          ...patch,
-        };
-        return ok(JSON.stringify(patchWithIndex));
+        // The patch sits under its own key rather than spread across the envelope, here and in
+        // `page`, so a block named `index` or `setName` cannot shadow what the read reports.
+        return ok(JSON.stringify({ setName: patchFile.name, index, patch }));
       }
 
       return ok(JSON.stringify(page(patchFile, offset ?? 0, limit ?? DEFAULT_LIMIT)));

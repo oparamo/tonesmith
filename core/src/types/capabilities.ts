@@ -5,9 +5,9 @@ interface ParamSpecBase {
    * The exact property key for this param in machine surfaces: the field name in decoded
    * patches (`read_patch` output), and the key it is written under when building a patch.
    * Where that key sits within the block varies by block, so the `example` on the group or item
-   * is what shows the placement. Distinct from `name`, which is the human display label
-   * ("PRE-DELAY" vs `preDelay`, "OCT F-BACK" vs `octFeedback`). Absent only for params with
-   * no backing codec field (e.g. HARMONIST's KEY, which is the patch-level key).
+   * is what shows the placement. Distinct from `name`, which is the label the device's own panel
+   * prints and is free to punctuate and abbreviate however it likes. Absent on a param with no
+   * codec field of its own, whose value the patch stores outside the block.
    */
   key?: string;
   /** Free text: "0–100", "–12–+12 semitones", enum list, etc. Derived from the param's domain. */
@@ -21,8 +21,8 @@ interface NumericParam extends ParamSpecBase {
   min: number;
   max: number;
   /**
-   * Decimal places this param accepts, present only where it takes fractional values (reverb TIME
-   * runs 0.1-10.0 s). Absent means whole numbers only, which is the common case. A consumer
+   * Decimal places this param accepts, present only where it takes fractional values, as a time
+   * in seconds does. Absent means whole numbers only, which is the common case. A consumer
    * building a schema needs this to know whether to reject 4.5: the bounds alone can't say, since
    * a fractional param's own min and max are often whole numbers.
    */
@@ -31,8 +31,8 @@ interface NumericParam extends ParamSpecBase {
 
 /**
  * A param taking one of a fixed set of strings. `values` is the machine-readable companion to
- * `range`, which for a long table (the 1/3-octave frequencies) is only a compact summary, so a
- * consumer can enumerate the exact labels instead of guessing their spelling.
+ * `range`, which for a long table of values is only a compact summary, so a consumer can
+ * enumerate the exact labels instead of guessing their spelling.
  */
 interface DiscreteParam extends ParamSpecBase {
   kind: "discrete";
@@ -57,17 +57,13 @@ type ParamSpec = NumericParam | DiscreteParam | BooleanParam;
  * A patch-spec fragment for one block, keyed by the block's own name in a spec and filled with the
  * device's factory defaults, ready to pass to `PatchDriver.buildPatch` once a patch `name` is added.
  *
- * It exists to answer where a param is written, which a list of param keys cannot: a device is free
- * to nest a block's controls or carry them flat, and that is device knowledge a consumer would
- * otherwise learn by being rejected, having already built the patch. Showing a real fragment also
- * avoids inventing a vocabulary to describe nesting in words.
+ * It answers what a list of param keys cannot: which selectors this item needs set alongside its
+ * controls, and the exact spelling of every key, as one fragment a consumer copies rather than
+ * assembles. Getting either wrong is learned by being rejected, with the patch already built.
  */
 type PatchSpecExample = Record<string, unknown>;
 
-/**
- * A selectable option within a capability group: an amp model, effect type, drive pedal,
- * reverb type, cab, mic, etc.
- */
+/** One of the models or types a block offers to select between. */
 interface CapabilityItem {
   /** The string value used in patches (must match the codec's lookup arrays exactly). */
   id: string;
@@ -77,7 +73,7 @@ interface CapabilityItem {
   description: string;
   /** Real-world gear this item emulates, where applicable. */
   models?: string;
-  /** Nested selectable variants within this item (e.g. the compressor types, drive pedal types). */
+  /** Nested selectable variants, where one item covers several named models. */
   subTypes?: CapabilityItem[];
   /** Parameters specific to this item (supplement the group's shared params). */
   params?: ParamSpec[];
@@ -86,12 +82,12 @@ interface CapabilityItem {
 }
 
 /**
- * A top-level block in the device's signal chain: amp, fx slot, delay, reverb, etc.
- * The `items` array lists selectable models/types within the block.
- * The `params` array lists controls that are always present regardless of the selected item.
+ * A top-level block in the device's signal chain. The `items` array lists selectable models/types
+ * within the block. The `params` array lists controls that are always present regardless of the
+ * selected item.
  */
 interface CapabilityGroup {
-  /** Stable identifier, e.g. "amp", "fx", "odds", "delay", "reverb", "cab", "mic", "ns", "fv". */
+  /** Stable identifier, the string an `items` entry names this group by. */
   id: string;
   name: string;
   /** What this block does in the signal chain. */

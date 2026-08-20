@@ -16,7 +16,7 @@ interface PageResponse {
   setName: string;
   total: number;
   offset: number;
-  patches: { index: number; name: string }[];
+  patches: { index: number; patch: { name: string } }[];
   more?: string;
 }
 
@@ -34,10 +34,10 @@ describe("read_patch", () => {
     const { text, isError } = await client.callTool("read_patch", input);
 
     expect(isError, text).toBe(false);
-    const body = JSON.parse(text) as { setName: string; patches: { index: number; name: string }[] };
+    const body = pageOf(text);
     expect(body.setName).toBe(expected.name);
     expect(body.patches).toHaveLength(expected.patches.length);
-    const actualNames = body.patches.map(patch => patch.name);
+    const actualNames = body.patches.map(entry => entry.patch.name);
     const expectedNames = expected.patches.map(patch => patch.name);
     expect(actualNames).toEqual(expectedNames);
   });
@@ -50,9 +50,9 @@ describe("read_patch", () => {
     const { text, isError } = await client.callTool("read_patch", input);
 
     expect(isError, text).toBe(false);
-    const body = JSON.parse(text) as { index: number; name: string };
+    const body = JSON.parse(text) as { index: number; patch: { name: string } };
     expect(body.index).toBe(0);
-    expect(body.name).toBe(present(expected.patches[0], "patch 0 of the fixture").name);
+    expect(body.patch.name).toBe(present(expected.patches[0], "patch 0 of the fixture").name);
   });
 
   // The all-patches read carries setName; this guards that a single-patch read does too, so the
@@ -66,6 +66,19 @@ describe("read_patch", () => {
 
     const body = JSON.parse(text) as { setName: string };
     expect(body.setName).toBe(expected.name);
+  });
+
+  // The envelope's keys are the tool's own, and the patch's keys are the device's. Nesting is what
+  // keeps a block named `index` or `setName` from shadowing what the read reports.
+  it("carries the patch under its own key rather than spread across the envelope", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const input = { device: "gx1", file: FIXTURE, ref: "0" };
+
+    const { text } = await client.callTool("read_patch", input);
+
+    const body = JSON.parse(text) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(["index", "patch", "setName"]);
   });
 
   // A device library runs to hundreds of patches at roughly 1.4 KB each decoded, which is a
@@ -98,7 +111,7 @@ describe("read_patch", () => {
     const body = pageOf(text);
     expect(body.offset).toBe(1);
     const rest = expected.patches.map((_, index) => index).slice(1);
-    expect(body.patches.map(patch => patch.index)).toEqual(rest);
+    expect(body.patches.map(entry => entry.index)).toEqual(rest);
     expect(body.more).toBeUndefined();
   });
 

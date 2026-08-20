@@ -63,7 +63,8 @@ come from describe_device rather than from this schema, so make that call first.
 \`patches\` takes an array, so a whole set goes out in ONE call. Pass every patch you intend to
 save rather than calling this once per patch. The array's order is the order they sit in the file,
 and the file is written once. Unset params take the device's factory default for the chosen type,
-and the patch echoed back is the complete resulting state, so no follow-up read is needed.`,
+and the patch echoed back under \`patch\` is the complete resulting state, so no follow-up read is
+needed.`,
       inputSchema,
       // A patch whose name is already in the file replaces it, so a save can overwrite work.
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
@@ -84,16 +85,10 @@ and the patch echoed back is the complete resulting state, so no follow-up read 
         if (entry === undefined) {
           throw new Error(`The save reported ${saved.length} patches for the ${stored.length} built.`);
         }
-        return {
-          name: patch.name,
-          action: entry.action,
-          // State the stored order outright, so a caller that omitted `chain` sees the default
-          // it took rather than having to look it up.
-          chain: patch.chain,
-          // Echo back the stored patch so the caller can confirm every field the builder
-          // defaulted, without a follow-up read_patch.
-          patch,
-        };
+        // The patch sits under its own key, matching read_patch, so a caller that reads a patch
+        // and generates one meets one shape. Echoing it whole is what lets the caller confirm
+        // every field the builder defaulted without a follow-up read_patch.
+        return { name: patch.name, action: entry.action, patch };
       });
 
       const fileVerb = created ? "Created" : "Updated";

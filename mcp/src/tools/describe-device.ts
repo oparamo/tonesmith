@@ -46,9 +46,9 @@ const fullGroup = (group: CapabilityGroup): object => {
 };
 
 /**
- * Splits an `items` entry into its group and optional item id, on the FIRST slash only: item ids can
- * themselves contain a slash (the fx effect type "OD/DS"), so "fx/OD/DS" must resolve to group "fx",
- * item "OD/DS" rather than being torn apart.
+ * Splits an `items` entry into its group and optional item id, on the FIRST slash only: an item id
+ * is a device's own label and may contain a slash itself, so "<group>/A/B" has to resolve to group
+ * "<group>", item "A/B" rather than being torn apart.
  */
 const splitEntry = (entry: string): { group: string; item?: string } => {
   const slash = entry.indexOf("/");
@@ -74,8 +74,8 @@ const viewForEntry = (
     return view;
   }
 
-  // The block's own controls apply to whichever item is selected, and they live on the group, so
-  // an item view that omitted them would hide amp's gain/bass/middle/treble entirely.
+  // A block's own controls apply to whichever item is selected, and they live on the group, so an
+  // item view that omitted them would hide every control the block carries outside its items.
   const foundItem = capabilityUtils.findItem(matched, item);
   return { ...foundItem, params: [...(matched.params ?? []), ...(foundItem.params ?? [])] };
 };
@@ -139,10 +139,11 @@ const registerDescribeDevice = (server: McpServer): void => {
     "describe_device",
     {
       description:
-        "Return capability metadata for a device: signal chain, effect types, amp models, cabs, " +
-        "mics, and every param with its key, range, and allowed values. Naming an item also " +
-        "returns an `example`: that block's spec at the device's factory defaults, showing where " +
-        "each param is written. Copy it into generate_patch and change the values you care about.",
+        "Return capability metadata for a device: its signal chain, every block with the types " +
+        "and models it offers, and every param with its key, range, and allowed values. Naming " +
+        "an item also returns an `example`: that block's spec at the device's factory defaults, " +
+        "showing where each param is written. Copy it into generate_patch and change the values " +
+        "you care about.",
       inputSchema: z.object({
         device: deviceField,
         items: z.array(z.string()).optional().describe(

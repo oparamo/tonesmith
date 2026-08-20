@@ -84,8 +84,8 @@ The aim is a self-describing device surface. You ask your AI agent for "a patch 
 based on *some song or tone*", the agent works out what that tone needs, then leans on this server
 for everything device-specific: the supported devices, their signal blocks, effects, parameters,
 and value ranges. The tools carry that knowledge themselves (`describe_device` returns the full set
-of parameter keys, ranges, and values; patch generation echoes back the resolved signal chain), so
-a connected agent can build a patch without any extra setup.
+of parameter keys, ranges, and values; patch generation echoes back the patch it stored), so a
+connected agent can build a patch without any extra setup.
 
 ```bash
 tonesmith-mcp            # installed: runs the server over stdio
@@ -164,7 +164,8 @@ rather than importing a device's own functions.
 
 **The shared layer stays device-agnostic.** `Patch`, `PatchFile`, `PatchDriver` and `RawPatch` are
 the vocabulary everywhere outside `devices/<id>/`. One device's block names and file extension never
-reach core's shared modules, the CLI's shared commands, or an MCP tool.
+reach core's shared modules, the CLI's shared commands, or an MCP tool, in code or in the prose they
+carry: an example spelled out of one device's blocks is an example that fails on every other one.
 
 **A device folder publishes two files.** `driver.ts` holds the `PatchDriver<T>` implementation and
 nothing else. `index.ts` is the packaging file and the device's entire published surface: the driver,
