@@ -51,7 +51,7 @@ describe("buildPatch", () => {
     const read = gx1.driver.decodePatch(gx1.driver.encodePatch(built));
 
     const resend = (): unknown => gx1.driver.buildPatch({
-      name: read.name, memo: read.memo, chain: read.chain, key: read.key,
+      name: read.name, memo: read.memo, chain: read.chain, bpm: read.bpm, key: read.key,
       amp: read.amp, fx1: read.fx1,
     });
 
@@ -69,6 +69,7 @@ describe("buildPatch", () => {
 
     expect(read.delay.params.time, "the fixture's own synced delay").toBe("1/4");
     expect(rebuilt.delay.params.time, "survives the rebuild as the note it is").toBe("1/4");
+    expect(rebuilt.bpm, "against the tempo that says how long that note lasts").toBe(read.bpm);
   });
 
   it("puts a block's params where the decoded patch keeps them", () => {

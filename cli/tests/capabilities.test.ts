@@ -29,6 +29,15 @@ describe("gx1 capabilities", () => {
     }
   });
 
+  // The settings sit in no group, so the chain view is the only page that can print them.
+  it("prints the settings the patch itself holds alongside the chain", async () => {
+    const output = await capabilitiesOutput("chain");
+
+    for (const setting of gx1.driver.capabilities.patchSettings) {
+      expect(output).toContain(setting.name);
+    }
+  });
+
   it("lists a group's item ids", async () => {
     const output = await capabilitiesOutput("amp");
 

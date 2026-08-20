@@ -5,7 +5,7 @@ import { decodeFxParams, encodeFxParams } from "./fx-params";
 import { liftSubType, withStoredSubType } from "./fields";
 import {
   decodeName, encodeName,
-  decodeKey, encodeKey,
+  decodeSettings, encodeSettings,
   decodeChain, encodeChain,
   decodeAmp, encodeAmp,
   decodeDrive, encodeDrive,
@@ -52,7 +52,7 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     name:      decodeName(rawBlock("MEMORY%COM")),
     memo:      raw.memo ?? "",
     chain:     decodeChain(rawBlock("MEMORY%CHAIN")),
-    key:       decodeKey(rawBlock("MEMORY%OTHER")),
+    ...decodeSettings(rawBlock("MEMORY%OTHER")),
     amp:       decodeAmp(rawBlock("MEMORY%AMP")),
     drive:     decodeDrive(rawBlock("MEMORY%ODDS")),
     noiseGate: decodeNoiseGate(rawBlock("MEMORY%NS")),
@@ -87,7 +87,7 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
 
   paramSet["MEMORY%COM"]   = encodeName(patch.name);
   paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain, rawBlock("MEMORY%CHAIN"));
-  paramSet["MEMORY%OTHER"] = encodeKey(patch.key, rawBlock("MEMORY%OTHER"));
+  paramSet["MEMORY%OTHER"] = encodeSettings(patch, rawBlock("MEMORY%OTHER"));
   paramSet["MEMORY%AMP"]   = encodeAmp(patch.amp);
   paramSet["MEMORY%ODDS"]  = encodeDrive(patch.drive);
   paramSet["MEMORY%NS"]    = encodeNoiseGate(patch.noiseGate);

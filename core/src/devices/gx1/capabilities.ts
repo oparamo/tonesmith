@@ -14,7 +14,9 @@
 import type {
   DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec, PatchSpecExample,
 } from "../../types";
-import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES, type PerTypeBlockId } from "./param-catalog";
+import {
+  PARAMS_BY_TYPE, PARAMS_BY_BLOCK, PATCH_SETTINGS, FIELD_LABEL_ALIASES, type PerTypeBlockId,
+} from "./param-catalog";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "./defaults";
 import type { ParamDefaults, BlockDefaults } from "./defaults";
 import { BLOCK_GROUPS, BLOCK_LABELS, DEFAULT_CHAIN, NAME_BYTES, onlyBlockFor } from "./common";
@@ -50,10 +52,11 @@ const withKeys = (block: PerTypeBlockId, type: string, params: readonly ParamSpe
 };
 
 /**
- * Stamps `key` on a single-shape block's params. These blocks are hand-decoded rather than built
- * from a FieldCodec map, so there is no field list to match against: the decoded field name is the
- * catalog label lower-cased and camel-cased ("SOLO LEVEL" → soloLevel). The catalog-completeness
- * guard checks every stamped key against a real decoded block, so this stays derived, not assumed.
+ * Stamps `key` on the params of a single-shape block, and on the patch's own settings. Neither is
+ * built from a FieldCodec map the way a per-type block is, so there is no field list to match
+ * against: the decoded field name is the catalog label lower-cased and camel-cased ("SOLO LEVEL" →
+ * soloLevel). The catalog-completeness guard checks every stamped key against a real decoded patch,
+ * so this stays derived, not assumed.
  */
 const withBlockKeys = (params: readonly ParamSpec[]): ParamSpec[] =>
   params.map(param => {
@@ -552,6 +555,7 @@ const gx1Capabilities: DeviceCapabilities = {
       "is what a manual or a photo of the unit shows. Write the names, not the labels.",
   },
   patchName: { maxLength: NAME_BYTES },
+  patchSettings: withBlockKeys(PATCH_SETTINGS),
   groups: withExamples([
     {
       id: "fx",

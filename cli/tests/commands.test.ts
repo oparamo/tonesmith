@@ -6,6 +6,7 @@ import { configureDeviceCommands } from "../src/common/commands";
 const caps: DeviceCapabilities = {
   chain: { description: "The signal chain model.", defaultOrder: ["amp", "delay"], blocks: {} },
   patchName: { maxLength: 16 },
+  patchSettings: [],
   groups: [],
 };
 

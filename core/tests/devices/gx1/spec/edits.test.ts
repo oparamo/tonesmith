@@ -34,6 +34,26 @@ const valueAt = (patch: Patch, path: string): unknown => {
 };
 
 describe("applyEdits", () => {
+  it("writes a patch setting, which belongs to no block", () => {
+    const patch = patchWith({});
+
+    const applied = applyTo(patch, { bpm: 140 });
+
+    expect(patch.bpm).toBe(140);
+    expect(applied).toEqual({ bpm: 140 });
+  });
+
+  // A setting names no block, so the per-block check never sees it. Without a check of its own the
+  // value reaches the encoder, which knows a byte index and not the field a caller typed.
+  it("rejects a patch setting the device cannot store, naming it and its range", () => {
+    const patch = patchWith({});
+
+    const [issue] = issuesFrom(patch, { bpm: 12 });
+
+    expect(issue).toContain("BPM");
+    expect(issue).toContain("40");
+  });
+
   it("writes a value the device accepts and reports what landed", () => {
     const patch = patchWith({});
 

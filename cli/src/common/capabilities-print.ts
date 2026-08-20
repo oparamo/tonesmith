@@ -1,12 +1,27 @@
-import type { DeviceCapabilities, CapabilityGroup, CapabilityItem, ChainSpec } from "@tonesmith/core";
+import type { DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec } from "@tonesmith/core";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "./color";
 
-/** Print the device's signal-chain model: default order, plus how ordering and bypass work. */
-const printChain = (chain: ChainSpec): void => {
-  console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
-  console.info(`${YELLOW}Default order:${RESET} ${chain.defaultOrder.join(" → ")}\n`);
-  console.info(chain.description);
+/**
+ * Print the settings the patch carries itself. They belong to no group, so the chain view is where
+ * a reader meets them: a device with a reference tempo has nowhere else to say so.
+ */
+const printPatchSettings = (settings: ParamSpec[]): void => {
+  if (settings.length === 0) return;
+  console.info(`${YELLOW}Patch settings:${RESET}`);
+  for (const setting of settings) {
+    const keyTag = setting.key ? `  ${GREEN}${setting.key}${RESET}` : "";
+    console.info(`  ${setting.name.padEnd(14)} ${DIM}${setting.range}${RESET}${keyTag}`);
+  }
   console.info();
+};
+
+/** Print the device's signal-chain model: default order, plus how ordering and bypass work. */
+const printChain = (caps: DeviceCapabilities): void => {
+  console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
+  console.info(`${YELLOW}Default order:${RESET} ${caps.chain.defaultOrder.join(" → ")}\n`);
+  console.info(caps.chain.description);
+  console.info();
+  printPatchSettings(caps.patchSettings);
 };
 
 /** Print a summary table of all groups (id, name, item count), led by a chain pointer. */

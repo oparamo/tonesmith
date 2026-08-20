@@ -220,6 +220,10 @@ const checkValue = (issues: Issues, check: ParamCheck): void => {
   if (issue !== undefined) issues.push(`${paramLabel(check)} ${issue} (got ${JSON.stringify(value)})`);
 };
 
+/** Params indexed by the key a spec writes them under, which is where a supplied value is matched. */
+const specsByKey = (specs: readonly ParamSpec[]): Map<string, ParamSpec> =>
+  new Map(specs.flatMap(spec => (spec.key === undefined ? [] : [[spec.key, spec] as const])));
+
 /**
  * Validates one block's selection against the catalog: that its `subType` is a variant this type
  * actually has, and that every supplied param value fits the spec for the chosen type (numeric
@@ -238,11 +242,34 @@ const validateTypeParams = (params: TypeParams): Issues => {
     checkSubType(issues, { group, type, item: selection.item, subType });
   }
 
-  const specs = specsForType(selection, subType);
-  const byKey = new Map(specs.flatMap(spec => (spec.key === undefined ? [] : [[spec.key, spec] as const])));
+  const byKey = specsByKey(specsForType(selection, subType));
   for (const [key, value] of Object.entries(values)) {
     const spec = byKey.get(key);
     if (spec !== undefined) checkValue(issues, { group, type, spec, value });
+  }
+  return issues;
+};
+
+/**
+ * How a rejection names the patch's own settings. They belong to no block, so the group name a
+ * block's params are reported under has nothing to stand in for it.
+ */
+const PATCH_GROUP = "patch";
+
+/**
+ * Every problem with the patch's own settings: its tempo, key, output trim and the two switches
+ * that decide what survives a patch change. They take the same check a block's params get, since
+ * they are ordinary params that happen to sit on the patch rather than inside a block.
+ *
+ * `values` may carry a whole patch spec, blocks and all: a key with no spec is skipped, the same
+ * way `validateTypeParams` leaves an unknown param key to the builder's own message.
+ */
+const validatePatchSettings = (values: Record<string, unknown>): Issues => {
+  const issues: Issues = [];
+  const byKey = specsByKey(gx1Capabilities.patchSettings);
+  for (const [key, value] of Object.entries(values)) {
+    const spec = byKey.get(key);
+    if (spec !== undefined) checkValue(issues, { group: PATCH_GROUP, spec, value });
   }
   return issues;
 };
@@ -281,6 +308,6 @@ const typeSurface = (selected: Selected): TypeSurface | undefined => {
 
 export {
   checkSelectors, checkTypeBelongsInBlock, resolveSelection, typeChoices, unknownTypeIssue,
-  validateTypeParams, typeSurface,
+  validateTypeParams, validatePatchSettings, typeSurface,
 };
 export type { Issues, Selection, Selectors, TypeParams, TypeSurface };

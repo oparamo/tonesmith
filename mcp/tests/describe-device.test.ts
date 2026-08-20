@@ -61,6 +61,19 @@ describe("describe_device", () => {
     expect(chain.defaultOrder, "chain view lists the default block order").toEqual(gx1.driver.capabilities.chain.defaultOrder);
   });
 
+  // The settings belong to no group, so this entry is the only one that can carry them. Dropping
+  // them from it makes a device's tempo undiscoverable without ever failing a call.
+  it("carries the settings the patch itself holds on the chain entry", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const { text, isError } = await client.callTool("describe_device", { device: "gx1", items: ["chain"] });
+
+    expect(isError, text).toBe(false);
+    const chain = viewOf(text, "chain") as { patchSettings: { key: string }[] };
+    expect(chain.patchSettings).toEqual(gx1.driver.capabilities.patchSettings);
+  });
+
   // The whole point of the batch form: a patch's worth of lookups in one round trip.
   it("resolves every requested entry in one call, keyed by the entry string", async () => {
     const client = await connectClient();

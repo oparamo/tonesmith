@@ -18,11 +18,12 @@ Building patches takes two calls, however many patches you are building:
 1. describe_device <device> items: [...] is ONE call naming "chain" plus every group and effect type
    you need. Omit \`items\` to list this device's own group ids, with an example call built from
    them; an entry is a group id, or "<group>/<item>" for one type within a group. "chain" returns
-   the device's block order and how bypass works; each other entry returns that item's params with
-   their exact key, range, and allowed values, plus an \`example\`: that block's spec at factory
-   defaults, which you copy into the call below and change the values you care about. Work the full
-   list out first, rather than one call per effect. This is the only source for a device's blocks,
-   types and params; no tool schema repeats them.
+   the device's block order, how bypass works, and the settings the patch carries itself rather than
+   inside any block (a reference tempo, an output trim), which you set beside \`name\`; each other
+   entry returns that item's params with their exact key, range, and allowed values, plus an
+   \`example\`: that block's spec at factory defaults, which you copy into the call below and change
+   the values you care about. Work the full list out first, rather than one call per effect. This
+   is the only source for a device's blocks, types and params; no tool schema repeats them.
 2. generate_patch takes every patch in the \`patches\` array, in the order you want them on the
    device, with one output path. The response echoes each patch under \`patch\`, complete with the
    defaults it filled in, so that response IS your confirmation: you do not need to read the file

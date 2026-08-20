@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePedalFx,
-  decodeKey, encodeKey, decodeNoiseGate, encodeNoiseGate, decodeVolume, encodeVolume, decodeName, encodeName,
+  decodeSettings, encodeSettings, decodeNoiseGate, encodeNoiseGate, decodeVolume, encodeVolume, decodeName, encodeName,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import {
@@ -157,37 +157,58 @@ describe("Chain block (real device values)", () => {
 });
 
 
-// ── Key (MEMORY%OTHER byte 4) ─────────────────────────────────────────────────
+// ── Patch settings (MEMORY%OTHER) ─────────────────────────────────────────────
+//
+// The device's own factory bytes for the block, which `blankPatch` opens every patch at.
 
-describe("Key", () => {
-  it("decodes the default key", () => {
-    const bytes = new Array<number>(7).fill(0);
-    const hexList = hexFromBytes(bytes);
+const FACTORY_SETTING_BYTES = [6, 4, 7, 8, 0, 1, 0];
 
-    const key = decodeKey(hexList);
+describe("Patch settings", () => {
+  it("decodes every setting from the device's factory bytes", () => {
+    const decoded = decodeSettings(hexFromBytes(FACTORY_SETTING_BYTES));
 
-    expect(key).toBe("C");
+    expect(decoded).toEqual({
+      memoryLevel: 100,
+      bpm: 120,
+      key: "C",
+      carryover: true,
+      tempoHold: false,
+    });
   });
 
-  it("decodes a non-default key", () => {
-    const bytes = new Array<number>(7).fill(0);
-    bytes[4] = 7; // G
-    const hexList = hexFromBytes(bytes);
+  it("encodes what it decoded back to the same bytes", () => {
+    const originalHex = hexFromBytes(FACTORY_SETTING_BYTES);
 
-    const key = decodeKey(hexList);
+    const reencoded = encodeSettings(decodeSettings(originalHex), originalHex);
 
-    expect(key).toBe("G");
+    expect(reencoded).toEqual(originalHex);
   });
 
-  it("encodes a key while preserving the rest of MEMORY%OTHER untouched", () => {
-    const original = [6, 4, 7, 8, 0, 1, 0];
-    const originalHex = hexFromBytes(original);
+  it("changes one setting and leaves the other bytes as they were", () => {
+    const originalHex = hexFromBytes(FACTORY_SETTING_BYTES);
+    const settings = { ...decodeSettings(originalHex), key: "G" };
 
-    const encodedHex = encodeKey("G", originalHex);
-    const result = bytesFromHex(encodedHex);
+    const result = bytesFromHex(encodeSettings(settings, originalHex));
 
-    expect(result[4]).toBe(7);
     expect(result).toEqual([6, 4, 7, 8, 7, 1, 0]);
+  });
+
+  it("splits each 8-bit setting across its two nibbles at the top of its range", () => {
+    const originalHex = hexFromBytes(FACTORY_SETTING_BYTES);
+    const settings = { ...decodeSettings(originalHex), memoryLevel: 200, bpm: 250 };
+
+    const result = bytesFromHex(encodeSettings(settings, originalHex));
+
+    expect(result).toEqual([12, 8, 15, 10, 0, 1, 0]);
+  });
+
+  it("round-trips a setting stored across two nibbles", () => {
+    const originalHex = hexFromBytes(FACTORY_SETTING_BYTES);
+    const settings = { ...decodeSettings(originalHex), bpm: 137 };
+
+    const reencoded = encodeSettings(settings, originalHex);
+
+    expect(decodeSettings(reencoded).bpm).toBe(137);
   });
 });
 

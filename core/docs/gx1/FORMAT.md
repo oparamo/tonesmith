@@ -47,7 +47,7 @@ Each patch:
 | `MEMORY%PFX`       |  14 | Pedal FX (WAH / PEDAL BEND)                                |
 | `MEMORY%FV`        |   4 | Foot volume                                                |
 | `MEMORY%NS`        |   4 | Noise suppressor                                           |
-| `MEMORY%OTHER`     |   7 | Master (BPM, key, carryover, etc.); only `key` is decoded  |
+| `MEMORY%OTHER`     |   7 | The patch's own settings: memory level, BPM, key, carryover |
 | `MEMORY%CTL`       |  32 | CTL footswitch assignments                                 |
 | `MEMORY%ASGN1`–`8` |  15 | Expression/assign slots                                    |
 
@@ -55,7 +55,7 @@ Each patch:
 
 Delay times, pre-delays and modulation rates store either a plain number or a note value, in one
 field. The numbers run up to the parameter's own ceiling, and the 18 codes immediately above it are
-note divisions, which the device plays against the patch tempo in `MEMORY%OTHER` rather than as a
+note divisions, which the device plays against the patch's own tempo (`patch.bpm`) rather than as a
 fixed span of milliseconds. A code is read as `ceiling + 1 + position in the list below`.
 
 | Parameter                                          | Numbers    | Note codes  |
@@ -485,17 +485,22 @@ same "shadow bytes" union layout as MEMORY%DLY and MEMORY%REV.
 | 2    | release   | 0–100               |
 | 3    | detect    | 0=INPUT, 1=NS INPUT |
 
-## MEMORY%OTHER: Patch Metadata (7 bytes)
+## MEMORY%OTHER: Patch Settings (7 bytes)
 
-Only `key` is decoded (`patch.key`); the rest is preserved verbatim (see rationale below).
+Every byte is decoded, and each field sits at the top level of the patch rather than inside a
+block: `patch.bpm`, `patch.key` and so on. They belong to the patch as a whole, which is where the
+device keeps them.
 
 | Byte(s) | Field       | Notes                                                                                                                                                                                                                    |
 |---------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 0–1     | memoryLevel | 8-bit, 2 hex-digit nibbles. Overall patch output trim, 0–200. Not decoded.                                                                                                                                                |
-| 2–3     | bpm         | 8-bit, 2 hex-digit nibbles. Reference tempo, 40–250. The tempo every note value resolves against (see "Tempo sync" above); a parameter holding a plain number ignores it. Not decoded.                                     |
-| 4       | key         | 0–11, one of `KEY_NAMES` (C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B). This is the song key that resolves `HARMONIST`'s diatonic `harmony` intervals (+2nd, +3rd, +6th, etc.) to actual semitones. Decoded as `patch.key`.    |
-| 5       | carryover   | 0=OFF, 1=ON. Whether the current tone keeps sounding through a patch change. Not decoded.                                                                                                                                 |
-| 6       | tempoHold   | 0=OFF, 1=ON. Whether tempo persists across a patch change. Not decoded.                                                                                                                                                   |
+| 0–1     | memoryLevel | 8-bit, 2 hex-digit nibbles. Overall patch output trim, 0–200, with 100 as unity.                                                                                                                                          |
+| 2–3     | bpm         | 8-bit, 2 hex-digit nibbles. Reference tempo, 40–250. The tempo every note value resolves against (see "Tempo sync" above); a parameter holding a plain number ignores it.                                                  |
+| 4       | key         | 0–11, one of `KEY_NAMES` (C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B). This is the song key that resolves `HARMONIST`'s diatonic `harmony` intervals (+2nd, +3rd, +6th, etc.) to actual semitones.                            |
+| 5       | carryover   | 0=OFF, 1=ON. Whether the current tone keeps sounding through a patch change. The device applies it only when the patches either side use the same effect configuration.                                                    |
+| 6       | tempoHold   | 0=OFF, 1=ON. Whether this patch's BPM stays in force across a patch change, instead of the next patch's own taking over.                                                                                                   |
+
+The parameter guide prints MEM LEVEL's range as 1–200; the device's own address table gives 0–200,
+which is what the codec accepts.
 
 ## Blocks documented but out of scope
 

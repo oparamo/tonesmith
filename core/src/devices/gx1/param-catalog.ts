@@ -498,6 +498,20 @@ const PARAMS_BY_TYPE = {
   fxDelay: FX_DELAY_PARAMS,
 } as const satisfies Record<string, Record<string, ParamSpec[]>>;
 
+/**
+ * The patch's own settings, which belong to no block: the device keeps them in a block of its own
+ * that no effect reads. Two of them reach the sound through other blocks, which is why they are
+ * described here rather than left as file metadata: KEY is what HARMONIST resolves its diatonic
+ * intervals against, and BPM is the tempo every note-valued control plays against.
+ */
+const PATCH_SETTINGS: ParamSpec[] = [
+  def("MEMORY LEVEL", num(0, 200), "Output volume of the whole patch, with 100 as the unity setting the device ships every patch at."),
+  def("BPM", num(40, 250), "Reference tempo in quarter-note beats per minute. A control set to a note value rather than a number plays that note at this tempo."),
+  def("KEY", oneOf(...KEY_NAMES), "Musical key HARMONIST calculates its diatonic harmony intervals in. Each major key implies its relative minor, so C also covers Am."),
+  def("CARRYOVER", bool(), "Whether the sound already ringing (a delay or reverb tail) keeps sounding when the player switches to another patch. The device applies it only when both patches use the same effect configuration."),
+  def("TEMPO HOLD", bool(), "Whether this patch's BPM stays in force when the player switches patches, instead of the next patch's own tempo taking over."),
+];
+
 /** Single-shape blocks: `[block] -> params`. */
 const PARAMS_BY_BLOCK = {
   amp: AMP_PARAMS,
@@ -534,5 +548,5 @@ const FIELD_LABEL_ALIASES: Record<PerTypeBlockId, Record<string, Record<string, 
   fxDelay: {},
 };
 
-export { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES };
+export { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, PATCH_SETTINGS, FIELD_LABEL_ALIASES };
 export type { PerTypeBlockId, SingleShapeBlockId };

@@ -19,21 +19,41 @@ import { PARAM_SUBTYPE_EFFECTS, DEFAULT_CHAIN } from "../../../src/devices/gx1/c
 import { DEFAULT_INIT_FIXTURE, present, patchAt } from "../../helpers";
 
 describe("basePatch", () => {
-  it("defaults to DEFAULT_CHAIN and key C", () => {
+  it("opens at the default chain and the device's own factory settings", () => {
     const patch = basePatch("Lead");
 
     expect(patch.name).toBe("Lead");
     expect(patch.chain).toEqual(DEFAULT_CHAIN);
+    expect(patch.memoryLevel).toBe(100);
+    expect(patch.bpm).toBe(120);
     expect(patch.key).toBe("C");
+    expect(patch.carryover).toBe(true);
+    expect(patch.tempoHold).toBe(false);
   });
 
-  it("accepts a custom chain and key", () => {
+  it("accepts a custom chain and any patch setting", () => {
     const custom = moveBefore(DEFAULT_CHAIN, "drive", "fx1");
 
-    const patch = basePatch("Test", custom, "G");
+    const patch = basePatch("Test", { chain: custom, key: "G", bpm: 90 });
 
     expect(patch.chain).toEqual(custom);
     expect(patch.key).toBe("G");
+    expect(patch.bpm).toBe(90);
+  });
+
+  // The two switches ship on and off respectively, so a truthiness test for "did the caller say"
+  // would silently restore the factory value for whichever one they deliberately turned off.
+  it("keeps a setting the caller set to false", () => {
+    const patch = basePatch("Test", { carryover: false });
+
+    expect(patch.carryover).toBe(false);
+  });
+
+  it("leaves the settings the caller did not name at their factory values", () => {
+    const patch = basePatch("Test", { bpm: 90 });
+
+    expect(patch.memoryLevel).toBe(100);
+    expect(patch.key).toBe("C");
   });
 });
 
@@ -60,7 +80,7 @@ describe("moveBefore", () => {
   // byte-diffed), so a wrong MEMORY%CHAIN encoding fails this, not just self-consistency.
   it("encodes an fx2-after-noiseGate reorder to the real device bytes", () => {
     const chain = moveBefore(DEFAULT_CHAIN, "fx2", "noiseGate");
-    const patch = basePatch("Test", chain);
+    const patch = basePatch("Test", { chain });
 
     const encoded = encodePatch(patch);
     const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
@@ -70,7 +90,7 @@ describe("moveBefore", () => {
 
   it("encodes a drive-before-fx1 reorder to the real device bytes", () => {
     const chain = moveBefore(DEFAULT_CHAIN, "drive", "fx1");
-    const patch = basePatch("Test", chain);
+    const patch = basePatch("Test", { chain });
 
     const encoded = encodePatch(patch);
     const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));

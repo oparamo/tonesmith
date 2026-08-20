@@ -151,6 +151,32 @@ describe("validatePatchSpec", () => {
     expect(validatePatchSpec({ name: "Test" })).toEqual([]);
   });
 
+  it("accepts every patch setting at a value the device stores", () => {
+    const settings = { memoryLevel: 0, bpm: 250, key: "F#", carryover: false, tempoHold: true };
+
+    expect(validatePatchSpec({ ...valid, ...settings })).toEqual([]);
+  });
+
+  const unstorableSettings = [
+    { field: "memoryLevel", value: 201, label: "MEMORY LEVEL", accepted: "200" },
+    { field: "bpm", value: 39, label: "BPM", accepted: "40" },
+    { field: "key", value: "H", label: "KEY", accepted: "F#" },
+    { field: "carryover", value: "yes", label: "CARRYOVER", accepted: "true" },
+    { field: "tempoHold", value: 1, label: "TEMPO HOLD", accepted: "true" },
+  ];
+
+  it.each(unstorableSettings)(
+    "rejects $field outside what the device stores, naming the setting and what it takes",
+    ({ field, value, label, accepted }) => {
+      const [issue, ...rest] = validatePatchSpec({ ...valid, [field]: value });
+
+      expect(rest).toEqual([]);
+      expect(issue, "names the setting").toContain(label);
+      expect(issue, "and what it accepts").toContain(accepted);
+      expect(issue, "and quotes back what it rejected").toContain(JSON.stringify(value));
+    }
+  );
+
   it("rejects a value of the wrong kind, naming the param", () => {
     const [issue] = validatePatchSpec({ ...valid, noiseGate: { params: { threshold: "loud", release: 40 } } });
 
