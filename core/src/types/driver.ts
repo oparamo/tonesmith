@@ -1,5 +1,6 @@
 import type { FieldValue, Patch, PatchFile, RawPatch } from "./patch";
 import type { DeviceCapabilities } from "./capabilities";
+import type { PatchView } from "./view";
 
 /** One requested edit: a dot-path, and the value to write there. */
 type FieldEdit = readonly [path: string, value: FieldValue];
@@ -32,6 +33,12 @@ interface PatchDriver<T extends Patch = Patch> {
    * partly edited, so a caller writes the file only once this returns.
    */
   applyEdits(patch: T, edits: readonly FieldEdit[]): FieldEdits;
+  /**
+   * The patch as a person reads it: the device's own block labels, in the order this patch runs
+   * them, with whatever the device stores about the patch itself. Grouping, ordering and labels
+   * stay the driver's, so displaying a device that ships later costs nothing outside its driver.
+   */
+  viewPatch(patch: T): PatchView;
   decodePatch(raw: RawPatch): T;
   encodePatch(patch: T): RawPatch;
 }

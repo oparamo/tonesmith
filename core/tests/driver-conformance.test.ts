@@ -69,3 +69,19 @@ describe("every driver's chain names the blocks a spec names", () => {
     expect(new Set(stored)).toEqual(new Set(chain.defaultOrder));
   });
 });
+
+describe("every driver's view shows the patch under the chain's own names", () => {
+  it.each(drivers.map(driver => ({ id: driver.id, driver })))("$id", ({ driver }) => {
+    const { chain } = driver.capabilities;
+    const view = driver.viewPatch(driver.buildPatch({ name: "View" }));
+
+    const keys = view.blocks.map(block => block.key);
+    expect(new Set(keys), "the view covers every block the chain names").toEqual(
+      new Set(chain.defaultOrder)
+    );
+    for (const block of view.blocks) {
+      expect(block.label, `${block.key} is shown under its panel label`).toBe(chain.blocks[block.key]);
+      expect(block.params, `${block.key} carries its controls`).toBeDefined();
+    }
+  });
+});

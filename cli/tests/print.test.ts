@@ -1,94 +1,84 @@
 import { describe, it, expect, vi, afterEach, type MockInstance } from "vitest";
-import { gx1 } from "@tonesmith/core";
-import { printPatch } from "../src/devices/gx1/print";
+import type { BlockView, PatchView } from "@tonesmith/core";
+import { printPatch } from "../src/common/patch-print";
 
 const capturedOutput = (info: MockInstance<(message?: unknown) => void>): string =>
   info.mock.calls.map(call => String(call[0])).join("\n");
 
+const block = (overrides: Partial<BlockView> = {}): BlockView =>
+  ({ label: "AMP", key: "amp", on: true, type: "JC-120", params: { gain: 72 }, ...overrides });
+
+const view = (overrides: Partial<PatchView> = {}): PatchView =>
+  ({ name: "Test", details: [], blocks: [block()], ...overrides });
+
+/** What the renderer prints for one view, with color off: these tests run outside a terminal. */
+const printed = (patch: PatchView, index = 0): string => {
+  const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  printPatch(patch, index);
+  return capturedOutput(info);
+};
+
 describe("printPatch", () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  // A bypassed block keeps its settings on the device, so the printer shows them rather than
+  it("heads the patch with its index and name", () => {
+    const output = printed(view({ name: "SWORD LEAD" }), 3);
+
+    expect(output).toContain("[3] SWORD LEAD");
+  });
+
+  it("prints each detail the driver supplied, in the order it supplied them", () => {
+    const details = [{ label: "Chain", value: "amp, delay" }, { label: "Key", value: "E" }];
+
+    const output = printed(view({ details }));
+
+    expect(output).toContain("Chain: amp, delay");
+    expect(output.indexOf("Chain:")).toBeLessThan(output.indexOf("Key:"));
+  });
+
+  // The key is what a `write` dot-path and a patch spec take, and no abbreviated panel label
+  // gives it away.
+  it("prints a block under its panel label and its key", () => {
+    const output = printed(view({ blocks: [block({ label: "OD/DS", key: "drive" })] }));
+
+    expect(output).toContain("OD/DS [drive]");
+  });
+
+  // A bypassed block keeps its settings on the device, so the renderer shows them rather than
   // hiding the block, matching every other block and matching read_patch.
-  it("prints the OD/DS line with its params when the drive block is off", () => {
-    const patch = gx1.driver.buildPatch({
-      name: "Test",
-      amp: { type: "JC-120" },
-      drive: { type: "OVERDRIVE", on: false, params: { drive: 50, tone: 0, level: 50 } },
-    });
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  it("shows a bypassed block's controls under an OFF tag", () => {
+    const drive = block({ label: "OD/DS", key: "drive", on: false, params: { drive: 50 } });
 
-    printPatch(patch, 0);
+    const output = printed(view({ blocks: [drive] }));
 
-    const output = capturedOutput(info);
-    expect(output).toContain("OD/DS [OFF]");
-    expect(output).toContain("Drive=50");
+    expect(output).toContain("[OFF]");
+    expect(output).toContain("drive=50");
   });
 
-  it("prints the memo when a patch carries one", () => {
-    const patch = gx1.driver.blankPatch("Test");
-    patch.memo = "bridge pickup";
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  it("tags no bypass state on a block the device always runs", () => {
+    const volume = block({ label: "FV", key: "volume", on: undefined, type: undefined });
 
-    printPatch(patch, 0);
+    const output = printed(view({ blocks: [volume] }));
 
-    expect(capturedOutput(info)).toContain("Memo: bridge pickup");
+    expect(output).not.toContain("[ON]");
+    expect(output).not.toContain("[OFF]");
   });
 
-  it("shows the solo level when the drive block's solo is enabled", () => {
-    const patch = gx1.driver.buildPatch({
-      name: "Test",
-      amp: { type: "JC-120" },
-      drive: { type: "OVERDRIVE", params: { drive: 50, tone: 0, level: 50, solo: true, soloLevel: 75 } },
-    });
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  it("prints the selected model in parentheses after the type", () => {
+    const fx1 = block({ label: "FX1", key: "fx1", type: "COMPRESSOR", subType: "BOSS COMP" });
 
-    printPatch(patch, 0);
+    const output = printed(view({ blocks: [fx1] }));
 
-    const output = capturedOutput(info);
-    expect(output).toContain("Solo=ON(75)");
+    expect(output).toContain("COMPRESSOR (BOSS COMP)");
+    expect(output).not.toContain("subType=");
   });
 
-  it("shows the type's default params for an FX slot the caller didn't configure", () => {
-    const patch = gx1.driver.buildPatch({
-      name: "Test",
-      amp: { type: "JC-120" },
-      fx1: { type: "TREMOLO" },
-    });
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  it("omits the params line for a block that carries no controls", () => {
+    const empty = block({ label: "FX1", key: "fx1", type: "BOGUS EFFECT", params: {} });
 
-    printPatch(patch, 0);
+    const output = printed(view({ blocks: [empty] }));
 
-    const output = capturedOutput(info);
-    expect(output).toContain("FX1 [ON]  TREMOLO");
-    expect(output).toContain("rate=75  depth=50  level=100");
-  });
-
-  it("omits the params line for a block whose type has no known fields", () => {
-    const patch = gx1.driver.blankPatch("Test");
-    // A pedal-fx type outside PFX_TYPE_MAPS decodes with no params at all, which leaves the header
-    // line with nothing to print under it.
-    patch.pedalFx = { on: true, type: "BOGUS TYPE", subType: null, params: {} } as unknown as gx1.Patch["pedalFx"];
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
-
-    printPatch(patch, 0);
-
-    const output = capturedOutput(info);
-    expect(output).toContain("PFX [ON]  BOGUS TYPE");
-    expect(output).not.toMatch(/PFX.*\n\s+\w+=/);
-  });
-
-  it("omits the params line for an FX slot whose type has no known fields", () => {
-    const patch = gx1.driver.blankPatch("Test");
-    // An fx type outside the codec's param maps: the builder refuses it, so it can only arrive
-    // here the way a file holding it would, decoded straight onto the block.
-    patch.fx1 = { on: true, type: "BOGUS EFFECT", subType: null, params: {} } as unknown as gx1.Patch["fx1"];
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
-
-    printPatch(patch, 0);
-
-    const output = capturedOutput(info);
-    expect(output).toContain("FX1 [ON]  BOGUS EFFECT");
+    expect(output).toContain("FX1 [fx1]");
     expect(output).not.toMatch(/FX1.*\n\s+\w+=/);
   });
 });

@@ -32,6 +32,7 @@ const makeFakeDriver = (files: Map<string, PatchFile>): PatchDriver => ({
   blankPatch: (name = "blank") => makePatch(name),
   buildPatch: (spec) => makePatch((spec as { name: string }).name),
   applyEdits: (_, edits) => Object.fromEntries(edits),
+  viewPatch: (patch) => ({ name: patch.name, details: [], blocks: [] }),
   decodePatch: (raw) => raw as unknown as Patch,
   encodePatch: (patch) => patch as unknown as Record<string, unknown>,
 });

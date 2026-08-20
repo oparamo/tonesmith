@@ -135,7 +135,7 @@ pnpm doc-to-md manual.pdf -o out.md    # local PDF manual to Markdown
 
 ```tree
 core/            @tonesmith/core: device-agnostic types, registry, and utils; one driver per device under src/devices/<id>/
-cli/             @tonesmith/cli:  shared device-agnostic commands; one thin printer/descriptor per device under src/devices/<id>/
+cli/             @tonesmith/cli:  commands and printing, all device-agnostic; a device is picked up from the core roster
 mcp/             @tonesmith/mcp:  MCP tools, all device-agnostic; a device is picked up from the core roster
 tools/           repo tooling (doc-to-md); not published
 fixtures/<id>/   one committed real patch-file export per device, the round-trip test baseline
@@ -156,9 +156,9 @@ pnpm clean        # remove dist/ directories
 
 The conventions below aren't checked by lint, and they're what makes a change look like it belongs.
 
-**Devices plug in; nothing else changes.** Adding one means a `core/src/devices/<id>/` driver, a
-`cli/src/devices/<id>/` printer, one roster line per package, and a fixture. No entry-point file
-and no shared module is edited to make room for it. Drivers don't self-register: `core/src/index.ts`
+**Devices plug in; nothing else changes.** Adding one means a `core/src/devices/<id>/` driver, one
+roster line, and a fixture. The CLI and the MCP server pick the device up from the core roster, so
+neither package gains a file. No entry-point file and no shared module is edited to make room for it. Drivers don't self-register: `core/src/index.ts`
 is the composition root and iterates the roster. Consumers call through the `PatchDriver` interface
 rather than importing a device's own functions.
 

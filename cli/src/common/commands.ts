@@ -2,8 +2,8 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, capabilityUtils } from "@tonesmith/core";
-import type { PrintPatch } from "../types";
 import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
+import { printPatch } from "./patch-print";
 
 /**
  * Splits "amp.params.gain=72" at the first "=", so a value containing one survives intact. Without
@@ -34,7 +34,7 @@ const run = (action: () => void): void => {
   }
 };
 
-const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPatch: PrintPatch<T>): void => {
+const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("read <file> [ref]")
     .description("display one or all patches from a patch file")
@@ -44,7 +44,7 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>, printPat
         // The driver's own name, not the file's `device` id, since this line is for a person.
         console.info(`File: ${file}  |  Set: ${patchFile.name}  |  Device: ${driver.name}`);
         for (const { index, patch } of patchUtils.resolvePatches(patchFile.patches, ref)) {
-          printPatch(patch, index);
+          printPatch(driver.viewPatch(patch), index);
         }
         console.info();
       });
@@ -147,12 +147,8 @@ const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>):
 };
 
 /** Every command a device gets for free, in the order they appear in `--help`. */
-const configureDeviceCommands = <T extends Patch>(
-  cmd: Command,
-  driver: PatchDriver<T>,
-  printPatch: PrintPatch<T>,
-): void => {
-  addRead(cmd, driver, printPatch);
+const configureDeviceCommands = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
+  addRead(cmd, driver);
   addWrite(cmd, driver);
   addCopy(cmd, driver);
   addNew(cmd, driver);
