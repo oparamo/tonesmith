@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { registry } from "@tonesmith/core";
-import { devices } from "./devices";
+import { configureDeviceCommands } from "./common";
 import packageJson from "../package.json" with { type: "json" };
 
 const buildProgram = (): Command => {
@@ -10,10 +10,9 @@ const buildProgram = (): Command => {
     .description("multi-device guitar processor patch toolkit")
     .version(packageJson.version);
 
-  for (const device of devices) {
-    const driver = registry.getDriver(device.id);
-    const cmd = program.command(device.id).description(driver.name);
-    device.configure(cmd, driver);
+  for (const driver of registry.listDrivers()) {
+    const cmd = program.command(driver.id).description(driver.name);
+    configureDeviceCommands(cmd, driver);
   }
 
   return program;

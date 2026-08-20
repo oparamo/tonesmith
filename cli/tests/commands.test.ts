@@ -19,6 +19,7 @@ const makeDriver = (overrides: Partial<PatchDriver> = {}): PatchDriver => ({
   blankPatch: (name = "NEW") => ({ name }),
   buildPatch: (spec: unknown) => ({ name: (spec as { name: string }).name }),
   applyEdits: (_, edits) => Object.fromEntries(edits),
+  viewPatch: (patch: Patch) => ({ name: patch.name, details: [], blocks: [] }),
   decodePatch: (raw: RawPatch) => raw as unknown as Patch,
   encodePatch: (patch: Patch) => patch as unknown as RawPatch,
   ...overrides,
@@ -26,7 +27,7 @@ const makeDriver = (overrides: Partial<PatchDriver> = {}): PatchDriver => ({
 
 const buildTestCommand = (driver: PatchDriver): Command => {
   const cmd = new Command("stub");
-  configureDeviceCommands(cmd, driver, () => { /* no-op print */ });
+  configureDeviceCommands(cmd, driver);
   cmd.exitOverride();
   return cmd;
 };

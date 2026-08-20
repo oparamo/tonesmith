@@ -50,8 +50,8 @@ Each device's committed round-trip fixture lives at `fixtures/<id>/`.
 
 Every `devices/<id>/` directory below follows one fixed per-device shape (gx1 is the current
 instance and the structural reference; the add-device skill enforces the shape for new devices).
-Adding a device means adding those directories plus one roster line per package. Nothing else in
-this tree changes.
+Adding a device means adding that directory plus one line in the core roster. The CLI and the MCP
+server read that roster, so nothing else in this tree changes.
 
 ```text
 fixtures/<id>/              one committed real patch-file export per device, in the device's own
@@ -63,6 +63,8 @@ core/                       @tonesmith/core
       patch.ts              Patch, PatchFile, RawPatch
       driver.ts             PatchDriver<T> interface (includes capabilities field)
       capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec
+      view.ts               PatchView / BlockView / PatchDetail: a patch as a person reads it,
+                            composed by the driver and rendered by whoever displays it
     registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
     patch-utils.ts          patch-file operations every surface shares: resolvePatch /
                             resolvePatches, upsertPatches, copyPatch, createPatchFile. Editing a
@@ -92,6 +94,8 @@ core/                       @tonesmith/core
       capabilities.ts       the device's DeviceCapabilities metadata (structure/models/subtypes;
                             each item's params come from param-catalog.ts)
       driver.ts             PatchDriver<T> object wiring codec + file I/O together
+      view.ts               the device's blocks in reading order, under its own panel labels,
+                            behind PatchDriver.viewPatch
       spec/                 validates a patch spec against the device's own capability catalog and
                             builds it: validate.ts checks blocks, types and values; errors.ts
                             composes the rejection messages; build.ts assembles the validated spec
@@ -114,17 +118,16 @@ core/                       @tonesmith/core
 
 cli/                        @tonesmith/cli  (bin: tonesmith)
   src/
-    common/                 device-agnostic pieces (barrel: common/index.ts)
+    common/                 every piece of the CLI, all device-agnostic (barrel: common/index.ts)
       commands.ts           configureDeviceCommands: shared read / write / copy / new /
                             capabilities, one registrar per command
       capabilities-print.ts color printer for DeviceCapabilities
-      device.ts             cliDevice: one roster entry from an id and a printer, holding in one
-                            place the cast that says an id yields that device's own patch type
-    devices/index.ts        CLI device roster, one CliDescriptor per device
-    devices/<id>/           per device: print.ts (patch pretty-printer) + barrel index.ts
-                            (descriptor handing driver + printer to the shared commands)
-    types/                  CliDescriptor (barrel: types/index.ts)
-    program.ts              buildProgram(), assembling the commander program from the roster
+      patch-print.ts        color printer for a driver's PatchView, so a device ships with no CLI
+                            code of its own
+      color.ts              the SGR constants both printers share, and the one gate that turns
+                            them off when stdout is not a terminal
+    program.ts              buildProgram(), assembling the commander program over
+                            registry.listDrivers()
     index.ts                bin entry: shebang + buildProgram().parse()
   tests/                    behavior tests (in-process commander, per-command suites)
 
@@ -196,10 +199,12 @@ follows is what that section doesn't carry. The mechanical rules are
 already errors in `eslint.config.js` (at most three parameters, no duplicate function bodies, no em
 dashes, ternaries assigned before use, cognitive complexity 10), so they are not repeated here.
 
-- **`print.ts` stays hand-written per device.** Driving it off `capabilities` reads as the obvious
-  refactor and isn't one: a generic loop trades deliberate grouping and ordering for an
-  alphabetical field dump, and the only consumer is a person reading a terminal. Agents read the
-  same capability data through MCP already.
+- **The driver supplies the view; the CLI only renders it.** `PatchDriver.viewPatch` returns the
+  patch as a person reads it, and one printer in `cli/src/common/` walks it, so a device ships with
+  no CLI code of its own. What this does not do is drive the display off `capabilities`, which reads
+  as the obvious refactor and isn't one: a generic loop over the catalog trades deliberate grouping
+  and ordering for an alphabetical field dump. Grouping, ordering and panel labels stay the
+  driver's, which is what keeps that objection answered.
 - **`type` and `subType` each mean one thing, everywhere.** `type` is the block's own selector, and
   `subType` is the model within it, in a patch spec, on a decoded block, and in the codec's field
   maps. Where a device stores the selection in a param byte, the codec's field map still names that

@@ -261,12 +261,12 @@ step, since that data isn't in the repo and so can't be a CI dependency.
 
 ## 6. Wire the presentation layers
 
-- **CLI**: `cli/src/devices/<id>/` with a `print.ts` (patch pretty-printer) and a barrel
-  `index.ts` exporting a `CliDescriptor` whose `configure` hands the driver and printer to the
-  shared `configureDeviceCommands` from `cli/src/common`. Read, write, copy, new, and
-  capabilities all come from that shared wiring; write no per-device command code. Add one
-  roster line in `cli/src/devices/index.ts`. The printer stays hand-written (see CLAUDE.md's
-  Conventions section for why).
+- **CLI**: nothing to add. Every command, printing included, is device-agnostic and reads the
+  core roster, so onboarding a device touches zero files under `cli/`. What `read` prints comes
+  from one driver method, `viewPatch(patch)`: return the patch's blocks in the order a person
+  should read them, each under the device's own panel label and its spec key, and whatever the
+  device stores about the patch itself as `details`. Ordering and labels stay the driver's, which
+  is why the CLI never walks `capabilities` to decide them (see CLAUDE.md's Conventions section).
 - **MCP**: every tool, including patch generation, is device-agnostic and already wired, so
   onboarding a device touches zero files under `mcp/`. `list_devices`, `read_patch`,
   `write_fields`, `describe_device`, and `copy_patch` / `create_patch_file` pick the new device up
@@ -316,7 +316,7 @@ copy from. Useful pointers:
 - `core/src/devices/gx1/`: a finished example of the step-3 and step-5 file layout.
 - `fixtures/gx1/rock-tones.tsl`: a finished example of the step-4 round-trip fixture, and
   `core/tests/fixtures/gx1/default-init.tsl` of the factory-default one.
-- `cli/src/devices/gx1/`, `core/src/devices/gx1/spec/`: finished examples of step 6.
+- `core/src/devices/gx1/view.ts`, `core/src/devices/gx1/spec/`: finished examples of step 6.
 
 A new device's file extension, envelope shape, byte encodings, and terminology will differ from
 GX-1's in ways that matter. Expect to discover them, not assume them.
