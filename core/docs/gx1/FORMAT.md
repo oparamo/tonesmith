@@ -51,6 +51,37 @@ Each patch:
 | `MEMORY%CTL`       |  32 | CTL footswitch assignments                                 |
 | `MEMORY%ASGN1`–`8` |  15 | Expression/assign slots                                    |
 
+## Tempo sync: note values above a parameter's ceiling
+
+Delay times, pre-delays and modulation rates store either a plain number or a note value, in one
+field. The numbers run up to the parameter's own ceiling, and the 18 codes immediately above it are
+note divisions, which the device plays against the patch tempo in `MEMORY%OTHER` rather than as a
+fixed span of milliseconds. A code is read as `ceiling + 1 + position in the list below`.
+
+| Parameter                                          | Numbers    | Note codes  |
+|----------------------------------------------------|------------|-------------|
+| `MEMORY%DLY` `time` (every type but ANALOG)         | 1–2000 ms  | 2001–2018   |
+| `MEMORY%DLY` `time` (ANALOG, byte 13)               | 12–1200 ms | 1201–1218   |
+| `MEMORY%REV` `time` (SUB DELAY, byte 11)            | 1–2000 ms  | 2001–2018   |
+| FX-slot DELAY `time`                                | 1–2000 ms  | 2001–2018   |
+| FX PITCH SHIFT / HARMONIST `preDelay`               | 0–300 ms   | 301–318     |
+| Every FX modulation `rate`                          | 0–100      | 101–118     |
+
+The 18 names are the same set in both of the orders the device counts them in, and which order
+applies is a property of the parameter, not of the block:
+
+```text
+time  1/32  1/16T  1/32D  1/16  1/8T  1/16D  1/8   1/4T  1/8D  1/4   1/2T  1/4D  1/2   1/1T  1/2D   1/1   1/1D   2/1
+rate  2/1   1/1D   1/1    1/2D  1/1T  1/2    1/4D  1/2T  1/4   1/8D  1/4T  1/8   1/16D 1/8T  1/16   1/32D 1/16T  1/32
+```
+
+A time counts up from the shortest note, so a longer time stays a longer note. A rate counts down
+from the longest, so a higher rate stays a faster cycle. Reading a rate off the time list names a
+note nobody set: code 101 is `2/1`, not `1/32`.
+
+The codes are not out-of-range numbers. `rock-tones.tsl` holds `time` 2010 on two patches, which is
+a quarter note, and 400, a literal 400 ms, on a third; both forms are ordinary stored values.
+
 ## MEMORY%COM: Patch Name (16 bytes)
 
 ASCII bytes, right-padded with spaces (0x20).
@@ -137,7 +168,8 @@ list says otherwise); see the conventions table for every other encoding used in
 | Signed (center C)      | `display = raw - C`. The default center is 50 (range -50..+50) when not noted. Other centers seen in this format: 20 (EQ gains, range -20..+20), 24 (pitch semitones, range -24..+24), 12 (TUNE DOWN, range -12..0), -1 (SLICER `duty`, range -1..+254 but only 0..100 meaningful) |
 | Scaled (×factor)       | `display = raw × factor`, rounded to 1 decimal. Used for CHORUS `preDelay` (factor 0.5, in ms) and REVERB `time` (factor 0.1, in seconds), in both the dedicated REV block and REVERB-as-FX-slot                                                                                 |
 | 16-bit time (4-nibble) | one hex digit per byte across 4 consecutive bytes, MSB first                                                                                                                                                                                                                    |
-| 8-bit value (2-nibble) | one hex digit per byte across 2 consecutive bytes, MSB first (reverb pre-delay)                                                                                                                                                                                                 |
+| 8-bit value (2-nibble) | one hex digit per byte across 2 consecutive bytes, MSB first (reverb pre-delay)                                                                                                                                                                                          |
+| Tempo sync             | codes above a parameter's ceiling are note values rather than larger numbers; see "Tempo sync" above                                                                                                                                                                                                 |
 
 ### Per-effect byte maps
 
@@ -460,7 +492,7 @@ Only `key` is decoded (`patch.key`); the rest is preserved verbatim (see rationa
 | Byte(s) | Field       | Notes                                                                                                                                                                                                                    |
 |---------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 0–1     | memoryLevel | 8-bit, 2 hex-digit nibbles. Overall patch output trim, 0–200. Not decoded.                                                                                                                                                |
-| 2–3     | bpm         | 8-bit, 2 hex-digit nibbles. Reference tempo, 40–250; not consumed by any tone parameter (delay and reverb times are stored directly in ms, not derived from this). Not decoded.                                            |
+| 2–3     | bpm         | 8-bit, 2 hex-digit nibbles. Reference tempo, 40–250. The tempo every note value resolves against (see "Tempo sync" above); a parameter holding a plain number ignores it. Not decoded.                                     |
 | 4       | key         | 0–11, one of `KEY_NAMES` (C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B). This is the song key that resolves `HARMONIST`'s diatonic `harmony` intervals (+2nd, +3rd, +6th, etc.) to actual semitones. Decoded as `patch.key`.    |
 | 5       | carryover   | 0=OFF, 1=ON. Whether the current tone keeps sounding through a patch change. Not decoded.                                                                                                                                 |
 | 6       | tempoHold   | 0=OFF, 1=ON. Whether tempo persists across a patch change. Not decoded.                                                                                                                                                   |

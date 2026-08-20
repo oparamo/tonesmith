@@ -275,7 +275,8 @@ describe("GX-1 single-shape block param keys name a real decoded field", () => {
 // The name-parity guards above match field/param NAMES only. This guard is auto-derived over
 // every per-type codec field and asserts its *representation* agrees with the catalog's authored
 // kind: a boolean toggle is a `bool` field; a discrete param is a `lookup` whose table equals its
-// `values` verbatim; a numeric one is a numeric field. It catches a catalog enum backed by a
+// `values` verbatim; a numeric one is a numeric field; a param that takes a number or a note value
+// is a `namedAbove` field whose note list is those same `values`. It catches a catalog enum backed by a
 // hand-rolled numeric codec (PHASER `stage` as a raw index instead of a lookup is that shape of
 // bug) and the trigger/solo drift between strings, numbers, and booleans, all without a
 // hand-maintained list, so a new effect/field can't silently reintroduce the class. An
@@ -290,6 +291,7 @@ type ReprClass = ParamSpec["kind"] | "opaque" | "unknown";
 const codecClass = (field: FieldCodec): ReprClass => {
   if (field.kind === "bool") return "boolean";
   if (field.kind === "lookup") return "discrete";
+  if (field.kind === "namedAbove") return "numericOrNamed";
   // indexTable holds a mixed string/number table (PITCH SHIFT's pitch presets), so its
   // representation isn't strictly pinned.
   if (field.kind === "indexTable") return "opaque";
@@ -322,7 +324,7 @@ const assertRepresentationParity = (block: PerTypeBlock, type: string, field: Fi
     `${block.block} "${type}" field "${field.name}": codec kind "${field.kind ?? "none"}" vs catalog kind "${param.kind}"`,
   ).toBe(param.kind);
 
-  if (param.kind === "discrete") {
+  if (param.kind === "discrete" || param.kind === "numericOrNamed") {
     expect(
       [...(field.table ?? [])],
       `${block.block} "${type}" field "${field.name}": codec table vs catalog values`,

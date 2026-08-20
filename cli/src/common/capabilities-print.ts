@@ -92,7 +92,9 @@ const printItemParams = (params: CapabilityItem["params"]): void => {
     const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
     console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
     console.info(`  ${"".padEnd(14)} ${param.description}`);
-    if (param.kind === "discrete") {
+    // A param that takes named values gets them listed whether or not it also takes a number:
+    // `range` summarizes the list, and the exact spelling is what a write has to match.
+    if (param.kind === "discrete" || param.kind === "numericOrNamed") {
       console.info(`  ${"".padEnd(14)} ${DIM}Values: ${param.values.join(", ")}${RESET}`);
     }
   }

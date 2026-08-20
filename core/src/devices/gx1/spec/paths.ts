@@ -7,6 +7,7 @@
  * only byte indices it knows, leaving the caller believing an edit landed while the file kept its
  * old value.
  */
+import { NOTE_VALUES } from "../common";
 import type { FieldValue } from "../../../types";
 
 /** Where a dot-path ends up: the record its last segment lives in, and that segment. */
@@ -49,6 +50,14 @@ const fieldAt = (target: Record<string, unknown>, dottedPath: string): Resolutio
 };
 
 /**
+ * Whether the field's current value shows it to be one that holds text. A tempo-synced control
+ * holds a note value where it otherwise holds a number, so a string found in one is no evidence of
+ * that: without the exception, a control synced to a note could never be set back to a number.
+ */
+const holdsText = (existing: unknown): boolean =>
+  typeof existing === "string" && !NOTE_VALUES.has(existing);
+
+/**
  * Interprets a value against the field it is going into: "72" becomes the number 72 and "true"
  * becomes a boolean, but only where `existing` shows the field is not itself a string. A command
  * line can express a number no other way, so the coercion has to happen somewhere; doing it blind
@@ -56,7 +65,7 @@ const fieldAt = (target: Record<string, unknown>, dottedPath: string): Resolutio
  * width. A value that arrives already typed is taken as it is.
  */
 const coerceValue = (value: FieldValue, existing: unknown): FieldValue => {
-  if (typeof value !== "string" || typeof existing === "string") return value;
+  if (typeof value !== "string" || holdsText(existing)) return value;
   if (value === "true") return true;
   if (value === "false") return false;
   const asNumber = Number(value);

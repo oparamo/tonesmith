@@ -1,5 +1,5 @@
 import { toSigned, toUnsigned, byteAt, lookupName, shownValue } from "./primitives";
-import { SUB_TYPE_FIELD } from "../common";
+import { SUB_TYPE_FIELD, TIME_NOTE_VALUES, RATE_NOTE_VALUES } from "../common";
 import type { BlockParams } from "../types";
 
 // ── Value guards ──────────────────────────────────────────────────────────────
@@ -40,7 +40,8 @@ interface FieldCodec {
   readonly name: string;
   /** Present on fields built by the constructors below; hand-written FieldCodec
    * object literals may omit it. */
-  readonly kind?: "u8" | "signed" | "lookup" | "bool" | "scaled" | "nibblePair" | "nibbleQuad" | "indexTable";
+  readonly kind?: "u8" | "signed" | "lookup" | "bool" | "scaled" | "nibblePair" | "nibbleQuad"
+    | "indexTable" | "namedAbove";
   readonly center?: number;
   readonly table?: readonly (string | number)[];
   decode(bytes: number[]): string | number | boolean;
@@ -158,6 +159,43 @@ const nibbleQuad = (name: string, offset: number): FieldCodec => ({
 });
 
 
+/**
+ * A numeric field whose codes above `ceiling` name settings rather than continuing the quantity:
+ * the device stores a tempo-synced control one past the ceiling per note, in `names` order.
+ * Decoding those as numbers is what makes a delay synced to a quarter note read as 2010 ms, several
+ * times the time it actually plays and a value a caller would sensibly try to correct.
+ *
+ * A code past the end of `names` decodes as its number, so a byte this codec cannot name still
+ * survives the round trip that writes it back.
+ */
+const namedAbove = (base: FieldCodec, ceiling: number, names: readonly string[]): FieldCodec => ({
+  name: base.name,
+  kind: "namedAbove",
+  table: names,
+  decode: bytes => {
+    const raw = base.decode(bytes);
+    if (typeof raw !== "number" || raw <= ceiling) return raw;
+    return names[raw - ceiling - 1] ?? raw;
+  },
+  encode: (value, bytes) => {
+    if (typeof value !== "string") {
+      base.encode(value, bytes);
+      return;
+    }
+    const index = names.indexOf(value);
+    if (index < 0) throw new Error(`Unknown ${base.name} value: ${JSON.stringify(value)}`);
+    base.encode(ceiling + 1 + index, bytes);
+  },
+});
+
+/** A tempo-syncable time in ms, at the 2000 ms ceiling every one of them shares except ANALOG. */
+const syncedTime = (name: string, offset: number): FieldCodec =>
+  namedAbove(nibbleQuad(name, offset), 2000, TIME_NOTE_VALUES);
+
+/** A tempo-syncable modulation rate: 0-100, then note values counting down from the longest. */
+const syncedRate = (name: string, offset: number): FieldCodec =>
+  namedAbove(u8(name, offset), 100, RATE_NOTE_VALUES);
+
 // ── Generic walkers ───────────────────────────────────────────────────────────
 
 const decodeFields = (fields: FieldCodec[], bytes: number[]): BlockParams =>
@@ -195,6 +233,6 @@ const withStoredSubType = (params: BlockParams, subType: string | null): BlockPa
 
 export type { FieldCodec };
 export {
-  u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad,
+  u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, namedAbove, syncedTime, syncedRate,
   decodeFields, encodeFields, liftSubType, withStoredSubType,
 };

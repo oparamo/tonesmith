@@ -135,6 +135,21 @@ const PHASER_STAGES = ["4 STAGE", "8 STAGE", "12 STAGE"] as const;
 // Playback head combinations.
 const SPACE_ECHO_HEAD = ["1", "1+2", "1+3", "2+3", "1+2+3"] as const;
 
+// The note values a tempo-synced param stores in the 18 codes above its numeric ceiling, in the
+// order the device counts them. A time counts up from the shortest note so that a longer time is
+// still a longer note, and a rate counts down from the longest so that a higher rate is still a
+// faster cycle, which makes the two lists the same names in opposite orders. Reading a rate off
+// the time list names a note nobody set: the first code above a rate's ceiling is 2/1, not 1/32.
+const TIME_NOTE_VALUES = [
+  "1/32", "1/16T", "1/32D", "1/16", "1/8T", "1/16D", "1/8", "1/4T", "1/8D",
+  "1/4", "1/2T", "1/4D", "1/2", "1/1T", "1/2D", "1/1", "1/1D", "2/1",
+] as const;
+const RATE_NOTE_VALUES: readonly string[] = [...TIME_NOTE_VALUES].reverse();
+
+// Membership only: what the two orders share is which strings are note values at all, which is how
+// a value already in a param says the param is one a number can go back into.
+const NOTE_VALUES = new Set<string>(TIME_NOTE_VALUES);
+
 // The 33 reachable HARMONIST harmony values (raw byte 0-32), in raw order.
 const HARMONIST_HR = [
   "+1oct&-1oct", "-4th&-6th", "-2oct", "-14th", "-13th", "-12th", "-11th", "-10th", "-9th",
@@ -211,5 +226,6 @@ export {
   VIBE_MODES, HUM_MODES, HUM_VOWELS, SBEND_PITCH, FB_MODE,
   SLICER_PAT, NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, PHASER_STAGES, SPACE_ECHO_HEAD,
   HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, KEY_NAMES, KEY_IDX,
+  TIME_NOTE_VALUES, RATE_NOTE_VALUES, NOTE_VALUES,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 };

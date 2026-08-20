@@ -1,6 +1,9 @@
 import type { NumericParam, ParamSpec } from "../../types";
 
-interface RangeOpts { unit?: string; decimals?: number; bpm?: boolean; percent?: boolean }
+interface RangeOpts { unit?: string; decimals?: number; percent?: boolean }
+
+/** A numeric interval on its own, the half a tempo-syncable domain shares with a plain one. */
+type RangeDomain = { kind: "range"; min: number; max: number } & RangeOpts;
 
 /**
  * A param's value domain, the single authored source of its range. The human `range` string, the
@@ -15,19 +18,31 @@ interface RangeOpts { unit?: string; decimals?: number; bpm?: boolean; percent?:
  *  - `lookup`:  a discrete quantized table (the frequency steps) whose full value list comes from
  *               a codec constant but whose `range` display is a compact human summary.
  *  - `boolean`: an on/off toggle carried as a real boolean (`true`/`false`); no `values`/bounds.
+ *  - `notes`:   a numeric interval that also takes the note values the device stores above it,
+ *               so the bounds and the value list are both the param's own.
  *
  * There is no display-only kind. A domain is what gives a param a shape the validator can check
  * against, so a param whose domain were a bare string like "1:1-INF:1" would accept any value at
  * all. A compact display belongs on `lookup`, which carries the real value list beside it.
  */
 type Domain =
-  | ({ kind: "range"; min: number; max: number } & RangeOpts)
+  | RangeDomain
   | { kind: "enum"; values: readonly string[] }
   | { kind: "lookup"; values: readonly string[]; display: string }
-  | { kind: "boolean" };
+  | { kind: "boolean" }
+  | ({ kind: "notes"; values: readonly string[] } & Omit<RangeDomain, "kind">);
 
-/** A numeric interval. `decimals` fixes display precision; `bpm`/`percent`/`unit` shape the suffix. */
-const num = (min: number, max: number, opts: RangeOpts = {}): Domain => ({ kind: "range", min, max, ...opts });
+/** A numeric interval. `decimals` fixes display precision; `percent`/`unit` shape the suffix. */
+const num = (min: number, max: number, opts: RangeOpts = {}): RangeDomain => ({ kind: "range", min, max, ...opts });
+
+/**
+ * A tempo-syncable param: everything its numeric interval takes, plus the note values the device
+ * stores above that interval, in the order it counts them. Wrapping the interval rather than
+ * restating it keeps the numeric half authored once, and mirrors how the codec wraps the field.
+ */
+const orNotes = (range: RangeDomain, notes: readonly string[]): Domain =>
+  ({ ...range, kind: "notes", values: notes });
+
 /** A fixed set of string options; the display is the comma-joined list. */
 const oneOf = (...values: string[]): Domain => ({ kind: "enum", values });
 /** A quantized lookup table (values from a codec constant) with a compact human display. */
@@ -47,7 +62,9 @@ const rangeText = (domain: Domain): string => {
   let out = base;
   if (domain.percent) out = `${base}%`;
   else if (domain.unit) out = `${base} ${domain.unit}`;
-  if (domain.bpm) out = `${out}, BPM`;
+  // The ends of the list rather than all 18 of it, since `values` carries the full set and the two
+  // ends are what say which way the device counts: a rate runs from the longest note down.
+  if (domain.kind === "notes") out = `${out}, or a note value from ${domain.values[0]} to ${domain.values.at(-1)}`;
   return out;
 };
 
@@ -56,11 +73,13 @@ const def = (name: string, domain: Domain, description: string): ParamSpec => {
   const base = { name, range: rangeText(domain), description };
   if (domain.kind === "boolean") return { ...base, kind: "boolean" };
   if (domain.kind === "enum" || domain.kind === "lookup") return { ...base, kind: "discrete", values: domain.values };
+  const bounds = { min: domain.min, max: domain.max };
+  if (domain.kind === "notes") return { ...base, kind: "numericOrNamed", ...bounds, values: domain.values };
 
-  const numeric: NumericParam = { ...base, kind: "numeric", min: domain.min, max: domain.max };
+  const numeric: NumericParam = { ...base, kind: "numeric", ...bounds };
   if (domain.decimals !== undefined) numeric.decimals = domain.decimals;
   return numeric;
 };
 
-export { num, oneOf, lookupOf, bool, def, rangeText };
-export type { Domain };
+export { num, oneOf, lookupOf, bool, orNotes, def, rangeText };
+export type { Domain, RangeDomain };

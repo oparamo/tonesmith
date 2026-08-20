@@ -23,11 +23,16 @@
 import type { ParamSpec } from "../../types";
 import {
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
-  SP_TYPES, MIC_TYPES, SLICER_PAT, HARMONIST_HR, KEY_NAMES,
+  SP_TYPES, MIC_TYPES, SLICER_PAT, HARMONIST_HR, KEY_NAMES, TIME_NOTE_VALUES, RATE_NOTE_VALUES,
 } from "./common";
-import { def, num, oneOf, lookupOf, bool } from "./param-domain";
+import { def, num, oneOf, lookupOf, bool, orNotes } from "./param-domain";
 
 // ── Shared param fragments (identical across many types, defined once) ────────
+
+// Every modulation rate and pre-delay the device can sync to the patch tempo, so the note values
+// are authored once rather than beside each effect that offers one.
+const SYNCED_RATE = orNotes(num(0, 100), RATE_NOTE_VALUES);
+const SYNCED_PRE_DELAY = orNotes(num(0, 300, { unit: "ms" }), TIME_NOTE_VALUES);
 
 const LEVEL_0_100: ParamSpec = def("LEVEL", num(0, 100), "Output volume.");
 const DIRECT: ParamSpec = def("DIRECT", num(0, 100), "Volume of the direct (unaffected) signal.");
@@ -71,7 +76,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   ],
   "AUTO WAH": [
     def("FILTER", oneOf("LPF", "BPF", "HPF"), "Filter type: low-pass, band-pass, or high-pass."),
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the auto-wah cycle."),
+    def("RATE", SYNCED_RATE, "Speed of the auto-wah cycle."),
     def("DEPTH", num(0, 100), "Depth of the auto-wah sweep."),
     def("FREQ", num(0, 100), "Center frequency of the wah."),
     def("RESO", num(0, 100), "Resonance intensity."),
@@ -169,14 +174,14 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     def("LEVEL", num(-20, 20, { unit: "dB" }), "Overall output level."),
   ],
   "CHORUS": [
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the chorus modulation."),
+    def("RATE", SYNCED_RATE, "Speed of the chorus modulation."),
     def("DEPTH", num(0, 100), "Depth of the modulation. Set to 0 for a doubling effect."),
     def("PRE-DELAY", num(0, 40, { unit: "ms", decimals: 1 }), "Pre-delay before the effect sound appears. Longer values create a doubling effect."),
     def("LEVEL", num(0, 100), "Volume of the chorus sound."),
     DIRECT,
   ],
   "FLANGER": [
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the flanging sweep."),
+    def("RATE", SYNCED_RATE, "Speed of the flanging sweep."),
     def("DEPTH", num(0, 100), "Depth of the flanging effect."),
     def("MANUAL", num(0, 100), "Center frequency of the effect."),
     def("RESO", num(0, 100), "Resonance (feedback): higher values create a more extreme effect."),
@@ -185,7 +190,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   ],
   "PHASER": [
     def("TYPE", oneOf("4 STAGE", "8 STAGE", "12 STAGE"), "Number of phase-shifting stages."),
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the phase sweep."),
+    def("RATE", SYNCED_RATE, "Speed of the phase sweep."),
     def("DEPTH", num(0, 100), "Depth of the phaser effect."),
     def("RESO", num(0, 100), "Resonance (feedback)."),
     def("MANUAL", num(0, 100), "Center frequency of the phaser."),
@@ -193,53 +198,53 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     DIRECT,
   ],
   "SCRIPT PH": [
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the phase sweep."),
+    def("RATE", SYNCED_RATE, "Speed of the phase sweep."),
     def("DEPTH", num(0, 100), "Depth of the phaser effect."),
     LEVEL_0_100,
   ],
   "CLASSIC-VIBE": [
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the Classic Vibe modulation."),
+    def("RATE", SYNCED_RATE, "Speed of the Classic Vibe modulation."),
     def("DEPTH", num(0, 100), "Depth of the modulation."),
     LEVEL_0_100,
   ],
   "ROTARY": [
     def("SPEED SELECT", oneOf("SLOW", "FAST"), "Current rotor speed."),
-    def("SLOW RATE", num(0, 100, { bpm: true }), "Rotation speed when set to SLOW."),
-    def("FAST RATE", num(0, 100, { bpm: true }), "Rotation speed when set to FAST."),
+    def("SLOW RATE", SYNCED_RATE, "Rotation speed when set to SLOW."),
+    def("FAST RATE", SYNCED_RATE, "Rotation speed when set to FAST."),
     def("DRIVE", num(0, 100), "Amount of preamp distortion."),
     def("BALANCE", num(0, 100), "Balance between treble and bass rotors."),
     LEVEL_0_100,
     DIRECT,
   ],
   "VIBRATO": [
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the vibrato."),
+    def("RATE", SYNCED_RATE, "Speed of the vibrato."),
     def("DEPTH", num(0, 100), "Depth of the pitch modulation."),
     def("RISE TIME", num(0, 100), "Time from trigger-on until full vibrato is reached."),
     def("TRIGGER", bool(), "Activates the vibrato."),
     LEVEL_0_100,
   ],
   "TREMOLO": [
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the volume cycle."),
+    def("RATE", SYNCED_RATE, "Speed of the volume cycle."),
     def("DEPTH", num(0, 100), "Depth of the volume change."),
     LEVEL_0_100,
   ],
   "SLICER": [
     def("PATTERN", lookupOf(SLICER_PAT, "P01-P20"), "Selects the rhythm pattern used to slice the sound."),
-    def("RATE", num(0, 100, { bpm: true }), "Speed at which the sound is sliced."),
+    def("RATE", SYNCED_RATE, "Speed at which the sound is sliced."),
     def("ATTACK", num(0, 100), "Attack volume for the rhythm pattern."),
     def("DUTY", num(1, 99), "Duration of the sound within each slice."),
     LEVEL_0_100,
     DIRECT,
   ],
   "PAN": [
-    def("RATE", num(0, 100, { bpm: true }), "Speed of the left/right alternation."),
+    def("RATE", SYNCED_RATE, "Speed of the left/right alternation."),
     def("DEPTH", num(0, 100), "Depth of the panning movement."),
     LEVEL_0_100,
   ],
   "RING MOD": [
     def("INTELLIGENT", bool(), "When ON, oscillator tracks input pitch for a more musical result."),
     def("FREQ", num(0, 100), "Internal oscillator frequency."),
-    def("MOD RATE", num(0, 100, { bpm: true }), "Rate of oscillator modulation."),
+    def("MOD RATE", SYNCED_RATE, "Rate of oscillator modulation."),
     def("MOD DEPTH", num(0, 100), "Depth of oscillator modulation."),
     def("LEVEL", num(0, 100), "Volume of the effect sound."),
     def("DIRECT", num(0, 100), "Volume of the direct signal."),
@@ -248,14 +253,14 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
     def("VOWEL1", oneOf("a", "e", "i", "o", "u"), "First vowel sound."),
     def("VOWEL2", oneOf("a", "e", "i", "o", "u"), "Second vowel sound."),
     def("SENS", num(0, 100), "Picking sensitivity (PICKING mode)."),
-    def("RATE", num(0, 100, { bpm: true }), "Cycle speed for vowel alternation."),
+    def("RATE", SYNCED_RATE, "Cycle speed for vowel alternation."),
     def("MANUAL", num(0, 100), "Manual vowel position (AUTO mode)."),
     LEVEL_0_100,
   ],
   "PITCH SHIFT": [
     def("PITCH", num(-24, 24, { unit: "semitones" }), "Amount of pitch shift."),
     def("MODE", oneOf("FAST", "MEDIUM", "SLOW", "MONO"), "Tracking response: FAST has more modulation, SLOW is cleaner."),
-    def("PRE-DELAY", num(0, 300, { unit: "ms", bpm: true }), "Delay before the shifted sound appears."),
+    def("PRE-DELAY", SYNCED_PRE_DELAY, "Delay before the shifted sound appears."),
     def("FEEDBACK", num(0, 100), "Feedback of the shifted signal."),
     def("LEVEL", num(0, 100), "Volume of the pitch-shifted sound."),
     def("DIRECT", num(0, 100), "Volume of the direct signal."),
@@ -263,7 +268,7 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   "HARMONIST": [
     def("HARMONY", lookupOf(HARMONIST_HR, "-2oct-+2oct"), "Pitch of the harmony voice relative to the input."),
     def("KEY", oneOf(...KEY_NAMES), "Key the harmony is calculated against. It is the patch's own `key`, not a control of this block."),
-    def("PRE-DELAY", num(0, 300, { unit: "ms", bpm: true }), "Delay before the harmony voice appears."),
+    def("PRE-DELAY", SYNCED_PRE_DELAY, "Delay before the harmony voice appears."),
     def("FEEDBACK", num(0, 100), "Feedback of the harmony signal."),
     def("LEVEL", num(0, 100), "Volume of the harmony sound."),
     def("DIRECT", num(0, 100), "Volume of the direct signal."),
@@ -336,8 +341,8 @@ const PFX_PARAMS: Record<string, ParamSpec[]> = {
 //
 // Sourced from gx1_parameter_guide.md; every field matches DELAY_TYPE_MAPS in codec/blocks.ts.
 
-const DLY_TIME: ParamSpec = def("TIME", num(1, 2000, { unit: "ms", bpm: true }), "Delay time.");
-const DLY_TIME_ANALOG: ParamSpec = def("TIME", num(12, 1200, { unit: "ms", bpm: true }), "Delay time.");
+const DLY_TIME: ParamSpec = def("TIME", orNotes(num(1, 2000, { unit: "ms" }), TIME_NOTE_VALUES), "Delay time.");
+const DLY_TIME_ANALOG: ParamSpec = def("TIME", orNotes(num(12, 1200, { unit: "ms" }), TIME_NOTE_VALUES), "Delay time.");
 const DLY_FEEDBACK: ParamSpec = def("FEEDBACK", num(0, 100), "Number of delay repeats.");
 const DLY_LEVEL: ParamSpec = def("LEVEL", num(1, 120), "Volume of the delay sound.");
 const DLY_LEVEL_0: ParamSpec = def("LEVEL", num(0, 120), "Volume of the delay sound.");
@@ -373,7 +378,8 @@ const DELAY_PARAMS: Record<string, ParamSpec[]> = {
   "REVERSE": [DLY_TIME, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT,
     def("TRIGGER", bool(), "Produces an effect matching what you're playing when ON.")],
   "ANALOG": [DLY_TIME_ANALOG, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT],
-  "ANLG MOD": [DLY_TIME_ANALOG, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT, ...DLY_MOD],
+  // ANLG MOD writes the shared time address, so it is ANALOG alone that keeps the lower ceiling.
+  "ANLG MOD": [DLY_TIME, DLY_FEEDBACK, DLY_LEVEL, DLY_HIGH_CUT, ...DLY_MOD],
   "SPACE ECHO": [DLY_TIME, DLY_FEEDBACK, DLY_LEVEL_0, DLY_HIGH_CUT,
     def("HEAD", oneOf("1", "1+2", "1+3", "2+3", "1+2+3"), "Combination of playback heads (2/3 give 2x/3x the head-1 delay time).")],
   "SHIMMER": [DLY_TIME, DLY_FEEDBACK, DLY_LEVEL_0, DLY_HIGH_CUT,
@@ -430,7 +436,7 @@ const REVERB_PARAMS: Record<string, ParamSpec[]> = {
     def("PITCH LVL", num(0, 100), "Volume of the pitch shifter."),
   ],
   "SUB DELAY": [
-    def("TIME", num(1, 2000, { unit: "ms", bpm: true }), "Delay time."),
+    def("TIME", orNotes(num(1, 2000, { unit: "ms" }), TIME_NOTE_VALUES), "Delay time."),
     def("FEEDBACK", num(0, 100), "Number of delay repeats."),
     def("LEVEL", num(1, 120), "Volume of the delay sound."),
     DLY_HIGH_CUT,

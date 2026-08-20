@@ -74,6 +74,36 @@ describe("validateTypeParams", () => {
     expect(issues).toEqual([]);
   });
 
+  // The device stores a tempo-synced time as a code above the param's ceiling, so both forms are
+  // ordinary stored values. Checking only the numeric half is what rejected a patch read straight
+  // off the device as out of range.
+  it("passes a tempo-synced param set to a note value", () => {
+    const issues = validateTypeParams({
+      group: "delay", type: "STANDARD", values: { time: "1/4" },
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("rejects a note value the device has no code for, listing the ones it does", () => {
+    const issues = validateTypeParams({
+      group: "delay", type: "STANDARD", values: { time: "1/5" },
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0], "quotes back the value it rejected").toContain("1/5");
+    expect(issues[0], "and lists a note value it would have taken").toContain("1/8D");
+  });
+
+  it("still range-checks the numeric half of a tempo-synced param", () => {
+    const issues = validateTypeParams({
+      group: "delay", type: "STANDARD", values: { time: 2010 },
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain("2010");
+  });
+
   it("checks discrete-value membership", () => {
     const issues = validateTypeParams({
       group: "delay", type: "ANALOG", values: { highCut: "9kHz" },
