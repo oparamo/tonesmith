@@ -88,9 +88,9 @@ core/                       @tonesmith/core
                             factory-default export; the builder fills unset params from here
       param-domain.ts       the value domains a ParamSpec derives from, so a param's human range
                             string, machine value list, and numeric bounds are authored once
-      param-catalog.ts      per block/type param surface (name + range + description), the
-                            in-repo param ground truth; capabilities derives from it and the
-                            codec-to-catalog drift guard checks against it
+      param-catalog.ts      per block/type param surface (name + range + description) plus the
+                            patch's own settings, the in-repo param ground truth; capabilities
+                            derives from it and the codec-to-catalog drift guard checks against it
       capabilities.ts       the device's DeviceCapabilities metadata (structure/models/subtypes;
                             each item's params come from param-catalog.ts)
       driver.ts             PatchDriver<T> object wiring codec + file I/O together
@@ -216,6 +216,12 @@ dashes, ternaries assigned before use, cognitive complexity 10), so they are not
   by one, and stays an ordinary param when it sets one aspect of a single effect and the value names
   speak for themselves. The device's own label is evidence, not the rule (the GX-1 labels two
   sub-model selectors MODE and one param TYPE).
+- **A setting the patch owns is described, not left to be discovered.** `DeviceCapabilities`
+  carries `patchSettings` beside `patchName` for what a device stores per patch rather than per
+  block: a reference tempo, an output trim, a musical key. Nothing in `groups` cross-checks these,
+  so one left out is one a consumer meets only by reading a patch that already has it, which is how
+  the GX-1's `key` sat decoded and undiscoverable. They are ordinary catalog params and take the
+  same validation a block's params take, on both write paths.
 - **`param-catalog.ts`, `capabilities.ts`, and `types/` are three views of one truth**, not
   triplication to collapse. The catalog is the param ground truth, capabilities is the structure an
   agent browses, the types are the decoded shape. The drift guards
@@ -276,7 +282,7 @@ repository.
 | `read_patch`          | `device`, `file`, `ref?`, `limit?`, `offset?`                      | `ref` = index or name, answered as `{ setName, index, patch }`. Omit it to page through the file: 20 patches by default (`limit` up to 100), each as `{ index, patch }`, plus `total` and a `more` line naming the offset to continue from                  |
 | `generate_patch`      | `device`, `outPath`, `setName?`, `patches[]`                       | One tool for every device: the per-patch spec comes from `describe_device`, not from this tool's schema. Builds every patch in `patches` and upserts them by name into `outPath` in array order, in one file write (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed). The response reports each patch as `{ name, action, patch }`, the patch complete with the defaults it filled in, so no follow-up read is needed |
 | `write_fields`        | `device`, `file`, `ref`, `fields`                                  | Dot-path mutations as a `{path: value}` record, same as CLI `write`. The batch applies atomically: a rejected edit leaves the file untouched                                                                                                              |
-| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<item>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). Omit `items` for all groups plus a chain summary. A bare-group entry is an index with no per-item params, so name the items instead, or pass `includeParams` for the full set. A named item also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
+| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<item>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). The `"chain"` entry also carries what belongs to the patch rather than to a block: the name limit, and the patch settings written beside `name`. Omit `items` for all groups plus a chain summary. A bare-group entry is an index with no per-item params, so name the items instead, or pass `includeParams` for the full set. A named item also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
 | `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use `generate_patch`, which appends by name                                                        |
 | `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults, `patchCount` from 1 to 500. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                          |
 

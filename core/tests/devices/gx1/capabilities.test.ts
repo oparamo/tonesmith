@@ -26,7 +26,7 @@ import { driver } from "../../../src/devices/gx1/driver";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../src/devices/gx1/param-catalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../src/devices/gx1/codec/fx-params";
 import {
-  PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES,
+  PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PATCH_SETTING_FIELDS,
   decodeAmp, decodeDrive, decodeNoiseGate, decodeVolume,
 } from "../../../src/devices/gx1/codec/blocks";
 import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
@@ -434,6 +434,37 @@ describe("GX-1 chain capability", () => {
 // The two numbers can drift silently: a generate schema capped at 13 while the format stores 16
 // is internally consistent either way, and the committed exports' longest name happening to be 13
 // characters would not surface the mismatch.
+
+// The patch's own settings belong to no block and so appear in no group. Nothing else in the
+// catalog would notice a codec field going undescribed here, or a described one naming a field the
+// decoder never emits, which is how `key` sat decoded and undiscoverable for as long as it did.
+describe("GX-1 patch-settings capability", () => {
+  const specs = gx1Capabilities.patchSettings;
+  const codecFields = PATCH_SETTING_FIELDS.map(field => field.name);
+
+  it("describes every setting the codec decodes, and no others", () => {
+    const described = specs.map(spec => spec.key);
+
+    expect(described.sort()).toEqual([...codecFields].sort());
+  });
+
+  it("stamps each setting with the key a decoded patch carries it under", () => {
+    const patch = driver.blankPatch("Test") as unknown as Record<string, unknown>;
+
+    for (const spec of specs) {
+      expect(Object.keys(patch), `setting "${spec.name}" stamped key "${spec.key}"`).toContain(spec.key);
+    }
+  });
+
+  it("takes the settings of a patch read off the device straight back as a spec", () => {
+    const patch = driver.blankPatch("Test") as unknown as Record<string, unknown>;
+    const settings = Object.fromEntries(codecFields.map(field => [field, patch[field]]));
+
+    const rebuilt = driver.buildPatch({ name: "Test", ...settings }) as unknown as Record<string, unknown>;
+
+    for (const field of codecFields) expect(rebuilt[field]).toEqual(patch[field]);
+  });
+});
 
 describe("GX-1 patch-name capability", () => {
   it("advertises the limit the codec actually encodes", () => {

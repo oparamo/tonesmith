@@ -129,7 +129,7 @@ const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>):
         // under it to name.
         if (groupId.toLowerCase() === "chain") {
           if (item) throw new Error(`The chain has no items, so there is no "${item}" to show.`);
-          printChain(caps.chain);
+          printChain(caps);
           return;
         }
 

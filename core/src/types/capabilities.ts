@@ -154,6 +154,13 @@ interface DeviceCapabilities {
   chain: ChainSpec;
   /** What the device will accept as a patch name. */
   patchName: PatchNameSpec;
+  /**
+   * Settings the patch carries itself rather than through any block, such as a reference tempo or
+   * an overall output trim. Each is written at the top level of a patch spec, beside `name`, and
+   * read back there. A consumer that browses `groups` alone never meets them, so a device with
+   * settings of this kind has to say so here or leave them undiscoverable.
+   */
+  patchSettings: ParamSpec[];
   groups: CapabilityGroup[];
 }
 

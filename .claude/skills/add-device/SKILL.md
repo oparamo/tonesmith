@@ -238,7 +238,12 @@ capabilities on top of it. Don't hand-write param ranges twice.
    format's own name-field width, not a guess. It belongs to no capability group, so no other
    device data cross-checks it, and a guess that looks plausible against the sample files can sit
    there wrong for years. A consumer that learns the real limit by being rejected has already built
-   the patch. Wire capabilities into the driver object from step 3.
+   the patch. Finally, declare the required **`patchSettings`**: the settings the device stores for
+   the patch as a whole rather than inside any block, such as a reference tempo, an overall output
+   trim, or a musical key. They are catalog params like any other, and they sit at the top level of
+   a spec beside `name`. Nothing in `groups` cross-checks them, so a setting left out here is one a
+   consumer can only find by reading a patch that already has it. Pass an empty array where the
+   device really has none. Wire capabilities into the driver object from step 3.
 3. **`example`**: on each item, or on the group itself where the block offers no types to choose
    between, a spec fragment `buildPatch` would accept, keyed by the block's own name in a spec and
    filled from the factory defaults harvested in step 4. Derive it; don't hand-write one per item.

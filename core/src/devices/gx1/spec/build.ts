@@ -11,16 +11,18 @@
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import {
-  BLOCK_GROUPS, BLOCK_NAMES, ON_FIELD, KEY_NAMES, DEFAULT_CHAIN,
+  BLOCK_GROUPS, BLOCK_NAMES, ON_FIELD, DEFAULT_CHAIN,
   LAST_NAMEABLE_CHAR, charsAbove,
 } from "../common";
 import type { BlockName } from "../common";
 import { validateChain } from "../codec";
 import { basePatch, amp, drive, fx, noiseGate, volume, pedalFx, delay, reverb } from "../builder";
+import type { BasePatchOptions } from "../builder";
 import type { CapabilityGroup } from "../../../types";
 import type { Patch, BlockParams } from "../types";
 import {
-  checkSelectors, checkTypeBelongsInBlock, typeChoices, unknownTypeIssue, validateTypeParams, typeSurface,
+  checkSelectors, checkTypeBelongsInBlock, typeChoices, unknownTypeIssue, validateTypeParams,
+  validatePatchSettings, typeSurface,
 } from "./validate";
 import type { Issues } from "./validate";
 import {
@@ -29,8 +31,13 @@ import {
 } from "./errors";
 import type { BlockContext } from "./errors";
 
+/** The patch's own settings, keyed as a spec writes them. Derived, so the catalog is the one list. */
+const SETTING_KEYS = gx1Capabilities.patchSettings.flatMap(
+  spec => (spec.key === undefined ? [] : [spec.key])
+);
+
 /** Patch-level fields that are not blocks. Every other key must name one. */
-const PATCH_FIELDS = ["name", "memo", "chain", "key"];
+const PATCH_FIELDS = ["name", "memo", "chain", ...SETTING_KEYS];
 
 /**
  * The one block the device can't bypass: the volume block has no on/off byte to write. Every other
@@ -184,14 +191,6 @@ const checkMemo = (issues: Issues, spec: Record<string, unknown>): void => {
   }
 };
 
-const checkKey = (issues: Issues, spec: Record<string, unknown>): void => {
-  const key = spec.key;
-  if (key === undefined) return;
-  if (typeof key !== "string" || !(KEY_NAMES as readonly string[]).includes(key)) {
-    issues.push(`Patch key ${JSON.stringify(key)} is not one this device names. Keys: ${KEY_NAMES.join(", ")}`);
-  }
-};
-
 const checkBlockNames = (issues: Issues, spec: Record<string, unknown>): void => {
   const known = new Set<string>([...PATCH_FIELDS, ...BLOCK_NAMES]);
   const unknown = Object.keys(spec).filter(key => !known.has(key));
@@ -208,7 +207,7 @@ const validatePatchSpec = (input: unknown): Issues => {
   checkName(issues, spec);
   checkMemo(issues, spec);
   checkChain(issues, spec);
-  checkKey(issues, spec);
+  issues.push(...validatePatchSettings(spec));
   checkBlockNames(issues, spec);
   for (const name of setBlocks(spec)) checkBlock(issues, name, spec[name]);
   return issues;
@@ -241,6 +240,16 @@ const applyBlock = (patch: Patch, name: BlockName, block: Record<string, unknown
 };
 
 /**
+ * The chain and the patch settings a spec carries, ready for the builder. The return type is what
+ * `validatePatchSpec` has just established of these values and TypeScript cannot see for itself. A
+ * setting the spec leaves out stays absent, so the blank patch's own factory value survives.
+ */
+const basePatchOptions = (spec: Record<string, unknown>): BasePatchOptions => {
+  const named = ["chain", ...SETTING_KEYS].filter(field => spec[field] !== undefined);
+  return Object.fromEntries(named.map(field => [field, spec[field]]));
+};
+
+/**
  * Builds one decoded patch from an unvalidated spec, rejecting the whole thing before any of it is
  * applied. Every block the spec leaves out stays off at the device's factory defaults.
  */
@@ -249,8 +258,7 @@ const buildPatch = (input: unknown): Patch => {
   if (issues.length > 0) throw new Error(issues.join("\n"));
 
   const spec = asRecord(input);
-  const chain = spec.chain as string[] | undefined;
-  const patch = basePatch(spec.name as string, chain, spec.key as string | undefined);
+  const patch = basePatch(spec.name as string, basePatchOptions(spec));
   if (typeof spec.memo === "string") patch.memo = spec.memo;
   for (const name of setBlocks(spec)) applyBlock(patch, name, asRecord(spec[name]));
   return patch;

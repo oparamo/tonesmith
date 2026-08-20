@@ -7,12 +7,12 @@ import {
   REV_TYPES, REV_TYPE_IDX,
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_SLOT_ORDER, CHAIN_VALUE_TO_BLOCK, CHAIN_BLOCK_TO_VALUE, CHAIN_TERMINATOR, DEFAULT_CHAIN,
-  NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES, KEY_IDX,
+  NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES,
   FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW, TIME_NOTE_VALUES,
 } from "../common";
 import type {
   FxBlock, DriveBlock, AmpBlock, NoiseGateBlock, VolumeBlock, DelayBlock, ReverbBlock,
-  PedalFxBlock,
+  PedalFxBlock, PatchSettings,
 } from "../types";
 import {
   bytesFromHex, hexFromBytes, byteReader, lookupName, lookupIndex, toSigned, toUnsigned,
@@ -62,20 +62,40 @@ const encodeName = (name: string): string[] => {
 };
 
 
-// ── Key (MEMORY%OTHER byte 4 only, the rest of that block is out of scope) ───────
+// ── OTHER block: the patch's own settings (7 bytes) ──────────────────────────
 //
-// memoryLevel/bpm/carryover/tempoHold aren't tied to any modeled effect's output, but
-// key is: HARMONIST_HR's scale-degree entries are diatonic, so this is what the device
-// uses to resolve them to actual semitones.
+// Not a signal block. Two of these reach the sound through other blocks rather than
+// on their own: `key` resolves HARMONIST_HR's diatonic scale degrees to semitones, and
+// `bpm` is the tempo every note-valued control plays against, so a delay set to 1/4
+// means nothing without it.
 
-const KEY_OFFSET = 4;
+const PATCH_SETTING_FIELDS: FieldCodec[] = [
+  nibblePair("memoryLevel", 0),
+  nibblePair("bpm", 2),
+  lookup("key", 4, KEY_NAMES),
+  bool("carryover", 5),
+  bool("tempoHold", 6),
+];
 
-const decodeKey = (hexList: string[]): string =>
-  lookupName(KEY_NAMES, byteReader(bytesFromHex(hexList), "MEMORY%OTHER")(KEY_OFFSET));
+/**
+ * `decodeFields` answers the union any field codec can produce, and these five are the only decoded
+ * values a consumer meets without a block around them, so each is narrowed back to its own type
+ * here rather than leaving the patch's tempo typed as "string or number or boolean".
+ */
+const decodeSettings = (hexList: string[]): PatchSettings => {
+  const decoded = decodeFields(PATCH_SETTING_FIELDS, bytesFromHex(hexList));
+  return {
+    memoryLevel: Number(decoded.memoryLevel),
+    bpm:         Number(decoded.bpm),
+    key:         String(decoded.key),
+    carryover:   Boolean(decoded.carryover),
+    tempoHold:   Boolean(decoded.tempoHold),
+  };
+};
 
-const encodeKey = (key: string, originalHex: string[]): string[] => {
+const encodeSettings = (settings: PatchSettings, originalHex: string[]): string[] => {
   const bytes = bytesFromHex(originalHex);
-  bytes[KEY_OFFSET] = lookupIndex(KEY_IDX, key, "key");
+  encodeFields(PATCH_SETTING_FIELDS, { ...settings }, bytes);
   return hexFromBytes(bytes);
 };
 
@@ -491,7 +511,7 @@ const encodePedalFx = (block: PedalFxBlock): string[] => {
 
 export {
   decodeName, encodeName,
-  decodeKey, encodeKey,
+  decodeSettings, encodeSettings, PATCH_SETTING_FIELDS,
   decodeChain, encodeChain, validateChain,
   decodeAmp, encodeAmp,
   decodeDrive, encodeDrive,

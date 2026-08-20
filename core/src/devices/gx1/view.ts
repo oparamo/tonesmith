@@ -3,10 +3,18 @@ import type { Patch } from "./types";
 import type { BlockName } from "./common";
 import { BLOCK_LABELS, BLOCK_NAMES } from "./common";
 
+const onOff = (setting: boolean): string => (setting ? "ON" : "OFF");
+
 const patchDetails = (patch: Patch): PatchDetail[] => {
   const details: PatchDetail[] = [
     { label: "Chain", value: patch.chain.join(", ") },
+    { label: "Memory level", value: String(patch.memoryLevel) },
+    // Named as the tempo rather than as BPM, since a reader meeting "1/4" in the delay below has
+    // to be able to find what that note plays against.
+    { label: "Tempo", value: `${patch.bpm} BPM` },
     { label: "Key", value: patch.key },
+    { label: "Carryover", value: onOff(patch.carryover) },
+    { label: "Tempo hold", value: onOff(patch.tempoHold) },
   ];
   if (patch.memo) details.push({ label: "Memo", value: patch.memo });
   return details;

@@ -18,6 +18,7 @@ import type { BlockName } from "../common";
 import type { Patch } from "../types";
 import {
   checkSelectors, checkTypeBelongsInBlock, resolveSelection, unknownTypeIssue, validateTypeParams,
+  validatePatchSettings,
 } from "./validate";
 import type { Issues, Selectors } from "./validate";
 import { asRecord } from "./errors";
@@ -36,7 +37,7 @@ const isBlockName = (name: string | undefined): name is BlockName =>
 
 /**
  * Which block and field a path addresses, or undefined for a path that names no block at all
- * (`name`, `key`, `chain`) or reaches deeper than a block's controls.
+ * (`name`, `chain`, a patch setting) or reaches deeper than a block's controls.
  *
  * Every block keeps its controls one level down in `params`, so the path says which kind of thing
  * it touches: `amp.on` is block state and `amp.params.gain` is a control.
@@ -53,7 +54,7 @@ const editTarget = (path: string): { block: BlockName; field: Omit<EditedField, 
   return { block: head, field: { leaf, isParam: false } };
 };
 
-/** A path addressing no block is dropped rather than reported: the codec still has its say on it. */
+/** A path addressing no block is dropped here; `patchSettingEdits` is what picks those up. */
 const editsByBlock = (edits: Record<string, unknown>): Map<BlockName, EditedField[]> => {
   const byBlock = new Map<BlockName, EditedField[]>();
   for (const [path, value] of Object.entries(edits)) {
@@ -105,12 +106,22 @@ const blockIssues = (patch: Patch, name: BlockName, fields: EditedField[]): Issu
 };
 
 /**
+ * The edits that named a patch setting rather than a block. A setting sits at the top level of the
+ * patch, so its path is a single segment, and the catalog decides which of those are settings:
+ * `name` and `memo` land here too and pass through unchecked, having no spec to check against.
+ */
+const patchSettingEdits = (edits: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(edits).filter(([path]) => !path.includes(".")));
+
+/**
  * Every problem with a set of edits, empty when they are all usable. The patch must already carry
  * them: each block's type comes from the patch, which is what lets a type change and a param of the
  * new type validate as the one consistent state they describe.
  */
-const validateFieldEdits = (patch: Patch, edits: Record<string, unknown>): Issues =>
-  [...editsByBlock(edits)].flatMap(([name, fields]) => blockIssues(patch, name, fields));
+const validateFieldEdits = (patch: Patch, edits: Record<string, unknown>): Issues => [
+  ...validatePatchSettings(patchSettingEdits(edits)),
+  ...[...editsByBlock(edits)].flatMap(([name, fields]) => blockIssues(patch, name, fields)),
+];
 
 /**
  * Applies a batch of edits in the order given and returns what each one wrote, throwing with every

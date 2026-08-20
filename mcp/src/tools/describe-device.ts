@@ -62,9 +62,13 @@ const viewForEntry = (
   entry: string,
   includeParams: boolean | undefined,
 ): object => {
-  // "chain" carries the patch-name limit too. It belongs to no group, so a caller asking only for
-  // groups would never meet it, and finding it out by being rejected costs a patch already built.
-  if (entry === "chain") return { ...capabilities.chain, patchName: capabilities.patchName };
+  // "chain" carries what belongs to the patch rather than to any group: the name limit, and the
+  // settings written beside the name. A caller asking only for groups would never meet either, and
+  // finding one out by being rejected costs a patch already built.
+  if (entry === "chain") {
+    const { patchName, patchSettings } = capabilities;
+    return { ...capabilities.chain, patchName, patchSettings };
+  }
 
   const { group, item } = splitEntry(entry);
   const matched = capabilityUtils.findGroup(capabilities, group);
@@ -122,7 +126,7 @@ const exampleEntries = (capabilities: DeviceCapabilities): string[] => {
 const deviceSummary = (capabilities: DeviceCapabilities): object => ({
   chain: {
     defaultOrder: capabilities.chain.defaultOrder,
-    help: 'Pass items: ["chain"] for how block order and on/off bypass work.',
+    help: 'Pass items: ["chain"] for how block order and on/off bypass work, and for the settings the patch carries itself.',
   },
   patchName: capabilities.patchName,
   groups: capabilities.groups.map(capGroup => ({
@@ -148,7 +152,8 @@ const registerDescribeDevice = (server: McpServer): void => {
         device: deviceField,
         items: z.array(z.string()).optional().describe(
           "What to look up, as a list. Each entry is one of: \"chain\" for the signal-chain model " +
-            "(default block order, reordering, and how blocks are bypassed); a group id for that " +
+            "(default block order, reordering, how blocks are bypassed, and the settings the patch " +
+            "carries itself rather than in a block); a group id for that " +
             'group\'s index; or "<group>/<item>" for one item\'s full params, split on the first ' +
             "slash so an item id containing one still resolves. Omit `items` to list every group " +
             "id this device has, which is where the ids come from. List every entry you need in a " +

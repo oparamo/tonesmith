@@ -1,4 +1,4 @@
-import type { Patch, BlockParams } from "./types";
+import type { Patch, BlockParams, PatchSettings } from "./types";
 import { blankPatch } from "./tsl";
 import {
   PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, DEFAULT_CHAIN, onlyBlockFor,
@@ -17,13 +17,27 @@ const moveBefore = (chain: string[], node: string, beforeNode: string): string[]
   return [...without.slice(0, index), node, ...without.slice(index)];
 };
 
-const basePatch = (name: string, chain: string[] = DEFAULT_CHAIN, key = "C"): Patch => {
+/**
+ * The patch-level inputs a spec may carry, each one optional: a blank patch already opens at the
+ * device's own factory value for every setting, so an option left out means "keep that" rather
+ * than "invent a default here".
+ */
+interface BasePatchOptions extends Partial<PatchSettings> {
+  chain?: string[];
+}
+
+const basePatch = (name: string, options: BasePatchOptions = {}): Patch => {
   const patch = blankPatch(name);
+  const chain = options.chain ?? DEFAULT_CHAIN;
   // The same check `encodeChain` runs at the byte boundary, called here so a bad order is rejected
   // while the caller still has the spec in hand rather than several blocks later.
   validateChain(chain);
   patch.chain = chain;
-  patch.key = key;
+  patch.memoryLevel = options.memoryLevel ?? patch.memoryLevel;
+  patch.bpm = options.bpm ?? patch.bpm;
+  patch.key = options.key ?? patch.key;
+  patch.carryover = options.carryover ?? patch.carryover;
+  patch.tempoHold = options.tempoHold ?? patch.tempoHold;
   return patch;
 };
 
@@ -320,6 +334,6 @@ export {
   basePatch, amp, drive, fx, noiseGate, volume, pedalFx, delay, reverb,
 };
 export type {
-  AmpOptions, DriveOptions, FxOptions, NoiseGateOptions, VolumeOptions, PedalFxOptions,
-  DelayOptions, ReverbOptions,
+  BasePatchOptions, AmpOptions, DriveOptions, FxOptions, NoiseGateOptions, VolumeOptions,
+  PedalFxOptions, DelayOptions, ReverbOptions,
 };

@@ -38,11 +38,20 @@ describe("gx1 patch view", () => {
     expect(present(drive, "the drive block in the view").label).toBe("OD/DS");
   });
 
-  it("carries the chain and the patch key as details", () => {
+  it("carries the chain and every patch setting as details", () => {
     const patch = patchAt(FIXTURE);
 
     expect(detail(patch, "Chain")).toBe(patch.chain.join(", "));
+    expect(detail(patch, "Memory level")).toBe(String(patch.memoryLevel));
+    expect(detail(patch, "Tempo")).toBe(`${patch.bpm} BPM`);
     expect(detail(patch, "Key")).toBe(patch.key);
+  });
+
+  it("reads the two switches as the device labels them, not as true and false", () => {
+    const patch = driver.blankPatch("Test");
+
+    expect(detail(patch, "Carryover")).toBe("ON");
+    expect(detail(patch, "Tempo hold")).toBe("OFF");
   });
 
   it("carries a memo only when the patch has one", () => {
