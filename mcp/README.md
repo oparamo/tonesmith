@@ -45,9 +45,10 @@ tonesmith-mcp   # runs over stdio
 | `copy_patch`        | Copy a patch into a slot in another file, replacing what was there                                                              |
 | `create_patch_file` | Start an empty file of blank patches at the device's factory defaults                                                           |
 
-Building a patch is two calls, however many patches are involved: one `describe_device` naming
-every group and effect type needed, then one `generate_patch`. The generate response echoes each
-patch complete with defaults and its resolved chain, so nothing has to be read back to confirm it.
+Building a patch is two lookups and one build, however many patches are involved: one
+`describe_device` with no `items` to see every group and type the device has, one naming the types
+needed, then one `generate_patch`. The generate response echoes each patch complete with defaults
+and its resolved chain, so nothing has to be read back to confirm it.
 
 A device's blocks, types and params live in `describe_device` rather than in any tool's schema, so
 `describe_device` is always the call that answers "what can this device do".

@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { gx1 } from "@tonesmith/core";
+import type { ParamSpec } from "@tonesmith/core";
 import { connectClient, present } from "./helpers";
 
 /** Pulls one entry's view out of a batched response, which is keyed by the requested entry string. */
@@ -31,6 +32,40 @@ describe("describe_device", () => {
     const groupIds = summary.groups.map(group => group.id);
     expect(groupIds).toContain("amp");
     expect(summary.chain.defaultOrder, "no-items summary carries a chain pointer").toContain("amp");
+  });
+
+  // Every id an `items` entry can name comes from here, so a caller writes the next call off this
+  // response alone rather than listing each group first.
+  it("names every type in the summary, so the next call can be built from it alone", async () => {
+    const client = await connectClient();
+    close = client.close;
+
+    const { text } = await client.callTool("describe_device", { device: "gx1" });
+    const { groups } = JSON.parse(text) as { groups: { id: string; typeIds: string[] }[] };
+    const amp = present(groups.find(group => group.id === "amp"), "the amp group");
+    const [firstType] = amp.typeIds;
+
+    const named = `amp/${present(firstType, "amp's first type id")}`;
+    const { text: reply, isError } = await client.callTool("describe_device", { device: "gx1", items: [named] });
+
+    expect(isError, reply).toBe(false);
+    const view = viewOf(reply, named) as { id: string; params: ParamSpec[] };
+    expect(view.id, "an id read out of the summary resolves as an entry").toBe(firstType);
+    expect(view.params.length, "and answers with the params the summary could not carry").toBeGreaterThan(0);
+  });
+
+  // The whole reason the ids fit here: they are the cheap half of a listing. Held as a ratio so
+  // that reformatting the response cannot turn this into an assertion about byte counts.
+  it("keeps the summary far cheaper than listing every group", async () => {
+    const client = await connectClient();
+    close = client.close;
+    const everyGroup = gx1.driver.capabilities.groups.map(group => group.id);
+
+    const summary = await client.callTool("describe_device", { device: "gx1" });
+    const listings = await client.callTool("describe_device", { device: "gx1", items: everyGroup });
+
+    expect(summary.text.length, "the ids are the cheap half of a listing")
+      .toBeLessThan(listings.text.length / 4);
   });
 
   // The example has to come from the catalog the call is answering about. Any hand-written list

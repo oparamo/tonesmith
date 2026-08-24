@@ -129,13 +129,15 @@ const deviceSummary = (capabilities: DeviceCapabilities): object => ({
     help: 'Pass items: ["chain"] for how block order and on/off bypass work, and for the settings the patch carries itself.',
   },
   patchName: capabilities.patchName,
+  // Every id an `items` entry can name, so the next call is writeable off this response alone
+  // rather than after a listing call per group.
   groups: capabilities.groups.map(capGroup => ({
     id: capGroup.id,
     name: capGroup.name,
     description: capGroup.description,
-    itemCount: capGroup.items.length,
+    typeIds: capGroup.items.map(item => item.id),
   })),
-  help: `e.g. items: ${JSON.stringify(exampleEntries(capabilities))}.`,
+  help: `Name any type above as "<group>/<type>" in \`items\` for its params and a copyable example. e.g. items: ${JSON.stringify(exampleEntries(capabilities))}.`,
 });
 
 const registerDescribeDevice = (server: McpServer): void => {
@@ -155,8 +157,8 @@ const registerDescribeDevice = (server: McpServer): void => {
             "(default block order, reordering, how blocks are bypassed, and the settings the patch " +
             "carries itself rather than in a block); a group id for that " +
             'group\'s index; or "<group>/<item>" for one item\'s full params, split on the first ' +
-            "slash so an item id containing one still resolves. Omit `items` to list every group " +
-            "id this device has, which is where the ids come from. List every entry you need in a " +
+            "slash so an item id containing one still resolves. Omit `items` to list this device's " +
+            "groups and every type id in them, which is where the ids come from. List every entry you need in a " +
             "single call, which is what this input is for. An unknown entry fails the whole call " +
             "and names itself."
         ),
