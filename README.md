@@ -116,8 +116,8 @@ MCP tools:
 | Tool                  | Description                                                                                         |
 |-----------------------|-----------------------------------------------------------------------------------------------------|
 | `list_devices`        | List supported devices                                                                              |
-| `read_patch`          | Read one or all patches from a patch file                                                           |
-| `write_fields`        | Edit one or more fields in an existing patch, applied as one batch                                  |
+| `read_patch`          | Read one patch, or page through a whole file                                                        |
+| `write_fields`        | Edit fields in an existing patch by dot-path, applied as one batch, and rename the patch set        |
 | `describe_device`     | Look up a device's capability metadata (chain, groups, types, params). `items` takes a list, so one call covers many lookups |
 | `generate_patch`      | Build one or more patches from structured parameters and save them in one write. The per-patch spec comes from `describe_device` |
 | `copy_patch`          | Copy a patch into a slot in another file, replacing what was there                                  |
@@ -175,6 +175,12 @@ carry: an example spelled out of one device's blocks is an example that fails on
 nothing else. `index.ts` is the packaging file and the device's entire published surface: the driver,
 the patch and block types, and `RAW`. Builders, codec helpers and spec internals stay inside the
 folder.
+
+**Every block takes one shape.** A block carries `type` where the device offers one, an optional
+`subType` and `on`, and one `params` bag holding its controls. Those three are the reserved
+block-level keys; everything else a block has goes under `params`. It is the shape a decoded patch
+reads back as, the shape a spec is written in, and the shape a dot-path addresses, so a consumer
+learns it once rather than per block.
 
 **Files group by domain, not by file type,** and are named for their role rather than the type inside
 them: `driver.ts`, `builder.ts`, `constants.ts`, never `Gx1Driver.ts`. Types live beside the runtime

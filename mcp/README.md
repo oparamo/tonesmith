@@ -1,5 +1,9 @@
 # @tonesmith/mcp
 
+[![npm](https://img.shields.io/npm/v/@tonesmith/mcp)](https://www.npmjs.com/package/@tonesmith/mcp)
+[![license](https://img.shields.io/npm/l/@tonesmith/mcp)](./LICENSE.md)
+[![node](https://img.shields.io/node/v/@tonesmith/mcp)](https://nodejs.org)
+
 An [MCP](https://modelcontextprotocol.io) server that carries the device knowledge an agent needs
 to read, edit, and build patches for guitar multi-effects processors.
 
@@ -41,7 +45,7 @@ tonesmith-mcp   # runs over stdio
 | `describe_device`   | A device's capability metadata (chain, groups, types, params). `items` takes a list, so one call covers a whole patch's lookups  |
 | `generate_patch`    | Build one or more patches from structured parameters and save them in one write. The per-patch spec comes from `describe_device` |
 | `read_patch`        | Read one patch, or page through a whole file                                                                                    |
-| `write_fields`      | Edit fields in an existing patch, applied as one batch                                                                          |
+| `write_fields`      | Edit fields in an existing patch by dot-path, applied as one batch, and rename the patch set     |
 | `copy_patch`        | Copy a patch into a slot in another file, replacing what was there                                                              |
 | `create_patch_file` | Start an empty file of blank patches at the device's factory defaults                                                           |
 

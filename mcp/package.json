@@ -2,6 +2,24 @@
   "name": "@tonesmith/mcp",
   "version": "0.2.0",
   "description": "MCP server carrying the device knowledge an agent needs to build guitar multi-effects patches.",
+  "keywords": [
+    "guitar",
+    "multi-effects",
+    "patch",
+    "preset",
+    "boss",
+    "gx-1",
+    "tsl",
+    "tone",
+    "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "claude"
+  ],
+  "homepage": "https://github.com/oparamo/tonesmith#readme",
+  "bugs": {
+    "url": "https://github.com/oparamo/tonesmith/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=24"

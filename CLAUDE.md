@@ -175,9 +175,9 @@ patch file (device-native format)
 
 - **Builder functions:** named after the block they configure, no "set" prefix; scaffolding helpers
   (gx1's `basePatch`) are the naming exception. Each takes the patch plus one options object, and
-  any block whose params vary by type carries them in a `params` bag. That bag is validated against
-  the current type's known fields, so an unknown key throws rather than silently writing a byte
-  that means something else for this type. The builders are internal: a consumer builds a patch
+  every block carries its controls in a `params` bag, whether or not they vary by type. That bag is
+  validated against the current type's known fields, so an unknown key throws rather than silently
+  writing a byte that means something else for this type. The builders are internal: a consumer builds a patch
   from a spec through `PatchDriver.buildPatch`.
 
 - **`write` dot-notation:** `fx1.params.rate=50` walks the decoded patch object; each segment
@@ -233,7 +233,7 @@ dashes, ternaries assigned before use, cognitive complexity 10), so they are not
 - **A device's block catalog never enters the tool schema.** `tools/list` sits in the model's
   context on every request, and one device's per-type schema measured 24,902 bytes against 5,205
   for every device-agnostic tool combined, so a per-device generate tool made the resident cost
-  scale with the roster. Deleting that layer took `tools/list` from 30,115 bytes to 7,129. A static
+  scale with the roster. Without that layer `tools/list` is 9,233 bytes for the whole roster. A static
   schema fits an argument shape that is fixed and independent of the argument values; a block's
   fields depend on its `type`, which is a lookup, not a signature. `generate_patch` takes a
   permissive `patches` array and the driver validates it, which is what `fx` already did for all
@@ -284,7 +284,7 @@ repository.
 | `list_devices`        | none                                                               | Returns `[{ id, name }]`                                                                                                                                                                                                                                  |
 | `read_patch`          | `device`, `file`, `ref?`, `limit?`, `offset?`                      | `ref` = index or name, answered as `{ setName, index, patch }`. Omit it to page through the file: 20 patches by default (`limit` up to 100), each as `{ index, patch }`, plus `total` and a `more` line naming the offset to continue from                  |
 | `generate_patch`      | `device`, `outPath`, `setName?`, `patches[]`                       | One tool for every device: the per-patch spec comes from `describe_device`, not from this tool's schema. Builds every patch in `patches` and upserts them by name into `outPath` in array order, in one file write (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed). The response reports each patch as `{ name, action, patch }`, the patch complete with the defaults it filled in, so no follow-up read is needed |
-| `write_fields`        | `device`, `file`, `ref`, `fields`                                  | Dot-path mutations as a `{path: value}` record, same as CLI `write`. The batch applies atomically: a rejected edit leaves the file untouched. Setting a block's `type` switches the effect: the block arrives at that type's factory settings on its factory sub-model, and its previous controls are gone, so name the ones you want after the type in the same call |
+| `write_fields`        | `device`, `file`, `ref?`, `fields?`, `setName?`                    | Dot-path mutations as a `{path: value}` record, the same paths CLI `write` takes. The batch applies atomically: a rejected edit leaves the file untouched. Setting a block's `type` switches the effect: the block arrives at that type's factory settings on its factory sub-model, and its previous controls are gone, so name the ones you want after the type in the same call. `setName` renames the patch set, which the CLI has no command for; it needs no `ref`, so a rename on its own names neither a patch nor a field. Asking for neither edit is an error rather than a silent no-op |
 | `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<type>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). The `"chain"` entry also carries what belongs to the patch rather than to a block: the name limit, and the patch settings written beside `name`. Omit `items` for a chain summary plus every group with every type id in it, which is what makes the next call nameable without listing each group first. A bare-group entry is an index with no per-type params, so name the types instead, or pass `includeParams` for the full set. A named type also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
 | `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use `generate_patch`, which appends by name                                                        |
 | `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults, `patchCount` from 1 to 500. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                          |

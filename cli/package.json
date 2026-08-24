@@ -2,6 +2,22 @@
   "name": "@tonesmith/cli",
   "version": "0.2.0",
   "description": "Command line for guitar multi-effects patch files: read a patch, edit a field, copy between files.",
+  "keywords": [
+    "guitar",
+    "multi-effects",
+    "patch",
+    "preset",
+    "boss",
+    "gx-1",
+    "tsl",
+    "tone",
+    "cli",
+    "command-line"
+  ],
+  "homepage": "https://github.com/oparamo/tonesmith#readme",
+  "bugs": {
+    "url": "https://github.com/oparamo/tonesmith/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=24"

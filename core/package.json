@@ -2,7 +2,26 @@
   "name": "@tonesmith/core",
   "version": "0.2.0",
   "description": "Read, edit, and build guitar multi-effects patch files. Each device is a driver behind one interface.",
+  "keywords": [
+    "guitar",
+    "multi-effects",
+    "patch",
+    "preset",
+    "boss",
+    "gx-1",
+    "tsl",
+    "tone",
+    "patch-file",
+    "codec"
+  ],
+  "homepage": "https://github.com/oparamo/tonesmith#readme",
+  "bugs": {
+    "url": "https://github.com/oparamo/tonesmith/issues"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
   "exports": {
