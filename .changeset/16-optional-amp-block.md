@@ -13,7 +13,8 @@ for having no `type` on a block it was switching off. Both now build the same pa
 off at the device's factory defaults, exactly as every other omitted block already did.
 
 An amp that is on still needs a `type`, which is the rule for every block with models and not an
-amp rule. FV remains the one block that cannot be bypassed, because it has no on/off byte to write.
+amp rule. `volume`, the foot-volume pedal, remains the one block that cannot be bypassed, because it
+has no on/off byte to write.
 
 This makes the capability metadata true: `describe_device`'s chain summary already told callers
-that every block but FV can be switched off by leaving its spec out.
+that every block but `volume` can be switched off by leaving its spec out.

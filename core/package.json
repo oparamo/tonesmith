@@ -19,9 +19,6 @@
     "url": "https://github.com/oparamo/tonesmith/issues"
   },
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
   "exports": {

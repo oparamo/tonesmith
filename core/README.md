@@ -2,7 +2,6 @@
 
 [![npm](https://img.shields.io/npm/v/@tonesmith/core)](https://www.npmjs.com/package/@tonesmith/core)
 [![license](https://img.shields.io/npm/l/@tonesmith/core)](./LICENSE.md)
-[![node](https://img.shields.io/node/v/@tonesmith/core)](https://nodejs.org)
 
 Read, edit, and build patch files for guitar multi-effects processors.
 

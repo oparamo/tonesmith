@@ -21,6 +21,6 @@ writing a block's `type` does to the controls already in it.
 also renames the patch set, with `ref` and `fields` optional so a rename names neither a patch nor a
 field.
 
-Every manifest gains `keywords`, `homepage` and `bugs`, and `@tonesmith/core` gains the `engines`
-field its siblings already had, so an npm page carries working Homepage and Issues links and the
-packages turn up in a search. Each README opens with version, license and node badges.
+Every manifest gains `keywords`, `homepage` and `bugs`, so an npm page carries working Homepage and
+Issues links and the packages turn up in a search. Each README opens with a version and a license
+badge, and the two packages that declare a node floor carry one for it.

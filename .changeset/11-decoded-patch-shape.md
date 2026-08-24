@@ -19,9 +19,9 @@ directly.
 
 **On/off params are real booleans.** `trigger` across FEEDBACKER, VIBRATO, S-BEND, the
 WARP/TWIST/GLITCH/REVERSE delay sub-algorithms and TERA ECHO, RING MOD's `intelligent`, and `solo`
-on amp/odds/OD-DS were variously an `"OFF"`/`"ON"` string, a raw number, or a boolean depending on
-where you found them. They are `true`/`false` end to end now, over a `boolean` param domain and a
-validating `bool` codec field.
+on the amp, the drive block and the FX-slot OD/DS were variously an `"OFF"`/`"ON"` string, a raw
+number, or a boolean depending on where you found them. They are `true`/`false` end to end now, over
+a `boolean` param domain and a validating `bool` codec field.
 
 **`subType` is the only way a model or sub-algorithm is selected**, and it is the only name that
 selection goes by. Ten effects and the pedal-FX block store the selector among their own params
@@ -35,6 +35,6 @@ selection exactly once: ten effects keep the selector in a param byte, and the c
 `subType` on the way out and writes it back on the way in, so nothing downstream is handed two
 copies to keep in agreement.
 
-**Blocks and fields that were undecoded now decode**: the `pfx` block (expression pedal WAH and
-PEDAL BEND), `solo` and `soloLevel` on both the dedicated AMP block and the FX-slot OD/DS, and
+**Blocks and fields that were undecoded now decode**: the `pedalFx` block (expression pedal WAH and
+PEDAL BEND), `solo` and `soloLevel` on both the `amp` block and the FX-slot OD/DS, and
 `patch.key`, the song key HARMONIST resolves its diatonic intervals against.

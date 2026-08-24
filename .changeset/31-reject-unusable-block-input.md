@@ -11,7 +11,8 @@ PHASER given `subType: "4 STAGE"` came back as a 4-stage patch in name only, sin
 is its `stage` param. That input is now refused, and the message names the param that does carry the
 variant, so the fix is one edit rather than a hunt. A subType a type has but doesn't recognize is
 refused the same way, naming the variants it does have; it used to reach the codec's lookup and come
-back as `Unknown type value: "..."`, which named neither the block nor the field nor the alternatives.
+back as `Unknown type value: "..."`, which named neither the block nor the field nor the
+alternatives.
 
 The pedal FX block gains the `subType` it already advertised. `describe_device` has always listed
 WAH's six pedal models as subTypes while `generate_patch` had no way to set one, leaving
@@ -28,6 +29,5 @@ saved and reported success. `describe_device` said "FX3 only" in prose while han
 `example` written under `fx1`, so following the example was the way to hit it; the example now
 names `fx3`.
 
-Builder callers see the same rules: `fx()` and `pfx()` throw on a subType the type cannot carry, or
-on a type the slot has nowhere to store, and `pfx()` takes `subType` alongside its existing
-`params`.
+Every one of these rules is enforced on the way to the bytes rather than at the tool boundary, so
+the CLI and the MCP server reject the same input for the same reason.

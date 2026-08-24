@@ -47,9 +47,10 @@ set stored in the file, distinct from `outPath`, the filename on disk.
 The response is one JSON object, `{ summary, file: { path, setName, total, created }, patches }`,
 rather than a prose line with a JSON array stuck to the end of it, which a consumer could only read
 by finding the first `[`. `file` says where the set stands after the write without reading it back,
-and each entry in `patches` says whether it replaced a same-named patch or was appended. A block's shape, meaning the
-fields it takes and their bounds, is validated by the device's own driver against its capability
-catalog rather than declared in the tool schema, so `describe_device` is where that detail lives.
+and each entry in `patches` says whether it replaced a same-named patch or was appended. A block's
+shape, meaning the fields it takes and their bounds, is validated by the device's own driver against
+its capability catalog rather than declared in the tool schema, so `describe_device` is where that
+detail lives.
 
 **`write_field` is `write_fields`** and takes a `{dot-path: value}` record instead of a single
 field and value pair. The whole set applies in memory before anything is written, so a rejected
@@ -60,23 +61,19 @@ so a rename needs no patch reference, and asking for neither edit is an error ra
 no-op.
 
 **Input names match the decoded field names** shown by `read_patch` and used by `write_fields`
-dot-paths. `amp.mid` is `amp.middle`, and `delay.timeMs` and `reverb.timeS` are `delay.time` and
-`reverb.time`, with the units documented in each field's description rather than carried in the
-field name.
+dot-paths. `mid` is `middle`, and delay's `timeMs` and reverb's `timeS` are both `time`, with the
+units documented in each field's description rather than carried in the field name.
 
-**Params go where the decoded patch keeps them.** `pfx`, `delay` and `reverb` take their params as
-fields on the block, which is how `read_patch` returns them and how `write_fields` addresses them by
-dot-path. An fx slot keeps a `params` record keyed by each param's `key`, because one slot takes any
-of 39 effects and a variant per type and subtype would cost roughly 35 KB of tool schema on every
-request, against a `describe_device` lookup paid once. `generate_patch`'s own schema declares
-neither shape: the device's driver checks each entry against its own catalog, block by block,
-enforcing the same rules a per-type schema used to. Both shapes take strings and booleans as well as
-numbers, which they did not: the many GX-1 params that select a model or mode by name (TOUCH WAH's
-`filter`, SLICER's `pattern`, HARMONIST's `harmony`, delay TWIST's `mode`, SPACE ECHO's `head`) are
-`lookup()`-encoded strings in the codec, and an input restricted to numbers could never build a
-working patch with any of them. A key the chosen type has
-no field for is rejected with the shape that type does take, printed with `type` filled in, so
-nesting is shown rather than described.
+**A block's params are declared nowhere in the tool schema.** One fx slot takes any of 39 effects,
+and a schema variant per type and subtype would cost roughly 35 KB on every request against a
+`describe_device` lookup paid once, so `generate_patch` takes a permissive `patches` array and the
+device's driver checks each entry against its own catalog, block by block, enforcing the same rules
+a per-type schema would. Params take strings and booleans as well as numbers, which they did not:
+the many GX-1 params that select a model or mode by name (TOUCH WAH's `filter`, SLICER's `pattern`,
+HARMONIST's `harmony`, delay TWIST's `mode`, SPACE ECHO's `head`) are `lookup()`-encoded strings in
+the codec, and an input restricted to numbers could never build a working patch with any of them. A
+key the chosen type has no field for is rejected with the shape that type does take, printed with
+`type` filled in, so nesting is shown rather than described.
 
 Pedal WAH's model is chosen by `subType`, alongside the fx slots and the way capabilities advertises
 it. It reads back under that name too, so the block you get from `read_patch` is a block you can
