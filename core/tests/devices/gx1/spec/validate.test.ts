@@ -52,7 +52,7 @@ describe("validateTypeParams", () => {
   // Checking only the "declares none" case would let a wrong value on a type that does have
   // variants fall through to the codec's lookup and come back as `Unknown type value: "WOBBLE"`,
   // naming neither the block, nor the field, nor what it could have been.
-  it("rejects a subType the item doesn't declare, listing the ones it does", () => {
+  it("rejects a subType the type doesn't declare, listing the ones it does", () => {
     const issues = validateTypeParams({ group: "fx", type: "COMPRESSOR", subType: "WOBBLE", values: {} });
 
     expect(issues).toHaveLength(1);
@@ -60,7 +60,7 @@ describe("validateTypeParams", () => {
     expect(issues[0], "should list the variants the type does have").toContain("ORANGE");
   });
 
-  it("accepts a subType the item declares", () => {
+  it("accepts a subType the type declares", () => {
     const issues = validateTypeParams({ group: "pfx", type: "WAH", subType: "CRY WAH", values: {} });
 
     expect(issues).toEqual([]);

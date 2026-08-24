@@ -1,10 +1,10 @@
 /**
  * GX-1 capability/description data.
  *
- * This module owns the *structural + sonic* metadata for each block: item ids/names, sonic
- * descriptions, the real-world `models` an item emulates, and nested subTypes. It does NOT
+ * This module owns the *structural + sonic* metadata for each block: type ids/names, sonic
+ * descriptions, the real-world `models` a type emulates, and nested subTypes. It does NOT
  * own parameter data: every `params` list is derived from `param-catalog.ts` (the single
- * source of truth for the device's param surface). Item `id` values must match the string
+ * source of truth for the device's param surface). Type `id` values must match the string
  * constants in `constants.ts` (which drive the codec).
  *
  * This assembled object is what the CLI (`capabilities` command) and MCP (`describe_device`
@@ -12,7 +12,7 @@
  * (and therefore the params surfaced here) stays in lockstep with the codec's field maps.
  */
 import type {
-  DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec, PatchSpecExample,
+  DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec, PatchSpecExample,
 } from "../../types";
 import {
   PARAMS_BY_TYPE, PARAMS_BY_BLOCK, PATCH_SETTINGS, FIELD_LABEL_ALIASES, type PerTypeBlockId,
@@ -65,13 +65,13 @@ const withBlockKeys = (params: readonly ParamSpec[]): ParamSpec[] =>
     return { ...param, key };
   });
 
-/** Attaches each item's params (with `key` stamped on) from the catalog for a per-type block. */
-const withTypeParams = (block: PerTypeBlockId, items: readonly CapabilityItem[]): CapabilityItem[] =>
-  items.map(item => ({ ...item, params: withKeys(block, item.id, PARAMS_BY_TYPE[block][item.id] ?? []) }));
+/** Attaches each type's params (with `key` stamped on) from the catalog for a per-type block. */
+const withTypeParams = (block: PerTypeBlockId, types: readonly CapabilityType[]): CapabilityType[] =>
+  types.map(type => ({ ...type, params: withKeys(block, type.id, PARAMS_BY_TYPE[block][type.id] ?? []) }));
 
 // FX-slot DELAY is the one fx type modeled per-sub-algorithm: its subTypes carry the params
-// (from the "fxDelay" catalog block), unlike the flat fx types whose params sit on the item.
-const FX_DELAY_SUBTYPES: CapabilityItem[] = withTypeParams("fxDelay", [
+// (from the "fxDelay" catalog block), unlike the flat fx types whose params sit on the type.
+const FX_DELAY_SUBTYPES: CapabilityType[] = withTypeParams("fxDelay", [
   { id: "STANDARD", name: "Standard", description: "Classic digital delay: repeats the sound to create an echo." },
   { id: "MODULATE", name: "Modulate", description: "Delay with modulation added to the repeats, giving a warm wavering quality." },
   { id: "WARP",     name: "Warp",     description: "Dream-like, time-stretching delay effect." },
@@ -83,7 +83,7 @@ const FX_DELAY_SUBTYPES: CapabilityItem[] = withTypeParams("fxDelay", [
 // FX1/FX2/FX3 structural metadata (params come from the catalog)
 // ---------------------------------------------------------------------------
 
-const FX_META: CapabilityItem[] = [
+const FX_META: CapabilityType[] = [
   {
     id: "COMPRESSOR",
     name: "Compressor",
@@ -285,21 +285,21 @@ const FX_META: CapabilityItem[] = [
   { id: "OVERTONE",    name: "Overtone",      description: "FX3 only. Uses MDP technology to add new harmonics to the sound, producing richness and resonance not present in the original. Adds octave-up, octave-down, and detuned unison voices." },
 ];
 
-const FX_ITEMS = withTypeParams("fx", FX_META);
+const FX_TYPES = withTypeParams("fx", FX_META);
 
 // ---------------------------------------------------------------------------
 // OD/DS block: same models as the FX OD/DS subtype list
 // ---------------------------------------------------------------------------
 
-const oddsFxItem = FX_META.find(item => item.id === "OD/DS");
-if (!oddsFxItem?.subTypes) throw new Error('"OD/DS" pedal models not found in FX_META');
-const ODDS_ITEMS = oddsFxItem.subTypes;
+const oddsFxType = FX_META.find(type => type.id === "OD/DS");
+if (!oddsFxType?.subTypes) throw new Error('"OD/DS" pedal models not found in FX_META');
+const ODDS_TYPES = oddsFxType.subTypes;
 
 // ---------------------------------------------------------------------------
 // AMP models
 // ---------------------------------------------------------------------------
 
-const AMP_ITEMS: CapabilityItem[] = [
+const AMP_TYPES: CapabilityType[] = [
   { id: "TRNSPRNT",    name: "Transparent",       description: "Extremely flat response across a broad frequency range. Good for acoustic guitar or any signal where you want zero amp coloration." },
   { id: "NATURAL",     name: "Natural",           description: "Clean, unembellished sound that minimizes amp idiosyncrasies like treble harshness or boomy lows." },
   { id: "BOUTIQUE",    name: "Boutique",          description: "Crunch sound that allows picking nuances to come through even more faithfully than on conventional combo amps." },
@@ -329,7 +329,7 @@ const AMP_ITEMS: CapabilityItem[] = [
 // Speaker cabinets
 // ---------------------------------------------------------------------------
 
-const CAB_ITEMS: CapabilityItem[] = [
+const CAB_TYPES: CapabilityType[] = [
   { id: "OFF",      name: "Off",      description: "Speaker simulator disabled." },
   { id: "ORIGINAL", name: "Original", description: "Built-in speaker of the selected amp type." },
   { id: '1x8"',     name: '1x8"',     description: "Compact open-back cabinet with one 8-inch speaker." },
@@ -353,7 +353,7 @@ const CAB_ITEMS: CapabilityItem[] = [
 // Microphones
 // ---------------------------------------------------------------------------
 
-const MIC_ITEMS: CapabilityItem[] = [
+const MIC_TYPES: CapabilityType[] = [
   { id: "DYN57",    name: "Dynamic 57",    description: "Models the Shure SM57, the standard dynamic mic for guitar amplifiers.", models: "Shure SM57" },
   { id: "DYN421",   name: "Dynamic 421",   description: "Models the Sennheiser MD-421, a dynamic mic with extended low end.", models: "Sennheiser MD-421" },
   { id: "CND451",   name: "Condenser 451", description: "Models the AKG C451B, a small condenser mic for instruments that adds detail and air.", models: "AKG C451B" },
@@ -369,7 +369,7 @@ const MIC_ITEMS: CapabilityItem[] = [
 // Delay types (params per type come from the catalog)
 // ---------------------------------------------------------------------------
 
-const DELAY_META: CapabilityItem[] = [
+const DELAY_META: CapabilityType[] = [
   { id: "STANDARD",    name: "Standard",    description: "Classic digital delay: repeats the sound to create an echo." },
   { id: "MODULATE",    name: "Modulate",    description: "Delay with modulation added to the repeats, giving a warm wavering quality." },
   { id: "PAN",         name: "Pan",         description: "Stereo ping-pong delay that divides delay time between L and R channels." },
@@ -387,7 +387,7 @@ const DELAY_META: CapabilityItem[] = [
 // Reverb types (params per type come from the catalog)
 // ---------------------------------------------------------------------------
 
-const REV_META: CapabilityItem[] = [
+const REV_META: CapabilityType[] = [
   { id: "HALL S",    name: "Hall S",    description: "Concert hall reverb, clear and spacious with a short tail." },
   { id: "HALL M",    name: "Hall M",    description: "Concert hall reverb, mild with a medium tail." },
   { id: "PLATE",     name: "Plate",     description: "Plate reverb: metallic character with a distinct upper range and dense early reflections." },
@@ -404,7 +404,7 @@ const REV_META: CapabilityItem[] = [
 // PFX (expression pedal effect) types
 // ---------------------------------------------------------------------------
 
-const PFX_META: CapabilityItem[] = [
+const PFX_META: CapabilityType[] = [
   {
     id: "WAH",
     name: "Wah",
@@ -435,7 +435,7 @@ const PER_TYPE_DEFAULTS: Partial<Record<string, BlockDefaults>> = { ...DEFAULTS_
 const PER_BLOCK_DEFAULTS: Partial<Record<string, ParamDefaults>> = BLOCK_DEFAULTS;
 
 /**
- * The catalog block holding an FX-slot DELAY sub-algorithm's params. That item is the one whose
+ * The catalog block holding an FX-slot DELAY sub-algorithm's params. That type is the one whose
  * params sit on its subTypes rather than on itself, so its example takes its values from here.
  */
 const VARIANT_BLOCK: PerTypeBlockId = "fxDelay";
@@ -465,13 +465,13 @@ const defaultSubType = (group: string, type?: string): string | undefined =>
   type === undefined ? undefined : DEFAULT_SUBTYPES[group]?.[type];
 
 /**
- * The chosen sub-model's own catalog entry, for the item whose params sit on its subTypes rather
+ * The chosen sub-model's own catalog entry, for the type whose params sit on its subTypes rather
  * than on itself (FX-slot DELAY, whose sub-algorithms each take a different set). Everywhere else
- * the item holds the params and the sub-model only colors them.
+ * the type holds the params and the sub-model only colors them.
  */
-const variantParams = (item: CapabilityItem, subType: string): CapabilityItem | undefined => {
-  if ((item.params?.length ?? 0) > 0) return undefined;
-  return item.subTypes?.find(variant => variant.id === subType && (variant.params?.length ?? 0) > 0);
+const variantParams = (type: CapabilityType, subType: string): CapabilityType | undefined => {
+  if ((type.params?.length ?? 0) > 0) return undefined;
+  return type.subTypes?.find(variant => variant.id === subType && (variant.params?.length ?? 0) > 0);
 };
 
 /** Every param key the chosen shape accepts: the block's shared controls, then the type's own. */
@@ -479,36 +479,36 @@ const acceptedKeys = (params: ParamSpec[]): Set<string> =>
   new Set(params.flatMap(param => (param.key === undefined ? [] : [param.key])));
 
 /** Where an example's values come from: the sub-model's defaults where it owns the params, else the type's. */
-const exampleValues = (group: string, item?: CapabilityItem, variant?: CapabilityItem): ParamDefaults | undefined =>
-  variant === undefined ? defaultsFor(group, item?.id) : PER_TYPE_DEFAULTS[VARIANT_BLOCK]?.[variant.id];
+const exampleValues = (group: string, type?: CapabilityType, variant?: CapabilityType): ParamDefaults | undefined =>
+  variant === undefined ? defaultsFor(group, type?.id) : PER_TYPE_DEFAULTS[VARIANT_BLOCK]?.[variant.id];
 
 /**
  * One block's spec fragment at factory defaults: the selection that picks its shape, then its
  * controls wherever that block keeps them.
  */
-const exampleFor = (group: CapabilityGroup, item?: CapabilityItem): PatchSpecExample | undefined => {
-  const block = specBlockFor(group.id, item?.id);
+const exampleFor = (group: CapabilityGroup, type?: CapabilityType): PatchSpecExample | undefined => {
+  const block = specBlockFor(group.id, type?.id);
   if (block === undefined) return undefined;
 
-  const selected = defaultSubType(group.id, item?.id);
-  const variant = item === undefined || selected === undefined ? undefined : variantParams(item, selected);
-  const values = exampleValues(group.id, item, variant);
+  const selected = defaultSubType(group.id, type?.id);
+  const variant = type === undefined || selected === undefined ? undefined : variantParams(type, selected);
+  const values = exampleValues(group.id, type, variant);
   if (values === undefined) return undefined;
 
   // A sub-model selection is named on its own below, so the codec field carrying it is not one of
   // the type's param keys and drops out here along with any other stale default.
-  const accepted = acceptedKeys([...(group.params ?? []), ...(item?.params ?? []), ...(variant?.params ?? [])]);
+  const accepted = acceptedKeys([...(group.params ?? []), ...(type?.params ?? []), ...(variant?.params ?? [])]);
   const controls = Object.fromEntries(Object.entries(values).filter(([key]) => accepted.has(key)));
 
-  const typeField = item === undefined ? {} : { type: item.id };
+  const typeField = type === undefined ? {} : { type: type.id };
   const subTypeField = selected === undefined ? {} : { subType: selected };
   return { [block]: { ...typeField, ...subTypeField, params: controls } };
 };
 
 // Both leave the key off entirely where the group names no block, rather than carrying an empty one.
-const withItemExample = (group: CapabilityGroup, item: CapabilityItem): CapabilityItem => {
-  const example = exampleFor(group, item);
-  const decorated = example === undefined ? item : { ...item, example };
+const withTypeExample = (group: CapabilityGroup, type: CapabilityType): CapabilityType => {
+  const example = exampleFor(group, type);
+  const decorated = example === undefined ? type : { ...type, example };
   return decorated;
 };
 
@@ -519,13 +519,13 @@ const withGroupExample = (group: CapabilityGroup): CapabilityGroup => {
 };
 
 /**
- * Attaches each block's example where a caller meets it: on every item for a group that offers
+ * Attaches each block's example where a caller meets it: on every type for a group that offers
  * types, and on the group itself for one that doesn't, since that is the only view those have.
  */
 const withExamples = (groups: CapabilityGroup[]): CapabilityGroup[] =>
   groups.map(group => {
-    if (group.items.length === 0) return withGroupExample(group);
-    return { ...group, items: group.items.map(item => withItemExample(group, item)) };
+    if (group.types.length === 0) return withGroupExample(group);
+    return { ...group, types: group.types.map(type => withTypeExample(group, type)) };
   });
 
 // ---------------------------------------------------------------------------
@@ -561,65 +561,65 @@ const gx1Capabilities: DeviceCapabilities = {
       id: "fx",
       name: "FX1/FX2/FX3",
       description: "Three independent effects slots in the signal chain. FX1 and FX2 can use any of the 38 effects; FX3 additionally supports OVERTONE.",
-      items: FX_ITEMS,
+      types: FX_TYPES,
     },
     {
       id: "drive",
       name: "OD/DS",
       description: "Dedicated overdrive/distortion block with 35 classic pedal models. This is the block to use for a patch's overdrive. The fx slots offer the same 35 models under their OD/DS type, for stacking a second overdrive in the chain.",
-      items: ODDS_ITEMS,
+      types: ODDS_TYPES,
       params: withBlockKeys(PARAMS_BY_BLOCK.drive),
     },
     {
       id: "amp",
       name: "AMP/CAB",
       description: "AIRD (Augmented Impulse Response Dynamics) amplifier simulation. Models the full amp circuit including preamp, power section, and speaker interaction.",
-      items: AMP_ITEMS,
+      types: AMP_TYPES,
       params: withBlockKeys(PARAMS_BY_BLOCK.amp),
     },
     {
       id: "cab",
       name: "Speaker Cabinet",
       description: "Speaker cabinet simulation applied to the amp signal. Selects the cabinet size and configuration, or an externally loaded IR.",
-      items: CAB_ITEMS,
+      types: CAB_TYPES,
     },
     {
       id: "mic",
       name: "Microphone",
       description: "Microphone simulation applied after the speaker cabinet, shaping the tonal character of the miked cab signal.",
-      items: MIC_ITEMS,
+      types: MIC_TYPES,
     },
     {
       id: "pedalFx",
       name: "PFX (Expression Pedal Effect)",
       description: "The effect assigned to the expression pedal input: either a wah pedal or a pitch-bend pedal. Only one is active at a time.",
-      items: withTypeParams("pedalFx", PFX_META),
+      types: withTypeParams("pedalFx", PFX_META),
     },
     {
       id: "noiseGate",
       name: "NS (Noise Suppressor)",
       description: "Reduces noise and hum picked up by guitar pickups. Responds to the guitar signal envelope so it doesn't cut sustain unnaturally.",
-      items: [],
+      types: [],
       params: withBlockKeys(PARAMS_BY_BLOCK.noiseGate),
     },
     {
       id: "volume",
       name: "FV (Foot Volume)",
       description: "Expression-pedal volume control. Typically assigned to the CTL 2/EXP 2 jack. The one chain block that's always active: it can't be bypassed.",
-      items: [],
+      types: [],
       params: withBlockKeys(PARAMS_BY_BLOCK.volume),
     },
     {
       id: "delay",
       name: "Delay",
       description: "Dedicated delay block that adds echoes and depth to the signal. 11 delay types from classic digital to creative special effects.",
-      items: withTypeParams("delay", DELAY_META),
+      types: withTypeParams("delay", DELAY_META),
     },
     {
       id: "reverb",
       name: "Reverb",
       description: "Dedicated reverb block that adds reverberation. 10 types from natural acoustic spaces to creative shimmer and echo effects.",
-      items: withTypeParams("reverb", REV_META),
+      types: withTypeParams("reverb", REV_META),
     },
   ]),
 };

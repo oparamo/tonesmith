@@ -1,4 +1,4 @@
-import type { DeviceCapabilities, CapabilityGroup, CapabilityItem } from "./types";
+import type { DeviceCapabilities, CapabilityGroup, CapabilityType } from "./types";
 
 /** Case-insensitive lookup; throws when no group matches. */
 const findGroup = (caps: DeviceCapabilities, id: string): CapabilityGroup => {
@@ -15,16 +15,16 @@ const findGroup = (caps: DeviceCapabilities, id: string): CapabilityGroup => {
  * Case-insensitive lookup by id, falling back to a name prefix so a caller can pass the leading
  * words of a display name. Throws when nothing matches.
  */
-const findItem = (group: CapabilityGroup, id: string): CapabilityItem => {
+const findType = (group: CapabilityGroup, id: string): CapabilityType => {
   const needle = id.toUpperCase();
   const found =
-    group.items.find(item => item.id.toUpperCase() === needle) ??
-    group.items.find(item => item.name.toUpperCase().startsWith(needle));
+    group.types.find(type => type.id.toUpperCase() === needle) ??
+    group.types.find(type => type.name.toUpperCase().startsWith(needle));
   if (!found) {
-    const ids = group.items.map(item => item.id).join(", ");
-    throw new Error(`Unknown item "${id}" in group "${group.id}". Available: ${ids}`);
+    const ids = group.types.map(type => type.id).join(", ");
+    throw new Error(`Unknown type "${id}" in group "${group.id}". Available: ${ids}`);
   }
   return found;
 };
 
-export { findGroup, findItem };
+export { findGroup, findType };

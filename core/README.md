@@ -57,7 +57,7 @@ also why `writeFile` refuses a `PatchFile` you assembled by hand: it carries non
 - `patchUtils` — `resolvePatch`, `resolvePatches`, `applyFieldEdits`, `upsertPatches`, `copyPatch`,
   `createPatchFile`, `coerceValue`, `setByPath`
 - `patchView.presentPatch` — the consumer-facing view of a decoded patch
-- `capabilityUtils` — `findGroup`, `findItem`
+- `capabilityUtils`: `findGroup`, `findType`
 - one namespace per device (`gx1`), publishing its `driver`, its patch and block types, and `RAW`
 
 ## License

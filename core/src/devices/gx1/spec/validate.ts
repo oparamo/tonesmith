@@ -1,8 +1,8 @@
-import { findGroup, findItem } from "../../../capability-utils";
+import { findGroup, findType } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import { onlyBlockFor } from "../common";
 import type { BlockName } from "../common";
-import type { CapabilityGroup, CapabilityItem, ParamSpec } from "../../../types";
+import type { CapabilityGroup, CapabilityType, ParamSpec } from "../../../types";
 
 /** Every problem found with one block, empty when the block is usable. */
 type Issues = string[];
@@ -16,11 +16,11 @@ interface TypeParams {
   values: Record<string, unknown>;
 }
 
-/** A block's selection resolved against capabilities: its group, and the item its `type` names. */
+/** A block's selection resolved against capabilities: its group, and the type its `type` names. */
 interface Selection {
   capGroup: CapabilityGroup;
   /** Absent for a group with no types, where the group's shared params are the whole surface. */
-  item?: CapabilityItem;
+  capType?: CapabilityType;
 }
 
 const groupOrUndefined = (id: string): CapabilityGroup | undefined => {
@@ -31,9 +31,9 @@ const groupOrUndefined = (id: string): CapabilityGroup | undefined => {
   }
 };
 
-const itemOrUndefined = (group: CapabilityGroup, id: string): CapabilityItem | undefined => {
+const typeOrUndefined = (group: CapabilityGroup, id: string): CapabilityType | undefined => {
   try {
-    return findItem(group, id);
+    return findType(group, id);
   } catch {
     return undefined;
   }
@@ -47,48 +47,48 @@ const itemOrUndefined = (group: CapabilityGroup, id: string): CapabilityItem | u
 const resolveSelection = (group: string, type?: unknown): Selection | undefined => {
   const capGroup = groupOrUndefined(group);
   if (capGroup === undefined) return undefined;
-  if (capGroup.items.length === 0) return { capGroup };
+  if (capGroup.types.length === 0) return { capGroup };
   if (typeof type !== "string") return undefined;
 
-  const item = itemOrUndefined(capGroup, type);
-  if (item === undefined) return undefined;
-  return { capGroup, item };
+  const capType = typeOrUndefined(capGroup, type);
+  if (capType === undefined) return undefined;
+  return { capGroup, capType };
 };
 
 /** Variant ids are matched case-insensitively, the one place a caller's casing is forgiven. */
-const matchesSubType = (candidate: CapabilityItem, subType: string): boolean =>
+const matchesSubType = (candidate: CapabilityType, subType: string): boolean =>
   candidate.id.toUpperCase() === subType.toUpperCase();
 
 /**
- * The ParamSpecs in effect for a selection: the group's shared params, the chosen item's params,
+ * The ParamSpecs in effect for a selection: the group's shared params, the chosen type's params,
  * and, when a subType is given and carries its own, that subType's params (e.g. a DELAY
  * sub-algorithm).
  */
 const specsForType = (selection: Selection, subType?: string): ParamSpec[] => {
-  const { capGroup, item } = selection;
-  const specs = [...(capGroup.params ?? []), ...(item?.params ?? [])];
+  const { capGroup, capType } = selection;
+  const specs = [...(capGroup.params ?? []), ...(capType?.params ?? [])];
   const matchedSubType = subType === undefined
     ? undefined
-    : item?.subTypes?.find(candidate => matchesSubType(candidate, subType));
+    : capType?.subTypes?.find(candidate => matchesSubType(candidate, subType));
   if (matchedSubType?.params) specs.push(...matchedSubType.params);
   return specs;
 };
 
-/** One block's subType alongside the capability item it was sent to. */
+/** One block's subType alongside the capability type it was sent to. */
 interface SubTypeCheck {
   group: string;
   type: string;
-  item: CapabilityItem;
+  capType: CapabilityType;
   subType: string;
 }
 
 /**
- * Where a variant selection belongs on an item that declares no subTypes. Some such items do have
+ * Where a variant selection belongs on a type that declares no subTypes. Some such types do have
  * a variant to pick, carried as an ordinary param the device labels TYPE, and naming that param's
  * key is what turns the rejection into a one-step fix rather than a dead end.
  */
-const subTypeAlternative = (item: CapabilityItem): string => {
-  const selector = item.params?.find(param => param.name === "TYPE");
+const subTypeAlternative = (capType: CapabilityType): string => {
+  const selector = capType.params?.find(param => param.name === "TYPE");
   if (selector?.key === undefined) return "it has no variants to choose between";
   return `set params.${selector.key} instead (${selector.range})`;
 };
@@ -100,10 +100,10 @@ const subTypeAlternative = (item: CapabilityItem): string => {
  * than a missing one, since the codec's own rejection names only the value it couldn't look up.
  */
 const checkSubType = (issues: Issues, check: SubTypeCheck): void => {
-  const { group, type, item, subType } = check;
-  const variants = item.subTypes ?? [];
+  const { group, type, capType, subType } = check;
+  const variants = capType.subTypes ?? [];
   if (variants.length === 0) {
-    issues.push(`${group} ${type} takes no subType (got "${subType}"): ${subTypeAlternative(item)}`);
+    issues.push(`${group} ${type} takes no subType (got "${subType}"): ${subTypeAlternative(capType)}`);
     return;
   }
   if (variants.some(candidate => matchesSubType(candidate, subType))) return;
@@ -111,7 +111,7 @@ const checkSubType = (issues: Issues, check: SubTypeCheck): void => {
   issues.push(`${group} ${type} has no subType "${subType}". Valid subTypes: ${valid}`);
 };
 
-const typeChoices = (capGroup: CapabilityGroup): string => capGroup.items.map(item => item.id).join(", ");
+const typeChoices = (capGroup: CapabilityGroup): string => capGroup.types.map(type => type.id).join(", ");
 
 /** Names what the group does offer, since a rejected `type` leaves the caller with no next step. */
 const unknownTypeIssue = (capGroup: CapabilityGroup, type: unknown): string =>
@@ -238,8 +238,8 @@ const validateTypeParams = (params: TypeParams): Issues => {
   const selection = resolveSelection(group, type);
   if (selection === undefined) return issues;
   // A subType on a block with no types at all is an unrecognized key, already reported as one.
-  if (subType !== undefined && type !== undefined && selection.item !== undefined) {
-    checkSubType(issues, { group, type, item: selection.item, subType });
+  if (subType !== undefined && type !== undefined && selection.capType !== undefined) {
+    checkSubType(issues, { group, type, capType: selection.capType, subType });
   }
 
   const byKey = specsByKey(specsForType(selection, subType));
@@ -302,7 +302,7 @@ const typeSurface = (selected: Selected): TypeSurface | undefined => {
   const subType = typeof selected.subType === "string" ? selected.subType : undefined;
   return {
     paramKeys: specsForType(selection, subType).flatMap(spec => (spec.key === undefined ? [] : [spec.key])),
-    subTypes: (selection.item?.subTypes ?? []).map(variant => variant.id),
+    subTypes: (selection.capType?.subTypes ?? []).map(variant => variant.id),
   };
 };
 

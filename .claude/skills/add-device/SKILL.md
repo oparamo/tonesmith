@@ -216,8 +216,8 @@ capabilities on top of it. Don't hand-write param ranges twice.
    drift guard below meaningful.
 2. **`capabilities.ts`**: a `DeviceCapabilities` object covering every group the device exposes
    (effect types, amp/cab models, subtypes, and so on). It holds only what's its own, meaning
-   group/item structure, real-world models, sonic descriptions, and subtypes, and it **derives
-   each item's `params` from the catalog** rather than restating them. Types whose param set
+   group/type structure, real-world models, sonic descriptions, and subtypes, and it **derives
+   each type's `params` from the catalog** rather than restating them. Types whose param set
    varies by sub-model are modeled per-subtype, each subtype carrying its own catalog-derived
    params. **What earns a sub-model rather than a param** is what the capability response can
    carry: a subtype gets a name, a description and a real-world models string of its own, so a
@@ -244,16 +244,16 @@ capabilities on top of it. Don't hand-write param ranges twice.
    a spec beside `name`. Nothing in `groups` cross-checks them, so a setting left out here is one a
    consumer can only find by reading a patch that already has it. Pass an empty array where the
    device really has none. Wire capabilities into the driver object from step 3.
-3. **`example`**: on each item, or on the group itself where the block offers no types to choose
+3. **`example`**: on each type, or on the group itself where the block offers no types to choose
    between, a spec fragment `buildPatch` would accept, keyed by the block's own name in a spec and
-   filled from the factory defaults harvested in step 4. Derive it; don't hand-write one per item.
+   filled from the factory defaults harvested in step 4. Derive it; don't hand-write one per type.
    A param list says what a control is called and never where it goes, so a device free to nest one
    block's controls and carry another's flat leaves a consumer to find out by being rejected. Guard
    it by building every example: that one assertion covers the block key, the nesting, the defaults
    and the validator at once. Where the codec stores a variant selection in a field the spec selects
    differently, the example follows the spec, since it is a spec. A type with sub-models names the
    one it opens on, from the selector table harvested in step 4, so the variant reads as the sibling
-   of the type that it is. Assert that every item declaring sub-models names one of its own.
+   of the type that it is. Assert that every type declaring sub-models names one of its own.
 
 Add the drift guard as a test. Because capabilities derives from the catalog, capabilities and
 the codec can't drift by construction; the real risk is between the two independently authored

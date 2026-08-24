@@ -5,16 +5,16 @@
 Building a patch takes a bounded number of calls, and the tool inputs say what they mean.
 
 **`describe_device` takes an `items` list** in place of `group`/`item`. Each entry is `"chain"`, a
-group id (`"amp"`), or `"<group>/<item>"` (`"fx/CHORUS"`), split on the first slash so ids that
+group id (`"amp"`), or `"<group>/<type>"` (`"fx/CHORUS"`), split on the first slash so ids that
 contain one (`"fx/OD/DS"`) still resolve. The response is keyed by the entry string, so one entry
 reads the same as twenty and a whole patch's worth of lookups is a single round trip. One bad entry
 fails the call and names itself.
 
 A group listing is an index rather than a full dump. `describe_device gx1 fx` ran to 70,627
 characters across 2,585 lines, large enough that some clients refuse the response, which pushed
-consumers into one call per item just to see what exists. Each item keeps its id, name, models,
+consumers into one call per type just to see what exists. Each type keeps its id, name, models,
 description and subtype ids, and the block's own controls stay attached. Pass `includeParams: true`
-for the full payload, or name the items you want.
+for the full payload, or name the types you want.
 
 **Omitting `items` answers with every group and every type id in it.** An entry has to name a type
 exactly, and a summary reporting only how many types a group held could not be acted on: the ids
@@ -29,12 +29,12 @@ fails. The summary's example is built from the catalog in hand, and the descript
 entry is shaped like. Two other tools pointed at "the device's generate tool", which has not existed
 since `generate_patch` replaced it.
 
-**Naming an item returns an `example`**: a spec fragment for that block at factory defaults, keyed
+**Naming a type returns an `example`**: a spec fragment for that block at factory defaults, keyed
 by the block's own name, ready to copy into `generate_patch` and edit. A list of param keys says
 what a control is called but not where it goes, and the answer differs by block, so a caller
 mirroring one block's shape onto another met a rejection on its first call. Blocks with no types to
 choose between carry the example on the group, their only view. A group index leaves it out, since
-naming an item is what asks for that detail.
+naming a type is what asks for that detail.
 
 **`generate_patch` takes a `device` argument, a `patches` array, and `setName`.** The 0.2.0 tool was
 gx1-only and took one patch per call with no `device` argument. One tool now builds patches for any

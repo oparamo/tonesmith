@@ -44,11 +44,11 @@ rather than among the params, which the subtype list alone never showed, and nam
 in that list instead would have put a value the device never chose in a fragment presented as its
 factory state.
 
-`capabilities.ts` derives each item's params from the catalog rather than restating them, which
+`capabilities.ts` derives each type's params from the catalog rather than restating them, which
 makes delay and reverb **per type**: `describe_device gx1 reverb SHIMMER` answers for SHIMMER
 instead of returning one flat list for the whole block. The FX-slot DELAY gained the same
 treatment, so its WARP, TWIST and GLITCH sub-algorithms carry the trigger, mode, rise-fall, glitch
-and balance fields that were previously unmodeled. Drilling into an item returns the block-level
+and balance fields that were previously unmodeled. Drilling into a type returns the block-level
 controls that apply to it as well, so `describe_device gx1 amp JC-120` no longer comes back with no
 params at all on the grounds that amp's gain, bass, middle and treble live on the group.
 
@@ -76,7 +76,7 @@ would have run 0.1 (seconds, for the halls) to 2000 (milliseconds, for SUB DELAY
 TWIST) and delay TIME 0 (GLITCH) are each the device's own range for that type, and each is now
 declared as such.
 
-The CLI's `capabilities <group> <item>` prints each param's write `key` and its full `values` list
+The CLI's `capabilities <group> <type>` prints each param's write `key` and its full `values` list
 alongside the label. Without the key there was no way to tell which dot-path `write` expects, and
 the exact spellings (`2.5kHz`, `FLAT`) appeared nowhere in the CLI.
 

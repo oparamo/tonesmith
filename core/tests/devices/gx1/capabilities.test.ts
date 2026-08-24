@@ -5,7 +5,7 @@
  * guard is the catalog (authored from the parameter guide) against the codec field maps
  * (authored from byte reverse-engineering), two independently-authored sources that can drift.
  * These tests assert, for every type of every block:
- *   - id coverage: the codec's type list, the catalog's keys, and capabilities' item ids
+ *   - id coverage: the codec's type list, the catalog's keys, and capabilities' type ids
  *     all agree;
  *   - param parity: every codec field maps to a catalog param and vice versa (bidirectional),
  *     modulo documented aliases (wording differences) and exceptions.
@@ -30,12 +30,12 @@ import {
   decodeAmp, decodeDrive, decodeNoiseGate, decodeVolume,
 } from "../../../src/devices/gx1/codec/blocks";
 import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
-import type { CapabilityItem, ParamSpec, PatchSpecExample } from "../../../src/types";
+import type { CapabilityType, ParamSpec, PatchSpecExample } from "../../../src/types";
 import type { FieldCodec } from "../../../src/devices/gx1/codec/fields";
 import { present } from "../../helpers";
 
-const groupItems = (groupId: string): CapabilityItem[] =>
-  gx1Capabilities.groups.find(group => group.id === groupId)?.items ?? [];
+const groupTypes = (groupId: string): CapabilityType[] =>
+  gx1Capabilities.groups.find(group => group.id === groupId)?.types ?? [];
 
 // Normalizes a param/field name for comparison: lowercase, strip anything that isn't a
 // letter or digit, so "PRE-DELAY" (catalog) and "preDelay" (codec) match.
@@ -47,7 +47,7 @@ const codecFieldNames = (fields: readonly FieldCodec[] | undefined): Set<string>
 const catalogParamNames = (params: readonly ParamSpec[] | undefined): Set<string> =>
   new Set((params ?? []).map(param => normalize(param.name)));
 
-// ── id coverage: codec type list === catalog keys === capabilities item ids ────
+// ── id coverage: codec type list === catalog keys === capabilities type ids ────
 
 interface PerTypeBlock {
   /** capabilities/catalog block id. */
@@ -109,7 +109,7 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
 
 // The FX-slot DELAY is the one fx type modeled per-sub-algorithm (like the dedicated delay
 // block). It isn't a top-level capability group; it lives as the subTypes of the fx DELAY
-// item, so it gets its own coverage check below rather than joining PER_TYPE_BLOCKS.
+// type, so it gets its own coverage check below rather than joining PER_TYPE_BLOCKS.
 const FX_DELAY_BLOCK: PerTypeBlock = {
   block: "fxDelay",
   types: FX_DLY_TYPES,
@@ -120,13 +120,13 @@ const FX_DELAY_BLOCK: PerTypeBlock = {
 };
 
 describe("GX-1 catalog id coverage", () => {
-  it.each(PER_TYPE_BLOCKS)("$block: codec types, catalog keys, and capabilities items all agree", ({ block, types }) => {
+  it.each(PER_TYPE_BLOCKS)("$block: codec types, catalog keys, and capabilities types all agree", ({ block, types }) => {
     const codecTypes = new Set(types);
     const catalogTypes = new Set(Object.keys(PARAMS_BY_TYPE[block]));
-    const capabilityTypes = new Set(groupItems(block).map(item => item.id));
+    const capabilityTypes = new Set(groupTypes(block).map(capType => capType.id));
 
     expect(catalogTypes, `${block} catalog keys vs codec types`).toEqual(codecTypes);
-    expect(capabilityTypes, `${block} capabilities items vs codec types`).toEqual(codecTypes);
+    expect(capabilityTypes, `${block} capabilities types vs codec types`).toEqual(codecTypes);
   });
 
   // Selection-only / metadata-only blocks: capabilities must list every codec model id.
@@ -136,7 +136,7 @@ describe("GX-1 catalog id coverage", () => {
     { block: "mic", types: MIC_TYPES },
     { block: "drive", types: ODDS_TYPES },
   ])("$block: capabilities lists every codec model id", ({ block, types }) => {
-    const capabilityIds = new Set(groupItems(block).map(item => item.id));
+    const capabilityIds = new Set(groupTypes(block).map(capType => capType.id));
 
     for (const type of types) {
       expect(capabilityIds, `${block} model "${type}" is missing from capabilities`).toContain(type);
@@ -181,15 +181,15 @@ describe("GX-1 codec ↔ catalog param parity (per-type blocks)", () => {
   }
 });
 
-// ── FX-slot DELAY: per-sub-algorithm codec ↔ catalog (nested under the fx DELAY item) ──
+// ── FX-slot DELAY: per-sub-algorithm codec ↔ catalog (nested under the fx DELAY type) ──
 
 describe("GX-1 FX-slot DELAY per-sub-algorithm parity", () => {
-  const fxDelayItem = groupItems("fx").find(item => item.id === "DELAY");
+  const fxDelayType = groupTypes("fx").find(capType => capType.id === "DELAY");
 
   it("codec sub-algorithms, catalog keys, and DELAY subTypes all agree", () => {
     const codecTypes = new Set<string>(FX_DLY_TYPES);
     const catalogTypes = new Set(Object.keys(PARAMS_BY_TYPE.fxDelay));
-    const subTypeIds = new Set((fxDelayItem?.subTypes ?? []).map(subType => subType.id));
+    const subTypeIds = new Set((fxDelayType?.subTypes ?? []).map(subType => subType.id));
 
     expect(catalogTypes, "fxDelay catalog keys vs codec sub-algorithms").toEqual(codecTypes);
     expect(subTypeIds, "fx DELAY subTypes vs codec sub-algorithms").toEqual(codecTypes);
@@ -344,38 +344,38 @@ describe("GX-1 codec ↔ catalog representation parity", () => {
 // in an effect's params record when building, stamped automatically from the codec map,
 // so an agent never has to guess "PRE-DELAY" → preDelay or "OCT F-BACK" → octFeedback.
 
-const paramKey = (groupId: string, itemId: string, paramName: string): string | undefined =>
-  groupItems(groupId).find(item => item.id === itemId)?.params?.find(param => param.name === paramName)?.key;
+const paramKey = (groupId: string, typeId: string, paramName: string): string | undefined =>
+  groupTypes(groupId).find(capType => capType.id === typeId)?.params?.find(param => param.name === paramName)?.key;
 
 describe("GX-1 param key stamping", () => {
   it.each([
-    { group: "fx",     item: "CHORUS",     name: "PRE-DELAY",    key: "preDelay" },
-    { group: "fx",     item: "PHASER",     name: "TYPE",         key: "stage" },
-    { group: "fx",     item: "ROTARY",     name: "SPEED SELECT", key: "speed" },
-    { group: "fx",     item: "FEEDBACKER", name: "OCT F-BACK",   key: "octFeedback" },
-    { group: "delay",  item: "STANDARD",   name: "HIGH CUT",     key: "highCut" },
-    { group: "reverb", item: "SHIMMER",    name: "PITCH LVL",    key: "pitchLevel" },
-    { group: "reverb", item: "TERA ECHO",  name: "S-TIME",       key: "spreadTime" },
-  ])("$group $item \"$name\" → key \"$key\"", ({ group, item, name, key }) => {
-    expect(paramKey(group, item, name)).toBe(key);
+    { group: "fx",     type: "CHORUS",     name: "PRE-DELAY",    key: "preDelay" },
+    { group: "fx",     type: "PHASER",     name: "TYPE",         key: "stage" },
+    { group: "fx",     type: "ROTARY",     name: "SPEED SELECT", key: "speed" },
+    { group: "fx",     type: "FEEDBACKER", name: "OCT F-BACK",   key: "octFeedback" },
+    { group: "delay",  type: "STANDARD",   name: "HIGH CUT",     key: "highCut" },
+    { group: "reverb", type: "SHIMMER",    name: "PITCH LVL",    key: "pitchLevel" },
+    { group: "reverb", type: "TERA ECHO",  name: "S-TIME",       key: "spreadTime" },
+  ])("$group $type \"$name\" → key \"$key\"", ({ group, type, name, key }) => {
+    expect(paramKey(group, type, name)).toBe(key);
   });
 
-  // item params + any per-subtype params (fx DELAY's sub-algorithms carry their own).
-  const itemParams = (item: CapabilityItem): ParamSpec[] =>
-    [item.params ?? [], ...(item.subTypes ?? []).map(sub => sub.params ?? [])].flat();
+  // type params + any per-subtype params (fx DELAY's sub-algorithms carry their own).
+  const typeParams = (capType: CapabilityType): ParamSpec[] =>
+    [capType.params ?? [], ...(capType.subTypes ?? []).map(sub => sub.params ?? [])].flat();
 
-  const keyedParams = (groupId: string): { item: string; param: ParamSpec }[] =>
-    groupItems(groupId).flatMap(item => itemParams(item).map(param => ({ item: item.id, param })));
+  const keyedParams = (groupId: string): { type: string; param: ParamSpec }[] =>
+    groupTypes(groupId).flatMap(capType => typeParams(capType).map(param => ({ type: capType.id, param })));
 
   // HARMONIST's KEY is the patch-level key, not a codec field, so it is the one param without a `key`.
-  const isParamOnly = (groupId: string, item: string, name: string): boolean =>
-    groupId === "fx" && item === "HARMONIST" && name === "KEY";
+  const isParamOnly = (groupId: string, typeId: string, name: string): boolean =>
+    groupId === "fx" && typeId === "HARMONIST" && name === "KEY";
 
   it("stamps a key on every per-type capability param (except paramOnly HARMONIST KEY)", () => {
     for (const groupId of ["fx", "pedalFx", "delay", "reverb"]) {
-      for (const { item, param } of keyedParams(groupId)) {
-        if (isParamOnly(groupId, item, param.name)) continue;
-        expect(param.key, `${groupId} "${item}" param "${param.name}"`).toBeDefined();
+      for (const { type, param } of keyedParams(groupId)) {
+        if (isParamOnly(groupId, type, param.name)) continue;
+        expect(param.key, `${groupId} "${type}" param "${param.name}"`).toBeDefined();
       }
     }
   });
@@ -384,7 +384,7 @@ describe("GX-1 param key stamping", () => {
 // ── subtype coverage: capabilities subTypes ↔ PARAM_SUBTYPE_EFFECTS ─────────────
 
 describe("GX-1 FX subtype coverage", () => {
-  it("covers every PARAM_SUBTYPE_EFFECTS entry as subTypes of the corresponding FX item", () => {
+  it("covers every PARAM_SUBTYPE_EFFECTS entry as subTypes of the corresponding FX type", () => {
     const paramSubtypeTables: Record<string, readonly string[]> = {
       "COMPRESSOR":   COMP_TYPES,
       "LIMITER":      LIM_TYPES,
@@ -396,25 +396,25 @@ describe("GX-1 FX subtype coverage", () => {
       "DELAY":        FX_DLY_TYPES,
       "REVERB":       FX_REV_TYPES,
     };
-    const fxItems = groupItems("fx");
+    const fxTypes = groupTypes("fx");
 
-    for (const [fxType, subTypes] of Object.entries(paramSubtypeTables)) {
-      const fxItem = fxItems.find(item => item.id === fxType);
-      expect(fxItem, `FX item "${fxType}" from PARAM_SUBTYPE_EFFECTS is missing from capabilities`).toBeDefined();
+    for (const [fxTypeId, subTypes] of Object.entries(paramSubtypeTables)) {
+      const found = fxTypes.find(capType => capType.id === fxTypeId);
+      expect(found, `FX type "${fxTypeId}" from PARAM_SUBTYPE_EFFECTS is missing from capabilities`).toBeDefined();
 
-      const itemSubTypeIds = new Set((fxItem?.subTypes ?? []).map(subType => subType.id));
+      const foundSubTypeIds = new Set((found?.subTypes ?? []).map(subType => subType.id));
       for (const subId of subTypes) {
-        expect(itemSubTypeIds, `Subtype "${subId}" of FX type "${fxType}" is missing from capabilities`).toContain(subId);
+        expect(foundSubTypeIds, `Subtype "${subId}" of FX type "${fxTypeId}" is missing from capabilities`).toContain(subId);
       }
     }
   });
 
-  it("every fx item with subTypes is registered in PARAM_SUBTYPE_EFFECTS", () => {
-    for (const item of groupItems("fx")) {
-      if (!item.subTypes || item.subTypes.length === 0) continue;
+  it("every fx type with subTypes is registered in PARAM_SUBTYPE_EFFECTS", () => {
+    for (const capType of groupTypes("fx")) {
+      if (!capType.subTypes || capType.subTypes.length === 0) continue;
       expect(
-        PARAM_SUBTYPE_EFFECTS.has(item.id),
-        `FX item "${item.id}" has subTypes but is missing from PARAM_SUBTYPE_EFFECTS`
+        PARAM_SUBTYPE_EFFECTS.has(capType.id),
+        `FX type "${capType.id}" has subTypes but is missing from PARAM_SUBTYPE_EFFECTS`
       ).toBe(true);
     }
   });
@@ -490,12 +490,12 @@ describe("GX-1 spec examples", () => {
   ));
 
   const examples = groupsWithBlocks.flatMap(group => {
-    if (group.items.length === 0) return [{ group: group.id, item: "", subTypes: [] as string[], example: group.example }];
-    return group.items.map(item => ({
+    if (group.types.length === 0) return [{ group: group.id, type: "", subTypes: [] as string[], example: group.example }];
+    return group.types.map(capType => ({
       group: group.id,
-      item: item.id,
-      subTypes: (item.subTypes ?? []).map(variant => variant.id),
-      example: item.example,
+      type: capType.id,
+      subTypes: (capType.subTypes ?? []).map(variant => variant.id),
+      example: capType.example,
     }));
   });
 
@@ -505,8 +505,8 @@ describe("GX-1 spec examples", () => {
   // One case per example, asserting everything an example has to be. A loop per property reports
   // the same broken example once per property, and counts the suite by properties checked rather
   // than by examples there are to get right.
-  it.each(examples)("$group $item carries a usable example", ({ group, subTypes, example }) => {
-    expect(example, "every block-backed item shows one").toBeDefined();
+  it.each(examples)("$group $type carries a usable example", ({ group, subTypes, example }) => {
+    expect(example, "every block-backed type shows one").toBeDefined();
     const [block] = Object.keys(example ?? {});
     const body = bodyOf(example);
 
@@ -525,14 +525,14 @@ describe("GX-1 spec examples", () => {
   });
 
   it("fills the values from the device's own factory defaults, not a guess", () => {
-    const chorus = groupItems("fx").find(item => item.id === "CHORUS");
+    const chorus = groupTypes("fx").find(capType => capType.id === "CHORUS");
     const example = chorus?.example?.fx1 as { params: Record<string, unknown> };
 
     expect(example.params).toEqual(DEFAULTS_BY_TYPE.fx.CHORUS);
   });
 
   it("takes its params from the sub-model where the sub-model owns them", () => {
-    const delay = groupItems("fx").find(item => item.id === "DELAY");
+    const delay = groupTypes("fx").find(capType => capType.id === "DELAY");
     const example = delay?.example?.fx1 as { subType: string; params: Record<string, unknown> };
 
     expect(example.params).toEqual(DEFAULTS_BY_TYPE.fxDelay[example.subType]);
@@ -543,7 +543,7 @@ describe("GX-1 spec examples", () => {
 
     for (const group of lookupOnly) {
       expect(group.example).toBeUndefined();
-      for (const item of group.items) expect(item.example).toBeUndefined();
+      for (const capType of group.types) expect(capType.example).toBeUndefined();
     }
   });
 });

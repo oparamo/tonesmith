@@ -3,7 +3,7 @@
  *
  * Authored from `core/docs/gx1/gx1_parameter_guide.md` and verified against the device's
  * ground-truth address table. Two consumers lean on it:
- *  - `capabilities.ts` derives every item/group `params` list from here (it owns only the
+ *  - `capabilities.ts` derives every type/group `params` list from here (it owns only the
  *    structural + sonic metadata: names, descriptions, models, subtypes);
  *  - the codec drift guard asserts every codec field maps to a catalog param and vice versa,
  *    for every type of every block, so neither the codec nor the described surface can drift
@@ -494,7 +494,7 @@ const PARAMS_BY_TYPE = {
   delay: DELAY_PARAMS,
   reverb: REVERB_PARAMS,
   // The FX-slot DELAY's per-sub-algorithm params (fx type "DELAY" is per-subtype, unlike the
-  // other flat fx types). Surfaced as the subTypes of the fx DELAY capability item.
+  // other flat fx types). Surfaced as the subTypes of the fx DELAY capability type.
   fxDelay: FX_DELAY_PARAMS,
 } as const satisfies Record<string, Record<string, ParamSpec[]>>;
 
