@@ -3,7 +3,8 @@
 "@tonesmith/mcp": major
 ---
 
-GX-1 AMP, OD/DS, NS and FV now take their unset values from the device's own factory defaults.
+The GX-1's `amp`, `drive`, `noiseGate` and `volume` blocks take their unset values from the device's
+own factory defaults.
 
 Every control on these four blocks is optional. Only `type` is still required, on the two blocks
 that have one, since choosing the model is the point of setting the block. Before this, `amp`
