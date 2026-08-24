@@ -44,7 +44,11 @@ const registerWriteFields = (server: McpServer): void => {
         "`patch`: a block's controls sit at '<block>.params.<control>', and a block's own " +
         "selectors at '<block>.on', '<block>.type' and '<block>.subType'. A path naming a field " +
         "the device doesn't have is rejected, listing the valid fields at that level. The whole " +
-        "set is applied together, so if any edit is rejected the file is left untouched.",
+        "set is applied together, so if any edit is rejected the file is left untouched. " +
+        "Setting a block's `type` switches the effect: the block arrives at that type's factory " +
+        "settings on its factory sub-model, and the controls of the effect it was are gone. Name " +
+        "the ones you want after the type in the same call, spelled as the new type does; paths " +
+        "resolve in the order given, so a control named before the type that has it is rejected.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
         device: deviceField,

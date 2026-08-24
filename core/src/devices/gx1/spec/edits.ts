@@ -7,12 +7,17 @@
  * fields. The encoder's byte guard rejects those in the end but knows only a byte index, so this is
  * what names the param and the range it accepts. The check runs on `validateTypeParams`, the same
  * function the spec validator uses, so the two write paths cannot drift in what they accept.
+ *
+ * Switching a block's type is part of that surface rather than a rebuild the caller has to go
+ * elsewhere for: the block is re-seeded to the new type's factory settings as the edit lands, since
+ * the controls it was carrying belong to the effect it has just stopped being.
  */
 import { findGroup } from "../../../capability-utils";
-import type { FieldEdit, FieldEdits } from "../../../types";
+import type { CapabilityGroup, CapabilityItem, FieldEdit, FieldEdits } from "../../../types";
 import { gx1Capabilities } from "../capabilities";
 import {
   BLOCK_GROUPS, SELECTION_FIELDS, ON_FIELD, PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
+  onlyBlockFor,
 } from "../common";
 import type { BlockName } from "../common";
 import type { Patch } from "../types";
@@ -21,6 +26,7 @@ import {
   validatePatchSettings,
 } from "./validate";
 import type { Issues, Selectors } from "./validate";
+import { applyBlock } from "./build";
 import { asRecord } from "./errors";
 import { coerceValue, fieldAt } from "./paths";
 
@@ -79,6 +85,73 @@ const asString = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
 
 /**
+ * Whether a block's controls belong to the type it is set to rather than to the block as a whole.
+ * An amp has the same controls whichever amp it models, so switching one has to leave the gain the
+ * player dialed in; an fx slot's controls are the effect's own, so the previous effect's have to go.
+ */
+const controlsFollowType = (capGroup: CapabilityGroup): boolean =>
+  capGroup.items.some(item => (item.params?.length ?? 0) > 0);
+
+/** The same question of a sub-model: true only where picking one is what decides the controls. */
+const controlsFollowSubType = (item: CapabilityItem): boolean =>
+  (item.subTypes ?? []).some(variant => (variant.params?.length ?? 0) > 0);
+
+/** A type the device offers somewhere, but not in this block. */
+const belongsElsewhere = (name: BlockName, type: string): boolean => {
+  const onlyBlock = onlyBlockFor(type);
+  return onlyBlock !== undefined && onlyBlock !== name;
+};
+
+/** The block spec a re-seed builds from: the selection now on the block, and no controls at all. */
+const factorySpec = (block: Record<string, unknown>, subType: unknown): Record<string, unknown> => ({
+  [TYPE_FIELD]: block[TYPE_FIELD],
+  [SUB_TYPE_FIELD]: subType,
+  [ON_FIELD]: block[ON_FIELD],
+  [PARAMS_FIELD]: {},
+});
+
+/**
+ * Re-seeds a block whose selection an edit just changed, to the device's factory settings for the
+ * selection it now carries.
+ *
+ * A decoded block holds only its current type's controls, so without this a switch leaves the
+ * previous effect's values behind and the codec reads them under the new type's field map: a
+ * compressor's sustain byte comes back as a delay time nobody chose. Re-seeding as the edit lands
+ * rather than after the batch is also what makes a control of the new type a field the paths that
+ * follow can find, so a type and a control of it can be set in one call.
+ *
+ * A selection the catalog cannot resolve, or one this block cannot hold, is left alone: the checks
+ * that run after the batch report both, and the builder would throw here before they ever ran.
+ */
+const reseedBlock = (patch: Patch, name: BlockName, leaf: string): void => {
+  const block = asRecord((patch as unknown as Record<string, unknown>)[name]);
+  const type = asString(block[TYPE_FIELD]);
+  if (type === undefined || belongsElsewhere(name, type)) return;
+  const selection = resolveSelection(BLOCK_GROUPS[name], type);
+  if (selection?.item === undefined) return;
+
+  const isTypeEdit = leaf === TYPE_FIELD;
+  const follows = isTypeEdit
+    ? controlsFollowType(selection.capGroup)
+    : controlsFollowSubType(selection.item);
+  if (!follows) return;
+
+  // A new type arrives on the device's factory sub-model, since the model the previous type was set
+  // to names nothing under this one and the codec has no field map for the pairing.
+  const subType = isTypeEdit ? undefined : block[SUB_TYPE_FIELD];
+  applyBlock(patch, name, factorySpec(block, subType));
+};
+
+/** Re-seeds when the edit that landed picked a shape; every other path leaves its block alone. */
+const reseedForEdit = (patch: Patch, path: string): void => {
+  const target = editTarget(path);
+  if (target === undefined || target.field.isParam) return;
+  const { leaf } = target.field;
+  if (leaf !== TYPE_FIELD && leaf !== SUB_TYPE_FIELD) return;
+  reseedBlock(patch, target.block, leaf);
+};
+
+/**
  * The selection is read off the patch rather than off the edits, so it reflects a type set in the
  * same batch. Validating `fx1.params.time` against the type the block held before the batch would
  * reject an edit that is only inconsistent when the two are read apart.
@@ -129,8 +202,10 @@ const validateFieldEdits = (patch: Patch, edits: Record<string, unknown>): Issue
  *
  * An unresolvable path lands nowhere and the rest of the batch still applies, because the check
  * that follows reads each block's selection off the patch: an edit setting a type and an edit
- * setting a param of that new type are one consistent state only once both are on it. Nothing
- * reaches disk on a throw, since the caller writes the file only after this returns.
+ * setting a param of that new type are one consistent state only once both are on it. Order is the
+ * caller's, so a control named before the type that has it still resolves against the type the
+ * block held at the time. Nothing reaches disk on a throw, since the caller writes the file only
+ * after this returns.
  */
 const applyEdits = (patch: Patch, edits: readonly FieldEdit[]): FieldEdits => {
   const fields = patch as unknown as Record<string, unknown>;
@@ -144,9 +219,13 @@ const applyEdits = (patch: Patch, edits: readonly FieldEdit[]): FieldEdits => {
       continue;
     }
     const { holder, key } = resolved.field;
-    const value = coerceValue(given, holder[key]);
+    const previous = holder[key];
+    const value = coerceValue(given, previous);
     holder[key] = value;
     applied[path] = value;
+    // Only a selection that actually moved: re-seeding on a value the block already had would
+    // discard the controls of a caller writing back the type a patch they just read reported.
+    if (value !== previous) reseedForEdit(patch, path);
   }
 
   issues.push(...validateFieldEdits(patch, applied));
