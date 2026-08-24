@@ -16,6 +16,12 @@ consumers into one call per item just to see what exists. Each item keeps its id
 description and subtype ids, and the block's own controls stay attached. Pass `includeParams: true`
 for the full payload, or name the items you want.
 
+**Omitting `items` answers with every group and every type id in it.** An entry has to name a type
+exactly, and a summary reporting only how many types a group held could not be acted on: the ids
+came from a per-group listing, so seeing what a device offers cost one call per block before any
+params could be asked for. The ids are the cheap half of a listing, roughly 1.7 KB against the 27 KB
+those listings run to, so the first call now carries the vocabulary the second one names.
+
 Nothing in the tool schemas names a device any more. `describe_device` carried one device's id as
 the example device, listed that device's group ids as though every device had them, and printed a
 hand-written `items` example naming its effects, which on any other device demonstrates a call that
