@@ -38,13 +38,13 @@ describe("gx1 capabilities", () => {
     }
   });
 
-  it("lists a group's item ids", async () => {
+  it("lists a group's type ids", async () => {
     const output = await capabilitiesOutput("amp");
 
     expect(output).toContain("JC-120");
   });
 
-  it("prints an item's subtypes and the hardware it models", async () => {
+  it("prints a type's subtypes and the hardware it models", async () => {
     const output = await capabilitiesOutput("fx", "compressor");
 
     expect(output).toContain("MXR Dyna Comp");
@@ -95,7 +95,7 @@ describe("gx1 capabilities", () => {
 
   // The chain is one view with nothing under it. Printing it anyway would answer a question the
   // caller did not ask, and every other group rejects a second argument it cannot resolve. Also
-  // the command's one error case: which group and item ids resolve is core's lookup, proven there.
+  // the command's one error case: which group and type ids resolve is core's lookup, proven there.
   it("exits with an error when the chain is given a second argument", async () => {
     const { error, exitCode } = await runCli(["gx1", "capabilities", "chain", "bogus"]);
 

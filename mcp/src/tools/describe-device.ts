@@ -1,62 +1,62 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import type { CapabilityGroup, CapabilityItem, DeviceCapabilities } from "@tonesmith/core";
+import type { CapabilityGroup, CapabilityType, DeviceCapabilities } from "@tonesmith/core";
 import { capabilityUtils, registry } from "@tonesmith/core";
 import { attempt, deviceField, messageOf, ok } from "../common";
 
 /**
- * A group listing is an index, not a data dump: every item's full param specs would run to tens of
+ * A group listing is an index, not a data dump: every type's full param specs would run to tens of
  * thousands of characters for a large group, which is more than some clients will accept in one
- * response. Items keep their identifying detail and their subtype ids; params come from naming a
- * single item, or from `includeParams` when the whole set really is wanted.
+ * response. Types keep their identifying detail and their subtype ids; params come from naming a
+ * single type, or from `includeParams` when the whole set really is wanted.
  */
 const groupIndex = (group: CapabilityGroup): object => {
-  // A group offering types shows its example on each item; one offering none has no other view to
+  // A group offering types shows its example on each type; one offering none has no other view to
   // carry it, and its params are right here, so it would otherwise say nothing about placement.
-  const example = group.items.length === 0 ? group.example : undefined;
+  const example = group.types.length === 0 ? group.example : undefined;
   return {
     id: group.id,
     name: group.name,
     description: group.description,
     params: group.params,
     example,
-    items: group.items.map(item => ({
-      id: item.id,
-      name: item.name,
-      models: item.models,
-      description: item.description,
-      subTypes: item.subTypes?.map(subType => subType.id),
+    types: group.types.map(capType => ({
+      id: capType.id,
+      name: capType.name,
+      models: capType.models,
+      description: capType.description,
+      subTypes: capType.subTypes?.map(subType => subType.id),
     })),
-    help: `Name an item as "${group.id}/<id>" in \`items\` for its params, or pass includeParams: true for every item's at once.`,
+    help: `Name a type as "${group.id}/<type>" in \`items\` for its params, or pass includeParams: true for every type's at once.`,
   };
 };
 
 /**
- * The whole group, minus the per-item examples. A caller asking for every item's params at once is
+ * The whole group, minus the per-type examples. A caller asking for every type's params at once is
  * reading the catalog rather than building one block, and the largest group's 39 examples would add
  * several KB to a response already large enough to need watching.
  */
 const fullGroup = (group: CapabilityGroup): object => {
-  const items = group.items.map(item => {
-    const bare: CapabilityItem = { ...item };
+  const types = group.types.map(capType => {
+    const bare: CapabilityType = { ...capType };
     delete bare.example;
     return bare;
   });
-  return { ...group, items };
+  return { ...group, types };
 };
 
 /**
- * Splits an `items` entry into its group and optional item id, on the FIRST slash only: an item id
+ * Splits an `items` entry into its group and optional type id, on the FIRST slash only: a type id
  * is a device's own label and may contain a slash itself, so "<group>/A/B" has to resolve to group
- * "<group>", item "A/B" rather than being torn apart.
+ * "<group>", type "A/B" rather than being torn apart.
  */
-const splitEntry = (entry: string): { group: string; item?: string } => {
+const splitEntry = (entry: string): { group: string; type?: string } => {
   const slash = entry.indexOf("/");
   if (slash < 0) return { group: entry };
-  return { group: entry.slice(0, slash), item: entry.slice(slash + 1) };
+  return { group: entry.slice(0, slash), type: entry.slice(slash + 1) };
 };
 
-/** Resolves one `items` entry to the view it names: the chain model, a group index/full group, or one item. */
+/** Resolves one `items` entry to the view it names: the chain model, a group index/full group, or one type. */
 const viewForEntry = (
   capabilities: DeviceCapabilities,
   entry: string,
@@ -70,18 +70,18 @@ const viewForEntry = (
     return { ...capabilities.chain, patchName, patchSettings };
   }
 
-  const { group, item } = splitEntry(entry);
+  const { group, type } = splitEntry(entry);
   const matched = capabilityUtils.findGroup(capabilities, group);
 
-  if (item === undefined) {
+  if (type === undefined) {
     const view = includeParams === true ? fullGroup(matched) : groupIndex(matched);
     return view;
   }
 
-  // A block's own controls apply to whichever item is selected, and they live on the group, so an
-  // item view that omitted them would hide every control the block carries outside its items.
-  const foundItem = capabilityUtils.findItem(matched, item);
-  return { ...foundItem, params: [...(matched.params ?? []), ...(foundItem.params ?? [])] };
+  // A block's own controls apply to whichever type is selected, and they live on the group, so a
+  // type view that omitted them would hide every control the block carries outside its types.
+  const found = capabilityUtils.findType(matched, type);
+  return { ...found, params: [...(matched.params ?? []), ...(found.params ?? [])] };
 };
 
 /**
@@ -106,21 +106,21 @@ const viewsForEntries = (
 };
 
 /**
- * An `items` list drawn from the device in hand: a group id and a couple of "<group>/<item>"
+ * An `items` list drawn from the device in hand: a group id and a couple of "<group>/<type>"
  * entries it really has. Written out by hand it names one device's groups and effects, which on
  * every other device makes it an example that fails the call it is showing how to make.
  */
 const exampleEntries = (capabilities: DeviceCapabilities): string[] => {
   const bareGroup = capabilities.groups.slice(0, 1).map(group => group.id);
-  const namedItems = capabilities.groups
+  const namedTypes = capabilities.groups
     .slice(1)
     .flatMap(group => {
-      const [item] = group.items;
-      const entry = item === undefined ? [] : [`${group.id}/${item.id}`];
+      const [capType] = group.types;
+      const entry = capType === undefined ? [] : [`${group.id}/${capType.id}`];
       return entry;
     })
     .slice(0, 2);
-  return ["chain", ...bareGroup, ...namedItems];
+  return ["chain", ...bareGroup, ...namedTypes];
 };
 
 const deviceSummary = (capabilities: DeviceCapabilities): object => ({
@@ -135,7 +135,7 @@ const deviceSummary = (capabilities: DeviceCapabilities): object => ({
     id: capGroup.id,
     name: capGroup.name,
     description: capGroup.description,
-    typeIds: capGroup.items.map(item => item.id),
+    typeIds: capGroup.types.map(capType => capType.id),
   })),
   help: `Name any type above as "<group>/<type>" in \`items\` for its params and a copyable example. e.g. items: ${JSON.stringify(exampleEntries(capabilities))}.`,
 });
@@ -147,7 +147,7 @@ const registerDescribeDevice = (server: McpServer): void => {
       description:
         "Return capability metadata for a device: its signal chain, every block with the types " +
         "and models it offers, and every param with its key, range, and allowed values. Naming " +
-        "an item also returns an `example`: that block's spec at the device's factory defaults, " +
+        "a type also returns an `example`: that block's spec at the device's factory defaults, " +
         "showing where each param is written. Copy it into generate_patch and change the values " +
         "you care about.",
       inputSchema: z.object({
@@ -156,16 +156,16 @@ const registerDescribeDevice = (server: McpServer): void => {
           "What to look up, as a list. Each entry is one of: \"chain\" for the signal-chain model " +
             "(default block order, reordering, how blocks are bypassed, and the settings the patch " +
             "carries itself rather than in a block); a group id for that " +
-            'group\'s index; or "<group>/<item>" for one item\'s full params, split on the first ' +
-            "slash so an item id containing one still resolves. Omit `items` to list this device's " +
+            'group\'s index; or "<group>/<type>" for one type\'s full params, split on the first ' +
+            "slash so a type id containing one still resolves. Omit `items` to list this device's " +
             "groups and every type id in them, which is where the ids come from. List every entry you need in a " +
             "single call, which is what this input is for. An unknown entry fails the whole call " +
             "and names itself."
         ),
         includeParams: z.boolean().optional().describe(
-          "Include every item's full param specs for bare-group entries. Off by default, since a " +
-            "group listing is an index; name the items you want instead. Ignored for " +
-            "\"<group>/<item>\" entries."
+          "Include every type's full param specs for bare-group entries. Off by default, since a " +
+            "group listing is an index; name the types you want instead. Ignored for " +
+            "\"<group>/<type>\" entries."
         ),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },

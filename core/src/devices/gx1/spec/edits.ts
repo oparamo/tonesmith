@@ -13,7 +13,7 @@
  * the controls it was carrying belong to the effect it has just stopped being.
  */
 import { findGroup } from "../../../capability-utils";
-import type { CapabilityGroup, CapabilityItem, FieldEdit, FieldEdits } from "../../../types";
+import type { CapabilityGroup, CapabilityType, FieldEdit, FieldEdits } from "../../../types";
 import { gx1Capabilities } from "../capabilities";
 import {
   BLOCK_GROUPS, SELECTION_FIELDS, ON_FIELD, PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
@@ -74,7 +74,7 @@ const editsByBlock = (edits: Record<string, unknown>): Map<BlockName, EditedFiel
 };
 
 const checkType = (issues: Issues, name: BlockName, value: unknown): void => {
-  if (resolveSelection(BLOCK_GROUPS[name], value)?.item === undefined) {
+  if (resolveSelection(BLOCK_GROUPS[name], value)?.capType === undefined) {
     issues.push(unknownTypeIssue(findGroup(gx1Capabilities, BLOCK_GROUPS[name]), value));
     return;
   }
@@ -90,11 +90,11 @@ const asString = (value: unknown): string | undefined =>
  * player dialed in; an fx slot's controls are the effect's own, so the previous effect's have to go.
  */
 const controlsFollowType = (capGroup: CapabilityGroup): boolean =>
-  capGroup.items.some(item => (item.params?.length ?? 0) > 0);
+  capGroup.types.some(type => (type.params?.length ?? 0) > 0);
 
 /** The same question of a sub-model: true only where picking one is what decides the controls. */
-const controlsFollowSubType = (item: CapabilityItem): boolean =>
-  (item.subTypes ?? []).some(variant => (variant.params?.length ?? 0) > 0);
+const controlsFollowSubType = (capType: CapabilityType): boolean =>
+  (capType.subTypes ?? []).some(variant => (variant.params?.length ?? 0) > 0);
 
 /** A type the device offers somewhere, but not in this block. */
 const belongsElsewhere = (name: BlockName, type: string): boolean => {
@@ -128,12 +128,12 @@ const reseedBlock = (patch: Patch, name: BlockName, leaf: string): void => {
   const type = asString(block[TYPE_FIELD]);
   if (type === undefined || belongsElsewhere(name, type)) return;
   const selection = resolveSelection(BLOCK_GROUPS[name], type);
-  if (selection?.item === undefined) return;
+  if (selection?.capType === undefined) return;
 
   const isTypeEdit = leaf === TYPE_FIELD;
   const follows = isTypeEdit
     ? controlsFollowType(selection.capGroup)
-    : controlsFollowSubType(selection.item);
+    : controlsFollowSubType(selection.capType);
   if (!follows) return;
 
   // A new type arrives on the device's factory sub-model, since the model the previous type was set

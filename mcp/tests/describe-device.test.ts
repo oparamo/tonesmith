@@ -1,7 +1,7 @@
 /**
  * How this tool cuts the catalog up, not what the catalog says.
  *
- * The groups, items, params and examples are `@tonesmith/core`'s, and its drift guards are what
+ * The groups, types, params and examples are `@tonesmith/core`'s, and its drift guards are what
  * hold them to the codec. What `describe-device.ts` owns is the shape of an answer: parsing an
  * entry, indexing a group against dumping it, the batch resolving or failing whole, and the two
  * size budgets a client imposes.
@@ -69,7 +69,7 @@ describe("describe_device", () => {
   });
 
   // The example has to come from the catalog the call is answering about. Any hand-written list
-  // names groups and items that exist on one device and not on the next.
+  // names groups and types that exist on one device and not on the next.
   it("shows an example `items` list built from this device's own catalog", async () => {
     const client = await connectClient();
     close = client.close;
@@ -120,8 +120,8 @@ describe("describe_device", () => {
     expect(isError, text).toBe(false);
     const views = JSON.parse(text) as Record<string, { id?: string; defaultOrder?: string[] }>;
     expect(Object.keys(views), "every requested entry comes back").toEqual(items);
-    const requested = (item: string): { id?: string; defaultOrder?: string[] } =>
-      present(views[item], `the ${item} view`);
+    const requested = (entry: string): { id?: string; defaultOrder?: string[] } =>
+      present(views[entry], `the ${entry} view`);
     expect(requested("chain").defaultOrder).toEqual(gx1.driver.capabilities.chain.defaultOrder);
     expect(requested("amp").id).toBe("amp");
     expect(requested("fx/CHORUS").id).toBe("CHORUS");
@@ -130,7 +130,7 @@ describe("describe_device", () => {
   });
 
   // "OD/DS" is a real fx effect type, so an entry is split on its FIRST slash only.
-  it("resolves an item id that itself contains a slash", async () => {
+  it("resolves a type id that itself contains a slash", async () => {
     const client = await connectClient();
     close = client.close;
 
@@ -148,13 +148,13 @@ describe("describe_device", () => {
     const { text, isError } = await client.callTool("describe_device", input);
 
     expect(isError, text).toBe(false);
-    const group = viewOf(text, "amp") as { id: string; items: { id: string }[] };
-    const itemIds = group.items.map(item => item.id);
+    const group = viewOf(text, "amp") as { id: string; types: { id: string }[] };
+    const typeIds = group.types.map(capType => capType.id);
     expect(group.id).toBe("amp");
-    expect(itemIds).toContain("JC-120");
+    expect(typeIds).toContain("JC-120");
   });
 
-  it("lists a group as an index: no per-item params, but subtype ids", async () => {
+  it("lists a group as an index: no per-type params, but subtype ids", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", items: ["fx"] };
@@ -162,13 +162,13 @@ describe("describe_device", () => {
     const { text, isError } = await client.callTool("describe_device", input);
 
     expect(isError, text).toBe(false);
-    const group = viewOf(text, "fx") as { items: { id: string; params?: unknown; subTypes?: string[] }[] };
-    const chorus = group.items.find(item => item.id === "CHORUS");
-    expect(group.items.every(item => item.params === undefined), "a listing carries no item params").toBe(true);
+    const group = viewOf(text, "fx") as { types: { id: string; params?: unknown; subTypes?: string[] }[] };
+    const chorus = group.types.find(capType => capType.id === "CHORUS");
+    expect(group.types.every(capType => capType.params === undefined), "a listing carries no type params").toBe(true);
     expect(chorus?.subTypes, "subtypes are listed by id").toContain("STEREO");
   });
 
-  // The listing exists to be read in one call, and inlining every item's params pushes fx past 70k
+  // The listing exists to be read in one call, and inlining every type's params pushes fx past 70k
   // characters, which some clients refuse outright. The full/listing comparison is a ratio rather
   // than a byte count, so changing how the response is serialized cannot quietly turn this guard
   // into a formatting assertion.
@@ -223,7 +223,7 @@ describe("describe_device", () => {
     expect(group.params.map(param => param.name)).toContain("GAIN");
   });
 
-  it("returns every item's params when includeParams is set", async () => {
+  it("returns every type's params when includeParams is set", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", items: ["fx"], includeParams: true };
@@ -231,12 +231,12 @@ describe("describe_device", () => {
     const { text, isError } = await client.callTool("describe_device", input);
 
     expect(isError, text).toBe(false);
-    const group = viewOf(text, "fx") as { items: { id: string; params?: { name: string }[] }[] };
-    const chorus = group.items.find(item => item.id === "CHORUS");
+    const group = viewOf(text, "fx") as { types: { id: string; params?: { name: string }[] }[] };
+    const chorus = group.types.find(capType => capType.id === "CHORUS");
     expect(chorus?.params?.map(param => param.name)).toContain("RATE");
   });
 
-  it("includes the block's own controls when naming an item", async () => {
+  it("includes the block's own controls when naming a type", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", items: ["amp/JC-120"] };
@@ -244,13 +244,13 @@ describe("describe_device", () => {
     const { text, isError } = await client.callTool("describe_device", input);
 
     expect(isError, text).toBe(false);
-    const item = viewOf(text, "amp/JC-120") as { params: { name: string }[] };
-    const paramNames = item.params.map(param => param.name);
-    expect(paramNames, "amp's controls live on the group, not the item").toContain("GAIN");
+    const view = viewOf(text, "amp/JC-120") as { params: { name: string }[] };
+    const paramNames = view.params.map(param => param.name);
+    expect(paramNames, "amp's controls live on the group, not the type").toContain("GAIN");
     expect(paramNames).toContain("TREBLE");
   });
 
-  it("carries a copyable spec example on a named item", async () => {
+  it("carries a copyable spec example on a named type", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", items: ["amp/JC-120", "fx/CHORUS"] };
@@ -260,7 +260,7 @@ describe("describe_device", () => {
     expect(isError, text).toBe(false);
     const amp = viewOf(text, "amp/JC-120") as { example: { amp: { type: string; params: Record<string, unknown> } } };
     const fx = viewOf(text, "fx/CHORUS") as { example: { fx1: { params: Record<string, unknown> } } };
-    expect(amp.example.amp.type, "the example selects the item it was asked about").toBe("JC-120");
+    expect(amp.example.amp.type, "the example selects the type it was asked about").toBe("JC-120");
     expect(amp.example.amp.params.gain, "with its controls under params, like every block").toBeDefined();
     expect(fx.example.fx1.params.rate, "including an fx slot").toBeDefined();
   });
@@ -286,14 +286,14 @@ describe("describe_device", () => {
     const indexed = await client.callTool("describe_device", index);
     const dumped = await client.callTool("describe_device", full);
 
-    const indexView = viewOf(indexed.text, "fx") as { example?: unknown; items: { example?: unknown }[] };
-    const fullView = viewOf(dumped.text, "fx") as { items: { example?: unknown }[] };
-    expect(indexView.example, "a group with types shows examples on its items").toBeUndefined();
-    expect(indexView.items.every(item => item.example === undefined)).toBe(true);
-    expect(fullView.items.every(item => item.example === undefined)).toBe(true);
+    const indexView = viewOf(indexed.text, "fx") as { example?: unknown; types: { example?: unknown }[] };
+    const fullView = viewOf(dumped.text, "fx") as { types: { example?: unknown }[] };
+    expect(indexView.example, "a group with types shows examples on its types").toBeUndefined();
+    expect(indexView.types.every(capType => capType.example === undefined)).toBe(true);
+    expect(fullView.types.every(capType => capType.example === undefined)).toBe(true);
   });
 
-  it("resolves an item id case-insensitively", async () => {
+  it("resolves a type id case-insensitively", async () => {
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", items: ["amp/jc-120"] };

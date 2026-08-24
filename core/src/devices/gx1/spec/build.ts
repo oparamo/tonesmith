@@ -65,7 +65,7 @@ const setBlocks = (spec: Record<string, unknown>): BlockName[] =>
 /** Every field name a block accepts: what selects its shape, then the one key its controls go under. */
 const acceptedFields = (name: BlockName, context: BlockContext): string[] => {
   const capGroup = findGroup(gx1Capabilities, context.group);
-  const selectors = capGroup.items.length > 0 ? [TYPE_FIELD, SUB_TYPE_FIELD] : [];
+  const selectors = capGroup.types.length > 0 ? [TYPE_FIELD, SUB_TYPE_FIELD] : [];
   const bypass = ALWAYS_ON.has(name) ? [] : [ON_FIELD];
   return [...selectors, ...bypass, PARAMS_FIELD];
 };
@@ -114,7 +114,7 @@ const checkParamKeys = (issues: Issues, params: Record<string, unknown>, context
  * caller's params reported as unknown keys with nothing saying the type was the problem.
  */
 const checkType = (issues: Issues, capGroup: CapabilityGroup, block: Record<string, unknown>): boolean => {
-  if (capGroup.items.length === 0) return true;
+  if (capGroup.types.length === 0) return true;
 
   const type = block[TYPE_FIELD];
   if (typeof type !== "string") {

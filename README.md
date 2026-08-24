@@ -63,8 +63,8 @@ tonesmith <device> write <file> <index|name> <field>=<value> ...
 # Copy a patch between files
 tonesmith <device> copy <src> <src_idx|name> <dst> <dst_idx|name>
 
-# Browse device capabilities (all groups / one group / one item)
-tonesmith <device> capabilities [group] [item]
+# Browse device capabilities (all groups / one group / one type)
+tonesmith <device> capabilities [group] [type]
 ```
 
 Field paths are device-specific: `read` a patch to see its structure (the printed fields

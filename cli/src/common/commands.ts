@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, capabilityUtils } from "@tonesmith/core";
-import { printChain, printGroups, printGroup, printItem } from "./capabilities-print";
+import { printChain, printGroups, printGroup, printType } from "./capabilities-print";
 import { printPatch } from "./patch-print";
 
 /**
@@ -113,9 +113,9 @@ const addNew = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => 
 
 const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
-    .command("capabilities [group] [item]")
+    .command("capabilities [group] [type]")
     .description("browse supported effects, amp models, and other device capabilities")
-    .action((groupId?: string, item?: string) => {
+    .action((groupId?: string, typeId?: string) => {
       run(() => {
         const caps = driver.capabilities;
 
@@ -128,20 +128,20 @@ const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>):
         // case-insensitive match they do, and to a second argument the same way: there is nothing
         // under it to name.
         if (groupId.toLowerCase() === "chain") {
-          if (item) throw new Error(`The chain has no items, so there is no "${item}" to show.`);
+          if (typeId) throw new Error(`The chain has no types, so there is no "${typeId}" to show.`);
           printChain(caps);
           return;
         }
 
         const group = capabilityUtils.findGroup(caps, groupId);
 
-        if (!item) {
+        if (!typeId) {
           printGroup(group);
           return;
         }
 
-        const foundItem = capabilityUtils.findItem(group, item);
-        printItem(group, foundItem);
+        const found = capabilityUtils.findType(group, typeId);
+        printType(group, found);
       });
     });
 };

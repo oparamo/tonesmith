@@ -4,7 +4,7 @@ interface ParamSpecBase {
   /**
    * The exact property key for this param in machine surfaces: the field name in decoded
    * patches (`read_patch` output), and the key it is written under when building a patch.
-   * Where that key sits within the block varies by block, so the `example` on the group or item
+   * Where that key sits within the block varies by block, so the `example` on the group or type
    * is what shows the placement. Distinct from `name`, which is the label the device's own panel
    * prints and is free to punctuate and abbreviate however it likes. Absent on a param with no
    * codec field of its own, whose value the patch stores outside the block.
@@ -61,7 +61,7 @@ interface NumericOrNamedParam extends ParamSpecBase {
 }
 
 /**
- * A single parameter on a capability item or group (informational; not used for encoding).
+ * A single parameter on a capability type or group (informational; not used for encoding).
  *
  * `kind` is what a value is checked and built against, so it is a discriminant rather than a hint.
  * A param that takes a number and a set of named settings alike says so as its own kind, rather
@@ -74,48 +74,48 @@ type ParamSpec = NumericParam | DiscreteParam | BooleanParam | NumericOrNamedPar
  * A patch-spec fragment for one block, keyed by the block's own name in a spec and filled with the
  * device's factory defaults, ready to pass to `PatchDriver.buildPatch` once a patch `name` is added.
  *
- * It answers what a list of param keys cannot: which selectors this item needs set alongside its
+ * It answers what a list of param keys cannot: which selectors this type needs set alongside its
  * controls, and the exact spelling of every key, as one fragment a consumer copies rather than
  * assembles. Getting either wrong is learned by being rejected, with the patch already built.
  */
 type PatchSpecExample = Record<string, unknown>;
 
-/** One of the models or types a block offers to select between. */
-interface CapabilityItem {
+/** One of the types a block offers to select between. */
+interface CapabilityType {
   /** The string value used in patches (must match the codec's lookup arrays exactly). */
   id: string;
   /** Human-readable display name. */
   name: string;
-  /** Sonic description: what the item sounds like or does. */
+  /** Sonic description: what the type sounds like or does. */
   description: string;
-  /** Real-world gear this item emulates, where applicable. */
+  /** Real-world gear this type emulates, where applicable. */
   models?: string;
-  /** Nested selectable variants, where one item covers several named models. */
-  subTypes?: CapabilityItem[];
-  /** Parameters specific to this item (supplement the group's shared params). */
+  /** Nested selectable variants, where one type covers several named models. */
+  subTypes?: CapabilityType[];
+  /** Parameters specific to this type (supplement the group's shared params). */
   params?: ParamSpec[];
-  /** A spec fragment selecting this item, at factory defaults. Absent where the item names no block. */
+  /** A spec fragment selecting this type, at factory defaults. Absent where the type names no block. */
   example?: PatchSpecExample;
 }
 
 /**
- * A top-level block in the device's signal chain. The `items` array lists selectable models/types
+ * A top-level block in the device's signal chain. The `types` array lists the types selectable
  * within the block. The `params` array lists controls that are always present regardless of the
- * selected item.
+ * selected type.
  */
 interface CapabilityGroup {
-  /** Stable identifier, the string an `items` entry names this group by. */
+  /** Stable identifier: the string a consumer names this group by. */
   id: string;
   name: string;
   /** What this block does in the signal chain. */
   description: string;
-  /** Selectable types/models for this block. */
-  items: CapabilityItem[];
-  /** Block-level controls shared across all selected items. */
+  /** Selectable types for this block. */
+  types: CapabilityType[];
+  /** Block-level controls shared across every type. */
   params?: ParamSpec[];
   /**
    * A spec fragment for this block at factory defaults, carried by the groups that offer no types
-   * to choose between. Where a group has items, each item carries its own instead.
+   * to choose between. Where a group has types, each type carries its own instead.
    */
   example?: PatchSpecExample;
 }
@@ -165,6 +165,6 @@ interface DeviceCapabilities {
 }
 
 export type {
-  ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam, PatchSpecExample, CapabilityItem,
+  ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam, PatchSpecExample, CapabilityType,
   CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities,
 };

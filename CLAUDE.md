@@ -62,14 +62,14 @@ core/                       @tonesmith/core
     types/                  device-agnostic type definitions (barrel: types/index.ts)
       patch.ts              Patch, PatchFile, RawPatch
       driver.ts             PatchDriver<T> interface (includes capabilities field)
-      capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityItem, ParamSpec
+      capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec
       view.ts               PatchView / BlockView / PatchDetail: a patch as a person reads it,
                             composed by the driver and rendered by whoever displays it
     registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
     patch-utils.ts          patch-file operations every surface shares: resolvePatch /
                             resolvePatches, upsertPatches, copyPatch, createPatchFile. Editing a
                             patch is not among them: what a dot-path means is the driver's
-    capability-utils.ts     findGroup / findItem
+    capability-utils.ts     findGroup / findType
     atomic-write.ts         writeFileAtomic: sibling file then rename, so a driver's writeFile can
                             never truncate a patch library it fails partway through
     devices/index.ts        driver roster, one line per device
@@ -92,7 +92,7 @@ core/                       @tonesmith/core
                             patch's own settings, the in-repo param ground truth; capabilities
                             derives from it and the codec-to-catalog drift guard checks against it
       capabilities.ts       the device's DeviceCapabilities metadata (structure/models/subtypes;
-                            each item's params come from param-catalog.ts)
+                            each type's params come from param-catalog.ts)
       driver.ts             PatchDriver<T> object wiring codec + file I/O together
       view.ts               the device's blocks in reading order, under its own panel labels,
                             behind PatchDriver.viewPatch
@@ -285,7 +285,7 @@ repository.
 | `read_patch`          | `device`, `file`, `ref?`, `limit?`, `offset?`                      | `ref` = index or name, answered as `{ setName, index, patch }`. Omit it to page through the file: 20 patches by default (`limit` up to 100), each as `{ index, patch }`, plus `total` and a `more` line naming the offset to continue from                  |
 | `generate_patch`      | `device`, `outPath`, `setName?`, `patches[]`                       | One tool for every device: the per-patch spec comes from `describe_device`, not from this tool's schema. Builds every patch in `patches` and upserts them by name into `outPath` in array order, in one file write (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed). The response reports each patch as `{ name, action, patch }`, the patch complete with the defaults it filled in, so no follow-up read is needed |
 | `write_fields`        | `device`, `file`, `ref`, `fields`                                  | Dot-path mutations as a `{path: value}` record, same as CLI `write`. The batch applies atomically: a rejected edit leaves the file untouched. Setting a block's `type` switches the effect: the block arrives at that type's factory settings on its factory sub-model, and its previous controls are gone, so name the ones you want after the type in the same call |
-| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<item>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). The `"chain"` entry also carries what belongs to the patch rather than to a block: the name limit, and the patch settings written beside `name`. Omit `items` for a chain summary plus every group with every type id in it, which is what makes the next call nameable without listing each group first. A bare-group entry is an index with no per-item params, so name the items instead, or pass `includeParams` for the full set. A named item also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
+| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<type>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). The `"chain"` entry also carries what belongs to the patch rather than to a block: the name limit, and the patch settings written beside `name`. Omit `items` for a chain summary plus every group with every type id in it, which is what makes the next call nameable without listing each group first. A bare-group entry is an index with no per-type params, so name the types instead, or pass `includeParams` for the full set. A named type also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
 | `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use `generate_patch`, which appends by name                                                        |
 | `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults, `patchCount` from 1 to 500. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                          |
 
@@ -293,8 +293,8 @@ repository.
 
 ```bash
 node cli/dist/index.js <device> capabilities                  # list all groups
-node cli/dist/index.js <device> capabilities <group>          # every item in one group
-node cli/dist/index.js <device> capabilities <group> <item>   # one item's params in detail
+node cli/dist/index.js <device> capabilities <group>          # every type in one group
+node cli/dist/index.js <device> capabilities <group> <type>   # one type's params in detail
 ```
 
 ## Adding a new device

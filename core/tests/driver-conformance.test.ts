@@ -26,8 +26,8 @@ interface BlockCase {
 
 const blockCases = (): BlockCase[] => drivers.flatMap(driver =>
   driver.capabilities.groups.flatMap(group => {
-    const views = group.items.length > 0
-      ? group.items.map(item => ({ where: `${group.id}/${item.id}`, example: item.example }))
+    const views = group.types.length > 0
+      ? group.types.map(capType => ({ where: `${group.id}/${capType.id}`, example: capType.example }))
       : [{ where: group.id, example: group.example }];
     return views.flatMap(({ where, example }) =>
       Object.entries(example ?? {}).map(([block, body]) => ({

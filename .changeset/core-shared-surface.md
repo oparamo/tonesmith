@@ -7,7 +7,7 @@
 Logic the CLI and the MCP server had each written for themselves lives in `@tonesmith/core`, and
 neither surface is tied to a particular device any more.
 
-Added to core: `capabilityUtils.findGroup` and `findItem`; `patchUtils.resolvePatch` and
+Added to core: `capabilityUtils.findGroup` and `findType`; `patchUtils.resolvePatch` and
 `resolvePatches` (the patch a ref names and the index it sits at, one patch or the whole file). Each
 replaced a pair of near-identical implementations, one per surface, which is also why the CLI's
 `read` stopped printing `type=<model>` in an fx slot's params line when the label already shows the
