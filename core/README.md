@@ -1,5 +1,9 @@
 # @tonesmith/core
 
+[![npm](https://img.shields.io/npm/v/@tonesmith/core)](https://www.npmjs.com/package/@tonesmith/core)
+[![license](https://img.shields.io/npm/l/@tonesmith/core)](./LICENSE.md)
+[![node](https://img.shields.io/node/v/@tonesmith/core)](https://nodejs.org)
+
 Read, edit, and build patch files for guitar multi-effects processors.
 
 Every supported device is a self-contained driver behind one `PatchDriver` interface, so the types
@@ -29,7 +33,7 @@ import { registry, patchUtils, gx1 } from "@tonesmith/core";
 const file = gx1.driver.readFile("rock-tones.tsl");
 const { patch } = patchUtils.resolvePatch(file.patches, "SWORD LEAD");
 
-console.log(patch.amp.type, patch.amp.gain);
+console.log(patch.amp.type, patch.amp.params.gain);
 
 const driver = registry.getDriver(file.device);
 ```
@@ -40,12 +44,16 @@ capability catalog before any byte is written:
 ```ts
 const patch = gx1.driver.buildPatch({
   name: "GLASSY",
-  amp: { type: "JC-120", gain: 40, bass: 55, middle: 50, treble: 60 },
-  reverb: { type: "HALL M", level: 30 },
+  amp: { type: "JC-120", params: { gain: 40, bass: 55, middle: 50, treble: 60 } },
+  reverb: { type: "HALL M", params: { level: 30 } },
 });
 
 patchUtils.upsertPatches(gx1.driver, { path: "my-set.tsl", patches: [patch] });
 ```
+
+Every block takes the same shape: `type` where the device offers one, an optional `subType` and
+`on`, and one `params` bag holding its controls. That is how a decoded patch reads back and how a
+spec is written.
 
 A write starts from the bytes the file was read as and overwrites only the indices the codec
 knows, so fields this driver has not reverse-engineered survive a round trip untouched. That is
@@ -53,11 +61,13 @@ also why `writeFile` refuses a `PatchFile` you assembled by hand: it carries non
 
 ## What it exposes
 
-- `registry` — `registerDriver`, `getDriver`, `listDrivers`
-- `patchUtils` — `resolvePatch`, `resolvePatches`, `applyFieldEdits`, `upsertPatches`, `copyPatch`,
-  `createPatchFile`, `coerceValue`, `setByPath`
-- `patchView.presentPatch` — the consumer-facing view of a decoded patch
+- `registry`: `registerDriver`, `getDriver`, `listDrivers`
+- `patchUtils`: `resolvePatch`, `resolvePatches`, `resolvePatchIndex`, `upsertPatches`, `copyPatch`,
+  `createPatchFile`, `MAX_NEW_PATCHES`
 - `capabilityUtils`: `findGroup`, `findType`
+- the `PatchDriver<T>` interface every device implements, whose methods are how a consumer reads,
+  edits, builds and views a patch: `readFile`, `writeFile`, `decodePatch`, `encodePatch`,
+  `buildPatch`, `applyEdits`, `viewPatch`, `blankPatch`, `newFile`, and its `capabilities` catalog
 - one namespace per device (`gx1`), publishing its `driver`, its patch and block types, and `RAW`
 
 ## License
