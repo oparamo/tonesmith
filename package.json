@@ -18,14 +18,14 @@
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",
-    "@opendocsg/pdf2md": "0.2.7",
-    "@types/node": "24.0.0",
-    "eslint": "10.8.0",
+    "@opendocsg/pdf2md": "0.3.0",
+    "@types/node": "24.13.3",
+    "eslint": "10.9.1",
     "eslint-plugin-sonarjs": "4.2.0",
     "node-html-markdown": "2.0.0",
-    "tsx": "4.23.1",
+    "tsx": "4.23.12",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.65.0",
-    "vitest": "4.1.10"
+    "typescript-eslint": "8.68.0",
+    "vitest": "4.1.11"
   }
 }
