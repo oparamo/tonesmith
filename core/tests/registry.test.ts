@@ -6,35 +6,45 @@ const makeDriver = (id: string): PatchDriver =>
   ({ id, name: `Driver ${id}` }) as unknown as PatchDriver;
 
 describe("registerDriver / getDriver / listDrivers", () => {
-  it("getDriver returns undefined for an unregistered id", () => {
-    expect(getDriver("__no_such_device__")).toBeUndefined();
-  });
-
   it("registers a driver and retrieves it by id", () => {
-    const d = makeDriver("test-reg-a");
-    registerDriver(d);
-    expect(getDriver("test-reg-a")).toBe(d);
+    const registered = makeDriver("test-reg-a");
+
+    registerDriver(registered);
+    const retrieved = getDriver("test-reg-a");
+
+    expect(retrieved).toBe(registered);
   });
 
   it("overwrites a driver registered under the same id", () => {
     const first  = makeDriver("test-reg-b");
     const second = makeDriver("test-reg-b");
+
     registerDriver(first);
     registerDriver(second);
-    expect(getDriver("test-reg-b")).toBe(second);
+    const retrieved = getDriver("test-reg-b");
+
+    expect(retrieved).toBe(second);
   });
 
   it("listDrivers includes all registered drivers", () => {
-    const d1 = makeDriver("test-list-1");
-    const d2 = makeDriver("test-list-2");
-    registerDriver(d1);
-    registerDriver(d2);
-    const ids = listDrivers().map(d => d.id);
+    const first  = makeDriver("test-list-1");
+    const second = makeDriver("test-list-2");
+
+    registerDriver(first);
+    registerDriver(second);
+    const ids = listDrivers().map(driver => driver.id);
+
     expect(ids).toContain("test-list-1");
     expect(ids).toContain("test-list-2");
   });
 
-  it("listDrivers returns an array", () => {
-    expect(Array.isArray(listDrivers())).toBe(true);
+  it("throws a descriptive error listing registered ids for an unregistered id", () => {
+    const registered = makeDriver("test-reg-listed");
+    registerDriver(registered);
+
+    const getUnregisteredDriver = () => getDriver("__no_such_device__");
+
+    expect(getUnregisteredDriver).toThrow(/__no_such_device__/);
+    expect(getUnregisteredDriver).toThrow(/test-reg-listed/);
   });
 });

@@ -7,19 +7,20 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # npm trusted publishing: npm verifies this job's OIDC token against the package's configured
+  # publisher, so there is no NPM_TOKEN to leak, and its absence below is deliberate.
   id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      # pnpm's version comes from `packageManager` in the root package.json, as in ci.yml.
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm

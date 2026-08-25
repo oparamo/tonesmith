@@ -1,0 +1,90 @@
+/**
+ * What a block says when it is handed a key it doesn't declare.
+ *
+ * Naming the rejected keys and stopping there leaves the caller to work out whether a key was wrong
+ * or only in the wrong place. Both happen: a control written beside the block's own selectors
+ * rather than inside `params` is the commonest mistake, and it reads identically to a typo unless
+ * the message says which it was. Printing the accepted shape answers both at once, and printing it
+ * per type means the caller reads the fields that type really has rather than a generic outline.
+ */
+import { typeSurface } from "./validate";
+import type { TypeSurface } from "./validate";
+import { PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD } from "../common";
+
+/** The block a rejected input was addressing, as far as the input itself reveals. */
+interface BlockContext {
+  group: string;
+  /** The chosen type, absent when the caller omitted it or sent something that isn't a string. */
+  type?: string;
+  /** What that type accepts, absent when nothing resolved it. */
+  surface?: TypeSurface;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+
+/**
+ * Reads the block's own selection back off the input being rejected. This runs on input that
+ * already failed validation, so every field is treated as untrusted: an unresolvable type just
+ * yields no param keys, and the message falls back to listing fields.
+ */
+const blockContext = (group: string, input: unknown): BlockContext => {
+  const block = asRecord(input);
+  const type = typeof block[TYPE_FIELD] === "string" ? block[TYPE_FIELD] : undefined;
+  return { group, type, surface: typeSurface({ group, type, subType: block[SUB_TYPE_FIELD] }) };
+};
+
+const quoted = (keys: string[]): string => keys.map(key => `"${key}"`).join(", ");
+
+/** One field of the skeleton, filled in where the block's own selection makes it concrete. */
+const fieldText = (name: string, block: BlockContext): string => {
+  if (name === TYPE_FIELD && block.type !== undefined) return `${TYPE_FIELD}: "${block.type}"`;
+  const paramKeys = block.surface?.paramKeys ?? [];
+  if (name === PARAMS_FIELD && paramKeys.length > 0) return `${PARAMS_FIELD}: { ${paramKeys.join(", ")} }`;
+  return name;
+};
+
+/**
+ * A field the chosen type can't use is left out. An fx slot declares one `subType` field on behalf
+ * of all 39 of its effects, so offering it at an effect with no variants sends the caller straight
+ * into a second rejection.
+ */
+const usableFields = (fields: string[], block: BlockContext): string[] => {
+  if (block.surface === undefined || block.surface.subTypes.length > 0) return fields;
+  return fields.filter(name => name !== SUB_TYPE_FIELD);
+};
+
+/**
+ * The shape this block accepts, printed rather than described. Nesting is exactly what a prose
+ * list of field names loses, and nesting is what the caller got wrong.
+ */
+const shapeSkeleton = (fields: string[], block: BlockContext): string => {
+  const label = block.type === undefined ? block.group : `${block.group} ${block.type}`;
+  const body = usableFields(fields, block).map(name => fieldText(name, block)).join(", ");
+  return `${label} takes: { ${body} }`;
+};
+
+/** Keys that name a real param of the chosen type, sent one level too high. */
+const misplacedLine = (keys: string[], block: BlockContext): string => {
+  const noun = keys.length === 1 ? "is a param" : "are params";
+  const place = keys.length === 1 ? "not a field on the block" : "not fields on the block";
+  return `${quoted(keys)} ${noun} of ${block.group} ${block.type}, ${place}.`;
+};
+
+/** Keys the chosen type has no param for either. */
+const unknownLine = (keys: string[]): string => {
+  const noun = keys.length === 1 ? "No field" : "No fields";
+  return `${noun} ${quoted(keys)} on this block.`;
+};
+
+/** Keys inside `params` that the chosen type has no control for. */
+const unknownParamLine = (keys: string[], block: BlockContext): string => {
+  const noun = keys.length === 1 ? "is not a param" : "are not params";
+  return `${quoted(keys)} ${noun} of ${block.group} ${block.type ?? ""}`.trimEnd() + ".";
+};
+
+export {
+  asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine, unknownParamLine,
+  PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
+};
+export type { BlockContext };

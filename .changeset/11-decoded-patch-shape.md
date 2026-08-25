@@ -1,0 +1,40 @@
+---
+"@tonesmith/core": major
+"@tonesmith/cli": major
+"@tonesmith/mcp": major
+---
+
+The decoded GX-1 patch has one consistent shape, and it is not the 0.2.0 shape.
+
+**Field names are camelCase**, matching the rest of the decoded object rather than the manual's
+display names: `preDelay`, `highCut`, `subType`, `octFeedback`, and so on throughout.
+`describe_device` reports each param's `key`, so the name to write is always available without
+guessing how a display name was transliterated.
+
+**Lookup-shaped fields decode as their labels, not raw byte indices.** Delay and PARA. EQ
+`highCut`, PARA. EQ `lowCut` and `midFreq`, and ENHANCER `lowFreq` and `highFreq` read as
+`"3.15kHz"` where they used to read as `22`. Byte layout is unchanged; only the decoded JSON
+differs. `HIGH_CUT_MAP` and `LOW_CUT_MAP` are no longer exported, since the codec handles labels
+directly.
+
+**On/off params are real booleans.** `trigger` across FEEDBACKER, VIBRATO, S-BEND, the
+WARP/TWIST/GLITCH/REVERSE delay sub-algorithms and TERA ECHO, RING MOD's `intelligent`, and `solo`
+on the amp, the drive block and the FX-slot OD/DS were variously an `"OFF"`/`"ON"` string, a raw
+number, or a boolean depending on where you found them. They are `true`/`false` end to end now, over
+a `boolean` param domain and a validating `bool` codec field.
+
+**`subType` is the only way a model or sub-algorithm is selected**, and it is the only name that
+selection goes by. Ten effects and the pedal-FX block store the selector among their own params
+rather than in a shared header, and the codec used to expose it three different ways: FIXED WAH's
+was named `wahType` and never threaded into the encoded bytes at all, so its model was silently
+dropped; the FX-slot REVERB picked its algorithm through `params.type`; and pedal WAH's model was
+set as `subType` but read back as `wahType`, so sending back the block you just read was rejected
+for naming a field the block does not have. All of them are `subType` now, on the way in and on the
+way out. `type` means the block's own selector and nothing else. A decoded block carries the
+selection exactly once: ten effects keep the selector in a param byte, and the codec lifts it onto
+`subType` on the way out and writes it back on the way in, so nothing downstream is handed two
+copies to keep in agreement.
+
+**Blocks and fields that were undecoded now decode**: the `pedalFx` block (expression pedal WAH and
+PEDAL BEND), `solo` and `soloLevel` on both the `amp` block and the FX-slot OD/DS, and
+`patch.key`, the song key HARMONIST resolves its diatonic intervals against.

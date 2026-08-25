@@ -1,0 +1,323 @@
+import { describe, it, expect } from "vitest";
+import { decodeFxParams, encodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
+import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
+import { FX_TYPES, FX_DLY_TYPES } from "../../../src/devices/gx1/common";
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
+
+// ── Per-effect-type symmetry tests ────────────────────────────────────────────
+//
+// For each FX type, decode a zero byte array, re-encode the decoded params, then
+// decode again and assert the two param objects are identical.
+// This verifies every FX_PARAM_MAPS entry is internally consistent (decode and
+// encode are true inverses) for all ~40 types, not just those in the fixture.
+
+describe("FX param map symmetry (all types)", () => {
+  const zeroBytes = new Array<number>(251).fill(0);
+
+  it.each(FX_TYPES)("%s: encode(decode(zeros)) equals decode(zeros)", (fxType) => {
+    const decoded = decodeFxParams(fxType, zeroBytes);
+
+    // A type with no field map decodes to an empty bag, which re-encodes to an empty bag, so the
+    // comparison below passes on exactly the regression it exists to catch.
+    expect(Object.keys(decoded), `${fxType} has no field map to decode through`).not.toEqual([]);
+
+    const reencoded = encodeFxParams(fxType, decoded, zeroBytes);
+    const reencodedBytes = bytesFromHex(reencoded);
+    const reDecoded = decodeFxParams(fxType, reencodedBytes);
+
+    expect(reDecoded).toEqual(decoded);
+  });
+});
+
+
+// ── FX-slot DELAY: every sub-algorithm round-trips losslessly ─────────────────
+//
+// The zeros symmetry test above only reaches STANDARD (type byte 0). The FX-slot DELAY is
+// per-sub-algorithm, so each of the 5 sub-algorithms is exercised here with a distinct type
+// selector and in-range field values, asserting decode↔encode is a true inverse AND that the
+// 251-byte block round-trips byte-for-byte (unread offsets pass through untouched).
+
+describe("FX-slot DELAY per-sub-algorithm round-trip", () => {
+  const DELAY_OFFSET = 212;
+
+  it.each(FX_DLY_TYPES)("%s: decode↔encode is lossless and byte-preserving", (subType) => {
+    const bytes = new Array<number>(251).fill(0);
+    bytes[DELAY_OFFSET] = FX_DLY_TYPES.indexOf(subType); // sub-algorithm selector (p[0])
+    bytes[DELAY_OFFSET + 5] = 40;   // feedback (STANDARD/MODULATE)
+    bytes[DELAY_OFFSET + 6] = 80;   // level (STANDARD/MODULATE)
+    bytes[DELAY_OFFSET + 12] = 70;  // level (WARP/TWIST)
+    bytes[DELAY_OFFSET + 13] = 30;  // riseTime (TWIST)
+    bytes[DELAY_OFFSET + 16] = 55;  // time (GLITCH)
+    bytes[DELAY_OFFSET + 17] = 60;  // glitch (GLITCH)
+    bytes[DELAY_OFFSET + 18] = 100; // balance (GLITCH)
+
+    const decoded = decodeFxParams("DELAY", bytes);
+    expect(decoded.subType).toBe(subType);
+
+    const reencoded = bytesFromHex(encodeFxParams("DELAY", decoded, bytes));
+    expect(reencoded).toEqual(bytes);
+    expect(decodeFxParams("DELAY", reencoded)).toEqual(decoded);
+  });
+});
+
+
+// ── Unknown/invalid type handling ─────────────────────────────────────────────
+//
+// A type outside the known FX_TYPES list decodes to its raw bytes rather than throwing, so a
+// corrupt or newer-firmware byte doesn't crash the whole read. Encoding a params bag for such a
+// type is the opposite case: there is nowhere to put the values, so it throws.
+
+describe("Unknown FX type handling", () => {
+  it("decodeFxParams reads no params off a type it does not recognize", () => {
+    const bytes = new Array<number>(40).fill(7);
+
+    const decoded = decodeFxParams("BOGUS TYPE", bytes);
+
+    expect(decoded).toEqual({});
+  });
+
+  it("encodeFxParams leaves an unrecognized type's bytes as they were read", () => {
+    const originalBytes = [1, 2, 3, 4];
+
+    const resultBytes = bytesFromHex(encodeFxParams("BOGUS TYPE", {}, originalBytes));
+
+    expect(resultBytes).toEqual(originalBytes);
+  });
+
+  it("encodeFxParams throws rather than drop params for a type with no FX_PARAM_MAPS entry", () => {
+    const originalBytes = [1, 2, 3, 4];
+
+    const encodeUnmappedType = () => encodeFxParams("BOGUS TYPE", { sustain: 50 }, originalBytes);
+
+    expect(encodeUnmappedType).toThrow(/BOGUS TYPE/);
+  });
+
+  it("encodeFxParams throws when DELAY's sub-algorithm has no field map of its own", () => {
+    const originalBytes = new Array<number>(251).fill(0);
+    const staleSubType = { subType: "BOSS COMP", time: 400 };
+
+    const encodeStaleSubType = () => encodeFxParams("DELAY", staleSubType, originalBytes);
+
+    expect(encodeStaleSubType).toThrow(/BOSS COMP/);
+  });
+
+  it("indexTable's encode throws for a value outside its table (PITCH SHIFT's pitch field)", () => {
+    const params = { mode: "MEDIUM", pitch: 999, preDelay: 0, level: 100, feedback: 0, direct: 100 };
+    const bytes = new Array<number>(20).fill(0);
+
+    const encodeWithBadPitch = () => encodeFxParams("PITCH SHIFT", params, bytes);
+
+    expect(encodeWithBadPitch, "names the value it refused").toThrow(/999/);
+    expect(encodeWithBadPitch, "and the field it refused it for").toThrow(/pitch/);
+  });
+});
+
+
+// ── Real device values (factory default init patch) ──────────────────────────
+//
+// default-init.tsl is a real GX-1 factory-default patch export. Every block below
+// asserts against that patch's actually-active type. Every effect type that ISN'T
+// the patch's active type still has the device's own factory-default bytes sitting
+// in its "shadow" byte range (the union region shared by all types of that slot),
+// so overriding just the type selector and decoding the same real bytes still
+// exercises genuine device data for every field checked below.
+
+describe("Real device values (default-init.tsl)", () => {
+  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const fx1Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX1"));
+  const fx2Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX2"));
+  const fx3aBytes = bytesFromHex(rawBlock(patch, "MEMORY%FX3A"));
+
+  it("decodes FX1 (active type: COMPRESSOR)", () => {
+    expect(patch.fx1.type).toBe("COMPRESSOR");
+    expect(patch.fx1.subType).toBe("BOSS COMP");
+    expect(patch.fx1.params).toMatchObject({ sustain: 50, attack: 50, level: 60 });
+  });
+
+  it("decodes FX2 (active type: PARA. EQ) in real UI display order", () => {
+    expect(patch.fx2.type).toBe("PARA. EQ");
+    expect(patch.fx2.params).toEqual({
+      lowGain: 0, highGain: 0, level: 0, midFreq: "4kHz",
+      midGain: 0, lowCut: "FLAT", highCut: "FLAT",
+    });
+  });
+
+  it("decodes FX3 (active type: CHORUS)", () => {
+    expect(patch.fx3.type).toBe("CHORUS");
+    expect(patch.fx3.subType).toBe("MONO");
+    expect(patch.fx3.params).toMatchObject({ rate: 50, depth: 40, level: 100, preDelay: 4 });
+  });
+
+  // The following decode the SAME real device bytes above, but under a different
+  // type selector, to reach fields the default patch's active type doesn't cover.
+  // Every byte read is still a genuine device default. Only the type string passed
+  // to decodeFxParams is synthetic.
+
+  it("decodes FX1 shadow bytes for LIMITER (byte offset 10)", () => {
+    const decoded = decodeFxParams("LIMITER", fx1Bytes);
+
+    expect(decoded).toEqual({
+      subType: "BOSS", threshold: 30, ratio: 10, level: 25, attack: 50, release: 50,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for ENHANCER (byte offset 19, reordered fields)", () => {
+    const decoded = decodeFxParams("ENHANCER", fx1Bytes);
+
+    expect(decoded).toEqual({
+      sens: 50, low: 50, high: 50, lowFreq: "63Hz", highFreq: "2kHz", level: 100,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for SLICER (byte offset 25, direct + signed duty)", () => {
+    const decoded = decodeFxParams("SLICER", fx1Bytes);
+
+    expect(decoded).toEqual({
+      pattern: "PATTERN 1", rate: 50, level: 100, attack: 50, duty: 50, direct: 0,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for TOUCH WAH (byte offset 59, reordered + direct)", () => {
+    const decoded = decodeFxParams("TOUCH WAH", fx1Bytes);
+
+    expect(decoded).toEqual({
+      filter: "BPF", polarity: "UP", sens: 50, freq: 30, reso: 70, decay: 85, level: 100, direct: 0,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for AUTO WAH (byte offset 67, reordered)", () => {
+    const decoded = decodeFxParams("AUTO WAH", fx1Bytes);
+
+    expect(decoded).toEqual({
+      filter: "BPF", freq: 50, rate: 50, depth: 50, reso: 50, level: 100,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for DEFRETTER (byte offset 73, reordered)", () => {
+    const decoded = decodeFxParams("DEFRETTER", fx1Bytes);
+
+    expect(decoded).toEqual({
+      sens: 50, attack: 70, depth: 0, reso: 50, tone: 0, level: 100, direct: 0,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for FIXED WAH (byte offset 85, no freq field, has manual)", () => {
+    const decoded = decodeFxParams("FIXED WAH", fx1Bytes);
+
+    expect(decoded).toEqual({
+      subType: "CRY WAH", level: 100, direct: 0, manual: 50,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for AC. GTR SIM (byte offset 93, reordered)", () => {
+    const decoded = decodeFxParams("AC. GTR SIM", fx1Bytes);
+
+    expect(decoded).toEqual({
+      high: 0, body: 50, low: 0, level: 50,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for OD/DS (byte offset 115, type read from the param block, not FX_COM byte 2)", () => {
+    const decoded = decodeFxParams("OD/DS", fx1Bytes);
+
+    expect(decoded).toEqual({
+      subType: "CLEAN BST", drive: 50, tone: 0, level: 50, direct: 0, solo: false, soloLevel: 50,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for FLANGER (byte offset 128, reordered + direct)", () => {
+    const decoded = decodeFxParams("FLANGER", fx1Bytes);
+
+    expect(decoded).toEqual({
+      rate: 25, depth: 60, reso: 35, manual: 55, level: 100, direct: 0,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for PHASER (byte offset 134, + direct)", () => {
+    const decoded = decodeFxParams("PHASER", fx1Bytes);
+
+    expect(decoded).toEqual({
+      stage: "4 STAGE", rate: 30, depth: 70, reso: 30, manual: 50, level: 100, direct: 0,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for VIBRATO (byte offset 155, reordered)", () => {
+    const decoded = decodeFxParams("VIBRATO", fx1Bytes);
+
+    expect(decoded).toEqual({
+      rate: 80, depth: 20, riseTime: 30, trigger: true, level: 100,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for ROTARY (byte offset 148, + direct)", () => {
+    const decoded = decodeFxParams("ROTARY", fx1Bytes);
+
+    expect(decoded).toEqual({
+      speed: "SLOW", slowRate: 50, fastRate: 50, level: 100, balance: 50, drive: 0, direct: 0,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for PITCH SHIFT (byte offset 179, 4-byte preDelay)", () => {
+    const decoded = decodeFxParams("PITCH SHIFT", fx1Bytes);
+
+    expect(decoded).toEqual({
+      mode: "MEDIUM", pitch: -5, preDelay: 0, level: 100, feedback: 0, direct: 100,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for HARMONIST (byte offset 188, 4-byte preDelay, no key field)", () => {
+    const decoded = decodeFxParams("HARMONIST", fx1Bytes);
+
+    expect(decoded).toEqual({
+      harmony: "+3rd", preDelay: 0, level: 100, feedback: 0, direct: 100,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for OCTAVE (byte offset 196, minus1Oct before minus2Oct)", () => {
+    const decoded = decodeFxParams("OCTAVE", fx1Bytes);
+
+    expect(decoded).toEqual({
+      minus1Oct: 50, minus2Oct: 50, direct: 100,
+    });
+  });
+
+  it("decodes FX1 shadow bytes for TUNE DOWN (byte offset 211, not 8)", () => {
+    const decoded = decodeFxParams("TUNE DOWN", fx1Bytes);
+
+    expect(decoded).toEqual({ pitch: -2 });
+  });
+
+  it("decodes FX1 shadow bytes for DELAY as an FX-slot type (byte offset 212, STANDARD sub-algorithm)", () => {
+    const decoded = decodeFxParams("DELAY", fx1Bytes);
+
+    // The FX-slot DELAY is per-sub-algorithm; the shadow bytes select STANDARD (type byte 0),
+    // whose fields are TIME/FEEDBACK/LEVEL/HIGH CUT (no MOD RATE/DEPTH, which are MODULATE's).
+    expect(decoded).toEqual({
+      subType: "STANDARD", time: 400, feedback: 30, level: 50, highCut: "6.3kHz",
+    });
+  });
+
+  it("decodes FX1 shadow bytes for REVERB as an FX-slot type (byte offset 231, 2-byte preDelay)", () => {
+    const decoded = decodeFxParams("REVERB", fx1Bytes);
+
+    expect(decoded).toEqual({
+      subType: "HALL M", time: 3, preDelay: 30, level: 30, direct: 100,
+    });
+  });
+
+  it("decodes FX3A (OVERTONE's dedicated block, not the 251-byte FX3 block)", () => {
+    const decoded = decodeFxParams("OVERTONE", fx3aBytes);
+
+    expect(decoded).toEqual({
+      lower: 50, upper: 50, unison: 50, direct: 100, detune: 35,
+    });
+  });
+
+  it("decodes FX2 shadow bytes for GEQ (byte offset 38)", () => {
+    const decoded = decodeFxParams("GEQ", fx2Bytes);
+
+    expect(decoded).toEqual({
+      "125Hz": 0, "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 0, level: 0,
+    });
+  });
+});

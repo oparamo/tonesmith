@@ -1,12 +1,18 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { registry } from "@tonesmith/core";
 import { ok } from "../common";
 
 const registerListDevices = (server: McpServer): void => {
   server.registerTool(
     "list_devices",
-    { description: "List all supported guitar processor devices and their IDs." },
-    async () => ok(JSON.stringify(registry.listDrivers().map(d => ({ id: d.id, name: d.name })), null, 2))
+    {
+      description: "List all supported guitar processor devices and their IDs.",
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    () => {
+      const deviceSummaries = registry.listDrivers().map(driver => ({ id: driver.id, name: driver.name }));
+      return ok(JSON.stringify(deviceSummaries));
+    }
   );
 };
 

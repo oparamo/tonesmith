@@ -1,12 +1,35 @@
 {
   "name": "@tonesmith/cli",
   "version": "0.2.0",
+  "description": "Command line for guitar multi-effects patch files: read a patch, edit a field, copy between files.",
+  "keywords": [
+    "guitar",
+    "multi-effects",
+    "patch",
+    "preset",
+    "boss",
+    "gx-1",
+    "tsl",
+    "tone",
+    "cli",
+    "command-line"
+  ],
+  "homepage": "https://github.com/oparamo/tonesmith#readme",
+  "bugs": {
+    "url": "https://github.com/oparamo/tonesmith/issues"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "bin": {
     "tonesmith": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc --noEmit && tsup"
+    "build": "tsc --noEmit && tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@tonesmith/core": "workspace:*",
@@ -25,6 +48,8 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "tsup": "8.5.1"
+    "tsup": "8.5.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "vitest": "4.1.11"
   }
 }

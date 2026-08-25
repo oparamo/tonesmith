@@ -2,25 +2,30 @@
   "name": "tonesmith",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test:watch",
+    "test:tools": "vitest run --config tools/vitest.config.ts",
+    "coverage": "pnpm -r coverage",
     "clean": "find core cli mcp -name dist -type d | xargs rm -rf",
-    "html-to-md": "tsx tools/html-to-md/index.ts",
-    "html-to-md:gx1": "tsx tools/html-to-md/index.ts tools/html-to-md/gx1.json",
+    "doc-to-md": "tsx tools/doc-to-md/index.ts",
     "lint": "eslint core cli mcp tools",
     "lint:fix": "eslint core cli mcp tools --fix",
     "changeset": "changeset",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && pnpm lint && pnpm coverage && changeset publish"
   },
   "devDependencies": {
-    "@changesets/cli": "2.31.0",
-    "@types/node": "24.0.0",
-    "eslint": "10.5.0",
-    "node-html-parser": "8.0.3",
-    "tsx": "4.22.4",
+    "@changesets/cli": "3.0.1",
+    "@opendocsg/pdf2md": "0.3.0",
+    "@types/node": "24.13.3",
+    "eslint": "10.9.1",
+    "eslint-plugin-sonarjs": "4.2.0",
+    "node-html-markdown": "2.0.0",
+    "tsx": "4.23.12",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.62.0"
+    "typescript-eslint": "8.68.0",
+    "vitest": "4.1.11"
   }
 }

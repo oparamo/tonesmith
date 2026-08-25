@@ -1,0 +1,313 @@
+import { findGroup, findType } from "../../../capability-utils";
+import { gx1Capabilities } from "../capabilities";
+import { onlyBlockFor } from "../common";
+import type { BlockName } from "../common";
+import type { CapabilityGroup, CapabilityType, ParamSpec } from "../../../types";
+
+/** Every problem found with one block, empty when the block is usable. */
+type Issues = string[];
+
+/** What the caller selected and supplied for one block. */
+interface TypeParams {
+  group: string;
+  /** Absent for a block whose group offers no types to choose between, such as NS and FV. */
+  type?: string;
+  subType?: string;
+  values: Record<string, unknown>;
+}
+
+/** A block's selection resolved against capabilities: its group, and the type its `type` names. */
+interface Selection {
+  capGroup: CapabilityGroup;
+  /** Absent for a group with no types, where the group's shared params are the whole surface. */
+  capType?: CapabilityType;
+}
+
+const groupOrUndefined = (id: string): CapabilityGroup | undefined => {
+  try {
+    return findGroup(gx1Capabilities, id);
+  } catch {
+    return undefined;
+  }
+};
+
+const typeOrUndefined = (group: CapabilityGroup, id: string): CapabilityType | undefined => {
+  try {
+    return findType(group, id);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Resolves a block's group and type, or undefined for either miss. Tolerant of anything in `type`,
+ * because its callers hold unvalidated input; a caller that needs the miss reported names the valid
+ * ids itself rather than having this raise.
+ */
+const resolveSelection = (group: string, type?: unknown): Selection | undefined => {
+  const capGroup = groupOrUndefined(group);
+  if (capGroup === undefined) return undefined;
+  if (capGroup.types.length === 0) return { capGroup };
+  if (typeof type !== "string") return undefined;
+
+  const capType = typeOrUndefined(capGroup, type);
+  if (capType === undefined) return undefined;
+  return { capGroup, capType };
+};
+
+/** Variant ids are matched case-insensitively, the one place a caller's casing is forgiven. */
+const matchesSubType = (candidate: CapabilityType, subType: string): boolean =>
+  candidate.id.toUpperCase() === subType.toUpperCase();
+
+/**
+ * The ParamSpecs in effect for a selection: the group's shared params, the chosen type's params,
+ * and, when a subType is given and carries its own, that subType's params (e.g. a DELAY
+ * sub-algorithm).
+ */
+const specsForType = (selection: Selection, subType?: string): ParamSpec[] => {
+  const { capGroup, capType } = selection;
+  const specs = [...(capGroup.params ?? []), ...(capType?.params ?? [])];
+  const matchedSubType = subType === undefined
+    ? undefined
+    : capType?.subTypes?.find(candidate => matchesSubType(candidate, subType));
+  if (matchedSubType?.params) specs.push(...matchedSubType.params);
+  return specs;
+};
+
+/** One block's subType alongside the capability type it was sent to. */
+interface SubTypeCheck {
+  group: string;
+  type: string;
+  capType: CapabilityType;
+  subType: string;
+}
+
+/**
+ * Where a variant selection belongs on a type that declares no subTypes. Some such types do have
+ * a variant to pick, carried as an ordinary param the device labels TYPE, and naming that param's
+ * key is what turns the rejection into a one-step fix rather than a dead end.
+ */
+const subTypeAlternative = (capType: CapabilityType): string => {
+  const selector = capType.params?.find(param => param.name === "TYPE");
+  if (selector?.key === undefined) return "it has no variants to choose between";
+  return `set params.${selector.key} instead (${selector.range})`;
+};
+
+/**
+ * Rejects a subType the chosen type can't take, whether because it declares none or because this
+ * isn't one of them. Either way the value would encode nowhere: the patch saves clean, plays as the
+ * default, and nothing in the response says the selection was dropped. An unlisted variant is worse
+ * than a missing one, since the codec's own rejection names only the value it couldn't look up.
+ */
+const checkSubType = (issues: Issues, check: SubTypeCheck): void => {
+  const { group, type, capType, subType } = check;
+  const variants = capType.subTypes ?? [];
+  if (variants.length === 0) {
+    issues.push(`${group} ${type} takes no subType (got "${subType}"): ${subTypeAlternative(capType)}`);
+    return;
+  }
+  if (variants.some(candidate => matchesSubType(candidate, subType))) return;
+  const valid = variants.map(candidate => candidate.id).join(", ");
+  issues.push(`${group} ${type} has no subType "${subType}". Valid subTypes: ${valid}`);
+};
+
+const typeChoices = (capGroup: CapabilityGroup): string => capGroup.types.map(type => type.id).join(", ");
+
+/** Names what the group does offer, since a rejected `type` leaves the caller with no next step. */
+const unknownTypeIssue = (capGroup: CapabilityGroup, type: unknown): string =>
+  `${capGroup.id} has no type ${JSON.stringify(type)}. Types: ${typeChoices(capGroup)}`;
+
+/**
+ * Rejects a type in a block the device does not offer it in. The block that does offer it is named
+ * because moving the block there is the whole fix. Without this the type is accepted, and its
+ * params are written over whatever the block it landed in keeps at those byte offsets.
+ */
+const checkTypeBelongsInBlock = (issues: Issues, name: BlockName, type: unknown): void => {
+  if (typeof type !== "string") return;
+  const onlyBlock = onlyBlockFor(type);
+  if (onlyBlock === undefined || onlyBlock === name) return;
+  issues.push(`${name} has no ${type}: this device offers it in ${onlyBlock} only.`);
+};
+
+/** A block's shape selectors, as they arrive from a caller: unvalidated, and each one optional. */
+interface Selectors {
+  group: string;
+  on?: unknown;
+  subType?: unknown;
+}
+
+/**
+ * `on` and `subType` pick a block's shape rather than set one of its controls, so they are filtered
+ * out of the param check and would otherwise reach the builder on nothing but a cast.
+ *
+ * `null` is what a decoded block carries for a type with no variants, so it has to mean the same
+ * thing here as leaving the field out. Rejecting it would make the block a caller just read back
+ * un-resendable, which is the whole reason input and output share a shape.
+ */
+const checkSelectors = (issues: Issues, selectors: Selectors): void => {
+  const { group, on, subType } = selectors;
+  if (on !== undefined && typeof on !== "boolean") {
+    issues.push(`${group} on takes true or false (got ${JSON.stringify(on)})`);
+  }
+  if (subType !== undefined && subType !== null && typeof subType !== "string") {
+    issues.push(`${group} subType takes the name of a variant (got ${JSON.stringify(subType)})`);
+  }
+};
+
+/** One param's value alongside the spec and selection it is checked against. */
+interface ParamCheck {
+  group: string;
+  type?: string;
+  spec: ParamSpec;
+  value: unknown;
+}
+
+/** How a message names the param, dropping the type clause for a block that has no types. */
+const paramLabel = (check: ParamCheck): string => {
+  const named = `${check.group} ${check.spec.name}`;
+  const label = check.type === undefined ? named : `${named} for ${check.type}`;
+  return label;
+};
+
+/**
+ * What kind of value a spec takes, in the words the rejection uses. Bounds say a param is numeric
+ * but not whether a fraction is legal, which is what `decimals` settles.
+ */
+const expectedKind = (spec: ParamSpec): string => {
+  if (spec.kind === "boolean") return "true or false";
+  if (spec.kind === "discrete") return `one of: ${spec.values.join(", ")}`;
+  if (spec.kind === "numericOrNamed") return `a whole number or one of: ${spec.values.join(", ")}`;
+  const numeric = spec.decimals === undefined ? "a whole number" : "a number";
+  return numeric;
+};
+
+/** True when the value is the kind this spec takes at all, before asking whether it is in range. */
+const isRightKind = (spec: ParamSpec, value: unknown): boolean => {
+  if (spec.kind === "boolean") return typeof value === "boolean";
+  if (spec.kind === "discrete") return typeof value === "string";
+  if (spec.kind === "numericOrNamed" && typeof value === "string") return true;
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  const fractionsAllowed = spec.kind === "numeric" && spec.decimals !== undefined;
+  return fractionsAllowed || Number.isInteger(value);
+};
+
+/** Bounds and value list read off whichever kinds carry them, so one check covers all four kinds. */
+const domainIssue = (spec: ParamSpec, value: unknown): string | undefined => {
+  const bounded = spec.kind === "numeric" || spec.kind === "numericOrNamed";
+  if (bounded && typeof value === "number" && (value < spec.min || value > spec.max)) {
+    return `must be ${spec.min}–${spec.max}`;
+  }
+  const named = spec.kind === "discrete" || spec.kind === "numericOrNamed";
+  if (named && typeof value === "string" && !spec.values.includes(value)) {
+    return `must be one of: ${spec.values.join(", ")}`;
+  }
+  return undefined;
+};
+
+/**
+ * Checks one value against one spec: that it is the kind the param takes, then that it is in range
+ * or a member of the value list. The kind check leads because a value of the wrong kind passes the
+ * range check by falling through it, letting something like a string threshold reach the codec
+ * unchecked.
+ */
+const checkValue = (issues: Issues, check: ParamCheck): void => {
+  const { spec, value } = check;
+  if (!isRightKind(spec, value)) {
+    issues.push(`${paramLabel(check)} takes ${expectedKind(spec)} (got ${JSON.stringify(value)})`);
+    return;
+  }
+  const issue = domainIssue(spec, value);
+  if (issue !== undefined) issues.push(`${paramLabel(check)} ${issue} (got ${JSON.stringify(value)})`);
+};
+
+/** Params indexed by the key a spec writes them under, which is where a supplied value is matched. */
+const specsByKey = (specs: readonly ParamSpec[]): Map<string, ParamSpec> =>
+  new Map(specs.flatMap(spec => (spec.key === undefined ? [] : [[spec.key, spec] as const])));
+
+/**
+ * Validates one block's selection against the catalog: that its `subType` is a variant this type
+ * actually has, and that every supplied param value fits the spec for the chosen type (numeric
+ * params by their per-type `min`/`max`, discrete params by their `values` list). `values` is keyed
+ * by each param's `key` (the same key used in a block's `params` record and by the named
+ * delay/reverb fields). Keys with no matching spec are ignored here, since the builder rejects
+ * unknown keys at encode with its own message.
+ */
+const validateTypeParams = (params: TypeParams): Issues => {
+  const { group, type, subType, values } = params;
+  const issues: Issues = [];
+  const selection = resolveSelection(group, type);
+  if (selection === undefined) return issues;
+  // A subType on a block with no types at all is an unrecognized key, already reported as one.
+  if (subType !== undefined && type !== undefined && selection.capType !== undefined) {
+    checkSubType(issues, { group, type, capType: selection.capType, subType });
+  }
+
+  const byKey = specsByKey(specsForType(selection, subType));
+  for (const [key, value] of Object.entries(values)) {
+    const spec = byKey.get(key);
+    if (spec !== undefined) checkValue(issues, { group, type, spec, value });
+  }
+  return issues;
+};
+
+/**
+ * How a rejection names the patch's own settings. They belong to no block, so the group name a
+ * block's params are reported under has nothing to stand in for it.
+ */
+const PATCH_GROUP = "patch";
+
+/**
+ * Every problem with the patch's own settings: its tempo, key, output trim and the two switches
+ * that decide what survives a patch change. They take the same check a block's params get, since
+ * they are ordinary params that happen to sit on the patch rather than inside a block.
+ *
+ * `values` may carry a whole patch spec, blocks and all: a key with no spec is skipped, the same
+ * way `validateTypeParams` leaves an unknown param key to the builder's own message.
+ */
+const validatePatchSettings = (values: Record<string, unknown>): Issues => {
+  const issues: Issues = [];
+  const byKey = specsByKey(gx1Capabilities.patchSettings);
+  for (const [key, value] of Object.entries(values)) {
+    const spec = byKey.get(key);
+    if (spec !== undefined) checkValue(issues, { group: PATCH_GROUP, spec, value });
+  }
+  return issues;
+};
+
+/** A block's selection as a rejection message finds it: read off input that already failed. */
+interface Selected {
+  group: string;
+  type?: unknown;
+  subType?: unknown;
+}
+
+/** What one type accepts: the params it takes, and the variants it offers, if any. */
+interface TypeSurface {
+  paramKeys: string[];
+  subTypes: string[];
+}
+
+/**
+ * The input surface of the chosen type, or undefined when nothing resolves it.
+ *
+ * Tolerant of anything in `type` and `subType`, because its callers hold unvalidated input: a
+ * message deciding whether a rejected key was a real param in the wrong place, and one deciding
+ * which fields are worth offering back. Not resolving is different from resolving to nothing, so
+ * an unknown type is undefined here rather than an empty surface.
+ */
+const typeSurface = (selected: Selected): TypeSurface | undefined => {
+  const selection = resolveSelection(selected.group, selected.type);
+  if (selection === undefined) return undefined;
+
+  const subType = typeof selected.subType === "string" ? selected.subType : undefined;
+  return {
+    paramKeys: specsForType(selection, subType).flatMap(spec => (spec.key === undefined ? [] : [spec.key])),
+    subTypes: (selection.capType?.subTypes ?? []).map(variant => variant.id),
+  };
+};
+
+export {
+  checkSelectors, checkTypeBelongsInBlock, resolveSelection, typeChoices, unknownTypeIssue,
+  validateTypeParams, validatePatchSettings, typeSurface,
+};
+export type { Issues, Selection, Selectors, TypeParams, TypeSurface };

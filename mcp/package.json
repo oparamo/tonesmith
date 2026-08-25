@@ -1,16 +1,41 @@
 {
   "name": "@tonesmith/mcp",
   "version": "0.2.0",
+  "description": "MCP server carrying the device knowledge an agent needs to build guitar multi-effects patches.",
+  "keywords": [
+    "guitar",
+    "multi-effects",
+    "patch",
+    "preset",
+    "boss",
+    "gx-1",
+    "tsl",
+    "tone",
+    "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "claude"
+  ],
+  "homepage": "https://github.com/oparamo/tonesmith#readme",
+  "bugs": {
+    "url": "https://github.com/oparamo/tonesmith/issues"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "bin": {
     "tonesmith-mcp": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc --noEmit && tsup",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "@tonesmith/core": "workspace:*",
     "zod": "4.4.3"
   },
@@ -27,6 +52,9 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "tsup": "8.5.1"
+    "@modelcontextprotocol/client": "2.0.0",
+    "tsup": "8.5.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "vitest": "4.1.11"
   }
 }
