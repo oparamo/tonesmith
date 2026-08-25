@@ -17,7 +17,7 @@
     "release": "pnpm build && pnpm lint && pnpm coverage && changeset publish"
   },
   "devDependencies": {
-    "@changesets/cli": "2.31.1",
+    "@changesets/cli": "3.0.1",
     "@opendocsg/pdf2md": "0.2.7",
     "@types/node": "24.0.0",
     "eslint": "10.8.0",
