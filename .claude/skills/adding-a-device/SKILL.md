@@ -1,6 +1,6 @@
 ---
-name: add-device
-description: Guided workflow for onboarding a new guitar multi-effects processor device to tonesmith: documentation capture, binary format reverse-engineering, codec implementation, and CLI/MCP wiring. Use when the user wants to add support for a device tonesmith doesn't yet know about.
+name: adding-a-device
+description: Use when the user wants to add support for a guitar multi-effects device tonesmith doesn't yet know about, or asks to onboard a new device driver.
 ---
 
 # Add a new device
@@ -30,7 +30,7 @@ the capture work while you wait.
 first: vendors scatter manuals across product pages, support portals, and downloads sections,
 and a web search can land on the wrong device, the wrong hardware revision, or a third-party
 summary. Bad capability data poisons step 5 quietly. Treat user-supplied sources as the
-authoritative set; use web search only to fill gaps the user couldn't cover, and confirm
+authoritative set. Use web search only to fill gaps the user couldn't cover, and confirm
 anything found that way with the user (right device? right manual revision?) before relying
 on it.
 
@@ -76,7 +76,7 @@ garble multi-column layouts and tables, and a parameter table that lost its alig
 than useless for step 5. Clean up anything mangled before relying on it.
 
 **Traversing the vendor's site is your job, not the tool's.** It converts exactly one URL per
-run and never follows links, and real manual sites are rarely one clean page per topic. Scout
+run and never follows links. Real manual sites are rarely one clean page per topic. Scout
 the structure first: convert the landing/contents page without `-o` and skim the output to find
 the section links worth converting. Expect any of these shapes: a manual split across many
 linked pages, everything collected on one long page, or a navigation shell whose actual content
@@ -104,16 +104,16 @@ unit and the device's doc root stays skimmable.
 Requires the exports from step 1. Diff them byte-by-byte to map out the file's structure:
 envelope framing, parameter block boundaries, and per-field encoding (fixed offsets,
 nibble-packed values, lookup tables, signed ranges, and so on). For targeted probes, work the
-loop with the user, since you don't operate the editor and they do: ask them to change one named
-parameter to a specific value, re-export, and send the file; diff it against the previous export
-to isolate which bytes moved. Batch these requests where you can (several parameters across
+loop with the user, since you don't operate the editor and they do. Ask them to change one named
+parameter to a specific value, re-export, and send the file, then diff it against the previous
+export to isolate which bytes moved. Batch these requests where you can (several parameters across
 different blocks per round) so each round trip to the user resolves more of the format.
 
 Write up the findings as `core/docs/<id>/FORMAT.md`. Follow this structure top to bottom: the
-envelope shape, then a block inventory table (in the order the format actually stores blocks),
-then one section per block in that same order, with a shared "encoding conventions" section
-defined once before any section that relies on it, and an "out of scope" section at the end for
-anything observed but not yet decoded. Define a thing before referencing it; don't make the
+envelope shape; a block inventory table (in the order the format actually stores blocks); one
+section per block in that same order, with a shared "encoding conventions" section defined once
+before any section that relies on it; and an "out of scope" section at the end for anything
+observed but not yet decoded. Define a thing before referencing it; don't make the
 reader hold context from far earlier in the file. The finished spec should read top to bottom in
 a single pass, with little to no jumping around the page to follow it.
 
@@ -181,19 +181,19 @@ and a clean baseline can't provide them.
 
 The **factory-default export** goes under `core/tests/fixtures/<id>/`. It is what step 3's
 `defaults.ts` is built from: decode it through the driver and read out each type's own field
-window, which for a union-layout block (step 2) holds that type's real factory value whether or
-not the type is selected. Write the harvested values into `defaults.ts` and add a drift guard
-that re-harvests from the fixture and asserts equality, so a fixture or codec change can't leave
-the table stale. Harvest rather than guess: an invented default silently ships a value the
-device would never produce.
+window. For a union-layout block (step 2), that window holds the type's real factory value
+whether or not the type is selected. Write the harvested values into `defaults.ts` and add a
+drift guard that re-harvests from the fixture and asserts equality. That way, a fixture or codec
+change can't leave the table stale. Harvest rather than guess: an invented default silently ships
+a value the device would never produce.
 
 Harvest the **sub-model each type opens on** as well, wherever a type offers a choice of models.
-That selection usually sits inside the type's own param window like any other field, so it is a
-factory default in exactly the same sense, but a patch spec sets it as the block's variant rather
-than as a control, so it belongs in its own table rather than among the param defaults. The reason
-to pay for the harvest is that the alternatives are both wrong: leaving the variant out of an
-example shows a shape that omits a field the block takes, and naming the first model in the list
-puts a value the device never chose in something labeled a factory default.
+That selection usually sits inside the type's own param window like any other field, so it's a
+factory default in the same sense. But a patch spec sets it as the block's variant rather than as
+a control, so it belongs in its own table, not among the param defaults. The reason to pay for the
+harvest is that the alternatives are both wrong: leaving the variant out of an example shows a
+shape that omits a field the block takes, and naming the first model in the list puts a value the
+device never chose in something labeled a factory default.
 
 Write byte-for-byte round-trip tests in `core/tests/devices/<id>/`, mirroring the source
 layout: decode the fixture, re-encode it, and assert the output bytes match the input exactly.
@@ -219,24 +219,23 @@ capabilities on top of it. Don't hand-write param ranges twice.
    group/type structure, real-world models, sonic descriptions, and subtypes, and it **derives
    each type's `params` from the catalog** rather than restating them. Types whose param set
    varies by sub-model are modeled per-subtype, each subtype carrying its own catalog-derived
-   params. **What earns a sub-model rather than a param** is what the capability response can
-   carry: a subtype gets a name, a description and a real-world models string of its own, so a
-   selector qualifies when its values are named variants worth describing one by one, and stays an
-   ordinary param when it sets one aspect of a single effect and the value names speak for
-   themselves. Read the device's own label as evidence rather than as the rule; a vendor is free to
-   call two selectors the same thing and mean different things by them. Whatever the answer, the
+   params. **What earns a sub-model rather than a param** is whether it can carry a name, a
+   description, and a real-world models string of its own: a selector with named variants worth
+   describing one by one becomes a subtype, and one that just sets one aspect of a single effect,
+   with values that speak for themselves, stays an ordinary param. Treat the device's own label as
+   a hint, not the rule, since a vendor can use the same word for either. Whatever the answer, the
    two words never trade places: `type` selects the block's own model and `subType` the model
    within it, in a spec, on a decoded block, and in the codec's field maps alike. Also author the required **`chain`** (`ChainSpec`): its `defaultOrder` is the device's
    block order (derive it from the driver's own default-chain constant so the two can't drift),
    and its `description` explains, for this device, how blocks are reordered and how they're
    turned on and off (which blocks can be bypassed, and any that can't). This is the signal-chain
    model an agent consults first. Take a chain as the **complete** block order, every block
-   exactly once, and reject anything less: where a partial list's missing blocks belong is a
+   exactly once, and reject anything less. Where a partial list's missing blocks belong is a
    guess, and a wrong guess silently ships a different sound. Say in the description that position
    and on/off are separate inputs, so leaving a block out of the order never reads as a way to
    switch it off. Also declare the required **`patchName`** (`{ maxLength }`): source it from the
    format's own name-field width, not a guess. It belongs to no capability group, so no other
-   device data cross-checks it, and a guess that looks plausible against the sample files can sit
+   device data cross-checks it. A guess that looks plausible against the sample files can sit
    there wrong for years. A consumer that learns the real limit by being rejected has already built
    the patch. Finally, declare the required **`patchSettings`**: the settings the device stores for
    the patch as a whole rather than inside any block, such as a reference tempo, an overall output
@@ -278,8 +277,8 @@ step, since that data isn't in the repo and so can't be a CI dependency.
   `write_fields`, `describe_device`, and `copy_patch` / `create_patch_file` pick the new device up
   automatically once its driver is in the core roster, the same as the CLI. `generate_patch` needs
   one thing from the driver to work for the new device: implement `buildPatch(spec)` (see
-  `core/src/devices/gx1/spec/` for the current instance), which validates a plain spec object
-  against the device's own capability catalog and builds the patch, owning its own rejection
+  `core/src/devices/gx1/spec/` for the current instance). It validates a plain spec object
+  against the device's own capability catalog, builds the patch, and owns its own rejection
   messages. Every bypassable block must accept a bare `{ on: false }`: wrap it with the
   `bypassable` helper so a bypass folds into the omitted case and writes identical bytes. Once
   `buildPatch` is in place, verify `generate_patch` works for the new device through the MCP
@@ -287,8 +286,8 @@ step, since that data isn't in the repo and so can't be a CI dependency.
   response echoes each built patch plus its resolved chain, so a caller never needs a follow-up
   read to confirm a write. `write_fields` and the CLI's `write` ask for the driver's other
   method, `applyEdits(patch, edits)`: a dot-path's segments are the device's own field names, so
-  resolving one, reading the value into the field it names, and reporting every problem at once
-  are all the driver's to answer.
+  the driver is the one to resolve each segment, read the value into the field it names, and
+  report every problem at once.
 - **Tests**: behavior tests in `cli/tests/` and `mcp/tests/`, exercising every CLI command and
   MCP tool against the fixture from step 4, including error paths (bad ref, bad field path,
   unknown device).
