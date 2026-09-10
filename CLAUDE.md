@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 multi-effects processor patch files. Every device is a self-contained driver behind the same
 device-agnostic core, CLI, and MCP surfaces; the docs below describe the shared layer and the
 per-device pattern, never one device's internals. Supported devices: **BOSS GX-1** (`gx1`, `.tsl`).
-New devices are onboarded with the add-device skill (`.claude/skills/add-device/SKILL.md`).
+New devices are onboarded with the adding-a-device skill (`.claude/skills/adding-a-device/SKILL.md`).
 
 ## Build & dev commands
 
@@ -34,11 +34,11 @@ pnpm doc-to-md <url|file> [-o out.md] [--format html|pdf]
 ```
 
 Each device's reverse-engineered binary format spec is `core/docs/<id>/FORMAT.md`. **Read it first
-and treat it as the answer.** It is written from the device's own official parameter tables, not
-inferred from sample files, so its offsets, field widths and value tables are the device's own
-numbers. Anything you would otherwise go digging through vendor material for should already be in
-there; if it isn't, or it disagrees with the code, that is a gap in FORMAT.md worth fixing rather
-than a reason to keep re-deriving it elsewhere.
+and treat it as the answer.** It's written from the device's own official parameter tables, not
+inferred from sample files, so its offsets, field widths, and value tables are the device's own
+numbers. Anything you'd otherwise dig through vendor material for should already be there; if it
+isn't, or it disagrees with the code, that's a gap in FORMAT.md worth fixing, not a reason to
+re-derive it elsewhere.
 
 The captured manual docs alongside it, also under `core/docs/<id>/`, cover what the parameters
 *mean*: what a control does, what it sounds like, how the device is operated. Use them for prose and
@@ -49,9 +49,9 @@ Each device's committed round-trip fixture lives at `fixtures/<id>/`.
 ## Repository layout
 
 Every `devices/<id>/` directory below follows one fixed per-device shape (gx1 is the current
-instance and the structural reference; the add-device skill enforces the shape for new devices).
-Adding a device means adding that directory plus one line in the core roster. The CLI and the MCP
-server read that roster, so nothing else in this tree changes.
+instance and structural reference; the adding-a-device skill enforces the shape for new devices).
+Adding a device means adding that directory plus one roster line; the CLI and MCP server read the
+roster, so nothing else in this tree changes.
 
 ```text
 fixtures/<id>/              one committed real patch-file export per device, in the device's own
@@ -174,19 +174,18 @@ patch file (device-native format)
   `Object.fromEntries(list.map((v,i) => [v,i]))`.
 
 - **Builder functions:** named after the block they configure, no "set" prefix; scaffolding helpers
-  (gx1's `basePatch`) are the naming exception. Each takes the patch plus one options object, and
-  every block carries its controls in a `params` bag, whether or not they vary by type. That bag is
-  validated against the current type's known fields, so an unknown key throws rather than silently
-  writing a byte that means something else for this type. The builders are internal: a consumer builds a patch
-  from a spec through `PatchDriver.buildPatch`.
+  (gx1's `basePatch`) are the naming exception. Each takes the patch plus one options object. Every
+  block carries its controls in a `params` bag, whether or not they vary by type, validated against
+  the current type's known fields so an unknown key throws rather than silently writing a byte that
+  means something else for this type. Builders are internal: a consumer builds a patch from a spec
+  through `PatchDriver.buildPatch`.
 
 - **`write` dot-notation:** `fx1.params.rate=50` walks the decoded patch object; each segment
   after splitting on `.` navigates one level deeper. The walk belongs to the driver
-  (`PatchDriver.applyEdits`), since a path's segments are the device's own field names, and a
-  device free to present them some other way needs somewhere to say so. A `type` edit re-seeds its
-  block to that type's factory settings as the edit lands, so a control of the new type is a field
-  the paths after it can find, and none of the previous effect's values are left for the codec to
-  read back under the new type's field map.
+  (`PatchDriver.applyEdits`), since a path's segments are the device's own field names and a device
+  free to present them differently needs somewhere to say so. A `type` edit re-seeds its block to
+  that type's factory settings as it lands, so the paths after it find fields of the new type; none
+  of the previous effect's values survive for the codec to read back under the new field map.
 
 Device-specific byte layouts, field names, and value tables do **not** live here. They would bloat
 this file and go stale as devices are added. When you need that detail for a device, read its
@@ -195,71 +194,65 @@ decoded-patch field lists) directly; don't duplicate any of it into this file.
 
 ## Conventions
 
-Decisions that tooling can't check and that are expensive to relitigate. The structural conventions
-(how a device plugs in, the device-agnostic shared layer, the `driver.ts` / `index.ts` split, domain
-grouping, naming, exports at the bottom) are in README.md's Contributing section and apply here; what
-follows is what that section doesn't carry. The mechanical rules are
-already errors in `eslint.config.js` (at most three parameters, no duplicate function bodies, no em
-dashes, ternaries assigned before use, cognitive complexity 10), so they are not repeated here.
+Decisions that tooling can't check and are expensive to relitigate. The structural conventions (how
+a device plugs in, the device-agnostic shared layer, the `driver.ts` / `index.ts` split, domain
+grouping, naming, exports at the bottom) live in README.md's Contributing section and apply here;
+what follows is what that section doesn't cover. Mechanical rules are already enforced as
+`eslint.config.js` errors (at most three parameters, no duplicate function bodies, no em dashes,
+ternaries assigned before use, cognitive complexity 10), so they aren't repeated here.
 
 - **The driver supplies the view; the CLI only renders it.** `PatchDriver.viewPatch` returns the
-  patch as a person reads it, and one printer in `cli/src/common/` walks it, so a device ships with
-  no CLI code of its own. What this does not do is drive the display off `capabilities`, which reads
-  as the obvious refactor and isn't one: a generic loop over the catalog trades deliberate grouping
-  and ordering for an alphabetical field dump. Grouping, ordering and panel labels stay the
-  driver's, which is what keeps that objection answered.
-- **`type` and `subType` each mean one thing, everywhere.** `type` is the block's own selector, and
-  `subType` is the model within it, in a patch spec, on a decoded block, and in the codec's field
-  maps. Where a device stores the selection in a param byte, the codec's field map still names that
-  byte `subType`, and decode lifts it onto the block so the decoded patch carries the selection once
-  rather than in two places a consumer has to keep in agreement. Which selectors get to be a
-  `subType` at all is decided by what
-  `describe_device` can carry: a `subType` gets a name, a description and a real-world `models`
-  string per value, so a selector qualifies when its values are named variants worth describing one
-  by one, and stays an ordinary param when it sets one aspect of a single effect and the value names
-  speak for themselves. The device's own label is evidence, not the rule (the GX-1 labels two
-  sub-model selectors MODE and one param TYPE).
+  patch as a person reads it; one printer in `cli/src/common/` walks it, so a device ships no CLI
+  code of its own. Don't drive the display off `capabilities` instead: a generic loop over the
+  catalog trades deliberate grouping and ordering for an alphabetical field dump. Grouping,
+  ordering, and panel labels stay the driver's.
+- **`type` and `subType` each mean one thing, everywhere.** `type` is the block's own selector,
+  `subType` the model within it, in a patch spec, a decoded block, and the codec's field maps alike.
+  Even where a device stores the selection in a param byte, the codec's field map still names it
+  `subType`, and decode lifts it onto the block, so the decoded patch carries the selection once
+  instead of two places that could disagree. What earns a `subType` is what `describe_device` can
+  carry for it: a name, a description, and a real-world `models` string per value. A selector with
+  named variants worth describing one by one qualifies; one that just sets one aspect of a single
+  effect, with self-explanatory values, stays an ordinary param. The device's own label is evidence,
+  not the rule: the GX-1 labels two sub-model selectors MODE and one param TYPE.
 - **A setting the patch owns is described, not left to be discovered.** `DeviceCapabilities`
   carries `patchSettings` beside `patchName` for what a device stores per patch rather than per
-  block: a reference tempo, an output trim, a musical key. Nothing in `groups` cross-checks these,
-  so one left out is one a consumer meets only by reading a patch that already has it, which is how
-  the GX-1's `key` sat decoded and undiscoverable. They are ordinary catalog params and take the
-  same validation a block's params take, on both write paths.
+  block: a reference tempo, an output trim, a musical key. `groups` doesn't cross-check these, so an
+  omitted one surfaces only when a consumer stumbles on it in an existing patch. They're ordinary
+  catalog params, validated like a block's params on both write paths.
 - **`param-catalog.ts`, `capabilities.ts`, and `types/` are three views of one truth**, not
-  triplication to collapse. The catalog is the param ground truth, capabilities is the structure an
-  agent browses, the types are the decoded shape. The drift guards
-  (`core/tests/devices/<id>/capabilities.test.ts` and the defaults guard) are what let the three
-  coexist, so they stay even when other defensive tests go.
-- **A device's block catalog never enters the tool schema.** `tools/list` sits in the model's
-  context on every request, and one device's per-type schema measured 24,902 bytes against 5,205
-  for every device-agnostic tool combined, so a per-device generate tool made the resident cost
-  scale with the roster. Without that layer `tools/list` is 9,233 bytes for the whole roster. A static
-  schema fits an argument shape that is fixed and independent of the argument values; a block's
-  fields depend on its `type`, which is a lookup, not a signature. `generate_patch` takes a
-  permissive `patches` array and the driver validates it, which is what `fx` already did for all
-  39 of its effect types. Point-of-use detail lives in `describe_device`, paid once.
+  triplication to collapse: the catalog is the param ground truth, capabilities the structure an
+  agent browses, the types the decoded shape. The drift guards
+  (`core/tests/devices/<id>/capabilities.test.ts` and the defaults guard) keep the three in sync, so
+  they stay even when other defensive tests go.
+- **A device's block catalog never enters the tool schema.** `tools/list` loads on every request,
+  so a per-device generate tool would scale that resident cost with the roster instead of holding it
+  fixed. A static schema only fits an argument shape that's fixed and independent of the values, and
+  a block's fields depend on its `type`. `generate_patch` takes a permissive `patches` array and
+  lets the driver validate it, the same approach `fx` already uses across all 39 of its effect
+  types. Point-of-use detail lives in `describe_device`, paid once.
 - **A tool's response is an envelope, and the patch sits inside it.** `read_patch` answers
-  `{ setName, index, patch }`, its paged form `{ index, patch }` per entry, and `generate_patch`
-  `{ name, action, patch }`, so an agent that reads a patch and generates one meets one shape.
-  Spreading a patch across the envelope's own keys is what lets a block named `index` or `setName`
-  shadow the tool's own report, the same hazard nesting closed at block level. Nothing beside the
-  patch is hoisted out of it either: a field carried twice is a field that can disagree with itself.
+  `{ setName, index, patch }` (paged: `{ index, patch }` per entry) and `generate_patch` answers
+  `{ name, action, patch }`, so reading and generating share one shape. Spreading the patch across
+  the envelope's own keys would let a block named `index` or `setName` shadow the tool's report, the
+  same hazard nesting already closes at block level. Nothing else gets hoisted out of the patch
+  either: a field carried twice can disagree with itself.
 - **Tests assert the data a message carries, never its wording.** Assert that a rejection names the
   bad id and lists the valid ones; don't assert the sentence it says them in. Prose written for
   agents gets reworded constantly, and a wording assertion turns every such edit into a test edit.
 - **Coverage thresholds are floors, not targets.** They sit well below the measured numbers
   deliberately. Don't write tests to raise them, and don't ratchet them toward what the suite
   currently scores: chasing the last uncovered branch is what produced the wording assertions above.
-- **cli and mcp test their own wiring, not core's behavior.** README states the rule; the criterion
-  that makes it decidable is that a surface test earns its place only if it can fail while core is
-  entirely correct. Reading a written file back through the driver to check a command's effect
-  qualifies, since that fails on a miswiring. 86 of 178 surface tests failed the criterion.
-- **Comments earn their line by explaining why.** The constraint that forced this shape, the bug it
+- **cli and mcp test their own wiring, not core's behavior.** README states the rule; the decidable
+  criterion is that a surface test earns its place only if it can fail while core is entirely
+  correct. Reading a written file back through the driver to check a command's effect qualifies,
+  since that fails on a miswiring.
+- **Comments earn their line by explaining why:** the constraint that forced this shape, the bug it
   prevents, the reason the obvious approach fails. A comment restating the code teaches nothing and
-  goes stale on the next edit. A comment also states a present property, never history: no "used to",
-  no "before this fix", no "now does X" contrasting with a past, no PR number as the reason. The bug
-  a guard prevents is fair game phrased as a present fact; git owns the rest. Match the comment
-  density of the file you're already in.
+  goes stale on the next edit. State a present property, never history: no "used to," "before this
+  fix," or "now does X," and no PR number as the reason. The bug a guard prevents is fair game
+  phrased as a present fact; git owns the rest. Match the comment density of the file you're
+  already in.
 - **Dependency versions are exact.** No `^` or `~` in any `package.json`. `pnpm add` writes a range
   by default, so correct it after adding.
 - **Changesets cover consumer-visible changes only:** a published package's API, behavior, or
@@ -274,7 +267,7 @@ dashes, ternaries assigned before use, cognitive complexity 10), so they are not
 
 The repository is written against two general craft skills, `typescript-clean-code` and
 `anti-slop-writing`. Neither is committed here: they aren't repository knowledge, and a vendored
-copy drifts from the original. `add-device` is committed, since its workflow is specific to this
+copy drifts from the original. `adding-a-device` is committed, since its workflow is specific to this
 repository.
 
 ## MCP server tools
@@ -282,10 +275,10 @@ repository.
 | Tool                  | Inputs                                                             | Notes                                                                                                                                                                                                                                                     |
 |-----------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `list_devices`        | none                                                               | Returns `[{ id, name }]`                                                                                                                                                                                                                                  |
-| `read_patch`          | `device`, `file`, `ref?`, `limit?`, `offset?`                      | `ref` = index or name, answered as `{ setName, index, patch }`. Omit it to page through the file: 20 patches by default (`limit` up to 100), each as `{ index, patch }`, plus `total` and a `more` line naming the offset to continue from                  |
-| `generate_patch`      | `device`, `outPath`, `setName?`, `patches[]`                       | One tool for every device: the per-patch spec comes from `describe_device`, not from this tool's schema. Builds every patch in `patches` and upserts them by name into `outPath` in array order, in one file write (replaces a same-named patch, appends otherwise, creates the file and any missing parent directories if needed). The response reports each patch as `{ name, action, patch }`, the patch complete with the defaults it filled in, so no follow-up read is needed |
-| `write_fields`        | `device`, `file`, `ref?`, `fields?`, `setName?`                    | Dot-path mutations as a `{path: value}` record, the same paths CLI `write` takes. The batch applies atomically: a rejected edit leaves the file untouched. Setting a block's `type` switches the effect: the block arrives at that type's factory settings on its factory sub-model, and its previous controls are gone, so name the ones you want after the type in the same call. `setName` renames the patch set, which the CLI has no command for; it needs no `ref`, so a rename on its own names neither a patch nor a field. Asking for neither edit is an error rather than a silent no-op |
-| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<type>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). The `"chain"` entry also carries what belongs to the patch rather than to a block: the name limit, and the patch settings written beside `name`. Omit `items` for a chain summary plus every group with every type id in it, which is what makes the next call nameable without listing each group first. A bare-group entry is an index with no per-type params, so name the types instead, or pass `includeParams` for the full set. A named type also carries an `example`: that block's spec at factory defaults, which is what shows where its params are written. One bad entry fails the whole call |
+| `read_patch`          | `device`, `file`, `ref?`, `limit?`, `offset?`                      | `ref` (index or name) answers `{ setName, index, patch }`. Omit it to page: 20 patches by default (`limit` up to 100) as `{ index, patch }`, plus `total` and a `more` offset to continue from |
+| `generate_patch`      | `device`, `outPath`, `setName?`, `patches[]`                       | One tool for every device; the per-patch spec comes from `describe_device`, not this tool's schema. Builds every patch in `patches` and upserts them by name into `outPath` in array order, in one write (replaces a same-named patch, appends otherwise, creating the file and any missing parent directories). Reports each patch as `{ name, action, patch }`, complete with the defaults it filled in, so no follow-up read is needed |
+| `write_fields`        | `device`, `file`, `ref?`, `fields?`, `setName?`                    | Dot-path mutations as a `{path: value}` record, the same paths CLI `write` takes. The batch applies atomically: a rejected edit leaves the file untouched. Setting a block's `type` switches the effect to that type's factory settings on its factory sub-model, dropping its old controls, so name the new ones you want in the same call. `setName` renames the patch set (no CLI equivalent) and needs no `ref`. Asking for neither edit is an error, not a silent no-op |
+| `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<type>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). `"chain"` also carries what belongs to the patch rather than a block: the name limit and the patch settings written beside `name`. Omit `items` for a chain summary plus every group and type id, so the next call needs no group listing first. A bare-group entry is an index with no per-type params; name the types, or pass `includeParams` for the full set. A named type also carries an `example`: its spec at factory defaults, showing where its params are written. One bad entry fails the whole call |
 | `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use `generate_patch`, which appends by name                                                        |
 | `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults, `patchCount` from 1 to 500. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                          |
 
@@ -299,7 +292,7 @@ node cli/dist/index.js <device> capabilities <group> <type>   # one type's param
 
 ## Adding a new device
 
-Use the **add-device skill** (`.claude/skills/add-device/SKILL.md`), the single source of truth for
+Use the **adding-a-device skill** (`.claude/skills/adding-a-device/SKILL.md`), the single source of truth for
 the full onboarding workflow: documentation capture, binary-format reverse engineering and
 `FORMAT.md` write-up, core driver scaffolding, round-trip proof, capabilities + drift guards,
 CLI/MCP wiring, and changesets. Don't duplicate its steps here; if the workflow changes, update
