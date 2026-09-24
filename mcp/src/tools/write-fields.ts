@@ -1,10 +1,13 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
-import type { FieldValue, Patch, PatchDriver } from "@tonesmith/core";
+import type { FieldEdits } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
-/** Rejects an input that asks for no change at all, or for a patch edit without naming the patch. */
+/**
+ * Rejects an input that asks for no change at all, or for a patch edit without naming the patch.
+ * Core refuses the same inputs, but in its own terms; this names the arguments the caller passed.
+ */
 const requireSomethingToChange = (ref?: string, fields?: object, setName?: string): void => {
   if (fields === undefined && setName === undefined) {
     throw new Error(
@@ -17,22 +20,11 @@ const requireSomethingToChange = (ref?: string, fields?: object, setName?: strin
   }
 };
 
-/**
- * Applies a batch of dot-path edits to one patch and reports what landed. Every edit lands in
- * memory before anything is written, so a rejected edit anywhere in the set leaves the file
- * exactly as it was rather than half-applied. The report reads the values back out of the edit
- * rather than re-deriving them, so what it says is what the patch now holds.
- */
-const editPatch = <T extends Patch>(
-  driver: PatchDriver<T>,
-  patch: T,
-  fields: Record<string, FieldValue>,
-): string => {
-  const applied = driver.applyEdits(patch, Object.entries(fields));
-  return Object.entries(applied)
+/** What the edit wrote, read back from core's report so it says what the patch now holds. */
+const describeApplied = (applied: FieldEdits): string =>
+  Object.entries(applied)
     .map(([field, value]) => `${field} = ${JSON.stringify(value)}`)
     .join(", ");
-};
 
 const registerWriteFields = (server: McpServer): void => {
   server.registerTool(
@@ -70,24 +62,20 @@ const registerWriteFields = (server: McpServer): void => {
       // replaces are gone.
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
-    ({ file, device, ref, fields, setName }) => attempt(() => {
+    ({ file, device, ref, fields, setName }) => attempt(async () => {
       requireSomethingToChange(ref, fields, setName);
 
       const driver = registry.getDriver(device);
-      const patchFile = driver.readFile(file);
+      const edits = fields === undefined ? undefined : Object.entries(fields);
+      const report = await patchUtils.editPatchFile(driver, file, { ref, edits, setName });
+
       const changes: string[] = [];
-
-      if (fields !== undefined && ref !== undefined) {
-        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
-        changes.push(`patch ${index}: ${editPatch(driver, patch, fields)}`);
+      if (report.index !== undefined && report.applied !== undefined) {
+        changes.push(`patch ${report.index}: ${describeApplied(report.applied)}`);
       }
-
-      if (setName !== undefined) {
-        patchFile.name = setName;
-        changes.push(`set name = ${JSON.stringify(setName)}`);
+      if (report.setName !== undefined) {
+        changes.push(`set name = ${JSON.stringify(report.setName)}`);
       }
-
-      driver.writeFile(patchFile, file);
       return ok(`Updated ${file}: ${changes.join("; ")}`);
     })
   );

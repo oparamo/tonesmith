@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { writeFileAtomic } from "../src/atomic-write";
 import { scratchDir } from "./helpers";
@@ -7,38 +7,38 @@ import { scratchDir } from "./helpers";
 describe("writeFileAtomic", () => {
   const scratch = scratchDir();
 
-  it("writes the contents, creating any missing parent directories", () => {
+  it("writes the contents, creating any missing parent directories", async () => {
     const path = join(scratch(), "nested", "deeper", "set.tsl");
 
-    writeFileAtomic(path, "contents");
+    await writeFileAtomic(path, new TextEncoder().encode("contents"));
 
-    expect(readFileSync(path, "utf8")).toBe("contents");
+    expect(await readFile(path, "utf8")).toBe("contents");
   });
 
-  it("replaces an existing file and leaves no temporary file behind", () => {
+  it("replaces an existing file and leaves no temporary file behind", async () => {
     const root = scratch();
     const path = join(root, "set.tsl");
-    writeFileSync(path, "old");
+    await writeFile(path, "old");
 
-    writeFileAtomic(path, "new");
+    await writeFileAtomic(path, new TextEncoder().encode("new"));
 
-    expect(readFileSync(path, "utf8")).toBe("new");
-    expect(readdirSync(root)).toEqual(["set.tsl"]);
+    expect(await readFile(path, "utf8")).toBe("new");
+    expect(await readdir(root)).toEqual(["set.tsl"]);
   });
 
   // The point of the sibling file: the target is never opened for writing, so a write that cannot
   // finish leaves the library as it was rather than truncated to nothing.
-  it("leaves the target alone and cleans up when the write cannot complete", () => {
+  it("leaves the target alone and cleans up when the write cannot complete", async () => {
     const root = scratch();
     const path = join(root, "set.tsl");
-    writeFileSync(path, "the library");
+    await writeFile(path, "the library");
     const blocked = join(root, "blocked");
-    mkdirSync(blocked);
+    await mkdir(blocked);
 
-    const writeOverADirectory = () => { writeFileAtomic(blocked, "contents"); };
+    const writeOverADirectory = writeFileAtomic(blocked, new TextEncoder().encode("contents"));
 
-    expect(writeOverADirectory).toThrow();
-    expect(readFileSync(path, "utf8")).toBe("the library");
-    expect(readdirSync(root).sort()).toEqual(["blocked", "set.tsl"]);
+    await expect(writeOverADirectory).rejects.toThrow();
+    expect(await readFile(path, "utf8")).toBe("the library");
+    expect((await readdir(root)).sort()).toEqual(["blocked", "set.tsl"]);
   });
 });

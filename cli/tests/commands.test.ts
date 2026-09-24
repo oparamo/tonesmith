@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, onTestFinished } from "vitest";
 import { Command } from "commander";
 import type { Patch, PatchDriver, DeviceCapabilities, RawPatch } from "@tonesmith/core";
 import { configureDeviceCommands } from "../src/common/commands";
+import { withTempDir } from "./helpers";
 
 const caps: DeviceCapabilities = {
   chain: { description: "The signal chain model.", defaultOrder: ["amp", "delay"], blocks: {} },
@@ -14,8 +15,8 @@ const makeDriver = (overrides: Partial<PatchDriver> = {}): PatchDriver => ({
   id: "stub",
   name: "Stub Device",
   capabilities: caps,
-  readFile: () => ({ name: "Set", device: "STUB", patches: [] }),
-  writeFile: () => { /* no-op */ },
+  parseFile: () => ({ name: "Set", device: "STUB", patches: [] }),
+  serializeFile: () => new Uint8Array(),
   newFile: (setName: string) => ({ name: setName, device: "STUB", patches: [] }),
   blankPatch: (name = "NEW") => ({ name }),
   buildPatch: (spec: unknown) => ({ name: (spec as { name: string }).name }),
@@ -40,8 +41,12 @@ describe("configureDeviceCommands", () => {
   });
 
   it("prints the driver's error message and fails the exit code when an action throws", async () => {
+    // Core reads the file from disk before the driver sees it, so it has to exist for the
+    // driver's own throw to be the one that reaches the command.
+    const temp = await withTempDir();
+    onTestFinished(temp.cleanup);
     const driver = makeDriver({
-      readFile: () => { throw new Error("boom"); },
+      parseFile: () => { throw new Error("boom"); },
     });
     const cmd = buildTestCommand(driver);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -49,7 +54,7 @@ describe("configureDeviceCommands", () => {
     // into another command can arrive truncated. Setting the code lets the runtime drain first.
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit called"); });
 
-    await cmd.parseAsync(["read", "file.tsl"], { from: "user" });
+    await cmd.parseAsync(["read", temp.fixture], { from: "user" });
 
     expect(errorSpy).toHaveBeenCalledWith("boom");
     expect(exitSpy).not.toHaveBeenCalled();

@@ -31,14 +31,14 @@ decoding the whole file a second time first, which is what `generate_patch` was 
 server speaks JSON-RPC over stdio, so a consumer reaching for it inside a tool corrupted the
 protocol stream. `patchUtils.upsertPatches` is the supported way to save patches to a file.
 
-`PatchDriver.writeFile` accepts a `PatchFile<T>`, which anyone can assemble by hand, and no driver
-can honor that: a write starts from the envelope the file was read as and overwrites only the byte
-indices the codec knows, which is what leaves the format's undecoded fields intact. A file that
+`PatchDriver.serializeFile` accepts a `PatchFile<T>`, which anyone can assemble by hand, and no
+driver can honor that: a write starts from the envelope the file was read as and overwrites only the
+byte indices the codec knows, which is what leaves the format's undecoded fields intact. A file that
 carries none of those bytes is now refused by name:
 
 ```
-Cannot write /tmp/set.tsl: this patch file did not come from readFile or newFile, so it carries
-none of the original bytes a write starts from.
+Cannot write this patch file: it did not come from parseFile or newFile, so it carries none of the
+original bytes a write starts from.
 ```
 
 It used to fail as `TypeError: Cannot read properties of undefined (reading 'data')`, and the GX-1

@@ -25,9 +25,9 @@ const registerCopyPatch = (server: McpServer): void => {
       // by design rather than by accident.
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
-    ({ device, src, srcRef, dst, dstRef }) => attempt(() => {
+    ({ device, src, srcRef, dst, dstRef }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const copied = patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
+      const copied = await patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
       return ok(
         `Copied "${copied.name}" from ${src} patch ${copied.fromIndex} into ${dst} patch ${copied.toIndex}.`
       );

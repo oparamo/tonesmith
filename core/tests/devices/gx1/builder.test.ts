@@ -18,6 +18,8 @@ import { BLOCK_DEFAULTS, DEFAULTS_BY_TYPE, DEFAULT_SUBTYPES } from "../../../src
 import { PARAM_SUBTYPE_EFFECTS, DEFAULT_CHAIN } from "../../../src/devices/gx1/common";
 import { DEFAULT_INIT_FIXTURE, present, patchAt } from "../../helpers";
 
+const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
+
 describe("basePatch", () => {
   it("opens at the default chain and the device's own factory settings", () => {
     const patch = basePatch("Lead");
@@ -637,7 +639,7 @@ describe("reverb", () => {
 // between the two is what puts a wrong value under an unset param, such as a GEQ band decoding
 // to -20 dB where the device ships it at 0.
 describe("defaultFxParams (anchored to default-init.tsl)", () => {
-  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const patch = defaultInitPatch;
 
   it("matches the fixture's real COMPRESSOR params (fx1)", () => {
     const compressorDefaults = defaultFxParams("COMPRESSOR");

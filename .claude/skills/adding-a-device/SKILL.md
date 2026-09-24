@@ -131,8 +131,10 @@ Create `core/src/devices/<id>/` with:
   and `raw.ts` holds a unique symbol for stashing a decoded patch's original raw bytes
 - `codec/`: the encode/decode pipeline, split into primitives, field codecs, per-block
   codecs, and a top-level patch composer, plus a barrel `index.ts`
-- a file-I/O module (`readFile` / `writeFile` / `blankPatch` / `newFile`), named after the
-  device's own patch-file format rather than a borrowed name
+- a file-format module (`parseFile` / `serializeFile` / `blankPatch` / `newFile`), named after
+  the device's own patch-file format rather than a borrowed name. It converts bytes to a decoded
+  file and back and never touches the disk: core's `patchUtils` does every read and write, and lint
+  rejects a filesystem import under `devices/`
 - `builder.ts`: high-level construction helpers, named after the block they configure with no
   "set" prefix. Each takes the patch plus one options object; a block whose params vary by type
   carries them in a `params` bag, validated against the current type's fields so an unknown key

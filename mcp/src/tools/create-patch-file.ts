@@ -24,9 +24,9 @@ const registerCreatePatchFile = (server: McpServer): void => {
       // It writes, but only where there is no file: an existing one is refused rather than replaced.
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ device, file, setName, patchCount }) => attempt(() => {
+    ({ device, file, setName, patchCount }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const created = patchUtils.createPatchFile(driver, file, { setName, patchCount });
+      const created = await patchUtils.createPatchFile(driver, file, { setName, patchCount });
       return ok(
         `Created ${file} with ${created.patches.length} blank patch(es), set name "${created.name}".`
       );

@@ -23,6 +23,8 @@ import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../../../src
 import type { Patch } from "../../../src/devices/gx1/types";
 import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
+const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
+
 // The FX-slot DELAY's sub-algorithm selector, at absolute offset 212 within the FX block (FORMAT.md).
 const FX_DELAY_SUBALGO_OFFSET = 212;
 
@@ -134,7 +136,7 @@ const harvestBlockDefaults = (patch: Patch): Record<string, ParamDefaults> =>
 const SINGLE_SHAPE_BLOCKS = ["amp", "drive", "noiseGate", "volume"] as const;
 
 describe("GX-1 defaults ↔ fixture drift guard", () => {
-  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const patch = defaultInitPatch;
 
   it("DEFAULTS_BY_TYPE matches the factory defaults harvested from default-init.tsl", () => {
     expect(DEFAULTS_BY_TYPE).toEqual(harvestDefaults(patch));

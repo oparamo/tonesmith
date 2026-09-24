@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { driver } from "../../../src/devices/gx1/driver";
 import { viewPatch } from "../../../src/devices/gx1/view";
 import { BLOCK_NAMES } from "../../../src/devices/gx1/common";
+import type { Patch } from "../../../src/devices/gx1/types";
 import { ROCK_TONES_FIXTURE as FIXTURE, patchAt, present } from "../../helpers";
 
-const detail = (patch: ReturnType<typeof patchAt>, label: string): string | undefined =>
+const detail = (patch: Patch, label: string): string | undefined =>
   viewPatch(patch).details.find(entry => entry.label === label)?.value;
 
 describe("gx1 patch view", () => {
@@ -22,8 +23,8 @@ describe("gx1 patch view", () => {
 
   // A chain decodes from a linked list that stops at its first terminator, so a file the unit did
   // not write can name fewer blocks than the patch stores. Every block still has settings to read.
-  it("still shows a block the chain leaves out", () => {
-    const patch = patchAt(FIXTURE);
+  it("still shows a block the chain leaves out", async () => {
+    const patch = await patchAt(FIXTURE);
     patch.chain = ["amp"];
 
     const keys = viewPatch(patch).blocks.map(block => block.key);
@@ -32,14 +33,14 @@ describe("gx1 patch view", () => {
     expect(new Set(keys)).toEqual(new Set(BLOCK_NAMES));
   });
 
-  it("labels each block the way the device's panel does", () => {
-    const drive = viewPatch(patchAt(FIXTURE)).blocks.find(block => block.key === "drive");
+  it("labels each block the way the device's panel does", async () => {
+    const drive = viewPatch(await patchAt(FIXTURE)).blocks.find(block => block.key === "drive");
 
     expect(present(drive, "the drive block in the view").label).toBe("OD/DS");
   });
 
-  it("carries the chain and every patch setting as details", () => {
-    const patch = patchAt(FIXTURE);
+  it("carries the chain and every patch setting as details", async () => {
+    const patch = await patchAt(FIXTURE);
 
     expect(detail(patch, "Chain")).toBe(patch.chain.join(", "));
     expect(detail(patch, "Memory level")).toBe(String(patch.memoryLevel));
@@ -66,8 +67,8 @@ describe("gx1 patch view", () => {
 
   // The raw bytes ride along on every decoded block under a symbol key, and a spread would copy
   // them onto the view, where a renderer walking the block would print them.
-  it("hands a renderer the block's controls and nothing else", () => {
-    const patch = patchAt(FIXTURE);
+  it("hands a renderer the block's controls and nothing else", async () => {
+    const patch = await patchAt(FIXTURE);
     const view = viewPatch(patch);
     const amp = present(view.blocks.find(block => block.key === "amp"), "the amp block in the view");
 

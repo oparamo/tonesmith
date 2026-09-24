@@ -62,8 +62,8 @@ describe("buildPatch", () => {
   // The same round trip over a patch the device itself wrote, which is where it first failed: a
   // tempo-synced delay came back as a code above the param's ceiling and was rejected as a time
   // nobody could have set.
-  it("takes a patch read off the device back as a spec, tempo-synced values included", () => {
-    const read = patchAt(ROCK_TONES_FIXTURE, 0);
+  it("takes a patch read off the device back as a spec, tempo-synced values included", async () => {
+    const read = await patchAt(ROCK_TONES_FIXTURE, 0);
 
     const rebuilt = gx1.driver.buildPatch({ ...read });
 

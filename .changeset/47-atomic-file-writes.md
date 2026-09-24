@@ -10,5 +10,5 @@ left a patch library at zero bytes with no copy of what it held. The write now f
 and renames it over the target, which is atomic within a directory: the path holds either the old
 file or the new one. A failed write cleans up its sibling and leaves the target untouched.
 
-Drivers get this from `writeFileAtomic`, shared in core rather than written per device, since the
-file every driver overwrites is the user's own library.
+Core makes every write this way. Drivers don't write files at all: they turn a decoded file into
+bytes, and `patchUtils` puts those bytes on disk.

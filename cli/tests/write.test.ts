@@ -9,11 +9,11 @@ import { describe, it, expect, afterEach } from "vitest";
 import { runCli, withTempDir, patchAt } from "./helpers";
 
 describe("gx1 write", () => {
-  let temp: ReturnType<typeof withTempDir>;
-  afterEach(() => { temp.cleanup(); });
+  let temp: Awaited<ReturnType<typeof withTempDir>>;
+  afterEach(async () => { await temp.cleanup(); });
 
   it("applies every field it was given and writes the file back", async () => {
-    temp = withTempDir();
+    temp = await withTempDir();
 
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0",
       "amp.params.gain=10", "amp.params.solo=true", "key=G",
@@ -21,7 +21,7 @@ describe("gx1 write", () => {
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
-    const patch = patchAt(temp.fixture);
+    const patch = await patchAt(temp.fixture);
     expect(patch.amp.params.gain).toBe(10);
     expect(patch.amp.params.solo).toBe(true);
     expect(patch.key).toBe("G");
@@ -30,7 +30,7 @@ describe("gx1 write", () => {
   // With no separator there is nothing to split on, and slicing at the index of one drops the
   // argument's last character, so `amp.params.gain` reads as the unknown field `amp.params.gai`.
   it("rejects a field argument with no '=', naming it as typed", async () => {
-    temp = withTempDir();
+    temp = await withTempDir();
 
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.params.gain"]);
 
@@ -41,7 +41,7 @@ describe("gx1 write", () => {
   // The command's one error case: a driver throw becomes a printed message and a failing exit
   // code rather than an unhandled rejection. Which paths the driver refuses is core's.
   it("prints a driver rejection and exits 1", async () => {
-    temp = withTempDir();
+    temp = await withTempDir();
 
     const { error, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "nonexistent.foo=1"]);
 

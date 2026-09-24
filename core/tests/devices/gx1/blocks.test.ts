@@ -9,6 +9,8 @@ import {
 } from "../../../src/devices/gx1/common";
 import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
+const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
+
 // ── Delay block symmetry tests ────────────────────────────────────────────────
 
 describe("Delay block symmetry (all types)", () => {
@@ -361,7 +363,7 @@ describe("Values the device has no byte for", () => {
 // still exercises genuine device data for every field checked below.
 
 describe("Real device values (default-init.tsl)", () => {
-  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const patch = defaultInitPatch;
   const dlyBytes = bytesFromHex(rawBlock(patch, "MEMORY%DLY"));
   const revBytes = bytesFromHex(rawBlock(patch, "MEMORY%REV"));
   const pfxBytes = bytesFromHex(rawBlock(patch, "MEMORY%PFX"));

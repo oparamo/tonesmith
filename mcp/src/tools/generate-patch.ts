@@ -69,14 +69,14 @@ needed.`,
       // A patch whose name is already in the file replaces it, so a save can overwrite work.
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
-    ({ device, outPath, setName, patches }) => attempt(() => {
+    ({ device, outPath, setName, patches }) => attempt(async () => {
       const driver = registry.getDriver(device);
       const built = buildAll(driver, patches);
       // Every round trip happens before the write, so a patch this codec cannot store fails the
       // call with the file untouched rather than after it has already been replaced on disk.
       const stored = built.map(patch => asStored(driver, patch));
 
-      const { file, created, saved } = patchUtils.upsertPatches(driver, {
+      const { file, created, saved } = await patchUtils.upsertPatches(driver, {
         path: outPath, patches: built, setName,
       });
 

@@ -1,4 +1,5 @@
-import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 /**
@@ -7,20 +8,17 @@ import { dirname } from "node:path";
  * target before the first byte lands, which turns a full disk, an interrupted process or anything
  * throwing partway into an emptied patch library. The rename is atomic because the sibling shares
  * the target's directory, and therefore its filesystem.
- *
- * Every driver's `writeFile` should go through this rather than `writeFileSync`: the file it is
- * overwriting is the user's own library.
  */
-const writeFileAtomic = (path: string, contents: string): void => {
-  mkdirSync(dirname(path), { recursive: true });
-  // The pid keeps two processes writing the same target off each other's temporary file. Within one
-  // process there is nothing to separate: both calls here are synchronous, so writes cannot overlap.
-  const pending = `${path}.${process.pid}.tmp`;
+const writeFileAtomic = async (path: string, contents: Uint8Array): Promise<void> => {
+  await mkdir(dirname(path), { recursive: true });
+  // The pid keeps two processes writing the same target off each other's temporary file, and the
+  // UUID does the same for two writes overlapping within one process.
+  const pending = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    writeFileSync(pending, contents);
-    renameSync(pending, path);
+    await writeFile(pending, contents);
+    await rename(pending, path);
   } catch (error) {
-    rmSync(pending, { force: true });
+    await rm(pending, { force: true });
     throw error;
   }
 };

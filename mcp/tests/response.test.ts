@@ -25,14 +25,14 @@ describe("err", () => {
 });
 
 describe("attempt", () => {
-  it("returns what the work returned", () => {
-    const result = attempt(() => ok("done"));
+  it("returns what the work returned", async () => {
+    const result = await attempt(() => ok("done"));
 
     expect(result).toEqual({ content: [{ type: "text", text: "done" }] });
   });
 
-  it("turns a throw into an error response rather than letting it reach the transport", () => {
-    const result = attempt(() => { throw new Error("boom"); });
+  it("turns a throw into an error response rather than letting it reach the transport", async () => {
+    const result = await attempt(() => { throw new Error("boom"); });
 
     expect(result).toEqual({ content: [{ type: "text", text: "Error: boom" }], isError: true });
   });

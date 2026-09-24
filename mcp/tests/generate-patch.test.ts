@@ -10,9 +10,8 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
-import { existsSync } from "node:fs";
-import { gx1 } from "@tonesmith/core";
-import { connectClient, emptyTempDir, patchAt, present } from "./helpers";
+import { gx1, patchUtils } from "@tonesmith/core";
+import { connectClient, emptyTempDir, pathExists, patchAt, present } from "./helpers";
 
 interface SavedPatch {
   name: string;
@@ -49,11 +48,11 @@ const AMP = { type: "JC-120", params: { gain: 50, bass: 50, middle: 50, treble: 
 
 describe("generate_patch", () => {
   let close: () => Promise<void>;
-  let temp: ReturnType<typeof emptyTempDir>;
-  afterEach(async () => { await close(); temp.cleanup(); });
+  let temp: Awaited<ReturnType<typeof emptyTempDir>>;
+  afterEach(async () => { await close(); await temp.cleanup(); });
 
   it("builds a spec through the driver and saves it where it was asked to", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const outPath = join(temp.dir, "minimal.tsl");
     const client = await connectClient();
     close = client.close;
@@ -62,13 +61,13 @@ describe("generate_patch", () => {
     const { isError } = await client.callTool("generate_patch", single(patchSpec));
 
     expect(isError).toBe(false);
-    const patch = patchAt(outPath);
+    const patch = await patchAt(outPath);
     expect(patch.amp.type).toBe("JC-120");
     expect(patch.amp.params.gain).toBe(50);
   });
 
   it("echoes the saved decoded patch with its resolved chain in the response", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const outPath = join(temp.dir, "echo.tsl");
     const client = await connectClient();
     close = client.close;
@@ -98,7 +97,7 @@ describe("generate_patch", () => {
    * reverb and report settings the device never stored.
    */
   it("echoes a patch as the file stores it, not as the builder assembled it", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const outPath = join(temp.dir, "tera.tsl");
     const client = await connectClient();
     close = client.close;
@@ -119,14 +118,14 @@ describe("generate_patch", () => {
     const echoed = saved.patch as unknown as { reverb: Record<string, unknown> };
     // Through JSON on both sides: the echo arrives serialized, and that drops the raw-bytes symbol
     // the codec attaches to every decoded block.
-    const stored = JSON.parse(JSON.stringify(patchAt(outPath).reverb)) as Record<string, unknown>;
+    const stored = JSON.parse(JSON.stringify((await patchAt(outPath)).reverb)) as Record<string, unknown>;
     expect(echoed.reverb).toEqual(stored);
     expect(Object.keys(echoed.reverb)).not.toContain("time");
   });
 
   // The reason `patches` is an array: a whole set is one call and one file write.
   it("saves every patch in one call, in array order", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const outPath = join(temp.dir, "album.tsl");
     const client = await connectClient();
     close = client.close;
@@ -144,7 +143,7 @@ describe("generate_patch", () => {
     const { text, isError } = await client.callTool("generate_patch", input);
 
     expect(isError, text).toBe(false);
-    const file = gx1.driver.readFile(outPath);
+    const file = await patchUtils.readPatchFile(gx1.driver, outPath);
     const patchNames = file.patches.map(patch => patch.name.trim());
     expect(patchNames, "array order is file order").toEqual(["First", "Second", "Third"]);
     expect(file.name).toBe("Album");
@@ -154,7 +153,7 @@ describe("generate_patch", () => {
   });
 
   it("reports each patch as appended or replaced within one call", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const outPath = join(temp.dir, "mixed.tsl");
     const client = await connectClient();
     close = client.close;
@@ -174,13 +173,13 @@ describe("generate_patch", () => {
     expect(isError, text).toBe(false);
     const actions = savedPatches(text).map(saved => `${saved.name.trim()}:${saved.action}`);
     expect(actions).toEqual(["Lead:replaced", "Rhythm:appended"]);
-    const file = gx1.driver.readFile(outPath);
+    const file = await patchUtils.readPatchFile(gx1.driver, outPath);
     expect(file.patches.map(patch => patch.name.trim())).toEqual(["Lead", "Rhythm"]);
     expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(90);
   });
 
   it("rejects an empty patches array", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const client = await connectClient();
     close = client.close;
     const input = { device: "gx1", outPath: join(temp.dir, "none.tsl"), patches: [] };
@@ -191,7 +190,7 @@ describe("generate_patch", () => {
   });
 
   it("rejects an unknown device, naming the ones it has, without writing anything", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const client = await connectClient();
     close = client.close;
     const outPath = join(temp.dir, "unknown.tsl");
@@ -203,13 +202,13 @@ describe("generate_patch", () => {
     expect(isError).toBe(true);
     expect(text).toContain("zz9");
     expect(text).toContain("gx1");
-    expect(existsSync(outPath)).toBe(false);
+    expect(await pathExists(outPath)).toBe(false);
   });
 
   // Both tools hand their patches through the same view, so this is the one case that holds them
   // to the same answer. What the view itself drops is core's to prove.
   it("presents a patch the same way here and through read_patch", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const outPath = join(temp.dir, "comp.tsl");
     const client = await connectClient();
     close = client.close;
@@ -235,7 +234,7 @@ describe("generate_patch", () => {
   // names only the block leaves eight candidates. The reason the tool builds each spec itself
   // instead of handing the array to the driver.
   it("names which patch of a batch a builder rejection came from, and writes nothing", async () => {
-    temp = emptyTempDir();
+    temp = await emptyTempDir();
     const outPath = join(temp.dir, "batch.tsl");
     const client = await connectClient();
     close = client.close;
@@ -249,6 +248,6 @@ describe("generate_patch", () => {
     expect(isError).toBe(true);
     expect(text, "names the patch, which the driver's own message cannot").toContain("Bad One");
     expect(text, "and carries the driver's reason through").toContain("wobble");
-    expect(existsSync(outPath), "one bad patch leaves the whole batch unwritten").toBe(false);
+    expect(await pathExists(outPath), "one bad patch leaves the whole batch unwritten").toBe(false);
   });
 });

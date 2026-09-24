@@ -1,25 +1,25 @@
 import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport } from "@modelcontextprotocol/server";
-import { mkdtempSync, rmSync, copyFileSync } from "node:fs";
+import { access, copyFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gx1 } from "@tonesmith/core";
+import { gx1, patchUtils } from "@tonesmith/core";
 import { buildServer } from "../src/server";
 
 const FIXTURE = join(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
 
 /** A scratch dir with the rock-tones fixture copied in, for tools that write files. */
-const withTempDir = (): { dir: string; fixture: string; cleanup: () => void } => {
-  const dir = mkdtempSync(join(tmpdir(), "tonesmith-mcp-"));
+const withTempDir = async (): Promise<{ dir: string; fixture: string; cleanup: () => Promise<void> }> => {
+  const dir = await mkdtemp(join(tmpdir(), "tonesmith-mcp-"));
   const fixture = join(dir, "rock-tones.tsl");
-  copyFileSync(FIXTURE, fixture);
-  return { dir, fixture, cleanup: () => { rmSync(dir, { recursive: true, force: true }); } };
+  await copyFile(FIXTURE, fixture);
+  return { dir, fixture, cleanup: () => rm(dir, { recursive: true, force: true }) };
 };
 
 /** An empty scratch dir, for tools that create new files from scratch. */
-const emptyTempDir = (): { dir: string; cleanup: () => void } => {
-  const dir = mkdtempSync(join(tmpdir(), "tonesmith-mcp-"));
-  return { dir, cleanup: () => { rmSync(dir, { recursive: true, force: true }); } };
+const emptyTempDir = async (): Promise<{ dir: string; cleanup: () => Promise<void> }> => {
+  const dir = await mkdtemp(join(tmpdir(), "tonesmith-mcp-"));
+  return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
 };
 
 /**
@@ -32,9 +32,22 @@ const present = <T>(value: T | undefined, what: string): T => {
   return value;
 };
 
+/** Whether a path exists. Only a missing file answers no; any other failure is rethrown. */
+const pathExists = async (path: string): Promise<boolean> => {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return false;
+  }
+};
+
 /** The patch at `index` of the file at `path`, read back through the driver. */
-const patchAt = (path: string, index = 0): gx1.Patch =>
-  present(gx1.driver.readFile(path).patches[index], `patch ${index} of ${path}`);
+const patchAt = async (path: string, index = 0): Promise<gx1.Patch> => {
+  const file = await patchUtils.readPatchFile(gx1.driver, path);
+  return present(file.patches[index], `patch ${index} of ${path}`);
+};
 
 interface ToolResult {
   text: string;
@@ -76,4 +89,4 @@ const connectClient = async (): Promise<{
   return { callTool, getToolSchema, close };
 };
 
-export { connectClient, withTempDir, emptyTempDir, present, patchAt, FIXTURE };
+export { connectClient, withTempDir, emptyTempDir, present, pathExists, patchAt, FIXTURE };

@@ -29,7 +29,7 @@ A file names the driver that reads it, so the registry can hand you one from the
 ```ts
 import { registry, patchUtils, gx1 } from "@tonesmith/core";
 
-const file = gx1.driver.readFile("rock-tones.tsl");
+const file = await patchUtils.readPatchFile(gx1.driver, "rock-tones.tsl");
 const { patch } = patchUtils.resolvePatch(file.patches, "SWORD LEAD");
 
 console.log(patch.amp.type, patch.amp.params.gain);
@@ -47,26 +47,43 @@ const patch = gx1.driver.buildPatch({
   reverb: { type: "HALL M", params: { level: 30 } },
 });
 
-patchUtils.upsertPatches(gx1.driver, { path: "my-set.tsl", patches: [patch] });
+await patchUtils.upsertPatches(gx1.driver, { path: "my-set.tsl", patches: [patch] });
+```
+
+Editing a patch in place names each field by its dot-path, the same paths a decoded patch reads
+back under:
+
+```ts
+await patchUtils.editPatchFile(gx1.driver, "my-set.tsl", {
+  ref: "GLASSY",
+  edits: [["amp.params.gain", 45], ["reverb.on", false]],
+});
 ```
 
 Every block takes the same shape: `type` where the device offers one, an optional `subType` and
 `on`, and one `params` bag holding its controls. That is how a decoded patch reads back and how a
 spec is written.
 
+Every file operation lives in `patchUtils` and returns a Promise. Each one that changes a file reads
+it, changes it and writes it back as one step, and calls on the same file take turns, so two edits
+made at once both land. Writes go to a sibling file that is renamed over the target, so a file is
+never left half-written.
+
 A write starts from the bytes the file was read as and overwrites only the indices the codec
 knows, so fields this driver has not reverse-engineered survive a round trip untouched. That is
-also why `writeFile` refuses a `PatchFile` you assembled by hand: it carries none of those bytes.
+also why `serializeFile` refuses a `PatchFile` you assembled by hand: it carries none of those
+bytes.
 
 ## What it exposes
 
 - `registry`: `registerDriver`, `getDriver`, `listDrivers`
-- `patchUtils`: `resolvePatch`, `resolvePatches`, `resolvePatchIndex`, `upsertPatches`, `copyPatch`,
-  `createPatchFile`, `MAX_NEW_PATCHES`
+- `patchUtils`: the file operations `readPatchFile`, `editPatchFile`, `upsertPatches`, `copyPatch`
+  and `createPatchFile`; `resolvePatch`, `resolvePatches`, `resolvePatchIndex`; `MAX_NEW_PATCHES`
 - `capabilityUtils`: `findGroup`, `findType`
-- the `PatchDriver<T>` interface every device implements, whose methods are how a consumer reads,
-  edits, builds and views a patch: `readFile`, `writeFile`, `decodePatch`, `encodePatch`,
-  `buildPatch`, `applyEdits`, `viewPatch`, `blankPatch`, `newFile`, and its `capabilities` catalog
+- the `PatchDriver<T>` interface every device implements, whose methods are how a consumer
+  decodes, edits, builds and views a patch: `parseFile`, `serializeFile`, `decodePatch`,
+  `encodePatch`, `buildPatch`, `applyEdits`, `viewPatch`, `blankPatch`, `newFile`, and its
+  `capabilities` catalog. A driver converts bytes and never touches the disk
 - one namespace per device (`gx1`), publishing its `driver`, its patch and block types, and `RAW`
 
 ## License

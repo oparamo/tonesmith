@@ -66,12 +66,15 @@ core/                       @tonesmith/core
       view.ts               PatchView / BlockView / PatchDetail: a patch as a person reads it,
                             composed by the driver and rendered by whoever displays it
     registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
-    patch-utils.ts          patch-file operations every surface shares: resolvePatch /
-                            resolvePatches, upsertPatches, copyPatch, createPatchFile. Editing a
-                            patch is not among them: what a dot-path means is the driver's
+    patch-utils.ts          every file operation, async: readPatchFile, editPatchFile,
+                            upsertPatches, copyPatch, createPatchFile, plus resolvePatch /
+                            resolvePatches. editPatchFile owns the read-edit-write; what a dot-path
+                            means stays the driver's (applyEdits)
+    file-lock.ts            withFileLock, internal: one queue per file, so two read-change-writes
+                            on one file take turns instead of losing an edit
     capability-utils.ts     findGroup / findType
-    atomic-write.ts         writeFileAtomic: sibling file then rename, so a driver's writeFile can
-                            never truncate a patch library it fails partway through
+    atomic-write.ts         writeFileAtomic: sibling file then rename, so a write can never
+                            truncate a patch library it fails partway through
     devices/index.ts        driver roster, one line per device
     devices/<id>/           per-device driver, always this shape:
       types/                device type definitions split by domain (barrel: index.ts)
@@ -81,8 +84,8 @@ core/                       @tonesmith/core
                             attaching original raw bytes to decoded objects), barrel
       codec/                encode/decode pipeline: primitives, then field codecs, then per-block
                             codecs, then top-level decodePatch/encodePatch (barrel: index.ts)
-      <format>.ts           file I/O (readFile / writeFile / blankPatch / newFile), named after the
-                            device's patch-file format (gx1: tsl.ts)
+      <format>.ts           the file format, bytes in and out (parseFile / serializeFile /
+                            blankPatch / newFile), named after it (gx1: tsl.ts). No disk I/O
       builder.ts            high-level patch-construction helpers
       defaults.ts           each block type's real factory defaults, harvested from a
                             factory-default export; the builder fills unset params from here
@@ -156,10 +159,12 @@ tools/                      repo tooling, not published and not exposed through 
 
 ```text
 patch file (device-native format)
-  → readFile()       parses the device's file envelope, calls decodePatch() on each patch
+  → readPatchFile()  core reads the bytes, hands them to the driver
+  → parseFile()      driver parses its file envelope, calls decodePatch() on each patch
   → decodePatch()    raw bytes to a decoded Patch object (every known block decoded)
   → encodePatch()    Patch to raw bytes (start from the original bytes, overwrite known indices)
-  → writeFile()      writes the envelope back to disk
+  → serializeFile()  driver writes the envelope back to bytes
+  → writeFileAtomic  core writes them to disk, under the file's lock when it read them first
 ```
 
 **Key design rules** (apply to every device driver):
@@ -199,13 +204,19 @@ a device plugs in, the device-agnostic shared layer, the `driver.ts` / `index.ts
 grouping, naming, exports at the bottom) live in README.md's Contributing section and apply here;
 what follows is what that section doesn't cover. Mechanical rules are already enforced as
 `eslint.config.js` errors (at most three parameters, no duplicate function bodies, no em dashes,
-ternaries assigned before use, cognitive complexity 10), so they aren't repeated here.
+ternaries assigned before use, cognitive complexity 10, no sync fs calls, no fs imports in a
+driver), so they aren't repeated here.
 
 - **The driver supplies the view; the CLI only renders it.** `PatchDriver.viewPatch` returns the
   patch as a person reads it; one printer in `cli/src/common/` walks it, so a device ships no CLI
   code of its own. Don't drive the display off `capabilities` instead: a generic loop over the
   catalog trades deliberate grouping and ordering for an alphabetical field dump. Grouping,
   ordering, and panel labels stay the driver's.
+- **A change to a file is one core operation.** Anything that reads a file, changes it and writes
+  it back belongs in `patch-utils.ts`, built on `updatePatchFile` (or `withFileLock` where a missing
+  file is a start rather than an error), so the lock spans the whole sequence. A surface composing
+  its own read and write would reopen the lost-edit race the lock closes, and would duplicate logic
+  the other surface needs too. The lock is not re-entrant: no locked operation calls another.
 - **`type` and `subType` each mean one thing, everywhere.** `type` is the block's own selector,
   `subType` the model within it, in a patch spec, a decoded block, and the codec's field maps alike.
   Even where a device stores the selection in a param byte, the codec's field map still names it

@@ -51,9 +51,9 @@ const registerReadPatch = (server: McpServer): void => {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ file, device, ref, limit, offset }) => attempt(() => {
+    ({ file, device, ref, limit, offset }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const patchFile = driver.readFile(file);
+      const patchFile = await patchUtils.readPatchFile(driver, file);
 
       if (ref !== undefined) {
         const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);

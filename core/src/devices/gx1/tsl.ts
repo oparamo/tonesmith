@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { writeFileAtomic } from "../../atomic-write";
 import { decodePatch, encodePatch, hexFromBytes } from "./codec";
 import { encodeName } from "./codec/blocks";
 import { RAW, NAME_BYTES } from "./common";
@@ -135,14 +133,14 @@ const paramSetOf = (patch: unknown): Record<string, unknown> | undefined => {
   return paramSet as Record<string, unknown>;
 };
 
-const checkPatch = (path: string, index: number, patch: unknown): void => {
+const checkPatch = (source: string, index: number, patch: unknown): void => {
   const paramSet = paramSetOf(patch);
   if (paramSet === undefined) {
-    throw new Error(`Cannot read ${path}: patch ${index} carries no paramSet.`);
+    throw new Error(`Cannot read ${source}: patch ${index} carries no paramSet.`);
   }
   const missing = REQUIRED_BLOCKS.filter(block => !isHexList(paramSet[block]));
   if (missing.length > 0) {
-    throw new Error(`Cannot read ${path}: patch ${index} is missing ${missing.join(", ")}.`);
+    throw new Error(`Cannot read ${source}: patch ${index} is missing ${missing.join(", ")}.`);
   }
 };
 
@@ -151,23 +149,23 @@ const checkPatch = (path: string, index: number, patch: unknown): void => {
  * pointed at a tool that takes a path, and without this the first field the codec reaches for
  * throws a TypeError naming neither the file nor what is wrong with it.
  */
-const parseEnvelope = (path: string, parsed: unknown): TslEnvelope => {
+const parseEnvelope = (source: string, parsed: unknown): TslEnvelope => {
   const envelope = (parsed ?? {}) as Partial<TslEnvelope>;
   if (typeof envelope !== "object" || typeof envelope.device !== "string") {
-    throw new Error(`Cannot read ${path}: it is not a patch file.`);
+    throw new Error(`Cannot read ${source}: it is not a patch file.`);
   }
   if (envelope.device !== FILE_DEVICE) {
-    throw new Error(`Cannot read ${path}: it holds a ${envelope.device} patch set, not a ${FILE_DEVICE} one.`);
+    throw new Error(`Cannot read ${source}: it holds a ${envelope.device} patch set, not a ${FILE_DEVICE} one.`);
   }
   if (!Array.isArray(envelope.data) || !Array.isArray(envelope.data[0])) {
-    throw new Error(`Cannot read ${path}: its "data" field holds no list of patches.`);
+    throw new Error(`Cannot read ${source}: its "data" field holds no list of patches.`);
   }
-  envelope.data[0].forEach((patch, index) => { checkPatch(path, index, patch); });
+  envelope.data[0].forEach((patch, index) => { checkPatch(source, index, patch); });
   return envelope as TslEnvelope;
 };
 
-const readFile = (path: string): PatchFile => {
-  const envelope = parseEnvelope(path, JSON.parse(readFileSync(path, "utf8")));
+const parseFile = (bytes: Uint8Array, source: string): PatchFile => {
+  const envelope = parseEnvelope(source, JSON.parse(new TextDecoder().decode(bytes)));
   return {
     name:      envelope.name,
     formatRev: envelope.formatRev,
@@ -178,28 +176,28 @@ const readFile = (path: string): PatchFile => {
 };
 
 /**
- * The device-agnostic `PatchFile` a caller may hand `PatchDriver.writeFile` is not one this writer
- * can start from. Every write begins at the envelope the file was read as and overwrites the byte
- * indices this codec knows, which is what leaves the format's undecoded fields intact, so a file
- * assembled by hand has nothing to write back.
+ * The device-agnostic `PatchFile` a caller may hand `PatchDriver.serializeFile` is not one this
+ * writer can start from. Every write begins at the envelope the file was parsed from and overwrites
+ * the byte indices this codec knows, which is what leaves the format's undecoded fields intact, so a
+ * file assembled by hand has nothing to write back.
  */
-const asWritable = (file: BasePatchFile<Patch>, path: string): PatchFile => {
+const asWritable = (file: BasePatchFile<Patch>): PatchFile => {
   const candidate = file as Partial<PatchFile>;
   if (candidate[RAW] === undefined || candidate.formatRev === undefined) {
-    throw new Error(`Cannot write ${path}: this patch file did not come from readFile or newFile, so it carries none of the original bytes a write starts from.`);
+    throw new Error("Cannot write this patch file: it did not come from parseFile or newFile, so it carries none of the original bytes a write starts from.");
   }
   return file as PatchFile;
 };
 
-const writeFile = (input: BasePatchFile<Patch>, path: string): void => {
-  const file = asWritable(input, path);
+const serializeFile = (input: BasePatchFile<Patch>): Uint8Array => {
+  const file = asWritable(input);
   const envelope: TslEnvelope = {
     ...file[RAW],
     name:      file.name,
     formatRev: file.formatRev,
     data: [file.patches.map(encodePatch), file[RAW].data[1]],
   };
-  writeFileAtomic(path, JSON.stringify(envelope));
+  return new TextEncoder().encode(JSON.stringify(envelope));
 };
 
-export { blankPatch, newFile, readFile, writeFile };
+export { blankPatch, newFile, parseFile, serializeFile };

@@ -4,8 +4,8 @@ import { decodePatch as codecDecodePatch, encodePatch as codecEncodePatch } from
 import {
   blankPatch as tslBlankPatch,
   newFile as tslNewFile,
-  readFile as tslReadFile,
-  writeFile as tslWriteFile,
+  parseFile as tslParseFile,
+  serializeFile as tslSerializeFile,
 } from "./tsl";
 import { gx1Capabilities } from "./capabilities";
 import { buildPatch as specBuildPatch, applyEdits as specApplyEdits } from "./spec";
@@ -18,11 +18,11 @@ const driver: PatchDriver<Patch> = {
   name:         "BOSS GX-1",
   capabilities: gx1Capabilities,
 
-  readFile:  (path: string): PatchFile =>
-    tslReadFile(path),
+  parseFile: (bytes: Uint8Array, source: string): PatchFile =>
+    tslParseFile(bytes, source),
 
-  writeFile: (file, path): void =>
-    { tslWriteFile(file, path); },
+  serializeFile: (file): Uint8Array =>
+    tslSerializeFile(file),
 
   newFile: (setName: string, patchCount?: number): PatchFile =>
     tslNewFile(setName, patchCount),

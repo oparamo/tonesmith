@@ -1,8 +1,8 @@
 import { afterEach, beforeEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { readFile } from "../src/devices/gx1/tsl";
+import { parseFile } from "../src/devices/gx1/tsl";
 import { RAW } from "../src/devices/gx1/common";
 import type { Patch } from "../src/devices/gx1/types";
 
@@ -26,12 +26,25 @@ const present = <T>(value: T | undefined, what: string): T => {
 };
 
 /** The patch at `index` of the fixture at `path`. */
-const patchAt = (path: string, index = 0): Patch =>
-  present(readFile(path).patches[index], `patch ${index} of ${path}`);
+const patchAt = async (path: string, index = 0): Promise<Patch> => {
+  const bytes = await readFile(path);
+  return present(parseFile(bytes, path).patches[index], `patch ${index} of ${path}`);
+};
 
 /** One raw block of a decoded patch, by the name the file gives it (`"MEMORY%DLY"`). */
 const rawBlock = (patch: Patch, key: string): string[] =>
   present(patch[RAW][key], `${key} of the decoded patch`);
+
+/** Whether a path exists. Only a missing file answers no; any other failure is rethrown. */
+const pathExists = async (path: string): Promise<boolean> => {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return false;
+  }
+};
 
 /**
  * A scratch directory of its own for every test in the calling suite, cleaned up after each one.
@@ -43,8 +56,8 @@ const rawBlock = (patch: Patch, key: string): string[] =>
  */
 const scratchDir = (): (() => string) => {
   let dir = "";
-  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "tonesmith-")); });
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "tonesmith-")); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
   return () => dir;
 };
 
@@ -59,5 +72,5 @@ const scratchFile = (basename: string): (() => string) => {
 
 export {
   ROCK_TONES_FIXTURE, DEFAULT_INIT_FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
-  present, patchAt, rawBlock, scratchDir, scratchFile,
+  present, patchAt, rawBlock, pathExists, scratchDir, scratchFile,
 };

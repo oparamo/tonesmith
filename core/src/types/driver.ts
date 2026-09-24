@@ -12,8 +12,14 @@ interface PatchDriver<T extends Patch = Patch> {
   readonly id: string;
   readonly name: string;
   readonly capabilities: DeviceCapabilities;
-  readFile(path: string): PatchFile<T>;
-  writeFile(file: PatchFile<T>, path: string): void;
+  /**
+   * Decodes a patch file's bytes. `source` names where they came from, for error messages only.
+   * Drivers never touch the filesystem: core's `patchUtils` reads and writes every file, which is
+   * what lets it serialize a read-change-write on one file as a unit.
+   */
+  parseFile(bytes: Uint8Array, source: string): PatchFile<T>;
+  /** Encodes a patch file to the bytes the device's format stores it as. */
+  serializeFile(file: PatchFile<T>): Uint8Array;
   newFile(setName: string, nPatches?: number): PatchFile<T>;
   blankPatch(name?: string): T;
   /**
