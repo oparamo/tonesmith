@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import { readFile } from "node:fs/promises";
 import { blankPatch, newFile, parseFile, serializeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
-import { ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES, present } from "../../helpers";
+import { DEFAULTS_BY_TYPE } from "../../../src/devices/gx1/defaults";
+import {
+  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES, DEFAULT_INIT_FIXTURE, present,
+} from "../../helpers";
 
 describe("blankPatch", () => {
   it("uses 'NEW PATCH' as the default name", () => {
@@ -25,6 +28,29 @@ describe("blankPatch", () => {
     expect(patch.amp).toMatchObject({ on: false, type: "NATURAL" });
     expect(patch.noiseGate.on).toBe(false);
     expect(patch.drive).toMatchObject({ on: false, type: "OVERDRIVE" });
+  });
+
+  // A block left out of a spec keeps what the blank patch opened with, and is switched on later
+  // with it, so every block has to open at the device's own values rather than zeros.
+  it("carries the device's factory-default patch byte for byte, apart from its name", async () => {
+    const factory = present(parseFile(await readFile(DEFAULT_INIT_FIXTURE), "default-init").patches[0], "the factory patch");
+    const name = "INIT MEMORY";
+
+    const blank = blankPatch(name);
+
+    expect(factory.name).toBe(name);
+    expect(blank[RAW]).toEqual(factory[RAW]);
+  });
+
+  it("opens every block that has types at that type's factory defaults", () => {
+    const patch = blankPatch();
+
+    expect(patch.delay.params).toEqual(DEFAULTS_BY_TYPE.delay[patch.delay.type]);
+    expect(patch.reverb.params).toEqual(DEFAULTS_BY_TYPE.reverb[patch.reverb.type]);
+    expect(patch.pedalFx.params).toEqual(DEFAULTS_BY_TYPE.pedalFx[patch.pedalFx.type]);
+    for (const slot of ["fx1", "fx2", "fx3"] as const) {
+      expect(patch[slot].params, slot).toEqual(DEFAULTS_BY_TYPE.fx[patch[slot].type]);
+    }
   });
 });
 

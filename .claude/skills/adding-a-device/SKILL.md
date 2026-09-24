@@ -141,6 +141,8 @@ Create `core/src/devices/<id>/` with:
   "set" prefix. Each takes the patch plus one options object, with the block's controls in a
   `params` bag. Builders take input the spec validator has already checked, and fill what it leaves
   out with factory defaults
+- `factory-patch.ts`: the factory-default export's raw blocks, which `blankPatch` starts every
+  patch from, so a block a spec leaves out sits at the device's own values rather than zeros
 - `defaults.ts`: each block type's factory defaults, authored in step 4 from the
   factory-default fixture. The builder fills any param the caller didn't set from here
 - `param-domain.ts`: the value domains a param spec derives from (numeric interval, enum,

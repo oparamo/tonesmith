@@ -1,105 +1,25 @@
-import { decodePatch, encodePatch, hexFromBytes } from "./codec";
+import { decodePatch, encodePatch } from "./codec";
 import { encodeName } from "./codec/blocks";
-import { RAW, NAME_BYTES } from "./common";
+import { RAW } from "./common";
+import { FACTORY_BLOCKS } from "./factory-patch";
 import type { PatchFile as BasePatchFile } from "../../types";
 import type { Patch, PatchFile, RawParamSet, TslEnvelope } from "./types";
 
-/** Byte length of each block that opens zero-filled. */
-const BLOCK_BYTES = {
-  fxCom: 3,
-  fxParams: 251,
-  fx3a: 5,
-  delay: 29,
-  reverb: 20,
-  pfx: 14,
-} as const;
+/** The block holding the patch name, which the factory blocks leave to each blank patch. */
+const NAME_BLOCK = "MEMORY%COM";
 
-const ASSIGN_SLOTS = 8;
-
-/** Patch names sit space-padded to the full block. */
-const NAME_PAD = 0x20;
+/** A fresh param set per call: RAW is a public escape hatch, and a caller may mutate a block in place. */
+const blankParamSet = (): RawParamSet =>
+  Object.fromEntries(
+    Object.entries(FACTORY_BLOCKS).map(([block, hex]) => [block, hex.match(/../g) ?? []])
+  );
 
 /**
- * PFX, FX1, OD/DS, AMP, NS, FV, FX2, FX3, DLY, REV, OUTPUT as a MEMORY%CHAIN linked list (see
- * CHAIN_BLOCK_ORDER in common/constants.ts): byte 0 is PFX, the first block; each later byte is
- * the firmware value of whatever follows that fixed block.
+ * The device's factory-default patch under a new name. Every block opens off, at the device's own
+ * values, which is what a block left out of a spec keeps and what switching it on later starts from.
  */
-const DEFAULT_CHAIN_BYTES = [1, 2, 3, 4, 7, 6, 9, 8, 5, 10, 0, 11, 12];
-
-// The blocks whose bytes are one fixed shape, so a blank patch can carry the device's own factory
-// values for them outright. Each array is `default-init.tsl`'s bytes for that block, which agree
-// with the device's official parameter table field for field. The rest open zero-filled: their
-// bytes mean different things per type, so there is no one value to open at, and the builder fills
-// each type's own defaults from DEFAULTS_BY_TYPE instead.
-
-/** Off, NATURAL, gain 50, level 50, bass/mid/treble 50, ORIGINAL speaker, DYN421 mic, solo off at 50. */
-const AMP_DEFAULT_BYTES = [0, 1, 0, 50, 50, 50, 50, 50, 1, 1, 1, 0, 50];
-
-/** Off, OVERDRIVE, drive 50, tone 0 (stored +50), level 50, direct 0, solo off at 50. */
-const ODDS_DEFAULT_BYTES = [0, 6, 50, 50, 50, 0, 0, 50];
-
-/** Position 100, min 0, max 100, NORMAL curve. */
-const FV_DEFAULT_BYTES = [100, 0, 100, 2];
-
-/** Off, threshold 30, release 30, INPUT detect. */
-const NS_DEFAULT_BYTES = [0, 30, 30, 0];
-
-/**
- * Memory level 100 and BPM 120, each a byte split across two nibbles, then key of C, carryover on,
- * tempo hold off. Zeros are a setting rather than an absence here: they trim the patch's output to
- * silence and put the tempo below the 40 the device accepts.
- */
-const OTHER_DEFAULT_BYTES = [6, 4, 7, 8, 0, 1, 0];
-
-/**
- * The footswitch assignments the device ships a patch with, a function index and a mode per switch.
- * FORMAT.md documents the shape and leaves the block undecoded, so these are the fixture's bytes
- * rather than a field-by-field reading of them.
- */
-const CTL_DEFAULT_BYTES = [
-  1, 0, 2, 0, 3, 0, 0, 0, 0, 0, 5, 0, 5, 2, 5, 0,
-  17, 0, 4, 0, 3, 17, 0, 4, 0, 7, 0, 16, 0, 11, 0, 3,
-];
-
-/** An assign slot at rest. Undecoded like MEMORY%CTL, so this is the fixture's bytes as they are. */
-const ASSIGN_DEFAULT_BYTES = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-
-// A fresh array per call: RAW is a public escape hatch, and callers are free to mutate
-// patch[RAW]["MEMORY%FXn"] in place (e.g. to probe undecoded byte offsets). A shared array would
-// let a mutation on one FX slot silently corrupt the blank template for every other slot and
-// every later blankPatch() call.
-const zeroBytes = (count: number): string[] => hexFromBytes(new Array<number>(count).fill(0));
-
-const blankParamSet = (): RawParamSet => {
-  const paramSet: RawParamSet = {
-    "MEMORY%COM":     hexFromBytes(new Array<number>(NAME_BYTES).fill(NAME_PAD)),
-    "MEMORY%CHAIN":   hexFromBytes(DEFAULT_CHAIN_BYTES),
-    "MEMORY%FX1_COM": zeroBytes(BLOCK_BYTES.fxCom),
-    "MEMORY%FX1":     zeroBytes(BLOCK_BYTES.fxParams),
-    "MEMORY%FX2_COM": zeroBytes(BLOCK_BYTES.fxCom),
-    "MEMORY%FX2":     zeroBytes(BLOCK_BYTES.fxParams),
-    "MEMORY%FX3_COM": zeroBytes(BLOCK_BYTES.fxCom),
-    "MEMORY%FX3":     zeroBytes(BLOCK_BYTES.fxParams),
-    "MEMORY%FX3A":    zeroBytes(BLOCK_BYTES.fx3a),
-    "MEMORY%ODDS":    hexFromBytes(ODDS_DEFAULT_BYTES),
-    "MEMORY%AMP":     hexFromBytes(AMP_DEFAULT_BYTES),
-    "MEMORY%DLY":     zeroBytes(BLOCK_BYTES.delay),
-    "MEMORY%REV":     zeroBytes(BLOCK_BYTES.reverb),
-    "MEMORY%PFX":     zeroBytes(BLOCK_BYTES.pfx),
-    "MEMORY%FV":      hexFromBytes(FV_DEFAULT_BYTES),
-    "MEMORY%NS":      hexFromBytes(NS_DEFAULT_BYTES),
-    "MEMORY%OTHER":   hexFromBytes(OTHER_DEFAULT_BYTES),
-    "MEMORY%CTL":     hexFromBytes(CTL_DEFAULT_BYTES),
-  };
-  for (let slot = 1; slot <= ASSIGN_SLOTS; slot++) {
-    paramSet[`MEMORY%ASGN${slot}`] = hexFromBytes(ASSIGN_DEFAULT_BYTES);
-  }
-  return paramSet;
-};
-
 const blankPatch = (name = "NEW PATCH"): Patch => {
-  const paramSet = blankParamSet();
-  paramSet["MEMORY%COM"] = encodeName(name);
+  const paramSet = { [NAME_BLOCK]: encodeName(name), ...blankParamSet() };
   return decodePatch({ memo: "", paramSet });
 };
 
@@ -117,11 +37,8 @@ const newFile = (setName: string, patchCount = 1): PatchFile => {
   return { name: setName, formatRev: FORMAT_REV, device: DRIVER_ID, patches, [RAW]: envelope };
 };
 
-/**
- * Every block a patch has to carry, read off the blank patch so the list cannot fall behind the
- * codec: a block the codec learns to write is a block a file has to hold.
- */
-const REQUIRED_BLOCKS = Object.keys(blankParamSet());
+/** Every block a patch has to carry: the name block, and every block the factory patch holds. */
+const REQUIRED_BLOCKS = [NAME_BLOCK, ...Object.keys(FACTORY_BLOCKS)];
 
 const isHexList = (value: unknown): boolean =>
   Array.isArray(value) && value.every(entry => typeof entry === "string");

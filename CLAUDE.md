@@ -88,6 +88,8 @@ core/                       @tonesmith/core
                             codecs, then top-level decodePatch/encodePatch (barrel: index.ts)
       <format>.ts           the file format, bytes in and out (parseFile / serializeFile /
                             blankPatch / newFile), named after it (gx1: tsl.ts). No disk I/O
+      factory-patch.ts      the device's factory-default patch as raw blocks, which every blank
+                            patch starts from, so a block left out of a spec is at factory settings
       builder.ts            high-level patch-construction helpers
       defaults.ts           each block type's real factory defaults, harvested from a
                             factory-default export; the builder fills unset params from here

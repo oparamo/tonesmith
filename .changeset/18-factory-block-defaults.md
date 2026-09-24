@@ -31,6 +31,14 @@ patch's output to silence, and BPM to 0, below the 40 the device accepts; it ope
 likewise open at the device's own values instead of every switch unassigned. Patches read from a
 file are unaffected: those bytes have always been preserved as they were found.
 
+The blocks whose controls depend on their type (the three fx slots, delay, reverb and the pedal
+effect) opened all-zeroed as well, and a spec that leaves a block out keeps what the blank patch
+opened with. A patch built without a reverb stored it at tone -50 and level 0, which is what
+switching it on later brought up. A blank patch is now the device's own factory-default patch byte
+for byte, name aside: every block off, each at the type the device opens it on, and every type's
+factory values in the bytes the block's types share, so a block switched to any type starts at its
+factory settings.
+
 The values live in `BLOCK_DEFAULTS`, lifted from the same factory-default export that already backs
-`DEFAULTS_BY_TYPE`, and the drift guard now checks both against it, plus the blank patch's decoded
-blocks and its bytes for the three undecoded ones.
+`DEFAULTS_BY_TYPE`, and the drift guard checks both against it. The blank patch's bytes are that
+export's, checked against it byte for byte.
