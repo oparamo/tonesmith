@@ -82,7 +82,7 @@ bytes.
 
 - `registry`: `registerDriver`, `getDriver`, `listDrivers`
 - `patchUtils`: the file operations `readPatchFile`, `editPatchFile`, `upsertPatches`, `copyPatch`
-  and `createPatchFile`; `resolvePatch`, `resolvePatches`, `resolvePatchIndex`; `MAX_NEW_PATCHES`
+  and `createPatchFile`; `resolvePatch`, `resolvePatches`; `MAX_NEW_PATCHES`
 - `capabilityUtils`: `lookup` (the chain, a group, or a type), `findGroup`, `findType`,
   `CHAIN_ENTRY`
 - the `PatchDriver<T>` interface every device implements, whose methods are how a consumer

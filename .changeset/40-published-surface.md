@@ -14,6 +14,9 @@ which goes through the driver, and each one published a signature that could not
 without a major version. The type barrel gained the names it was missing in exchange: `PatchNameSpec`
 and `PatchSpecExample` had no way to be named, and `FieldEdits` comes with the surface above.
 
+`patchUtils` publishes `resolvePatch`, which answers with the patch and its index together, and not
+the index-only `resolvePatchIndex` beside it.
+
 `PatchFile.device` is specified, and it is the driver's id: a consumer holding a file can hand that
 field to `registry.getDriver` and get the driver that reads it. It was undocumented, and the GX-1
 driver filled it with `"GX-1"`, the device's name for itself in the file format, which the registry

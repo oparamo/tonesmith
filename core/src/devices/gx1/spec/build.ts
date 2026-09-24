@@ -9,6 +9,7 @@
  * pays a round trip per mistake and the catalog can answer for all of them in one pass.
  */
 import { findGroup } from "../../../capability-utils";
+import { messageOf } from "../../../errors";
 import { gx1Capabilities } from "../capabilities";
 import {
   BLOCK_GROUPS, BLOCK_NAMES, ON_FIELD, PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD, DEFAULT_CHAIN,
@@ -175,8 +176,7 @@ const checkChain = (issues: Issues, spec: Record<string, unknown>): void => {
   try {
     validateChain(chain as string[]);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    issues.push(message);
+    issues.push(messageOf(error));
   }
 };
 

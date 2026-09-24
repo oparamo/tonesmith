@@ -2,18 +2,23 @@ import { access, readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import { writeFileAtomic } from "./atomic-write";
 import { withFileLock } from "./file-lock";
+import { messageOf } from "./errors";
 import type { FieldEdit, FieldEdits, Patch, PatchFile, PatchDriver } from "./types";
 
 /** A reference that names a slot rather than a patch: digits, optionally signed. */
 const INDEX_REF = /^-?\d+$/;
 
-/** Every index whose patch carries this name, matched whole and case-insensitively. */
-const indicesNamed = (patches: Patch[], ref: string): number[] => {
-  const needle = ref.toLowerCase();
-  return patches.flatMap((patch, index) =>
-    patch.name.trim().toLowerCase() === needle ? [index] : []
-  );
-};
+/**
+ * Whether `patch` is the one `name` names. Exactly, case included: a device can hold "Lead" and
+ * "LEAD" as two patches, and a case-blind match would leave a file holding both with neither
+ * reachable by name. Refs and saves both match this way, so a name that finds a patch is the name a
+ * save replaces.
+ */
+const hasName = (patch: Patch, name: string): boolean => patch.name === name;
+
+/** Every index whose patch carries this name. */
+const indicesNamed = (patches: Patch[], ref: string): number[] =>
+  patches.flatMap((patch, index) => (hasName(patch, ref) ? [index] : []));
 
 /** The single patch a name picks out, or why it picks out none or several. */
 const soleIndexNamed = (matches: number[], ref: string): number => {
@@ -109,6 +114,9 @@ const updatePatchFile = <T extends Patch, R>(
     return result;
   });
 
+/** Whether a filesystem call failed because nothing exists at the path, as opposed to any other reason. */
+const isMissingFile = (error: unknown): boolean => (error as NodeJS.ErrnoException).code === "ENOENT";
+
 /** Reads `path`, or starts a fresh empty file named `setName` when it doesn't exist yet. */
 const readExistingOrNew = async <T extends Patch>(
   driver: PatchDriver<T>,
@@ -118,7 +126,7 @@ const readExistingOrNew = async <T extends Patch>(
   try {
     return { file: await readPatchFile(driver, path), created: false };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!isMissingFile(error)) throw error;
     return { file: driver.newFile(setName, 0), created: true };
   }
 };
@@ -183,8 +191,7 @@ const buildEach = <T extends Patch>(driver: PatchDriver<T>, specs: readonly unkn
     try {
       return driver.buildPatch(spec);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`Patch spec at position ${position}${specNameTag(spec)}: ${reason}`);
+      throw new Error(`Patch spec at position ${position}${specNameTag(spec)}: ${messageOf(error)}`);
     }
   });
 
@@ -235,7 +242,7 @@ const upsertPatches = async <T extends Patch>(
     if (setName !== undefined) file.name = setName;
 
     const saved = patches.map((patch): SavedPatch<T> => {
-      const index = file.patches.findIndex(existing => existing.name === patch.name);
+      const index = file.patches.findIndex(existing => hasName(existing, patch.name));
       if (index >= 0) {
         file.patches[index] = patch;
         return { name: patch.name, action: "replaced", patch };
@@ -359,7 +366,7 @@ const isPathFree = async (path: string): Promise<boolean> => {
     await access(path);
     return false;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!isMissingFile(error)) throw error;
     return true;
   }
 };
@@ -382,7 +389,8 @@ const createPatchFile = async <T extends Patch>(
   path: string,
   options: NewFileOptions = {},
 ): Promise<PatchFile<T>> => {
-  requireUsableCount(options.patchCount ?? DEFAULT_NEW_PATCH_COUNT);
+  const patchCount = options.patchCount ?? DEFAULT_NEW_PATCH_COUNT;
+  requireUsableCount(patchCount);
   const setName = options.setName ?? basename(path, extname(path));
 
   // The check and the write share one lock, or two creates on one path could both find it free.
@@ -390,7 +398,7 @@ const createPatchFile = async <T extends Patch>(
     const pathFree = await isPathFree(path);
     if (!pathFree) throw new Error(`${path} already exists, refusing to overwrite it.`);
 
-    const file = driver.newFile(setName, options.patchCount ?? DEFAULT_NEW_PATCH_COUNT);
+    const file = driver.newFile(setName, patchCount);
     await writePatchFile(driver, file, path);
     return file;
   });
@@ -398,7 +406,6 @@ const createPatchFile = async <T extends Patch>(
 
 export {
   MAX_NEW_PATCHES,
-  resolvePatchIndex,
   resolvePatch,
   resolvePatches,
   readPatchFile,

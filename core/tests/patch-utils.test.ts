@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../src/types";
 import {
-  resolvePatchIndex, resolvePatches, readPatchFile, editPatchFile, upsertPatches, copyPatch,
+  resolvePatch, resolvePatches, readPatchFile, editPatchFile, upsertPatches, copyPatch,
   createPatchFile, MAX_NEW_PATCHES,
 } from "../src/patch-utils";
 import { pathExists, scratchDir } from "./helpers";
@@ -222,6 +222,18 @@ describe("upsertPatches", () => {
     expect(patchNames, "Rhythm replaced in place, Solo appended").toEqual(["Lead", "Rhythm", "Solo"]);
   });
 
+  it("keys on the name exactly, so a name differing only in case is a patch of its own", async () => {
+    const driver = makeFakeDriver();
+    const path = pathTo("set.tsl");
+    await seedFile(path, { name: "Set", device: "FAKE", patches: [makePatch("LEAD")] });
+
+    const { file, saved } = await upsertPatches(driver, { path, patches: [makePatch("lead"), makePatch("Lead")] });
+    const patchNames = file.patches.map(patch => patch.name);
+
+    expect(patchNames).toEqual(["LEAD", "lead", "Lead"]);
+    expect(saved.map(entry => entry.action)).toEqual(["appended", "appended"]);
+  });
+
   it("stays idempotent across reruns of the same batch", async () => {
     const driver = makeFakeDriver();
     const path = pathTo("set.tsl");
@@ -378,23 +390,27 @@ describe("upsertPatches", () => {
   });
 });
 
-describe("resolvePatchIndex", () => {
+describe("resolvePatch", () => {
   const patches = [makePatch("Rock Lead"), makePatch("Clean Jazz"), makePatch("Rock Lead")];
 
   it("returns numeric index when ref is the integer string", () => {
-    const index = resolvePatchIndex(patches, "1");
+    const index = resolvePatch(patches, "1").index;
 
     expect(index).toBe(1);
   });
 
-  it("resolves name case-insensitively", () => {
-    const index = resolvePatchIndex(patches, "clean jazz");
+  // The device stores "Lead" and "LEAD" as two names, so a case-blind match would leave a file
+  // holding both with neither reachable by name.
+  it("matches a name exactly, case included", () => {
+    const withCaseVariant = [...patches, makePatch("CLEAN JAZZ")];
 
-    expect(index).toBe(1);
+    expect(resolvePatch(withCaseVariant, "Clean Jazz").index).toBe(1);
+    expect(resolvePatch(withCaseVariant, "CLEAN JAZZ").index).toBe(3);
+    expect(() => resolvePatch(withCaseVariant, "clean jazz")).toThrow(/clean jazz/);
   });
 
   it("throws when no patch matches the name", () => {
-    const resolveMissingName = () => resolvePatchIndex(patches, "Metal");
+    const resolveMissingName = () => resolvePatch(patches, "Metal").index;
 
     expect(resolveMissingName).toThrow(/Metal/);
   });
@@ -402,34 +418,34 @@ describe("resolvePatchIndex", () => {
   // Callers index straight into the array with what this returns, so an unchecked index reads as
   // undefined, or on a write leaves a hole that encodes as a corrupt file.
   it("throws for an index past the last patch", () => {
-    const resolvePastEnd = () => resolvePatchIndex(patches, "3");
+    const resolvePastEnd = () => resolvePatch(patches, "3").index;
 
     expect(resolvePastEnd).toThrow(/3/);
   });
 
   it("throws for a negative index", () => {
-    const resolveNegative = () => resolvePatchIndex(patches, "-1");
+    const resolveNegative = () => resolvePatch(patches, "-1").index;
 
     expect(resolveNegative).toThrow(/-1/);
   });
 
   it("throws when multiple patches share the same name", () => {
-    const resolveAmbiguousName = () => resolvePatchIndex(patches, "rock lead");
+    const resolveAmbiguousName = () => resolvePatch(patches, "Rock Lead").index;
 
-    expect(resolveAmbiguousName).toThrow(/rock lead/);
+    expect(resolveAmbiguousName).toThrow(/Rock Lead/);
     expect(resolveAmbiguousName, "names both colliding indices").toThrow(/0.*2|2.*0/);
   });
 
   // Every surface takes the ref as a bare string, so an omitted one arrives here as "". Read as a
   // number it is 0, which would select the first patch and, on a write, overwrite it.
   it.each(["", "   "])("rejects %o rather than selecting the first patch", (ref) => {
-    const resolveEmpty = () => resolvePatchIndex(patches, ref);
+    const resolveEmpty = () => resolvePatch(patches, ref).index;
 
     expect(resolveEmpty).toThrow();
   });
 
   it("reads a padded integer as that index", () => {
-    const index = resolvePatchIndex(patches, " 1 ");
+    const index = resolvePatch(patches, " 1 ").index;
 
     expect(index).toBe(1);
   });
@@ -437,7 +453,7 @@ describe("resolvePatchIndex", () => {
   // Number() accepts both of these and rounds them into an index, which would select a patch
   // the caller never spelled out.
   it.each(["0x1", "2.0"])("does not read %o as an index", (ref) => {
-    const resolveNonIndex = () => resolvePatchIndex(patches, ref);
+    const resolveNonIndex = () => resolvePatch(patches, ref).index;
 
     expect(resolveNonIndex).toThrow(new RegExp(ref.replace(".", "\\.")));
   });
@@ -445,7 +461,7 @@ describe("resolvePatchIndex", () => {
   it("finds a patch whose name is all digits once no such index exists", () => {
     const withNumericName = [...patches, makePatch("808")];
 
-    expect(resolvePatchIndex(withNumericName, "808")).toBe(3);
+    expect(resolvePatch(withNumericName, "808").index).toBe(3);
   });
 });
 
@@ -465,7 +481,7 @@ describe("resolvePatches", () => {
     expect(selected).toEqual([{ index: 1, patch: patches[1] }]);
   });
 
-  it("propagates resolvePatchIndex's not-found error", () => {
+  it("propagates a ref that names no patch", () => {
     const resolveMissingName = () => resolvePatches(patches, "Bogus");
 
     expect(resolveMissingName).toThrow(/Bogus/);
