@@ -17,10 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - uses: changesets/action@v1
+      - uses: changesets/action@v2
         with:
-          version: pnpm changeset version
-          publish: pnpm release
-          createGithubReleases: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version-script: pnpm changeset version
+          publish-script: pnpm release
+          create-github-releases: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
