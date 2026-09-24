@@ -1,4 +1,4 @@
-import { toSigned, toUnsigned, byteAt, lookupName, shownValue } from "./primitives";
+import { toSigned, toUnsigned, byteAt, lookupName, tableIndex, shownValue } from "./primitives";
 import { SUB_TYPE_FIELD, TIME_NOTE_VALUES, RATE_NOTE_VALUES } from "../common";
 import type { BlockParams } from "../types";
 
@@ -76,21 +76,15 @@ const signed = (name: string, offset: number, center = 50): FieldCodec => ({
 });
 
 /**
- * A lookup field: the byte is an index into a string table.
- * Decoding an out-of-range index produces an "UNKNOWN_N" sentinel.
- * Encoding an unknown sentinel throws: callers should only write values that were
- * decoded from the same table.
+ * A lookup field: the byte is an index into a string table. An index past the end decodes as an
+ * "UNKNOWN_N" sentinel and encodes back to the same byte; any other name outside the table throws.
  */
 const lookup = (name: string, offset: number, table: readonly string[]): FieldCodec => ({
   name,
   kind: "lookup",
   table,
   decode: bytes => lookupName(table, byteAt(bytes, offset, name)),
-  encode: (value, bytes) => {
-    const index = table.indexOf(value as string);
-    if (index < 0) throw new Error(`Unknown ${name} value: ${JSON.stringify(value)}`);
-    bytes[offset] = index;
-  },
+  encode: (value, bytes) => { bytes[offset] = tableIndex(table, value, name); },
 });
 
 

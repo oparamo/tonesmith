@@ -7,7 +7,7 @@ import {
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ, TIME_NOTE_VALUES,
 } from "../common";
 import type { BlockParams } from "../types";
-import { hexFromBytes, byteAt, lookupName, lookupIndex } from "./primitives";
+import { hexFromBytes, byteAt, lookupName, lookupIndex, tableIndex } from "./primitives";
 import {
   u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, namedAbove, syncedTime, syncedRate,
   decodeFields, encodeFields, type FieldCodec,
@@ -52,11 +52,7 @@ const indexTable = (name: string, offset: number, table: readonly (string | numb
     const index = byteAt(bytes, offset, name);
     return table[index] ?? `UNKNOWN_${name}${index}`;
   },
-  encode: (value, bytes) => {
-    const index = table.indexOf(value as string | number);
-    if (index < 0) throw new Error(`Unknown ${name} value: ${JSON.stringify(value)}`);
-    bytes[offset] = index;
-  },
+  encode: (value, bytes) => { bytes[offset] = tableIndex(table, value, name); },
 });
 
 // Byte offset where each type's param block begins within the 251-byte FX block. OVERTONE is the

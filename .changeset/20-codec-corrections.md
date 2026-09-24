@@ -23,6 +23,9 @@ value the hardware does not use.
 - **Type enums that had borrowed another block's values**: FX-slot DELAY types are their own set
   (STANDARD/MODULATE/WARP/TWIST/GLITCH), FX-slot REVERB types are their own set (HALL S/HALL
   M/PLATE/ROOM/STUDIO), and the dedicated DLY block's TWIST `MODE` is RISE-FALL/RISE-FADE.
+- **A lookup byte past the end of its table** decodes as an `UNKNOWN_<n>` placeholder, and writes
+  back as the byte it was read from. Encoding refused the placeholder, and every save re-encodes
+  every patch in the file, so one such byte anywhere made the whole file unsaveable.
 
 Round trip stays byte identical. The codec preserves the raw byte behind each of these, and no
 committed patch used a phantom value.

@@ -166,6 +166,14 @@ describe("lookup", () => {
     expect(encodeUnknownName, "names the value it refused").toThrow(/GAMMA/);
     expect(encodeUnknownName, "and the field it refused it for").toThrow(/type/);
   });
+
+  it("writes back a byte past the end of its table as it found it", () => {
+    const bytes = [7];
+
+    field.encode(field.decode(bytes), bytes);
+
+    expect(bytes).toEqual([7]);
+  });
 });
 
 describe("encodeFields", () => {

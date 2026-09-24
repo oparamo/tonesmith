@@ -112,6 +112,16 @@ describe("Unknown FX type handling", () => {
     expect(encodeWithBadPitch, "names the value it refused").toThrow(/999/);
     expect(encodeWithBadPitch, "and the field it refused it for").toThrow(/pitch/);
   });
+
+  it("indexTable writes back a byte past the end of its table as it found it", () => {
+    const original = new Array<number>(251).fill(0);
+    original[179 + 1] = 60;
+    const params = decodeFxParams("PITCH SHIFT", original);
+
+    const encoded = encodeFxParams("PITCH SHIFT", params, original);
+
+    expect(bytesFromHex(encoded)).toEqual(original);
+  });
 });
 
 
