@@ -7,6 +7,7 @@ const registerCreatePatchFile = (server: McpServer): void => {
   server.registerTool(
     "create_patch_file",
     {
+      title: "Create patch file",
       description:
         "Create an empty patch file of blank patches at the device's factory defaults, for filling " +
         "in later with write_fields or copy_patch. An existing file is never overwritten. Building " +
@@ -22,7 +23,7 @@ const registerCreatePatchFile = (server: McpServer): void => {
         ),
       }),
       // It writes, but only where there is no file: an existing one is refused rather than replaced.
-      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     ({ device, file, setName, patchCount }) => attempt(async () => {
       const driver = registry.getDriver(device);

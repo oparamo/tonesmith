@@ -90,8 +90,12 @@ describe("tool registrations", () => {
       expect(annotationsOf(name).destructiveHint, `${name} can replace what is there`).toBe(true);
     }
     expect(annotationsOf("create_patch_file").destructiveHint, "it refuses an existing file").toBe(false);
+    for (const name of ["write_fields", "copy_patch", "generate_patch", "create_patch_file"]) {
+      expect(annotationsOf(name).idempotentHint, `${name} repeated changes nothing more`).toBe(true);
+    }
     for (const tool of tools) {
       expect(tool.annotations?.openWorldHint, `${tool.name} touches no network`).toBe(false);
+      expect(tool.title, `${tool.name} has a display title`).toBeTruthy();
     }
   });
 });

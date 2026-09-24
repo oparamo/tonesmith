@@ -131,6 +131,7 @@ const registerDescribeDevice = (server: McpServer): void => {
   server.registerTool(
     "describe_device",
     {
+      title: "Describe device",
       description:
         "Return capability metadata for a device: its signal chain, every block with the types " +
         "and models it offers, and every param with its key, range, and allowed values. Naming " +

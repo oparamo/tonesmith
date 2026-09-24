@@ -14,6 +14,7 @@ const registerWriteFields = (server: McpServer): void => {
   server.registerTool(
     "write_fields",
     {
+      title: "Edit patch fields",
       description:
         "Edit a patch file: one or more fields of a single patch, the name of the patch set, or " +
         "both. Patch fields use dot-notation, counted from the patch read_patch returns under " +
@@ -44,7 +45,7 @@ const registerWriteFields = (server: McpServer): void => {
       }),
       // It edits a file the caller already has, which is the destructive case: the values it
       // replaces are gone.
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     ({ file, device, ref, fields, setName }) => attempt(async () => {
       const driver = registry.getDriver(device);

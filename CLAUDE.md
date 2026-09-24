@@ -147,7 +147,9 @@ mcp/                        @tonesmith/mcp  (bin: tonesmith-mcp)
     tools/                  tool registrations, all device-agnostic (barrel: tools/index.ts):
                             list_devices, read_patch, write_fields, describe_device, copy_patch,
                             create_patch_file, generate_patch
-    server.ts               buildServer(), registering the tools
+    prompts/                prompt registrations (barrel: prompts/index.ts): build_patch, a person's
+                            slash-command entry to the build workflow, with `device` completion
+    server.ts               buildServer(), registering the tools and prompts
     index.ts                bin entry: shebang + buildServer() over stdio
   tests/                    behavior tests (MCP InMemoryTransport, per-tool suites)
 
@@ -303,6 +305,11 @@ repository.
 | `describe_device`     | `device`, `items?`, `includeParams?`                               | Returns capability metadata. `items` is a list, so one call covers a whole patch's lookups: each entry is `"chain"`, a group id (`"amp"`), or `"<group>/<type>"` (`"fx/CHORUS"`, split on the first slash so `"fx/OD/DS"` works). `"chain"` also carries what belongs to the patch rather than a block: the name limit and the patch settings written beside `name`. Omit `items` for a chain summary plus every group and type id, so the next call needs no group listing first. A bare-group entry is an index with no per-type params; name the types, or pass `includeParams` for the full set. A named type also carries an `example`: its spec at factory defaults, showing where its params are written. One bad entry fails the whole call |
 | `copy_patch`          | `device`, `src`, `srcRef`, `dst`, `dstRef`                         | Copies one patch into a slot in another file, replacing what was there. Both files must already exist. To add a patch without displacing one, use `generate_patch`, which appends by name                                                        |
 | `create_patch_file`   | `device`, `file`, `setName?`, `patchCount?`                        | Starts an empty file of blank patches at the device's factory defaults, `patchCount` from 1 to 500. Never overwrites an existing file. Not part of building a patch from parameters: `generate_patch` creates its own output file                          |
+
+Every tool carries a `title` for client display, and annotations: the three reads are read-only, and
+the four writes are idempotent, so a repeated call with the same arguments changes nothing more. One
+prompt, `build_patch` (`device`, `description`, `outPath`), states a person's request and leaves the
+how to the server instructions.
 
 ## CLI capabilities command
 

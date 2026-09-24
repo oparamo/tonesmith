@@ -25,6 +25,7 @@ const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
     "generate_patch",
     {
+      title: "Generate patches",
       description: `Build patches from structured parameters and save them as a device patch file.
 
 Two calls build any patch: describe_device for the device's blocks, types and params, then this.
@@ -38,7 +39,7 @@ and the patch echoed back under \`patch\` is the complete resulting state, so no
 needed.`,
       inputSchema,
       // A patch whose name is already in the file replaces it, so a save can overwrite work.
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     ({ device, outPath, setName, patches }) => attempt(async () => {
       const driver = registry.getDriver(device);

@@ -31,6 +31,7 @@ const registerReadPatch = (server: McpServer): void => {
   server.registerTool(
     "read_patch",
     {
+      title: "Read patches",
       description:
         "Read decoded patches from a patch file. The patch itself arrives under `patch`, beside " +
         "`setName`, the name of the patch set the file holds. Naming a `ref` returns that one " +

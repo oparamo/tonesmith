@@ -8,6 +8,7 @@ import {
   registerCreatePatchFile,
   registerGeneratePatch,
 } from "./tools";
+import { registerBuildPatch } from "./prompts";
 import { instructions } from "./instructions";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -28,6 +29,8 @@ const buildServer = (): McpServer => {
   registerCopyPatch(server);
   registerCreatePatchFile(server);
   registerGeneratePatch(server);
+
+  registerBuildPatch(server);
 
   return server;
 };
