@@ -35,6 +35,13 @@ const patchAt = async (path: string, index = 0): Promise<Patch> => {
 const rawBlock = (patch: Patch, key: string): string[] =>
   present(patch[RAW][key], `${key} of the decoded patch`);
 
+/** `chain` with `block` moved to sit immediately before `before`, for building a reordered chain. */
+const moveBefore = (chain: readonly string[], block: string, before: string): string[] => {
+  const without = chain.filter(name => name !== block);
+  const index = without.indexOf(before);
+  return [...without.slice(0, index), block, ...without.slice(index)];
+};
+
 /** Whether a path exists. Only a missing file answers no; any other failure is rethrown. */
 const pathExists = async (path: string): Promise<boolean> => {
   try {
@@ -72,5 +79,5 @@ const scratchFile = (basename: string): (() => string) => {
 
 export {
   ROCK_TONES_FIXTURE, DEFAULT_INIT_FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
-  present, patchAt, rawBlock, pathExists, scratchDir, scratchFile,
+  present, patchAt, rawBlock, moveBefore, pathExists, scratchDir, scratchFile,
 };

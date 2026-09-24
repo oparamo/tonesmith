@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/devices/gx1";
-import { moveBefore } from "../../../../src/devices/gx1/builder";
 import { BLOCK_NAMES, DEFAULT_CHAIN } from "../../../../src/devices/gx1/common";
-import { ROCK_TONES_FIXTURE, patchAt } from "../../../helpers";
+import { ROCK_TONES_FIXTURE, moveBefore, patchAt } from "../../../helpers";
 
 describe("buildPatch", () => {
   it("builds every block the spec names, defaults filled in", () => {

@@ -20,54 +20,47 @@ import {
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "./defaults";
 import type { ParamDefaults, BlockDefaults } from "./defaults";
 import { BLOCK_GROUPS, BLOCK_LABELS, DEFAULT_CHAIN, NAME_BYTES, onlyBlockFor } from "./common";
-import { PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES } from "./codec/blocks";
-import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "./codec/fx-params";
-import type { FieldCodec } from "./codec/fields";
+import { PATCH_SETTING_FIELDS, fieldsFor } from "./codec";
+import type { FieldCodec } from "./codec";
 
 const normalizeLabel = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-const PER_TYPE_CODEC_MAPS: Record<PerTypeBlockId, Partial<Record<string, readonly FieldCodec[]>>> = {
-  fx: FX_PARAM_MAPS, pedalFx: PFX_TYPE_MAPS, delay: DELAY_TYPE_MAPS,
-  reverb: REV_TYPE_MAPS, fxDelay: FX_DELAY_TYPE_MAPS,
-};
-
-const codecFieldsFor = (block: PerTypeBlockId, type: string): readonly FieldCodec[] => {
-  // Every reverb type but the STANDARD group shares STANDARD's field map.
-  const resolvedType = block === "reverb" && (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
-    ? "STANDARD"
-    : type;
-  return PER_TYPE_CODEC_MAPS[block][resolvedType] ?? [];
-};
-
-/** Stamps each catalog param with its backing codec field name (`key`), matched by label. */
-const withKeys = (block: PerTypeBlockId, type: string, params: readonly ParamSpec[]): ParamSpec[] => {
-  const fields = codecFieldsFor(block, type);
-  const aliases = FIELD_LABEL_ALIASES[block][type] ?? {};
-  return params.map(param => {
+/**
+ * Stamps each catalog param with the codec field it is stored in (`key`), matched by label. A param
+ * no field matches is left without one: it names a setting the patch keeps outside the block.
+ */
+const withKeys = (
+  fields: readonly FieldCodec[] | undefined,
+  aliases: Record<string, string>,
+  params: readonly ParamSpec[],
+): ParamSpec[] =>
+  params.map(param => {
     const target = normalizeLabel(param.name);
-    const field = fields.find(candidate => normalizeLabel(aliases[candidate.name] ?? candidate.name) === target);
+    const field = fields?.find(candidate => normalizeLabel(aliases[candidate.name] ?? candidate.name) === target);
     const stamped = field ? { ...param, key: field.name } : param;
     return stamped;
   });
-};
 
 /**
- * Stamps `key` on the params of a single-shape block, and on the patch's own settings. Neither is
- * built from a FieldCodec map the way a per-type block is, so there is no field list to match
- * against: the decoded field name is the catalog label lower-cased and camel-cased ("SOLO LEVEL" →
- * soloLevel). The catalog-completeness guard checks every stamped key against a real decoded patch,
- * so this stays derived, not assumed.
+ * The field list behind one catalog entry. The FX-slot DELAY's sub-algorithms are catalogued as a
+ * block of their own, but their fields are the fx DELAY type's, picked by sub-algorithm.
  */
-const withBlockKeys = (params: readonly ParamSpec[]): ParamSpec[] =>
-  params.map(param => {
-    const [head = "", ...rest] = param.name.toLowerCase().split(" ");
-    const key = head + rest.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join("");
-    return { ...param, key };
-  });
+const catalogFields = (block: PerTypeBlockId, type: string): FieldCodec[] | undefined => {
+  if (block === "fxDelay") return fieldsFor("fx", "DELAY", type);
+  return fieldsFor(block, type);
+};
 
 /** Attaches each type's params (with `key` stamped on) from the catalog for a per-type block. */
 const withTypeParams = (block: PerTypeBlockId, types: readonly CapabilityType[]): CapabilityType[] =>
-  types.map(type => ({ ...type, params: withKeys(block, type.id, PARAMS_BY_TYPE[block][type.id] ?? []) }));
+  types.map(type => {
+    const aliases = FIELD_LABEL_ALIASES[block][type.id] ?? {};
+    const params = withKeys(catalogFields(block, type.id), aliases, PARAMS_BY_TYPE[block][type.id] ?? []);
+    return { ...type, params };
+  });
+
+/** A single-shape block's params, stamped from its one field list. */
+const withBlockKeys = (group: string, params: readonly ParamSpec[]): ParamSpec[] =>
+  withKeys(fieldsFor(group), {}, params);
 
 // FX-slot DELAY is the one fx type modeled per-sub-algorithm: its subTypes carry the params
 // (from the "fxDelay" catalog block), unlike the flat fx types whose params sit on the type.
@@ -555,7 +548,7 @@ const gx1Capabilities: DeviceCapabilities = {
       "is what a manual or a photo of the unit shows. Write the names, not the labels.",
   },
   patchName: { maxLength: NAME_BYTES },
-  patchSettings: withBlockKeys(PATCH_SETTINGS),
+  patchSettings: withKeys(PATCH_SETTING_FIELDS, {}, PATCH_SETTINGS),
   groups: withExamples([
     {
       id: "fx",
@@ -568,25 +561,25 @@ const gx1Capabilities: DeviceCapabilities = {
       name: "OD/DS",
       description: "Dedicated overdrive/distortion block with 35 classic pedal models. This is the block to use for a patch's overdrive. The fx slots offer the same 35 models under their OD/DS type, for stacking a second overdrive in the chain.",
       types: ODDS_TYPES,
-      params: withBlockKeys(PARAMS_BY_BLOCK.drive),
+      params: withBlockKeys("drive", PARAMS_BY_BLOCK.drive),
     },
     {
       id: "amp",
       name: "AMP/CAB",
       description: "AIRD (Augmented Impulse Response Dynamics) amplifier simulation. Models the full amp circuit including preamp, power section, and speaker interaction.",
       types: AMP_TYPES,
-      params: withBlockKeys(PARAMS_BY_BLOCK.amp),
+      params: withBlockKeys("amp", PARAMS_BY_BLOCK.amp),
     },
     {
       id: "cab",
       name: "Speaker Cabinet",
-      description: "Speaker cabinet simulation applied to the amp signal. Selects the cabinet size and configuration, or an externally loaded IR.",
+      description: "Speaker cabinet simulation applied to the amp signal. Selects the cabinet size and configuration, or an externally loaded IR. Set through the amp block as amp.params.speaker: a patch has no cab block of its own.",
       types: CAB_TYPES,
     },
     {
       id: "mic",
       name: "Microphone",
-      description: "Microphone simulation applied after the speaker cabinet, shaping the tonal character of the miked cab signal.",
+      description: "Microphone simulation applied after the speaker cabinet, shaping the tonal character of the miked cab signal. Set through the amp block as amp.params.mic: a patch has no mic block of its own.",
       types: MIC_TYPES,
     },
     {
@@ -600,14 +593,14 @@ const gx1Capabilities: DeviceCapabilities = {
       name: "NS (Noise Suppressor)",
       description: "Reduces noise and hum picked up by guitar pickups. Responds to the guitar signal envelope so it doesn't cut sustain unnaturally.",
       types: [],
-      params: withBlockKeys(PARAMS_BY_BLOCK.noiseGate),
+      params: withBlockKeys("noiseGate", PARAMS_BY_BLOCK.noiseGate),
     },
     {
       id: "volume",
       name: "FV (Foot Volume)",
       description: "Expression-pedal volume control. Typically assigned to the CTL 2/EXP 2 jack. The one chain block that's always active: it can't be bypassed.",
       types: [],
-      params: withBlockKeys(PARAMS_BY_BLOCK.volume),
+      params: withBlockKeys("volume", PARAMS_BY_BLOCK.volume),
     },
     {
       id: "delay",

@@ -224,6 +224,12 @@ describe("validatePatchSpec", () => {
     expect(issues.join("\n")).toContain("time");
   });
 
+  it("rejects a sub-model named among the params, where the decoded block never carries it", () => {
+    const issues = validatePatchSpec({ ...valid, pedalFx: { type: "WAH", params: { subType: "CRY WAH" } } });
+
+    expect(issues.join("\n")).toContain("subType");
+  });
+
   it("names a param sent one level too high as a param of its type, not an unknown key", () => {
     const spec = { ...valid, fx1: { type: "CHORUS", rate: 16 } };
     const [issue] = validatePatchSpec(spec);

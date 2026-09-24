@@ -102,8 +102,6 @@ const indexMap = <T extends string>(list: readonly T[]): Record<T, number> =>
 const FX_TYPE_IDX  = indexMap(FX_TYPES);
 const ODDS_IDX     = indexMap(ODDS_TYPES);
 const AMP_TYPE_IDX = indexMap(AMP_TYPES);
-const SP_TYPE_IDX  = indexMap(SP_TYPES);
-const MIC_TYPE_IDX = indexMap(MIC_TYPES);
 const DLY_TYPE_IDX = indexMap(DLY_TYPES);
 const REV_TYPE_IDX = indexMap(REV_TYPES);
 const PFX_TYPE_IDX = indexMap(PFX_TYPES);
@@ -127,8 +125,6 @@ const FB_MODE      = ["NORMAL", "OSC"] as const;
 const SLICER_PAT   = Array.from({ length: 20 }, (_, i) => `PATTERN ${i + 1}`);
 const NS_DETECT    = ["INPUT", "NS INPUT"] as const;
 const FV_CURVE     = ["SLOW1", "SLOW2", "NORMAL", "FAST"] as const;
-const NS_DETECT_IDX = indexMap(NS_DETECT);
-const FV_CURVE_IDX  = indexMap(FV_CURVE);
 const TWIST_MODES  = ["RISE-FALL", "RISE-FADE"] as const;
 // PHASER TYPE: raw byte 0/1/2 selects the number of phase-shifting stages.
 const PHASER_STAGES = ["4 STAGE", "8 STAGE", "12 STAGE"] as const;
@@ -189,7 +185,6 @@ const ENHANCER_HIGH_FREQ = [
 // (+2nd, +3rd, +6th, etc.) are diatonic, so the actual semitone shift HARMONIST applies
 // depends on this key.
 const KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
-const KEY_IDX = indexMap(KEY_NAMES);
 
 // The one name a sub-model selection goes by: in a codec field map, on a decoded block, and in a
 // patch spec. `type` is the block's own selector and never a sub-model's, so the two words each
@@ -221,11 +216,11 @@ export {
   FX_TYPES, ODDS_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   FX_DLY_TYPES, FX_REV_TYPES, NAME_BYTES, LAST_STORABLE_CHAR, LAST_NAMEABLE_CHAR, charsAbove,
   CHAIN_SLOT_ORDER, CHAIN_VALUE_TO_BLOCK, CHAIN_BLOCK_TO_VALUE, CHAIN_TERMINATOR, DEFAULT_CHAIN,
-  FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, SP_TYPE_IDX, MIC_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
+  FX_TYPE_IDX, ODDS_IDX, AMP_TYPE_IDX, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX,
   COMP_TYPES, LIM_TYPES, ACRESO_TYPES, WAH_TYPES, CHORUS_TYPES, ROTARY_SPEED,
   VIBE_MODES, HUM_MODES, HUM_VOWELS, SBEND_PITCH, FB_MODE,
-  SLICER_PAT, NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, PHASER_STAGES, SPACE_ECHO_HEAD,
-  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, KEY_NAMES, KEY_IDX,
+  SLICER_PAT, NS_DETECT, FV_CURVE, TWIST_MODES, PHASER_STAGES, SPACE_ECHO_HEAD,
+  HARMONIST_HR, PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, KEY_NAMES,
   TIME_NOTE_VALUES, RATE_NOTE_VALUES, NOTE_VALUES,
   FREQ_STEPS, FREQ_HIGH_CUT, FREQ_LOW_CUT, ENHANCER_LOW_FREQ, ENHANCER_HIGH_FREQ,
 };

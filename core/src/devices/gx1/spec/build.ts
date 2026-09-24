@@ -11,7 +11,7 @@
 import { findGroup } from "../../../capability-utils";
 import { gx1Capabilities } from "../capabilities";
 import {
-  BLOCK_GROUPS, BLOCK_NAMES, ON_FIELD, DEFAULT_CHAIN,
+  BLOCK_GROUPS, BLOCK_NAMES, ON_FIELD, PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD, DEFAULT_CHAIN,
   LAST_NAMEABLE_CHAR, charsAbove,
 } from "../common";
 import type { BlockName } from "../common";
@@ -25,10 +25,7 @@ import {
   validatePatchSettings, typeSurface,
 } from "./validate";
 import type { Issues } from "./validate";
-import {
-  asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine, unknownParamLine,
-  PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
-} from "./errors";
+import { asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine, unknownParamLine } from "./errors";
 import type { BlockContext } from "./errors";
 
 /** The patch's own settings, keyed as a spec writes them. Derived, so the catalog is the one list. */

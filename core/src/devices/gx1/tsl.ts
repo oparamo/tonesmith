@@ -200,4 +200,4 @@ const serializeFile = (input: BasePatchFile<Patch>): Uint8Array => {
   return new TextEncoder().encode(JSON.stringify(envelope));
 };
 
-export { blankPatch, newFile, parseFile, serializeFile };
+export { DRIVER_ID, blankPatch, newFile, parseFile, serializeFile };

@@ -182,10 +182,14 @@ patch file (device-native format)
 
 - **Builder functions:** named after the block they configure, no "set" prefix; scaffolding helpers
   (gx1's `basePatch`) are the naming exception. Each takes the patch plus one options object. Every
-  block carries its controls in a `params` bag, whether or not they vary by type, validated against
-  the current type's known fields so an unknown key throws rather than silently writing a byte that
-  means something else for this type. Builders are internal: a consumer builds a patch from a spec
-  through `PatchDriver.buildPatch`.
+  block carries its controls in a `params` bag, whether or not they vary by type. Builders are
+  internal and take input `spec/` has already validated against the catalog, so they check nothing
+  again: they fill what the caller left out with factory defaults. A consumer builds a patch from a
+  spec through `PatchDriver.buildPatch`.
+- **Every block's layout is a field list.** A block's controls are `FieldCodec`s, whether the block
+  has one fixed set or one set per type, and the codec's `fieldsFor` is the one place that says which
+  list a block, type and sub-model use. Capabilities stamps each param's `key` from it, and the drift
+  guards compare it against the catalog.
 
 - **`write` dot-notation:** `fx1.params.rate=50` walks the decoded patch object; each segment
   after splitting on `.` navigates one level deeper. The walk belongs to the driver

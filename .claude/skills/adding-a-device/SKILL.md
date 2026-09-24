@@ -130,15 +130,17 @@ Create `core/src/devices/<id>/` with:
   arrays, with reverse-index maps derived via `Object.fromEntries(list.map((v, i) => [v, i]))`,
   and `raw.ts` holds a unique symbol for stashing a decoded patch's original raw bytes
 - `codec/`: the encode/decode pipeline, split into primitives, field codecs, per-block
-  codecs, and a top-level patch composer, plus a barrel `index.ts`
+  codecs, and a top-level patch composer, plus a barrel `index.ts`. Every block's controls are a
+  `FieldCodec` list, fixed-shape blocks included, and one `fieldsFor(group, type, subType)` says
+  which list applies
 - a file-format module (`parseFile` / `serializeFile` / `blankPatch` / `newFile`), named after
   the device's own patch-file format rather than a borrowed name. It converts bytes to a decoded
   file and back and never touches the disk: core's `patchUtils` does every read and write, and lint
   rejects a filesystem import under `devices/`
 - `builder.ts`: high-level construction helpers, named after the block they configure with no
-  "set" prefix. Each takes the patch plus one options object; a block whose params vary by type
-  carries them in a `params` bag, validated against the current type's fields so an unknown key
-  throws instead of writing a byte that means something else for this type
+  "set" prefix. Each takes the patch plus one options object, with the block's controls in a
+  `params` bag. Builders take input the spec validator has already checked, and fill what it leaves
+  out with factory defaults
 - `defaults.ts`: each block type's factory defaults, authored in step 4 from the
   factory-default fixture. The builder fills any param the caller didn't set from here
 - `param-domain.ts`: the value domains a param spec derives from (numeric interval, enum,
@@ -149,9 +151,10 @@ Create `core/src/devices/<id>/` with:
   the in-repo ground truth capabilities derives from and the drift guard checks the codec
   against; authored in step 5 (see there for what it's built from)
 - `driver.ts`: exports a `PatchDriver<T>` object (the contract lives in
-  `core/src/types/driver.ts`) wiring the codec and file-I/O functions together. A driver
-  never self-registers
-- `index.ts`: the device's public barrel, exporting the driver, patch types, and builder helpers
+  `core/src/types/driver.ts`) wiring the codec, file-format and spec functions together. A
+  driver never self-registers
+- `index.ts`: the device's public barrel, exporting the driver, the patch and block types, and
+  `RAW`
 
 **Round-trip byte preservation is non-negotiable**: the codec must start from the original raw
 bytes and overwrite only the byte indices it has actually decoded. Anything not yet understood

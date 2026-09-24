@@ -54,7 +54,8 @@ params at all on the grounds that amp's gain, bass, middle and treble live on th
 
 The amp block's speaker cabinet and microphone are ordinary catalog params now. They were neither,
 so an amp lookup returned every parameter except those two with nothing to say the answer was
-incomplete. Capability lists were corrected wherever else they had drifted from the codec: FIXED
+incomplete. The `cab` and `mic` groups, which describe each cabinet and microphone, say they are
+set through `amp.params.speaker` and `amp.params.mic`, since a patch has no block of either name. Capability lists were corrected wherever else they had drifted from the codec: FIXED
 WAH's `FREQ` is `MANUAL`, the dedicated Delay block never had the `DIRECT` it advertised, several
 FX types were under-reporting `DIRECT` and other params, and the cabinet list was missing its
 `USER1` through `USER8` entries.

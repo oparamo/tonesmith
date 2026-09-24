@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePedalFx,
   decodeSettings, encodeSettings, decodeNoiseGate, encodeNoiseGate, decodeVolume, encodeVolume, decodeName, encodeName,
+  decodeAmp, encodeAmp,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import {
@@ -349,6 +350,15 @@ describe("Values the device has no byte for", () => {
     const encodeBadCurve = () => encodeVolume(block);
 
     expect(encodeBadCurve).toThrow(/BOGUS/);
+  });
+
+  it("encodeAmp names the control whose value is not a byte", () => {
+    const block = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
+    block.params.gain = 500;
+
+    const encodeBadGain = () => encodeAmp(block);
+
+    expect(encodeBadGain).toThrow(/gain/);
   });
 });
 
