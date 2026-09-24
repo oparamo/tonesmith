@@ -1,6 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import type { Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, registry } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
@@ -21,34 +20,6 @@ const inputSchema = z.object({
     "you leave out stays off. Pass the whole set in one call rather than one call per patch."
   ),
 });
-
-type PatchSpec = z.infer<typeof inputSchema>["patches"][number];
-
-/**
- * Builds every patch, naming which one failed. A rejection out of a batch of eight otherwise says
- * only which block was wrong, and the same block is present in all eight.
- */
-const buildAll = (driver: PatchDriver, specs: PatchSpec[]): Patch[] =>
-  specs.map((spec, index) => {
-    try {
-      return driver.buildPatch(spec);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`patches[${index}] "${spec.name}": ${reason}`);
-    }
-  });
-
-/**
- * The patch as the file holds it, rather than as the builder assembled it.
- *
- * A block's decoded shape is per-type, but a builder filling one struct covering every type leaves
- * fields the chosen type has no params for. The codec drops them on the way to bytes, so a round
- * trip through it is what the caller would read back. This echo is documented as the confirmation
- * that replaces a follow-up read_patch, which is why it has to agree with the file rather than with
- * the builder.
- */
-const asStored = (driver: PatchDriver, patch: Patch): Patch =>
-  driver.decodePatch(driver.encodePatch(patch));
 
 const registerGeneratePatch = (server: McpServer): void => {
   server.registerTool(
@@ -71,30 +42,19 @@ needed.`,
     },
     ({ device, outPath, setName, patches }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const built = buildAll(driver, patches);
-      // Every round trip happens before the write, so a patch this codec cannot store fails the
-      // call with the file untouched rather than after it has already been replaced on disk.
-      const stored = built.map(patch => asStored(driver, patch));
-
       const { file, created, saved } = await patchUtils.upsertPatches(driver, {
-        path: outPath, patches: built, setName,
+        path: outPath, specs: patches, setName,
       });
 
-      const results = stored.map((patch, index) => {
-        const entry = saved[index];
-        if (entry === undefined) {
-          throw new Error(`The save reported ${saved.length} patches for the ${stored.length} built.`);
-        }
-        // The patch sits under its own key, matching read_patch, so a caller that reads a patch
-        // and generates one meets one shape. Echoing it whole is what lets the caller confirm
-        // every field the builder defaulted without a follow-up read_patch.
-        return { name: patch.name, action: entry.action, patch };
-      });
+      // The patch sits under its own key, matching read_patch, so a caller that reads a patch and
+      // generates one meets one shape. Echoing it whole is what lets the caller confirm every field
+      // the builder defaulted without a follow-up read_patch.
+      const results = saved.map(({ name, action, patch }) => ({ name, action, patch }));
 
       const fileVerb = created ? "Created" : "Updated";
       const response = {
         summary:
-          `${fileVerb} ${outPath}: saved ${built.length} patch(es), ` +
+          `${fileVerb} ${outPath}: saved ${saved.length} patch(es), ` +
           `${file.patches.length} total in set "${file.name}"`,
         file: { path: outPath, setName: file.name, total: file.patches.length, created },
         patches: results,

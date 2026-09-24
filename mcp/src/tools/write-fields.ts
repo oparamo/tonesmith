@@ -4,22 +4,6 @@ import { patchUtils, registry } from "@tonesmith/core";
 import type { FieldEdits } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
-/**
- * Rejects an input that asks for no change at all, or for a patch edit without naming the patch.
- * Core refuses the same inputs, but in its own terms; this names the arguments the caller passed.
- */
-const requireSomethingToChange = (ref?: string, fields?: object, setName?: string): void => {
-  if (fields === undefined && setName === undefined) {
-    throw new Error(
-      "Nothing to change: pass `fields` (with `ref`) to edit a patch, `setName` to rename " +
-        "the patch set, or both."
-    );
-  }
-  if (fields !== undefined && ref === undefined) {
-    throw new Error("`ref` is required alongside `fields`, since it selects which patch to edit.");
-  }
-};
-
 /** What the edit wrote, read back from core's report so it says what the patch now holds. */
 const describeApplied = (applied: FieldEdits): string =>
   Object.entries(applied)
@@ -63,11 +47,9 @@ const registerWriteFields = (server: McpServer): void => {
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
     ({ file, device, ref, fields, setName }) => attempt(async () => {
-      requireSomethingToChange(ref, fields, setName);
-
       const driver = registry.getDriver(device);
       const edits = fields === undefined ? undefined : Object.entries(fields);
-      const report = await patchUtils.editPatchFile(driver, file, { ref, edits, setName });
+      const report = await patchUtils.editPatchFile(driver, file, { ref, fields: edits, setName });
 
       const changes: string[] = [];
       if (report.index !== undefined && report.applied !== undefined) {

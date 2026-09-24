@@ -69,10 +69,12 @@ core/                       @tonesmith/core
     patch-utils.ts          every file operation, async: readPatchFile, editPatchFile,
                             upsertPatches, copyPatch, createPatchFile, plus resolvePatch /
                             resolvePatches. editPatchFile owns the read-edit-write; what a dot-path
-                            means stays the driver's (applyEdits)
+                            means stays the driver's (applyEdits). upsertPatches saves patches as
+                            given, or builds them from specs first
     file-lock.ts            withFileLock, internal: one queue per file, so two read-change-writes
                             on one file take turns instead of losing an edit
-    capability-utils.ts     findGroup / findType
+    capability-utils.ts     findGroup / findType, and lookup: the chain, a group, or a type (with
+                            its block's controls), whichever a caller names
     atomic-write.ts         writeFileAtomic: sibling file then rename, so a write can never
                             truncate a patch library it fails partway through
     devices/index.ts        driver roster, one line per device
@@ -212,6 +214,11 @@ driver), so they aren't repeated here.
   code of its own. Don't drive the display off `capabilities` instead: a generic loop over the
   catalog trades deliberate grouping and ordering for an alphabetical field dump. Grouping,
   ordering, and panel labels stay the driver's.
+- **A surface parses its own arguments, words its own output and sizes its own responses;
+  everything else is a core call.** The test for anything else a surface is about to write: would
+  the other surface, or a library consumer, need it too? If so it belongs in core, even when one
+  surface is its only caller today. Lint can't see duplication across packages, so this is the
+  check.
 - **A change to a file is one core operation.** Anything that reads a file, changes it and writes
   it back belongs in `patch-utils.ts`, built on `updatePatchFile` (or `withFileLock` where a missing
   file is a start rather than an error), so the lock spans the whole sequence. A surface composing

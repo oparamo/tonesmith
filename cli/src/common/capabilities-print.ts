@@ -1,4 +1,4 @@
-import type { DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
+import type { ChainView, DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "./color";
 
 /**
@@ -15,13 +15,17 @@ const printPatchSettings = (settings: ParamSpec[]): void => {
   console.info();
 };
 
-/** Print the device's signal-chain model: default order, plus how ordering and bypass work. */
-const printChain = (caps: DeviceCapabilities): void => {
+/**
+ * Print the device's signal-chain model (default order, how ordering and bypass work) and what the
+ * patch carries outside any block.
+ */
+const printChain = (chain: ChainView): void => {
   console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
-  console.info(`${YELLOW}Default order:${RESET} ${caps.chain.defaultOrder.join(" → ")}\n`);
-  console.info(caps.chain.description);
+  console.info(`${YELLOW}Default order:${RESET} ${chain.defaultOrder.join(" → ")}\n`);
+  console.info(chain.description);
   console.info();
-  printPatchSettings(caps.patchSettings);
+  console.info(`${YELLOW}Patch name:${RESET} up to ${chain.patchName.maxLength} characters\n`);
+  printPatchSettings(chain.patchSettings);
 };
 
 /** Print a summary table of all groups (id, name, type count), led by a chain pointer. */
@@ -126,7 +130,10 @@ const printExample = (example: CapabilityType["example"]): void => {
   console.info(JSON.stringify(example, null, 2));
 };
 
-/** Print full detail for a single type: description, models, subTypes, params. */
+/**
+ * Print full detail for a single type: description, models, subTypes, params. `capType` comes from
+ * `capabilityUtils.lookup`, whose params already lead with the block's own controls.
+ */
 const printType = (group: CapabilityGroup, capType: CapabilityType): void => {
   console.info(`\n${BOLD}${capType.name}${RESET}  ${DIM}[${group.id} / ${capType.id}]${RESET}\n`);
   console.info(capType.description);
@@ -137,8 +144,7 @@ const printType = (group: CapabilityGroup, capType: CapabilityType): void => {
 
   printTypeSubTypes(capType.subTypes);
 
-  const params = [...(group.params ?? []), ...(capType.params ?? [])];
-  printTypeParams(params);
+  printTypeParams(capType.params);
   printExample(capType.example);
 
   console.info();

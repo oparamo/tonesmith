@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
-import type { Patch, PatchDriver } from "@tonesmith/core";
+import type { FieldEdits, Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, capabilityUtils } from "@tonesmith/core";
 import { printChain, printGroups, printGroup, printType } from "./capabilities-print";
 import { printPatch } from "./patch-print";
@@ -51,6 +51,10 @@ const addRead = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =>
     );
 };
 
+/** What an edit wrote, in the path=value form the command takes. */
+const describeApplied = (applied: FieldEdits): string =>
+  Object.entries(applied).map(([path, value]) => `${path}=${String(value)}`).join(", ");
+
 const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
   cmd
     .command("write <file> <ref> <fields...>")
@@ -58,8 +62,8 @@ const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =
     .action((file: string, ref: string, fields: string[]) =>
       run(async () => {
         const edits = fields.map(parseFieldAssignment);
-        const { index } = await patchUtils.editPatchFile(driver, file, { ref, edits });
-        console.info(`Wrote ${file}, patch ${String(index)} updated: ${fields.join(", ")}`);
+        const { index, applied = {} } = await patchUtils.editPatchFile(driver, file, { ref, fields: edits });
+        console.info(`Wrote ${file}, patch ${String(index)} updated: ${describeApplied(applied)}`);
       })
     );
 };
@@ -114,31 +118,17 @@ const addCapabilities = <T extends Patch>(cmd: Command, driver: PatchDriver<T>):
     .description("browse supported effects, amp models, and other device capabilities")
     .action((groupId?: string, typeId?: string) =>
       run(() => {
-        const caps = driver.capabilities;
-
         if (!groupId) {
-          printGroups(caps);
+          printGroups(driver.capabilities);
           return;
         }
 
-        // The chain sits alongside the groups in the listing, so it answers to the same
-        // case-insensitive match they do, and to a second argument the same way: there is nothing
-        // under it to name.
-        if (groupId.toLowerCase() === "chain") {
-          if (typeId) throw new Error(`The chain has no types, so there is no "${typeId}" to show.`);
-          printChain(caps);
-          return;
+        const found = capabilityUtils.lookup(driver.capabilities, groupId, typeId);
+        switch (found.kind) {
+          case "chain": printChain(found.chain); break;
+          case "group": printGroup(found.group); break;
+          case "type": printType(found.group, found.type); break;
         }
-
-        const group = capabilityUtils.findGroup(caps, groupId);
-
-        if (!typeId) {
-          printGroup(group);
-          return;
-        }
-
-        const found = capabilityUtils.findType(group, typeId);
-        printType(group, found);
       })
     );
 };

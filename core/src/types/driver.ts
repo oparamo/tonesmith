@@ -26,6 +26,7 @@ interface PatchDriver<T extends Patch = Patch> {
    * Builds a patch from a plain spec object, validated against this device's own capability
    * catalog. Takes `unknown` because the spec's shape is device knowledge: a caller that could
    * type it would already have to know the device, which is what this method exists to avoid.
+   * Returns the patch as a file will store it, so what a caller sees is what reading it back gives.
    */
   buildPatch(spec: unknown): T;
   /**

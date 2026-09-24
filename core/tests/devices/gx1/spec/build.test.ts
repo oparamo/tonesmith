@@ -19,6 +19,18 @@ describe("buildPatch", () => {
     expect(patch.chain).toEqual(DEFAULT_CHAIN);
   });
 
+  // A TERA ECHO reverb has no TIME, DENSITY or PRE-DELAY. The blank patch's reverb does, and a
+  // patch carrying them would show settings its file never stores.
+  it("builds a type with only the fields that type stores", () => {
+    const patch = gx1.driver.buildPatch({
+      name: "Tera",
+      reverb: { type: "TERA ECHO", params: { level: 60, direct: 100, spreadTime: 50, feedback: 40, trigger: false } },
+    });
+
+    expect(Object.keys(patch.reverb.params)).not.toContain("time");
+    expect(Object.keys(patch.reverb.params)).not.toContain("density");
+  });
+
   // A sub-model goes in under one name and has to come back out under the same one, so a caller
   // mirroring the block it just read is never rejected for the shape it was handed.
   it("accepts a block's sub-model spelled the way reading it back spells it", () => {

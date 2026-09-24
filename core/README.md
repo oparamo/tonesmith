@@ -37,18 +37,22 @@ console.log(patch.amp.type, patch.amp.params.gain);
 const driver = registry.getDriver(file.device);
 ```
 
-Building a patch goes through the driver, which validates the spec against the device's own
-capability catalog before any byte is written:
+Saving patches from specs builds each one through the driver, which validates it against the
+device's own capability catalog before the file is read or written:
 
 ```ts
-const patch = gx1.driver.buildPatch({
-  name: "GLASSY",
-  amp: { type: "JC-120", params: { gain: 40, bass: 55, middle: 50, treble: 60 } },
-  reverb: { type: "HALL M", params: { level: 30 } },
+await patchUtils.upsertPatches(gx1.driver, {
+  path: "my-set.tsl",
+  specs: [{
+    name: "GLASSY",
+    amp: { type: "JC-120", params: { gain: 40, bass: 55, middle: 50, treble: 60 } },
+    reverb: { type: "HALL M", params: { level: 30 } },
+  }],
 });
-
-await patchUtils.upsertPatches(gx1.driver, { path: "my-set.tsl", patches: [patch] });
 ```
+
+`gx1.driver.buildPatch(spec)` builds one without saving it, exactly as a file would store it, and
+`upsertPatches` takes built or decoded patches as `patches` in place of `specs`.
 
 Editing a patch in place names each field by its dot-path, the same paths a decoded patch reads
 back under:
@@ -56,7 +60,7 @@ back under:
 ```ts
 await patchUtils.editPatchFile(gx1.driver, "my-set.tsl", {
   ref: "GLASSY",
-  edits: [["amp.params.gain", 45], ["reverb.on", false]],
+  fields: [["amp.params.gain", 45], ["reverb.on", false]],
 });
 ```
 
@@ -79,7 +83,8 @@ bytes.
 - `registry`: `registerDriver`, `getDriver`, `listDrivers`
 - `patchUtils`: the file operations `readPatchFile`, `editPatchFile`, `upsertPatches`, `copyPatch`
   and `createPatchFile`; `resolvePatch`, `resolvePatches`, `resolvePatchIndex`; `MAX_NEW_PATCHES`
-- `capabilityUtils`: `findGroup`, `findType`
+- `capabilityUtils`: `lookup` (the chain, a group, or a type), `findGroup`, `findType`,
+  `CHAIN_ENTRY`
 - the `PatchDriver<T>` interface every device implements, whose methods are how a consumer
   decodes, edits, builds and views a patch: `parseFile`, `serializeFile`, `decodePatch`,
   `encodePatch`, `buildPatch`, `applyEdits`, `viewPatch`, `blankPatch`, `newFile`, and its

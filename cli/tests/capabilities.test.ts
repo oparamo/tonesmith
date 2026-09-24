@@ -29,6 +29,13 @@ describe("gx1 capabilities", () => {
     }
   });
 
+  // The name belongs to no block either, and a limit found by being rejected costs a built patch.
+  it("prints the patch name limit alongside the chain", async () => {
+    const output = await capabilitiesOutput("chain");
+
+    expect(output).toContain(String(gx1.driver.capabilities.patchName.maxLength));
+  });
+
   // The settings sit in no group, so the chain view is the only page that can print them.
   it("prints the settings the patch itself holds alongside the chain", async () => {
     const output = await capabilitiesOutput("chain");

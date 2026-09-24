@@ -9,16 +9,16 @@ File I/O is async and lives in `patchUtils`; drivers convert bytes and never tou
 write goes through `patchUtils`, and every one returns a Promise:
 
 - `readPatchFile(driver, path)` reads and decodes a file.
-- `editPatchFile(driver, path, { ref, edits, setName })` applies dot-path edits to one patch and/or
+- `editPatchFile(driver, path, { ref, fields, setName })` applies dot-path edits to one patch and/or
   renames the set in one write, and reports what each edit wrote. A rejected edit leaves the file
   untouched.
-- `upsertPatches`, `copyPatch` and `createPatchFile` keep their arguments and results.
+- `upsertPatches`, `copyPatch` and `createPatchFile` resolve to the reports they return.
 
 ```ts
 const file = await patchUtils.readPatchFile(gx1.driver, "rock-tones.tsl");
 await patchUtils.editPatchFile(gx1.driver, "rock-tones.tsl", {
   ref: "SWORD LEAD",
-  edits: [["amp.params.gain", 45]],
+  fields: [["amp.params.gain", 45]],
 });
 ```
 

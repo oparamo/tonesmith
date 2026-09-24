@@ -27,6 +27,17 @@ describe("gx1 write", () => {
     expect(patch.key).toBe("G");
   });
 
+  // The report comes from what the driver wrote, so a value it normalized reads back normalized.
+  it("reports each value as written rather than as typed", async () => {
+    temp = await withTempDir();
+
+    const { info, exitCode } = await runCli(["gx1", "write", temp.fixture, "0", "amp.params.gain=045"]);
+
+    expect(exitCode).toBeUndefined();
+    expect(info.join("\n")).toContain("amp.params.gain=45");
+    expect(info.join("\n")).not.toContain("045");
+  });
+
   // With no separator there is nothing to split on, and slicing at the index of one drops the
   // argument's last character, so `amp.params.gain` reads as the unknown field `amp.params.gai`.
   it("rejects a field argument with no '=', naming it as typed", async () => {

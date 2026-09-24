@@ -123,17 +123,36 @@ const readExistingOrNew = async <T extends Patch>(
   }
 };
 
-/** What to save and where. `setName` names the patch set itself, not the file. */
-interface UpsertRequest<T extends Patch> {
+/** Where to save, and what to name the patch set: a fresh file takes it, an existing one is renamed. */
+interface UpsertTarget {
   path: string;
-  patches: T[];
   setName?: string;
 }
 
+/**
+ * Patches already decoded or built, saved as they are. A decoded patch has to come this way rather
+ * than as a spec: rebuilding it from its fields would drop the bytes its codec doesn't know.
+ */
+interface SavePatches<T extends Patch> extends UpsertTarget {
+  patches: readonly T[];
+  specs?: never;
+}
+
+/** Plain spec objects, built through `driver.buildPatch` before anything is read or written. */
+interface SaveSpecs extends UpsertTarget {
+  specs: readonly unknown[];
+  patches?: never;
+}
+
+/** Exactly one of `patches` or `specs`: the `never` side makes passing both, or neither, a type error. */
+type UpsertRequest<T extends Patch> = SavePatches<T> | SaveSpecs;
+
 /** What one saved patch became: it took the place of a same-named patch, or joined the set. */
-interface SavedPatch {
+interface SavedPatch<T extends Patch> {
   name: string;
   action: "replaced" | "appended";
+  /** The patch as saved, so a caller can show it without reading the file back. */
+  patch: T;
 }
 
 /**
@@ -144,31 +163,54 @@ interface UpsertReport<T extends Patch> {
   file: PatchFile<T>;
   /** True when `path` held no file and this save started one. */
   created: boolean;
-  saved: SavedPatch[];
+  saved: SavedPatch<T>[];
 }
+
+/** The `name` a spec gives itself, when it gives one, to tell a failing spec apart from its batch. */
+const specNameTag = (spec: unknown): string => {
+  const name = (spec as { name?: unknown } | null)?.name;
+  const tag = typeof name === "string" ? ` ("${name}")` : "";
+  return tag;
+};
+
+/**
+ * Builds every spec, naming which one failed. The same block usually appears in every spec of a
+ * batch, so the driver's own message, which names only the block, leaves the caller guessing which
+ * patch it came from.
+ */
+const buildEach = <T extends Patch>(driver: PatchDriver<T>, specs: readonly unknown[]): T[] =>
+  specs.map((spec, position) => {
+    try {
+      return driver.buildPatch(spec);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Patch spec at position ${position}${specNameTag(spec)}: ${reason}`);
+    }
+  });
 
 /**
  * Refuses a batch that names the same patch twice. The save keys on the name, so the second would
  * replace the first and the report would claim two patches landed where the file holds one.
  */
-const requireDistinctNames = (patches: Patch[]): void => {
+const requireDistinctNames = (patches: readonly Patch[]): void => {
   const seen = new Map<string, number>();
-  for (const [index, patch] of patches.entries()) {
+  for (const [position, patch] of patches.entries()) {
     const first = seen.get(patch.name);
     if (first !== undefined) {
       throw new Error(
-        `Duplicate patch name "${patch.name}" at patches[${first}] and patches[${index}]: ` +
+        `Duplicate patch name "${patch.name}" at positions ${first} and ${position}: ` +
         "a save keys on the name, so only the last would survive. Give each patch its own name."
       );
     }
-    seen.set(patch.name, index);
+    seen.set(patch.name, position);
   }
 };
 
 /**
  * Saves every patch into the file at `path`, keyed by name: a patch whose name already exists
  * replaces it, otherwise it is appended, in array order. Creates the file and any missing parent
- * directories when `path` doesn't exist yet.
+ * directories when `path` doesn't exist yet. Specs are built first, so one that fails leaves the
+ * file as it was.
  *
  * The file is read once and written once however many patches are saved, so a whole set lands in
  * one write rather than a read/write cycle per patch.
@@ -180,9 +222,10 @@ const upsertPatches = async <T extends Patch>(
   driver: PatchDriver<T>,
   request: UpsertRequest<T>,
 ): Promise<UpsertReport<T>> => {
-  const { path, patches, setName } = request;
+  const { path, setName } = request;
+  const patches = request.specs === undefined ? request.patches : buildEach(driver, request.specs);
   const [first] = patches;
-  if (first === undefined) throw new Error("No patches to save: `patches` must hold at least one patch.");
+  if (first === undefined) throw new Error("No patches to save: give at least one.");
   requireDistinctNames(patches);
 
   // Not updatePatchFile: a missing file is a start here rather than an error, and the lock has to
@@ -191,14 +234,14 @@ const upsertPatches = async <T extends Patch>(
     const { file, created } = await readExistingOrNew(driver, path, setName ?? first.name);
     if (setName !== undefined) file.name = setName;
 
-    const saved = patches.map((patch): SavedPatch => {
+    const saved = patches.map((patch): SavedPatch<T> => {
       const index = file.patches.findIndex(existing => existing.name === patch.name);
       if (index >= 0) {
         file.patches[index] = patch;
-        return { name: patch.name, action: "replaced" };
+        return { name: patch.name, action: "replaced", patch };
       }
       file.patches.push(patch);
-      return { name: patch.name, action: "appended" };
+      return { name: patch.name, action: "appended", patch };
     });
 
     await writePatchFile(driver, file, path);
@@ -240,7 +283,7 @@ const copyPatch = async <T extends Patch>(driver: PatchDriver<T>, request: CopyR
 /** Which patch to edit and how, and whether to rename the set. At least one of the two is asked for. */
 interface PatchFileEdit {
   ref?: string;
-  edits?: readonly FieldEdit[];
+  fields?: readonly FieldEdit[];
   setName?: string;
 }
 
@@ -253,14 +296,14 @@ interface PatchFileEditReport {
 
 /** Rejects an edit that asks for no change at all, or for a patch edit without naming the patch. */
 const requireSomethingToChange = (request: PatchFileEdit): void => {
-  if (request.edits === undefined && request.setName === undefined) {
+  if (request.fields === undefined && request.setName === undefined) {
     throw new Error(
-      "Nothing to change: give edits (with a ref) to edit a patch, a setName to rename the patch " +
-        "set, or both."
+      "Nothing to change: pass `fields` (with `ref`) to edit a patch, `setName` to rename the " +
+        "patch set, or both."
     );
   }
-  if (request.edits !== undefined && request.ref === undefined) {
-    throw new Error("A ref is required alongside edits, since it selects which patch to edit.");
+  if (request.fields !== undefined && request.ref === undefined) {
+    throw new Error("`ref` is required alongside `fields`, since it selects which patch to edit.");
   }
 };
 
@@ -275,14 +318,14 @@ const editPatchFile = async <T extends Patch>(
   request: PatchFileEdit,
 ): Promise<PatchFileEditReport> => {
   requireSomethingToChange(request);
-  const { ref, edits, setName } = request;
+  const { ref, fields, setName } = request;
 
   return updatePatchFile(driver, path, file => {
     const report: PatchFileEditReport = {};
-    if (edits !== undefined && ref !== undefined) {
+    if (fields !== undefined && ref !== undefined) {
       const { index, patch } = resolvePatch(file.patches, ref);
       report.index = index;
-      report.applied = driver.applyEdits(patch, edits);
+      report.applied = driver.applyEdits(patch, fields);
     }
     if (setName !== undefined) {
       file.name = setName;
@@ -365,6 +408,7 @@ export {
   createPatchFile,
 };
 export type {
-  SelectedPatch, UpsertRequest, UpsertReport, SavedPatch, CopiedPatch, CopyRequest, NewFileOptions,
+  SelectedPatch, UpsertRequest, SavePatches, SaveSpecs, UpsertReport, SavedPatch, CopiedPatch,
+  CopyRequest, NewFileOptions,
   PatchFileEdit, PatchFileEditReport,
 };

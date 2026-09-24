@@ -89,7 +89,7 @@ describe("editPatchFile", () => {
   it("applies every edit to the patch the ref names and reports what it wrote", async () => {
     const path = await seeded();
 
-    const report = await editPatchFile(makeEditingDriver(), path, { ref: "Clean", edits: [["gain", 40], ["key", "G"]] });
+    const report = await editPatchFile(makeEditingDriver(), path, { ref: "Clean", fields: [["gain", 40], ["key", "G"]] });
 
     expect(report).toEqual({ index: 1, applied: { gain: 40, key: "G" } });
     const [, clean] = (await loadFile(path)).patches;
@@ -101,7 +101,7 @@ describe("editPatchFile", () => {
     const driver = makeEditingDriver();
 
     await editPatchFile(driver, path, { setName: "Renamed" });
-    const both = await editPatchFile(driver, path, { ref: "0", edits: [["gain", 5]], setName: "Both" });
+    const both = await editPatchFile(driver, path, { ref: "0", fields: [["gain", 5]], setName: "Both" });
 
     expect(both).toEqual({ index: 0, applied: { gain: 5 }, setName: "Both" });
     const file = await loadFile(path);
@@ -115,7 +115,7 @@ describe("editPatchFile", () => {
     const path = await seeded();
     const before = await readFile(path, "utf8");
 
-    const refused = editPatchFile(makeEditingDriver(), path, { ref: "0", edits: [["gain", 1], ["badField", 2]] });
+    const refused = editPatchFile(makeEditingDriver(), path, { ref: "0", fields: [["gain", 1], ["badField", 2]] });
 
     await expect(refused).rejects.toThrow("badField");
     expect(await readFile(path, "utf8")).toBe(before);
@@ -123,7 +123,7 @@ describe("editPatchFile", () => {
 
   it.each([
     ["nothing to change", {}],
-    ["edits without a ref", { edits: [["gain", 1]] as const }],
+    ["fields without a ref", { fields: [["gain", 1]] as const }],
   ])("rejects %s without touching the file", async (_, request) => {
     const path = await seeded();
     const before = await readFile(path, "utf8");
@@ -144,8 +144,8 @@ describe("concurrent changes to one file", () => {
     const driver = makeEditingDriver();
 
     await Promise.all([
-      editPatchFile(driver, path, { ref: "0", edits: [["gain", 10]] }),
-      editPatchFile(driver, path, { ref: "1", edits: [["gain", 20]] }),
+      editPatchFile(driver, path, { ref: "0", fields: [["gain", 10]] }),
+      editPatchFile(driver, path, { ref: "1", fields: [["gain", 20]] }),
     ]);
 
     const [lead, clean] = (await loadFile(path)).patches;
@@ -185,8 +185,8 @@ describe("concurrent changes to one file", () => {
     const driver = makeEditingDriver();
 
     const [failed, landed] = await Promise.allSettled([
-      editPatchFile(driver, path, { ref: "0", edits: [["badField", 1]] }),
-      editPatchFile(driver, path, { ref: "0", edits: [["gain", 7]] }),
+      editPatchFile(driver, path, { ref: "0", fields: [["badField", 1]] }),
+      editPatchFile(driver, path, { ref: "0", fields: [["gain", 7]] }),
     ]);
 
     expect(failed.status).toBe("rejected");
@@ -295,18 +295,17 @@ describe("upsertPatches", () => {
     const setPath = pathTo("set.tsl");
     await seedFile(setPath, { name: "Set", device: "FAKE", patches: [makePatch("Lead")] });
 
-    const fresh = await upsertPatches(driver, { path: pathTo("new.tsl"), patches: [makePatch("Solo")] });
-    const existing = await upsertPatches(driver, {
-      path: setPath,
-      patches: [makePatch("Lead"), makePatch("Clean")],
-    });
+    const solo = makePatch("Solo");
+    const [lead, clean] = [makePatch("Lead"), makePatch("Clean")];
+    const fresh = await upsertPatches(driver, { path: pathTo("new.tsl"), patches: [solo] });
+    const existing = await upsertPatches(driver, { path: setPath, patches: [lead, clean] });
 
     expect(fresh.created).toBe(true);
-    expect(fresh.saved).toEqual([{ name: "Solo", action: "appended" }]);
+    expect(fresh.saved).toEqual([{ name: "Solo", action: "appended", patch: solo }]);
     expect(existing.created).toBe(false);
     expect(existing.saved).toEqual([
-      { name: "Lead", action: "replaced" },
-      { name: "Clean", action: "appended" },
+      { name: "Lead", action: "replaced", patch: lead },
+      { name: "Clean", action: "appended", patch: clean },
     ]);
   });
 
@@ -331,6 +330,51 @@ describe("upsertPatches", () => {
     await expect(upsertRepeatedName).rejects.toThrow(/0/);
     await expect(upsertRepeatedName).rejects.toThrow(/2/);
     expect(await pathExists(path), "nothing is written when the batch is rejected").toBe(false);
+  });
+
+  describe("given specs", () => {
+    /** A fake driver that refuses to build any spec carrying `bad`, saying which block it was. */
+    const makeBuildingDriver = (): PatchDriver => ({
+      ...makeFakeDriver(),
+      buildPatch: (spec) => {
+        const { name, bad } = spec as { name: string; bad?: boolean };
+        if (bad === true) throw new Error("fx1: unknown param wobble");
+        return makePatch(name);
+      },
+    });
+
+    it("builds each spec through the driver and saves them in spec order", async () => {
+      const path = pathTo("set.tsl");
+
+      const { saved } = await upsertPatches(makeBuildingDriver(), { path, specs: [{ name: "One" }, { name: "Two" }] });
+      const savedNames = (await loadFile(path)).patches.map(patch => patch.name);
+
+      expect(saved.map(entry => entry.patch)).toEqual([makePatch("One"), makePatch("Two")]);
+      expect(savedNames).toEqual(["One", "Two"]);
+    });
+
+    // The same block tends to appear in every spec of a batch, so the driver's message alone
+    // leaves the caller guessing which patch it came from.
+    it("names the position and name of a spec the driver rejects, and writes nothing", async () => {
+      const path = pathTo("set.tsl");
+      const specs = [{ name: "Good" }, { name: "Bad One", bad: true }];
+
+      const upsertBadSpec = upsertPatches(makeBuildingDriver(), { path, specs });
+
+      await expect(upsertBadSpec).rejects.toThrow(/1/);
+      await expect(upsertBadSpec).rejects.toThrow(/Bad One/);
+      await expect(upsertBadSpec, "carries the driver's reason through").rejects.toThrow(/wobble/);
+      expect(await pathExists(path)).toBe(false);
+    });
+
+    it("rejects specs that build to the same name", async () => {
+      const path = pathTo("set.tsl");
+
+      const upsertRepeatedName = upsertPatches(makeBuildingDriver(), { path, specs: [{ name: "Lead" }, { name: "Lead" }] });
+
+      await expect(upsertRepeatedName).rejects.toThrow(/Lead/);
+      expect(await pathExists(path)).toBe(false);
+    });
   });
 });
 

@@ -89,40 +89,6 @@ describe("generate_patch", () => {
     expect(Object.keys(saved).sort()).toEqual(["action", "name", "patch"]);
   });
 
-  /**
-   * The echo is documented as the confirmation that replaces a follow-up read_patch, so it has to
-   * agree with the file. Taking it from the built patch would not: the builder mutates one block in
-   * place, so fields belonging to whichever type occupied it before survive in memory. A TERA ECHO
-   * reverb, which has no TIME, DENSITY or PRE-DELAY, would keep all three from the blank patch's
-   * reverb and report settings the device never stored.
-   */
-  it("echoes a patch as the file stores it, not as the builder assembled it", async () => {
-    temp = await emptyTempDir();
-    const outPath = join(temp.dir, "tera.tsl");
-    const client = await connectClient();
-    close = client.close;
-    const patchSpec = {
-      name: "Tera",
-      outPath,
-      amp: AMP,
-      reverb: {
-        type: "TERA ECHO",
-        params: { level: 60, direct: 100, spreadTime: 50, feedback: 40, trigger: false },
-      },
-    };
-
-    const { text, isError } = await client.callTool("generate_patch", single(patchSpec));
-
-    expect(isError, text).toBe(false);
-    const saved = onlySaved(text);
-    const echoed = saved.patch as unknown as { reverb: Record<string, unknown> };
-    // Through JSON on both sides: the echo arrives serialized, and that drops the raw-bytes symbol
-    // the codec attaches to every decoded block.
-    const stored = JSON.parse(JSON.stringify((await patchAt(outPath)).reverb)) as Record<string, unknown>;
-    expect(echoed.reverb).toEqual(stored);
-    expect(Object.keys(echoed.reverb)).not.toContain("time");
-  });
-
   // The reason `patches` is an array: a whole set is one call and one file write.
   it("saves every patch in one call, in array order", async () => {
     temp = await emptyTempDir();
@@ -228,26 +194,5 @@ describe("generate_patch", () => {
     const body = JSON.parse(read.text) as { patch: { fx1: Record<string, unknown> } };
 
     expect(echoed.fx1).toEqual(body.patch.fx1);
-  });
-
-  // A batch is one call, and the same block is present in every patch of it, so a rejection that
-  // names only the block leaves eight candidates. The reason the tool builds each spec itself
-  // instead of handing the array to the driver.
-  it("names which patch of a batch a builder rejection came from, and writes nothing", async () => {
-    temp = await emptyTempDir();
-    const outPath = join(temp.dir, "batch.tsl");
-    const client = await connectClient();
-    close = client.close;
-    const good = { name: "Good", amp: AMP };
-    const bad = { name: "Bad One", amp: AMP, fx1: { type: "SCRIPT PH", params: { wobble: 3 } } };
-
-    const { isError, text } = await client.callTool("generate_patch", {
-      device: "gx1", outPath, patches: [good, bad],
-    });
-
-    expect(isError).toBe(true);
-    expect(text, "names the patch, which the driver's own message cannot").toContain("Bad One");
-    expect(text, "and carries the driver's reason through").toContain("wobble");
-    expect(await pathExists(outPath), "one bad patch leaves the whole batch unwritten").toBe(false);
   });
 });

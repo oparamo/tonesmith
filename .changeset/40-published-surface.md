@@ -23,7 +23,7 @@ the file's own raw envelope, which is where the writer takes it from, so no byte
 
 `patchUtils.upsertPatches` returns `{ file, created, saved }` rather than the file alone: whether
 the save started the file, and for each patch, whether it replaced a same-named patch or was
-appended. Its own documented property is that it reads once and writes once however many patches
+appended, and the patch as saved. Its own documented property is that it reads once and writes once however many patches
 are saved, and a caller that had to say what the save did could only work it out by reading and
 decoding the whole file a second time first, which is what `generate_patch` was doing.
 

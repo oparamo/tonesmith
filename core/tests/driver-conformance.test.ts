@@ -85,3 +85,21 @@ describe("every driver's view shows the patch under the chain's own names", () =
     }
   });
 });
+
+/**
+ * A caller shows or saves what `buildPatch` returns, so it has to be what the file will hold. A
+ * builder that mutates a block in place can leave fields of the type it replaced, which a read of
+ * the saved file would not show. Serialized on both sides, since the codec attaches its raw bytes
+ * under a symbol that JSON drops.
+ */
+describe("every driver builds a patch as its file stores it", () => {
+  const cases = blockCases();
+
+  it.each(cases)("$driver $where", ({ driver: id, block, body }) => {
+    const driver = present(drivers.find(candidate => candidate.id === id), `driver ${id}`);
+    const built = driver.buildPatch({ name: "Stored", [block]: body });
+    const stored = driver.decodePatch(driver.encodePatch(built));
+
+    expect(JSON.parse(JSON.stringify(built))).toEqual(JSON.parse(JSON.stringify(stored)));
+  });
+});
