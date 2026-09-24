@@ -84,6 +84,13 @@ describe("gx1 capabilities", () => {
     expect(output).toContain("FLAT");
   });
 
+  it("prints a block control's write key and a sub-algorithm param's", async () => {
+    const [amp, fxDelay] = await Promise.all([capabilitiesOutput("amp"), capabilitiesOutput("fx", "delay")]);
+
+    expect(amp, "the amp's SOLO LEVEL control").toContain("soloLevel");
+    expect(fxDelay, "MODULATE's MOD RATE").toContain("modRate");
+  });
+
   it("prints the block controls for a group with no selectable types", async () => {
     const output = await capabilitiesOutput("noiseGate");
 

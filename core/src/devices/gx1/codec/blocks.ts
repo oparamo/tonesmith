@@ -280,8 +280,7 @@ const encodeVolume = (block: VolumeBlock): string[] => {
 // ── FX_COM block (on/type header + bass-mode type mirror, 3 bytes) ────────────
 //
 // Byte 2 is the bass-mode mirror of byte 1's type selector and never carries a subtype for any
-// effect. Effects that have their own sub-model (COMPRESSOR, LIMITER, AC RESO, CHORUS,
-// CLASSIC-VIBE, HUMANIZER, OD/DS) store it in the FX param block itself (see
+// effect. An effect with its own sub-model stores it in the FX param block itself (see
 // PARAM_SUBTYPE_EFFECTS in common/constants.ts), not here. Out of scope in guitar mode, so
 // byte 2 is always passed through untouched.
 

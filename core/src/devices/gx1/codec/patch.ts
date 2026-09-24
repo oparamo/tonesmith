@@ -30,7 +30,7 @@ const paramBlockKey = (slot: FxSlot, type: string): string => {
 };
 
 /**
- * A raw block this codec reads. `readFile` checks the same list at the file boundary, but decoding
+ * A raw block this codec reads. `parseFile` checks the same list at the file boundary, but decoding
  * is public on the driver, so a param set assembled by hand arrives here having passed no check.
  */
 const blockAt = (paramSet: RawParamSet, key: string): string[] => {

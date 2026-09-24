@@ -7,14 +7,12 @@
  * re-harvests the same data from the fixture and asserts equality.
  *
  * Keys are codec field names (the decoded `key`), values are the decoded defaults. The block-level
- * `on`/`type` selectors are omitted (set separately by the builder), and so is an fx type's
- * `subType`, which DEFAULT_SUBTYPES below carries instead: an FX-slot DELAY's sub-algorithm decides
- * which params exist, so the builder has to resolve it before it can pick a field map, rather than
- * filling it afterwards like any other unset value. PFX has no such type, so its sub-model stays
- * here as the ordinary field it is. fx type param windows don't
- * overlap, so every fx/fxDelay default is exactly the device's factory value; delay/reverb types
- * share some byte offsets, but those shared fields are exactly the builder's positional "covered"
- * fields, so the harvest is only consulted for each type's own (unshared) fields, where it holds.
+ * `on`/`type` selectors are omitted (set separately by the builder), and so is a sub-model
+ * selection, which DEFAULT_SUBTYPES below carries instead: an FX-slot DELAY's sub-algorithm decides
+ * which params exist, so the builder has to resolve it before it can pick that sub-algorithm's
+ * defaults, rather than filling it afterwards like any other unset value. fx type param windows
+ * don't overlap, so every fx/fxDelay default is exactly the device's factory value; delay and reverb
+ * types share some byte offsets, so a field several of them share harvests one value for all.
  *
  * Regenerate after a fixture change: see `tests/devices/gx1/defaults.test.ts`.
  */

@@ -212,7 +212,7 @@ a device plugs in, the device-agnostic shared layer, the `driver.ts` / `index.ts
 grouping, naming, exports at the bottom) live in README.md's Contributing section and apply here;
 what follows is what that section doesn't cover. Mechanical rules are already enforced as
 `eslint.config.js` errors (at most three parameters, no duplicate function bodies, no em dashes,
-ternaries assigned before use, cognitive complexity 10, no sync fs calls, no fs imports in a
+ternaries assigned before use, cognitive complexity 6, no sync fs calls, no fs imports in a
 driver), so they aren't repeated here.
 
 - **The driver supplies the view; the CLI only renders it.** `PatchDriver.viewPatch` returns the

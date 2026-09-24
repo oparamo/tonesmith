@@ -32,6 +32,8 @@ case-sensitively while every real group matches either case, so `capabilities CH
 list that did not mention chain; and `capabilities chain bogus` printed the chain while
 `capabilities amp bogus` errored. Both now behave the way the neighboring groups do. The chain
 view shows the patch name limit alongside the settings the patch carries itself.
+Every param `capabilities` prints carries its `write` key, a block's own controls and a
+sub-algorithm's params included, where only a type's params and the patch settings carried one.
 
 **Color is gated on a terminal reading the output.** The escape sequences were unconditional, so
 `capabilities fx > types.txt` filled the file with them and a pipe carried them into whatever read

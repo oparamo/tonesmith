@@ -72,7 +72,7 @@ export default tseslint.config(
         caughtErrorsIgnorePattern: '^_$',
       }],
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
-      'sonarjs/cognitive-complexity': ['error', 10],
+      'sonarjs/cognitive-complexity': ['error', 6],
       'no-nested-ternary': 'error',
       'no-unneeded-ternary': 'error',
       'max-depth': ['error', 4],

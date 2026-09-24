@@ -55,7 +55,7 @@ const resolveSelection = (group: string, type?: unknown): Selection | undefined 
   return { capGroup, capType };
 };
 
-/** Variant ids are matched case-insensitively, the one place a caller's casing is forgiven. */
+/** Variant ids are matched case-insensitively, as group and type ids are. */
 const matchesSubType = (candidate: CapabilityType, subType: string): boolean =>
   candidate.id.toUpperCase() === subType.toUpperCase();
 

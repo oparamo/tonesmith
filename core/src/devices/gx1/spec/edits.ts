@@ -151,6 +151,9 @@ const reseedForEdit = (patch: Patch, path: string): void => {
   reseedBlock(patch, target.block, leaf);
 };
 
+/** Which of the checked selectors a non-type selection field sets. */
+const selectorKey = (leaf: string): "on" | "subType" => (leaf === ON_FIELD ? "on" : "subType");
+
 /**
  * The selection is read off the patch rather than off the edits, so it reflects a type set in the
  * same batch. Validating `fx1.params.time` against the type the block held before the batch would
@@ -166,10 +169,7 @@ const blockIssues = (patch: Patch, name: BlockName, fields: EditedField[]): Issu
   for (const { leaf, isParam, value } of fields) {
     if (isParam) values[leaf] = value;
     else if (leaf === TYPE_FIELD) checkType(issues, name, value);
-    else {
-      const selector = leaf === ON_FIELD ? "on" : "subType";
-      selectors[selector] = value;
-    }
+    else selectors[selectorKey(leaf)] = value;
   }
   checkSelectors(issues, selectors);
 
