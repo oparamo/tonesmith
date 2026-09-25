@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/device/gx1";
+import { validatePatchSpec } from "../../../../src/device/gx1/spec/build";
+import { gx1Capabilities } from "../../../../src/device/gx1/catalog/capabilities";
 import { BLOCK_NAMES, DEFAULT_CHAIN } from "../../../../src/device/gx1/model";
 import { ROCK_TONES_FIXTURE, moveBefore, patchAt, storedAs } from "../../../helpers";
 
@@ -203,5 +205,158 @@ describe("buildPatch", () => {
 
       expect(storedAs(gx1.driver, bypassed)).toEqual(storedAs(gx1.driver, omitted));
     });
+  });
+});
+
+describe("validatePatchSpec", () => {
+  const amp = { type: "TWIN", params: { gain: 20, bass: 50, middle: 50, treble: 50 } };
+  const valid = { name: "Test", amp };
+
+  it("accepts a minimal usable spec", () => {
+    expect(validatePatchSpec(valid)).toEqual([]);
+  });
+
+  it("names the unknown block and lists the real ones", () => {
+    const [issue] = validatePatchSpec({ ...valid, revrb: { type: "HALL S" } });
+
+    expect(issue).toContain("revrb");
+    expect(issue).toContain("reverb");
+  });
+
+  it("rejects a name longer than the device can store", () => {
+    const tooLong = "x".repeat(gx1Capabilities.patchName.maxLength + 1);
+
+    expect(validatePatchSpec({ ...valid, name: tooLong })).not.toEqual([]);
+  });
+
+  // The block stores one ASCII byte per character. A character outside that set has no byte, and
+  // encoding it would write the low half of its code point as some other letter entirely.
+  it("rejects a name the device has no characters for", () => {
+    const [issue] = validatePatchSpec({ ...valid, name: "Café" });
+
+    expect(issue).toContain("é");
+  });
+
+  // The device gives the amp an on/off byte like every other bypassable block, so a patch that
+  // doesn't sound through one is a patch the hardware runs.
+  it("accepts a spec that names no amp", () => {
+    expect(validatePatchSpec({ name: "Test" })).toEqual([]);
+  });
+
+  it("accepts every patch setting at a value the device stores", () => {
+    const settings = { memoryLevel: 0, bpm: 250, key: "F#", carryover: false, tempoHold: true };
+
+    expect(validatePatchSpec({ ...valid, ...settings })).toEqual([]);
+  });
+
+  const unstorableSettings = [
+    { field: "memoryLevel", value: 201, label: "MEMORY LEVEL", accepted: "200" },
+    { field: "bpm", value: 39, label: "BPM", accepted: "40" },
+    { field: "key", value: "H", label: "KEY", accepted: "F#" },
+    { field: "carryover", value: "yes", label: "CARRYOVER", accepted: "true" },
+    { field: "tempoHold", value: 1, label: "TEMPO HOLD", accepted: "true" },
+  ];
+
+  it.each(unstorableSettings)(
+    "rejects $field outside what the device stores, naming the setting and what it takes",
+    ({ field, value, label, accepted }) => {
+      const [issue, ...rest] = validatePatchSpec({ ...valid, [field]: value });
+
+      expect(rest).toEqual([]);
+      expect(issue, "names the setting").toContain(label);
+      expect(issue, "and what it accepts").toContain(accepted);
+      expect(issue, "and quotes back what it rejected").toContain(JSON.stringify(value));
+    }
+  );
+
+  it("rejects a value of the wrong kind, naming the param", () => {
+    const [issue] = validatePatchSpec({ ...valid, noiseGate: { params: { threshold: "loud", release: 40 } } });
+
+    expect(issue).toContain("THRESHOLD");
+    expect(issue, "should quote back what it was given").toContain("loud");
+  });
+
+  it("rejects a fraction for a param the catalog gives no decimals", () => {
+    const spec = { ...valid, delay: { type: "STANDARD", params: { time: 400.5 } } };
+
+    expect(validatePatchSpec(spec)).not.toEqual([]);
+  });
+
+  it("accepts a fraction where the catalog gives decimals", () => {
+    const spec = { ...valid, reverb: { type: "HALL S", params: { time: 4.5 } } };
+
+    expect(validatePatchSpec(spec)).toEqual([]);
+  });
+
+  it("rejects a block that names no type, listing the types it has", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { params: { time: 4 } } });
+
+    expect(issue).toContain("HALL S");
+  });
+
+  // Without this the type is left unresolved, so every param the caller sent alongside it reads as
+  // an unknown key and nothing in the response says the type was the problem.
+  it("rejects a type the block doesn't have, listing the ones it does", () => {
+    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "HALL XL", params: { time: 4 } } });
+
+    expect(issue).toContain("HALL XL");
+    expect(issue).toContain("HALL S");
+  });
+
+  // Every block fills what the caller leaves unset from the device's own factory values, so naming
+  // the type is the whole obligation. Demanding the controls outright would make a caller invent a
+  // value for every knob on a block it only wanted switched on.
+  it("accepts a block that names only its type, leaving the rest to default", () => {
+    expect(validatePatchSpec({ name: "Test", amp: { type: "TWIN" } })).toEqual([]);
+  });
+
+  it("rejects a control the chosen type has no field for", () => {
+    const issues = validatePatchSpec({ ...valid, reverb: { type: "TERA ECHO", params: { time: 4, level: 50 } } });
+
+    expect(issues.join("\n")).toContain("time");
+  });
+
+  it("rejects a sub-model named among the params, where the decoded block never carries it", () => {
+    const issues = validatePatchSpec({ ...valid, pedalFx: { type: "WAH", params: { subType: "CRY WAH" } } });
+
+    expect(issues.join("\n")).toContain("subType");
+  });
+
+  it("names a param sent one level too high as a param of its type, not an unknown key", () => {
+    const spec = { ...valid, fx1: { type: "CHORUS", rate: 16 } };
+    const [issue] = validatePatchSpec(spec);
+
+    expect(issue).toContain("rate");
+    expect(issue, "should say where it belongs").toContain("params");
+  });
+
+  it("reports every problem it finds rather than stopping at the first", () => {
+    const spec = { ...valid, reverb: { type: "HALL S", params: { time: 99, tone: 999 } } };
+
+    expect(validatePatchSpec(spec)).toHaveLength(2);
+  });
+
+  /**
+   * `on` and `subType` select a block's shape rather than set a control, so they are filtered out
+   * before the param check and reach the builder on trust.
+   */
+  it.each([
+    { label: "a non-boolean on", block: { type: "TWIN", on: "yes" } },
+    { label: "a non-string subType", block: { type: "TWIN", subType: 42 } },
+  ])("rejects $label", ({ block }) => {
+    expect(validatePatchSpec({ name: "Test", amp: block })).toHaveLength(1);
+  });
+
+  it.each([
+    { label: "a chain that is not an array", spec: { chain: "pedalFx" } },
+    { label: "a chain naming a block twice", spec: { chain: ["amp", "amp"] } },
+    { label: "a key the device has no name for", spec: { key: "Am" } },
+    { label: "a key that is not a string", spec: { key: 5 } },
+  ])("rejects $label", ({ spec }) => {
+    expect(validatePatchSpec({ ...valid, ...spec })).toHaveLength(1);
+  });
+
+  it("accepts a key the device names", () => {
+    expect(validatePatchSpec({ ...valid, key: "G" })).toEqual([]);
   });
 });
