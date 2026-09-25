@@ -21,6 +21,7 @@
     "@opendocsg/pdf2md": "0.3.2",
     "@types/node": "24.13.6",
     "eslint": "10.11.0",
+    "eslint-plugin-import-x": "4.17.1",
     "eslint-plugin-sonarjs": "4.2.1",
     "node-html-markdown": "2.0.0",
     "tsx": "4.23.15",

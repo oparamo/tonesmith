@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
+import importX, { createNodeResolver } from 'eslint-plugin-import-x';
 
 const ternarySelector = 'ConditionalExpression:not(VariableDeclarator > ConditionalExpression):not(AssignmentExpression > ConditionalExpression):not(ArrowFunctionExpression > ConditionalExpression)';
 
@@ -60,16 +61,17 @@ const fileNameCase = {
   },
 };
 
-// Both spellings Node accepts for the fs modules, so a bare "fs" can't slip past either rule.
-const fsModules = ['fs', 'node:fs'];
-const allFsModules = [...fsModules, 'fs/promises', 'node:fs/promises'];
-
-// A file importing its own folder's barrel imports itself back through the re-export, which is an
-// import cycle that no layer rule sees.
+// A file importing its own folder's barrel imports itself back through the re-export. no-cycle
+// ignores a type-only import, since it is erased at build, so this keeps the pattern out of the
+// types as well.
 const ownBarrel = {
   regex: '^\\.(/index)?$',
   message: "Import the module itself: this folder's barrel re-exports this file.",
 };
+
+// Both spellings Node accepts for the fs modules, so a bare "fs" can't slip past either rule.
+const fsModules = ['fs', 'node:fs'];
+const allFsModules = [...fsModules, 'fs/promises', 'node:fs/promises'];
 
 /** The patterns that match an import from any of the named folders, at any depth. */
 const folderPatterns = folders => folders.flatMap(folder => [`**/${folder}`, `**/${folder}/**`]);
@@ -104,7 +106,14 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    plugins: { sonarjs, tonesmith: { rules: { 'no-em-dash': noEmDash, 'file-name-case': fileNameCase } } },
+    settings: {
+      // no-cycle follows each import into the file it names, so it has to parse TypeScript and
+      // resolve an extensionless relative path to its .ts file.
+      'import-x/parsers': { '@typescript-eslint/parser': ['.ts'] },
+      'import-x/extensions': ['.ts', '.js'],
+      'import-x/resolver-next': [createNodeResolver({ extensions: ['.ts', '.js', '.json'] })],
+    },
+    plugins: { sonarjs, 'import-x': importX, tonesmith: { rules: { 'no-em-dash': noEmDash, 'file-name-case': fileNameCase } } },
     rules: {
       // Clean Code, enforced rather than reviewed. F1: parameter objects past three arguments.
       // Library callbacks that dictate their own arity (commander's .action) disable it inline.
@@ -116,6 +125,9 @@ export default tseslint.config(
       // the shape this codebase wants, so enabling it would trade a real convention for noise.
       'tonesmith/no-em-dash': 'error',
       'tonesmith/file-name-case': 'error',
+      // An import cycle leaves some module reading another's exports before they exist, and the layer
+      // rules can't see one inside a single layer.
+      'import-x/no-cycle': 'error',
       '@typescript-eslint/no-unused-vars': ['error', {
         vars: 'all',
         args: 'all',

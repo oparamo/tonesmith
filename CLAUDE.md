@@ -102,7 +102,8 @@ folders, naming, exports at the bottom) live in README.md's Contributing section
 what follows is what that section doesn't cover. Mechanical rules are already enforced as
 `eslint.config.js` errors (at most three parameters, no duplicate function bodies, no em dashes,
 ternaries assigned before use, cognitive complexity 6, no sync fs calls, no fs imports in a
-driver, layers importing only downward, camelCase file names), so they aren't repeated here.
+driver, layers importing only downward, no import cycles, camelCase file names), so they aren't
+repeated here.
 
 - **The driver supplies the view; the CLI only renders it.** `PatchDriver.viewPatch` returns the
   patch as a person reads it; one printer in `cli/src/common/` walks it, so a device ships no CLI

@@ -79,6 +79,8 @@ What holds each boundary:
   second device plugs in without a shared file changing to make room for it.
 - **Only persistence touches the disk.** Drivers are linted against every fs module and against
   `persistence/`, and the model and common layers against everything above them.
+- **No import cycles.** `import-x/no-cycle` rejects a runtime cycle anywhere, and a file may not
+  import its own folder's barrel, which also keeps type-only cycles out.
 
 ## core
 
