@@ -2,3 +2,7 @@ packages:
   - core
   - cli
   - mcp
+
+# esbuild's install script checks that its platform binary landed; tsup, tsx and vitest all run on it.
+allowBuilds:
+  esbuild: true
