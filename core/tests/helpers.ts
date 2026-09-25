@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { parseFile } from "../src/device/gx1/format/tsl";
 import { RAW } from "../src/device/gx1/model";
 import type { Patch } from "../src/device/gx1/model";
+import type { Patch as BasePatch, PatchDriver } from "../src/model";
 
 /** Both fixtures anchored off this file, so no suite hand-counts its own way up the tree. */
 const REPO_ROOT = resolve(import.meta.dirname, "../..");
@@ -77,7 +78,14 @@ const scratchFile = (basename: string): (() => string) => {
   return () => join(dir(), basename);
 };
 
+/** `patch` as a file stores it: saved into a file of its own through the driver's format and read back. */
+const storedAs = <T extends BasePatch>(driver: PatchDriver<T>, patch: T): T => {
+  const file = driver.newFile("Stored", 0);
+  file.patches.push(patch);
+  return present(driver.parseFile(driver.serializeFile(file), "stored").patches[0], "the stored patch");
+};
+
 export {
   ROCK_TONES_FIXTURE, DEFAULT_INIT_FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
-  present, patchAt, rawBlock, moveBefore, pathExists, scratchDir, scratchFile,
+  present, patchAt, rawBlock, moveBefore, pathExists, scratchDir, scratchFile, storedAs,
 };

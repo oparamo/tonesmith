@@ -23,6 +23,7 @@ import type { BlockName } from "../../../../src/device/gx1/model";
 import { DEFAULTS_BY_TYPE } from "../../../../src/device/gx1/catalog/defaults";
 import { gx1Capabilities } from "../../../../src/device/gx1/catalog/capabilities";
 import { driver } from "../../../../src/device/gx1/driver";
+import { blankPatch } from "../../../../src/device/gx1/format/tsl";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../../src/device/gx1/catalog/paramCatalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../../src/device/gx1/format/codec/fxParams";
 import {
@@ -458,7 +459,7 @@ describe("GX-1 patch-settings capability", () => {
   });
 
   it("stamps each setting with the key a decoded patch carries it under", () => {
-    const patch = driver.blankPatch("Test") as unknown as Record<string, unknown>;
+    const patch = blankPatch("Test") as unknown as Record<string, unknown>;
 
     for (const spec of specs) {
       expect(Object.keys(patch), `setting "${spec.name}" stamped key "${spec.key}"`).toContain(spec.key);
@@ -466,7 +467,7 @@ describe("GX-1 patch-settings capability", () => {
   });
 
   it("takes the settings of a patch read off the device straight back as a spec", () => {
-    const patch = driver.blankPatch("Test") as unknown as Record<string, unknown>;
+    const patch = blankPatch("Test") as unknown as Record<string, unknown>;
     const settings = Object.fromEntries(codecFields.map(field => [field, patch[field]]));
 
     const rebuilt = driver.buildPatch({ name: "Test", ...settings }) as unknown as Record<string, unknown>;
@@ -483,7 +484,7 @@ describe("GX-1 patch-name capability", () => {
   it("keeps a name that fills the stored width", () => {
     const full = "x".repeat(NAME_BYTES);
 
-    expect(driver.blankPatch(full).name).toBe(full);
+    expect(blankPatch(full).name).toBe(full);
   });
 });
 

@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { drivers } from "../../src/device";
-import { present } from "../helpers";
+import { present, storedAs } from "../helpers";
 
 /** The complete set of keys a block may carry beside its params. */
 const SELECTORS = ["on", "type", "subType"];
@@ -98,7 +98,7 @@ describe("every driver builds a patch as its file stores it", () => {
   it.each(cases)("$driver $where", ({ driver: id, block, body }) => {
     const driver = present(drivers.find(candidate => candidate.id === id), `driver ${id}`);
     const built = driver.buildPatch({ name: "Stored", [block]: body });
-    const stored = driver.decodePatch(driver.encodePatch(built));
+    const stored = storedAs(driver, built);
 
     expect(JSON.parse(JSON.stringify(built))).toEqual(JSON.parse(JSON.stringify(stored)));
   });

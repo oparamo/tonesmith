@@ -38,6 +38,4 @@ interface PatchFile<T extends Patch = Patch> {
   patches: T[];
 }
 
-type RawPatch = Record<string, unknown>;
-
-export type { FieldValue, PatchBlock, Patch, PatchFile, RawPatch };
+export type { FieldValue, PatchBlock, Patch, PatchFile };

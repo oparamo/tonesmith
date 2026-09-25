@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/device/gx1";
 import type { Patch } from "../../../../src/device/gx1";
 import type { FieldValue } from "../../../../src/model";
-import { ROCK_TONES_FIXTURE, patchAt } from "../../../helpers";
+import { ROCK_TONES_FIXTURE, patchAt, storedAs } from "../../../helpers";
 
 /** A built patch these cases can edit, with an amp on it so an amp edit has somewhere to land. */
 const patchWith = (spec: Record<string, unknown>): Patch =>
@@ -386,7 +386,7 @@ describe("applyEdits survives the round trip through the device's own bytes", ()
     const patch = await patchAt(ROCK_TONES_FIXTURE);
 
     applyTo(patch, { "fx1.type": "DELAY", "fx1.subType": "STANDARD", "fx1.params.time": 400 });
-    const reread = gx1.driver.decodePatch(gx1.driver.encodePatch(patch));
+    const reread = storedAs(gx1.driver, patch);
 
     expect(reread.fx1.type).toBe("DELAY");
     expect(reread.fx1.subType).toBe("STANDARD");

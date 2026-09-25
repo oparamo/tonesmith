@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { driver } from "../../../src/device/gx1/driver";
 import { viewPatch } from "../../../src/device/gx1/view";
+import { blankPatch } from "../../../src/device/gx1/format/tsl";
 import { BLOCK_NAMES } from "../../../src/device/gx1/model";
 import type { Patch } from "../../../src/device/gx1/model";
 import { ROCK_TONES_FIXTURE as FIXTURE, patchAt, present } from "../../helpers";
@@ -49,14 +50,14 @@ describe("gx1 patch view", () => {
   });
 
   it("reads the two switches as the device labels them, not as true and false", () => {
-    const patch = driver.blankPatch("Test");
+    const patch = blankPatch("Test");
 
     expect(detail(patch, "Carryover")).toBe("ON");
     expect(detail(patch, "Tempo hold")).toBe("OFF");
   });
 
   it("carries a memo only when the patch has one", () => {
-    const patch = driver.blankPatch("Test");
+    const patch = blankPatch("Test");
 
     expect(detail(patch, "Memo")).toBeUndefined();
 

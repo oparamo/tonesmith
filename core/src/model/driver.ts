@@ -1,4 +1,4 @@
-import type { FieldValue, Patch, PatchFile, RawPatch } from "./patch";
+import type { FieldValue, Patch, PatchFile } from "./patch";
 import type { DeviceCapabilities } from "./capabilities";
 import type { PatchView } from "./view";
 
@@ -21,7 +21,6 @@ interface PatchDriver<T extends Patch = Patch> {
   /** Encodes a patch file to the bytes the device's format stores it as. */
   serializeFile(file: PatchFile<T>): Uint8Array;
   newFile(setName: string, nPatches?: number): PatchFile<T>;
-  blankPatch(name?: string): T;
   /**
    * Builds a patch from a plain spec object, validated against this device's own capability
    * catalog. Takes `unknown` because the spec's shape is device knowledge: a caller that could
@@ -46,8 +45,6 @@ interface PatchDriver<T extends Patch = Patch> {
    * stay the driver's, so displaying a device that ships later costs nothing outside its driver.
    */
   viewPatch(patch: T): PatchView;
-  decodePatch(raw: RawPatch): T;
-  encodePatch(patch: T): RawPatch;
 }
 
 export type { FieldEdit, FieldEdits, PatchDriver };

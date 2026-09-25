@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/device/gx1";
 import { BLOCK_NAMES, DEFAULT_CHAIN } from "../../../../src/device/gx1/model";
-import { ROCK_TONES_FIXTURE, moveBefore, patchAt } from "../../../helpers";
+import { ROCK_TONES_FIXTURE, moveBefore, patchAt, storedAs } from "../../../helpers";
 
 describe("buildPatch", () => {
   it("builds every block the spec names, defaults filled in", () => {
@@ -39,7 +39,7 @@ describe("buildPatch", () => {
       pedalFx: { type: "WAH", subType: "VO WAH" },
     });
 
-    const read = gx1.driver.decodePatch(gx1.driver.encodePatch(built));
+    const read = storedAs(gx1.driver, built);
     const echoed = (): unknown => gx1.driver.buildPatch({
       name: "Wah Again",
       amp: { type: "TWIN" },
@@ -59,7 +59,7 @@ describe("buildPatch", () => {
       amp: { type: "TWIN" },
       fx1: { type: "TREMOLO" },
     });
-    const read = gx1.driver.decodePatch(gx1.driver.encodePatch(built));
+    const read = storedAs(gx1.driver, built);
 
     const resend = (): unknown => gx1.driver.buildPatch({
       name: read.name, memo: read.memo, chain: read.chain, bpm: read.bpm, key: read.key,
@@ -201,7 +201,7 @@ describe("buildPatch", () => {
       const omitted = gx1.driver.buildPatch({ name: "Bypass" });
       const bypassed = gx1.driver.buildPatch({ name: "Bypass", [block]: { on: false } });
 
-      expect(gx1.driver.encodePatch(bypassed)).toEqual(gx1.driver.encodePatch(omitted));
+      expect(storedAs(gx1.driver, bypassed)).toEqual(storedAs(gx1.driver, omitted));
     });
   });
 });
