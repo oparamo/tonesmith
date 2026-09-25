@@ -3,7 +3,8 @@ import * as gx1 from "../../../../src/device/gx1";
 import { validatePatchSpec } from "../../../../src/device/gx1/spec/build";
 import { gx1Capabilities } from "../../../../src/device/gx1/catalog/capabilities";
 import { BLOCK_NAMES, DEFAULT_CHAIN } from "../../../../src/device/gx1/model";
-import { ROCK_TONES_FIXTURE, moveBefore, patchAt, storedAs } from "../../../helpers";
+import { ROCK_TONES_FIXTURE, moveBefore, patchAt } from "../helpers";
+import { storedAs } from "../../../helpers";
 
 describe("buildPatch", () => {
   it("builds every block the spec names, defaults filled in", () => {
@@ -17,7 +18,7 @@ describe("buildPatch", () => {
     expect(patch.name).toBe("Ojitos Lindos");
     expect(patch.delay.params.time).toBe(400);
     expect(patch.reverb.params.pitch).toBe(12);
-    expect(patch.chain).toEqual(DEFAULT_CHAIN);
+    expect(patch.chain).toStrictEqual(DEFAULT_CHAIN);
   });
 
   // A TERA ECHO reverb has no TIME, DENSITY or PRE-DELAY. The blank patch's reverb does, and a
@@ -113,7 +114,7 @@ describe("buildPatch", () => {
       amp: { type: "TWIN", params: { gain: 20, bass: 50, middle: 50, treble: 50 } },
     });
 
-    expect(patch.chain).toEqual(reordered);
+    expect(patch.chain).toStrictEqual(reordered);
   });
 
   it("throws every issue at once rather than the first", () => {
@@ -182,7 +183,7 @@ describe("buildPatch", () => {
       const omitted = gx1.driver.buildPatch(delayOnly);
       const bypassed = gx1.driver.buildPatch({ ...delayOnly, amp: { on: false } });
 
-      expect(bypassed.amp).toEqual(omitted.amp);
+      expect(bypassed.amp).toStrictEqual(omitted.amp);
     });
 
     it("still requires a type from an amp the patch does sound through", () => {
@@ -203,7 +204,7 @@ describe("buildPatch", () => {
       const omitted = gx1.driver.buildPatch({ name: "Bypass" });
       const bypassed = gx1.driver.buildPatch({ name: "Bypass", [block]: { on: false } });
 
-      expect(storedAs(gx1.driver, bypassed)).toEqual(storedAs(gx1.driver, omitted));
+      expect(storedAs(gx1.driver, bypassed)).toStrictEqual(storedAs(gx1.driver, omitted));
     });
   });
 });
@@ -213,7 +214,7 @@ describe("validatePatchSpec", () => {
   const valid = { name: "Test", amp };
 
   it("accepts a minimal usable spec", () => {
-    expect(validatePatchSpec(valid)).toEqual([]);
+    expect(validatePatchSpec(valid)).toStrictEqual([]);
   });
 
   it("names the unknown block and lists the real ones", () => {
@@ -226,7 +227,7 @@ describe("validatePatchSpec", () => {
   it("rejects a name longer than the device can store", () => {
     const tooLong = "x".repeat(gx1Capabilities.patchName.maxLength + 1);
 
-    expect(validatePatchSpec({ ...valid, name: tooLong })).not.toEqual([]);
+    expect(validatePatchSpec({ ...valid, name: tooLong })).not.toStrictEqual([]);
   });
 
   // The block stores one ASCII byte per character. A character outside that set has no byte, and
@@ -240,13 +241,13 @@ describe("validatePatchSpec", () => {
   // The device gives the amp an on/off byte like every other bypassable block, so a patch that
   // doesn't sound through one is a patch the hardware runs.
   it("accepts a spec that names no amp", () => {
-    expect(validatePatchSpec({ name: "Test" })).toEqual([]);
+    expect(validatePatchSpec({ name: "Test" })).toStrictEqual([]);
   });
 
   it("accepts every patch setting at a value the device stores", () => {
     const settings = { memoryLevel: 0, bpm: 250, key: "F#", carryover: false, tempoHold: true };
 
-    expect(validatePatchSpec({ ...valid, ...settings })).toEqual([]);
+    expect(validatePatchSpec({ ...valid, ...settings })).toStrictEqual([]);
   });
 
   const unstorableSettings = [
@@ -262,7 +263,7 @@ describe("validatePatchSpec", () => {
     ({ field, value, label, accepted }) => {
       const [issue, ...rest] = validatePatchSpec({ ...valid, [field]: value });
 
-      expect(rest).toEqual([]);
+      expect(rest).toStrictEqual([]);
       expect(issue, "names the setting").toContain(label);
       expect(issue, "and what it accepts").toContain(accepted);
       expect(issue, "and quotes back what it rejected").toContain(JSON.stringify(value));
@@ -279,13 +280,13 @@ describe("validatePatchSpec", () => {
   it("rejects a fraction for a param the catalog gives no decimals", () => {
     const spec = { ...valid, delay: { type: "STANDARD", params: { time: 400.5 } } };
 
-    expect(validatePatchSpec(spec)).not.toEqual([]);
+    expect(validatePatchSpec(spec)).not.toStrictEqual([]);
   });
 
   it("accepts a fraction where the catalog gives decimals", () => {
     const spec = { ...valid, reverb: { type: "HALL S", params: { time: 4.5 } } };
 
-    expect(validatePatchSpec(spec)).toEqual([]);
+    expect(validatePatchSpec(spec)).toStrictEqual([]);
   });
 
   it("rejects a block that names no type, listing the types it has", () => {
@@ -307,7 +308,7 @@ describe("validatePatchSpec", () => {
   // the type is the whole obligation. Demanding the controls outright would make a caller invent a
   // value for every knob on a block it only wanted switched on.
   it("accepts a block that names only its type, leaving the rest to default", () => {
-    expect(validatePatchSpec({ name: "Test", amp: { type: "TWIN" } })).toEqual([]);
+    expect(validatePatchSpec({ name: "Test", amp: { type: "TWIN" } })).toStrictEqual([]);
   });
 
   it("rejects a control the chosen type has no field for", () => {
@@ -357,6 +358,6 @@ describe("validatePatchSpec", () => {
   });
 
   it("accepts a key the device names", () => {
-    expect(validatePatchSpec({ ...valid, key: "G" })).toEqual([]);
+    expect(validatePatchSpec({ ...valid, key: "G" })).toStrictEqual([]);
   });
 });

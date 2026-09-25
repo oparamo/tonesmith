@@ -6,7 +6,8 @@ import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/device/gx1";
 import type { Patch } from "../../../../src/device/gx1";
 import type { FieldValue } from "../../../../src/model";
-import { ROCK_TONES_FIXTURE, patchAt, storedAs } from "../../../helpers";
+import { ROCK_TONES_FIXTURE, patchAt } from "../helpers";
+import { storedAs } from "../../../helpers";
 
 /** A built patch these cases can edit, with an amp on it so an amp edit has somewhere to land. */
 const patchWith = (spec: Record<string, unknown>): Patch =>
@@ -41,7 +42,7 @@ describe("applyEdits", () => {
     const applied = applyTo(patch, { bpm: 140 });
 
     expect(patch.bpm).toBe(140);
-    expect(applied).toEqual({ bpm: 140 });
+    expect(applied).toStrictEqual({ bpm: 140 });
   });
 
   // A setting names no block, so the per-block check never sees it. Without a check of its own the
@@ -61,7 +62,7 @@ describe("applyEdits", () => {
     const applied = applyTo(patch, { "amp.params.gain": 72 });
 
     expect(valueAt(patch, "amp.params.gain")).toBe(72);
-    expect(applied).toEqual({ "amp.params.gain": 72 });
+    expect(applied).toStrictEqual({ "amp.params.gain": 72 });
   });
 
   it("applies a whole batch in order, leaving the fields it was not given alone", () => {
@@ -79,7 +80,7 @@ describe("applyEdits", () => {
   it("accepts an edit to a block that has no types of its own", () => {
     const patch = patchWith({ noiseGate: { params: { threshold: 20 } } });
 
-    expect(issuesFrom(patch, { "noiseGate.params.threshold": 40 })).toEqual([]);
+    expect(issuesFrom(patch, { "noiseGate.params.threshold": 40 })).toStrictEqual([]);
   });
 });
 
@@ -267,7 +268,7 @@ describe("applyEdits rejects a value the device cannot store", () => {
   it("accepts switching fx3 to OVERTONE", () => {
     const patch = patchWith({ fx3: { type: "TREMOLO" } });
 
-    expect(issuesFrom(patch, { "fx3.type": "OVERTONE" })).toEqual([]);
+    expect(issuesFrom(patch, { "fx3.type": "OVERTONE" })).toStrictEqual([]);
   });
 });
 
@@ -284,7 +285,7 @@ describe("applyEdits reads each block's selection off the patch it just edited",
       "fx1.type": "DELAY", "fx1.subType": "STANDARD", "fx1.params.time": 400,
     });
 
-    expect(issues).toEqual([]);
+    expect(issues).toStrictEqual([]);
     expect(patch.fx1.type).toBe("DELAY");
     expect(patch.fx1.subType).toBe("STANDARD");
     expect(valueAt(patch, "fx1.params.time")).toBe(400);
@@ -301,14 +302,14 @@ describe("applyEdits reads each block's selection off the patch it just edited",
 
     applyTo(patch, { "fx1.type": "DELAY", "fx1.subType": "STANDARD", "fx1.params.time": 400 });
 
-    expect(patch.fx1.params).toEqual(built.fx1.params);
+    expect(patch.fx1.params).toStrictEqual(built.fx1.params);
     expect("sustain" in patch.fx1.params, "a control of the effect it stopped being").toBe(false);
   });
 
   it("takes a type change on its own, arriving on the device's factory sub-model", () => {
     const patch = patchWith({ fx1: { type: "COMPRESSOR" } });
 
-    expect(issuesFrom(patch, { "fx1.type": "DELAY" })).toEqual([]);
+    expect(issuesFrom(patch, { "fx1.type": "DELAY" })).toStrictEqual([]);
     expect(patch.fx1.subType).toBe("STANDARD");
   });
 
@@ -318,7 +319,7 @@ describe("applyEdits reads each block's selection off the patch it just edited",
 
     const issues = issuesFrom(patch, { "fx1.subType": "GLITCH", "fx1.params.glitch": 50 });
 
-    expect(issues).toEqual([]);
+    expect(issues).toStrictEqual([]);
     expect(valueAt(patch, "fx1.params.glitch")).toBe(50);
     expect("highCut" in patch.fx1.params, "a control of the sub-model it left").toBe(false);
   });
@@ -371,7 +372,7 @@ describe("applyEdits reads each block's selection off the patch it just edited",
   it("passes over a path the catalog says nothing about, leaving it to the codec", () => {
     const patch = patchWith({});
 
-    expect(issuesFrom(patch, { name: "Renamed" })).toEqual([]);
+    expect(issuesFrom(patch, { name: "Renamed" })).toStrictEqual([]);
   });
 });
 
@@ -390,6 +391,6 @@ describe("applyEdits survives the round trip through the device's own bytes", ()
 
     expect(reread.fx1.type).toBe("DELAY");
     expect(reread.fx1.subType).toBe("STANDARD");
-    expect(reread.fx1.params).toEqual(patch.fx1.params);
+    expect(reread.fx1.params).toStrictEqual(patch.fx1.params);
   });
 });

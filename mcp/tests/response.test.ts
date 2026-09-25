@@ -6,7 +6,7 @@ describe("ok", () => {
   it("wraps text in a single text content block", () => {
     const result = ok("hello");
 
-    expect(result).toEqual({ content: [{ type: "text", text: "hello" }] });
+    expect(result).toStrictEqual({ content: [{ type: "text", text: "hello" }] });
   });
 });
 
@@ -14,13 +14,13 @@ describe("err", () => {
   it("formats an Error instance's message", () => {
     const result = err(new Error("boom"));
 
-    expect(result).toEqual({ content: [{ type: "text", text: "Error: boom" }], isError: true });
+    expect(result).toStrictEqual({ content: [{ type: "text", text: "Error: boom" }], isError: true });
   });
 
   it("stringifies a non-Error thrown value", () => {
     const result = err("boom");
 
-    expect(result).toEqual({ content: [{ type: "text", text: "Error: boom" }], isError: true });
+    expect(result).toStrictEqual({ content: [{ type: "text", text: "Error: boom" }], isError: true });
   });
 });
 
@@ -28,12 +28,12 @@ describe("attempt", () => {
   it("returns what the work returned", async () => {
     const result = await attempt(() => ok("done"));
 
-    expect(result).toEqual({ content: [{ type: "text", text: "done" }] });
+    expect(result).toStrictEqual({ content: [{ type: "text", text: "done" }] });
   });
 
   it("turns a throw into an error response rather than letting it reach the transport", async () => {
     const result = await attempt(() => { throw new Error("boom"); });
 
-    expect(result).toEqual({ content: [{ type: "text", text: "Error: boom" }], isError: true });
+    expect(result).toStrictEqual({ content: [{ type: "text", text: "Error: boom" }], isError: true });
   });
 });

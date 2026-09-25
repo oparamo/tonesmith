@@ -82,7 +82,7 @@ describe("describe_device", () => {
 
     expect(entries.length, help).toBeGreaterThan(1);
     expect(isError, reply).toBe(false);
-    expect(Object.keys(JSON.parse(reply) as object)).toEqual(entries);
+    expect(Object.keys(JSON.parse(reply) as object)).toStrictEqual(entries);
   });
 
   it("returns the full chain model for the chain entry", async () => {
@@ -93,7 +93,7 @@ describe("describe_device", () => {
 
     expect(isError, text).toBe(false);
     const chain = viewOf(text, "chain") as { defaultOrder: string[] };
-    expect(chain.defaultOrder, "chain view lists the default block order").toEqual(gx1.driver.capabilities.chain.defaultOrder);
+    expect(chain.defaultOrder, "chain view lists the default block order").toStrictEqual(gx1.driver.capabilities.chain.defaultOrder);
   });
 
   // The settings belong to no group, so this entry is the only one that can carry them. Dropping
@@ -106,7 +106,7 @@ describe("describe_device", () => {
 
     expect(isError, text).toBe(false);
     const chain = viewOf(text, "chain") as { patchSettings: { key: string }[] };
-    expect(chain.patchSettings).toEqual(gx1.driver.capabilities.patchSettings);
+    expect(chain.patchSettings).toStrictEqual(gx1.driver.capabilities.patchSettings);
   });
 
   // The whole point of the batch form: a patch's worth of lookups in one round trip.
@@ -119,10 +119,10 @@ describe("describe_device", () => {
 
     expect(isError, text).toBe(false);
     const views = JSON.parse(text) as Record<string, { id?: string; defaultOrder?: string[] }>;
-    expect(Object.keys(views), "every requested entry comes back").toEqual(items);
+    expect(Object.keys(views), "every requested entry comes back").toStrictEqual(items);
     const requested = (entry: string): { id?: string; defaultOrder?: string[] } =>
       present(views[entry], `the ${entry} view`);
-    expect(requested("chain").defaultOrder).toEqual(gx1.driver.capabilities.chain.defaultOrder);
+    expect(requested("chain").defaultOrder).toStrictEqual(gx1.driver.capabilities.chain.defaultOrder);
     expect(requested("amp").id).toBe("amp");
     expect(requested("fx/CHORUS").id).toBe("CHORUS");
     expect(requested("reverb/HALL M").id).toBe("HALL M");

@@ -93,26 +93,26 @@ const slot = (patch: Patch, name: string) => (patch as unknown as Record<string,
 
 describe("validateTypeParams", () => {
   it("leaves a type the catalog doesn't know to the type check", () => {
-    expect(validateTypeParams(CATALOG, { group: "fx", type: "NOPE", values: { level: 500 } })).toEqual([]);
+    expect(validateTypeParams(CATALOG, { group: "fx", type: "NOPE", values: { level: 500 } })).toStrictEqual([]);
   });
 
   it("names the param, the type and the value when a number is out of range", () => {
     const [issue, ...rest] = validateTypeParams(CATALOG, { group: "fx", type: "ECHO", values: { level: 500 } });
 
-    expect(rest).toEqual([]);
+    expect(rest).toStrictEqual([]);
     expect(issue).toContain("LEVEL");
     expect(issue).toContain("ECHO");
     expect(issue).toContain("500");
   });
 
   it("ignores a key the type has no param for, leaving it to the key check", () => {
-    expect(validateTypeParams(CATALOG, { group: "fx", type: "ECHO", values: { bogus: 1 } })).toEqual([]);
+    expect(validateTypeParams(CATALOG, { group: "fx", type: "ECHO", values: { bogus: 1 } })).toStrictEqual([]);
   });
 
   it("takes either half of a numeric-or-named param", () => {
     const issues = validateTypeParams(CATALOG, { group: "fx", type: "ECHO", values: { time: "1/8" } });
 
-    expect(issues).toEqual([]);
+    expect(issues).toStrictEqual([]);
   });
 
   it("rejects a named value the param doesn't have, listing the ones it does", () => {
@@ -160,18 +160,18 @@ describe("validatePatchSettings", () => {
   });
 
   it("takes a fraction only where the param has decimals", () => {
-    expect(validatePatchSettings(CATALOG, { trim: 2.5 })).toEqual([]);
+    expect(validatePatchSettings(CATALOG, { trim: 2.5 })).toStrictEqual([]);
     expect(validatePatchSettings(CATALOG, { tempo: 120.5 })).toHaveLength(1);
   });
 });
 
 describe("setBlocks", () => {
   it("folds a bare bypass into a block left out, for a block that can be bypassed", () => {
-    expect(setBlocks(CATALOG, { slot1: { on: false }, slot2: { type: "ECHO" } })).toEqual(["slot2"]);
+    expect(setBlocks(CATALOG, { slot1: { on: false }, slot2: { type: "ECHO" } })).toStrictEqual(["slot2"]);
   });
 
   it("keeps a bare bypass on a block that can't be bypassed, so the check reports it", () => {
-    expect(setBlocks(CATALOG, { gate: { on: false } })).toEqual(["gate"]);
+    expect(setBlocks(CATALOG, { gate: { on: false } })).toStrictEqual(["gate"]);
   });
 });
 
@@ -179,7 +179,7 @@ describe("validateSpec", () => {
   it("accepts a spec whose blocks and settings all fit", () => {
     const spec = { name: "Ok", tempo: 90, slot1: { type: "ECHO", params: { level: 10 } }, gate: { params: { threshold: 5 } } };
 
-    expect(validateSpec(CATALOG, spec)).toEqual([]);
+    expect(validateSpec(CATALOG, spec)).toStrictEqual([]);
   });
 
   it("rejects a type in a block that doesn't offer it, naming the block that does", () => {
@@ -225,14 +225,14 @@ describe("applyEdits", () => {
   it("reads a string as the number a numeric field holds", () => {
     const patch = echoPatch();
 
-    expect(edit(patch, { "slot1.params.level": "75" })).toEqual({ "slot1.params.level": 75 });
+    expect(edit(patch, { "slot1.params.level": "75" })).toStrictEqual({ "slot1.params.level": 75 });
     expect(slot(patch, "slot1")?.params).toMatchObject({ level: 75 });
   });
 
   it("keeps a string a string where the field holds text", () => {
     const patch = echoPatch();
 
-    expect(edit(patch, { name: "1984" })).toEqual({ name: "1984" });
+    expect(edit(patch, { name: "1984" })).toStrictEqual({ name: "1984" });
   });
 
   // A field holding one of the catalog's named numbers is still a numeric field, or a control set
@@ -240,7 +240,7 @@ describe("applyEdits", () => {
   it("reads a number into a field holding a named number", () => {
     const patch = echoPatch();
 
-    expect(edit(patch, { "slot2.params.time": "40" })).toEqual({ "slot2.params.time": 40 });
+    expect(edit(patch, { "slot2.params.time": "40" })).toStrictEqual({ "slot2.params.time": 40 });
   });
 
   it("re-seeds a block whose type switches, so the new type's controls can be set in the same batch", () => {

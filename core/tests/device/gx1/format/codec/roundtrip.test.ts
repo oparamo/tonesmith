@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import { parseFile } from "../../../../../src/device/gx1/format/tsl";
 import { decodePatch, encodePatch } from "../../../../../src/device/gx1/format/codec";
 import { RAW } from "../../../../../src/device/gx1/model";
-import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../../../helpers";
+import { ROCK_TONES_FIXTURE as FIXTURE } from "../../helpers";
+import { present } from "../../../../helpers";
 
 const fixtureBytes = await readFile(FIXTURE);
 const file = parseFile(fixtureBytes, FIXTURE);
@@ -31,10 +32,10 @@ describe("GX-1 round-trip", () => {
 
     // The loop below walks the original's keys, so a block the encoder invented would pass it.
     expect(Object.keys(reencoded.paramSet).sort(), `patch ${index} block set`)
-      .toEqual(Object.keys(original.paramSet).sort());
+      .toStrictEqual(Object.keys(original.paramSet).sort());
 
     for (const key of Object.keys(original.paramSet)) {
-      expect(reencoded.paramSet[key], `patch ${index} key ${key}`).toEqual(original.paramSet[key]);
+      expect(reencoded.paramSet[key], `patch ${index} key ${key}`).toStrictEqual(original.paramSet[key]);
     }
   });
 });

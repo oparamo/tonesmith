@@ -20,7 +20,7 @@ import {
 } from "../../../../src/device/gx1/model";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../../../../src/device/gx1/catalog/defaults";
 import type { Patch } from "../../../../src/device/gx1/model";
-import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../../helpers";
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../helpers";
 
 const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
 
@@ -138,14 +138,14 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
   const patch = defaultInitPatch;
 
   it("DEFAULTS_BY_TYPE matches the factory defaults harvested from default-init.tsl", () => {
-    expect(DEFAULTS_BY_TYPE).toEqual(harvestDefaults(patch));
+    expect(DEFAULTS_BY_TYPE).toStrictEqual(harvestDefaults(patch));
   });
 
   it("DEFAULT_SUBTYPES matches the sub-models selected in default-init.tsl", () => {
-    expect(DEFAULT_SUBTYPES).toEqual(harvestSubTypes(patch));
+    expect(DEFAULT_SUBTYPES).toStrictEqual(harvestSubTypes(patch));
   });
 
   it("BLOCK_DEFAULTS matches the single-shape blocks in default-init.tsl", () => {
-    expect(BLOCK_DEFAULTS).toEqual(harvestBlockDefaults(patch));
+    expect(BLOCK_DEFAULTS).toStrictEqual(harvestBlockDefaults(patch));
   });
 });

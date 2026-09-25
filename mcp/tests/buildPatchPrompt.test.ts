@@ -23,7 +23,7 @@ describe("build_patch prompt", () => {
     const { prompts } = await connected.client.listPrompts();
     const prompt = prompts.find(candidate => candidate.name === "build_patch");
 
-    expect(prompt?.arguments?.map(argument => argument.name).sort()).toEqual(["description", "device", "outPath"]);
+    expect(prompt?.arguments?.map(argument => argument.name).sort()).toStrictEqual(["description", "device", "outPath"]);
   });
 
   it("carries every argument it was given into the request", async () => {
@@ -48,6 +48,6 @@ describe("build_patch prompt", () => {
       argument: { name: "device", value: "" },
     });
 
-    expect(completion.values).toEqual(ids);
+    expect(completion.values).toStrictEqual(ids);
   });
 });

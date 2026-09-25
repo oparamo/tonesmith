@@ -39,7 +39,7 @@ describe("read_patch", () => {
     expect(body.patches).toHaveLength(expected.patches.length);
     const actualNames = body.patches.map(entry => entry.patch.name);
     const expectedNames = expected.patches.map(patch => patch.name);
-    expect(actualNames).toEqual(expectedNames);
+    expect(actualNames).toStrictEqual(expectedNames);
   });
 
   it("returns a single patch by numeric index", async () => {
@@ -78,7 +78,7 @@ describe("read_patch", () => {
     const { text } = await client.callTool("read_patch", input);
 
     const body = JSON.parse(text) as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual(["index", "patch", "setName"]);
+    expect(Object.keys(body).sort()).toStrictEqual(["index", "patch", "setName"]);
   });
 
   // A device library runs to hundreds of patches at roughly 1.4 KB each decoded, which is a
@@ -111,7 +111,7 @@ describe("read_patch", () => {
     const body = pageOf(text);
     expect(body.offset).toBe(1);
     const rest = expected.patches.map((_, index) => index).slice(1);
-    expect(body.patches.map(entry => entry.index)).toEqual(rest);
+    expect(body.patches.map(entry => entry.index)).toStrictEqual(rest);
     expect(body.more).toBeUndefined();
   });
 

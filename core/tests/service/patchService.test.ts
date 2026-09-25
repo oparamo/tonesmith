@@ -88,7 +88,7 @@ describe("editPatchFile", () => {
 
     const report = await editPatchFile(makeEditingDriver(), path, { ref: "Clean", fields: [["gain", 40], ["key", "G"]] });
 
-    expect(report).toEqual({ index: 1, applied: { gain: 40, key: "G" } });
+    expect(report).toStrictEqual({ index: 1, applied: { gain: 40, key: "G" } });
     const [, clean] = (await loadFile(path)).patches;
     expect(clean).toMatchObject({ gain: 40, key: "G" });
   });
@@ -100,7 +100,7 @@ describe("editPatchFile", () => {
     await editPatchFile(driver, path, { setName: "Renamed" });
     const both = await editPatchFile(driver, path, { ref: "0", fields: [["gain", 5]], setName: "Both" });
 
-    expect(both).toEqual({ index: 0, applied: { gain: 5 }, setName: "Both" });
+    expect(both).toStrictEqual({ index: 0, applied: { gain: 5 }, setName: "Both" });
     const file = await loadFile(path);
     expect(file.name).toBe("Both");
     expect(file.patches[0]).toMatchObject({ gain: 5 });
@@ -160,7 +160,7 @@ describe("concurrent changes to one file", () => {
     ]);
 
     const names = (await readPatchFile(driver, path)).patches.map(patch => patch.name).sort();
-    expect(names).toEqual(["Clean", "Lead"]);
+    expect(names).toStrictEqual(["Clean", "Lead"]);
   });
 
   it("lets exactly one of two creates on one path succeed", async () => {
@@ -173,7 +173,7 @@ describe("concurrent changes to one file", () => {
     ]);
 
     const statuses = outcomes.map(outcome => outcome.status).sort();
-    expect(statuses).toEqual(["fulfilled", "rejected"]);
+    expect(statuses).toStrictEqual(["fulfilled", "rejected"]);
   });
 
   it("still runs a queued change after the one ahead of it fails", async () => {
@@ -203,8 +203,8 @@ describe("upsertPatches", () => {
 
     const { file } = await upsertPatches(driver, { path, patches });
 
-    expect(file.patches).toEqual(patches);
-    expect(await loadFile(path)).toEqual(file);
+    expect(file.patches).toStrictEqual(patches);
+    expect(await loadFile(path)).toStrictEqual(file);
   });
 
   it("replaces same-named patches and appends the rest, in one pass", async () => {
@@ -216,7 +216,7 @@ describe("upsertPatches", () => {
     const { file } = await upsertPatches(driver, { path, patches });
     const patchNames = file.patches.map(patch => patch.name);
 
-    expect(patchNames, "Rhythm replaced in place, Solo appended").toEqual(["Lead", "Rhythm", "Solo"]);
+    expect(patchNames, "Rhythm replaced in place, Solo appended").toStrictEqual(["Lead", "Rhythm", "Solo"]);
   });
 
   it("keys on the name exactly, so a name differing only in case is a patch of its own", async () => {
@@ -227,8 +227,8 @@ describe("upsertPatches", () => {
     const { file, saved } = await upsertPatches(driver, { path, patches: [makePatch("lead"), makePatch("Lead")] });
     const patchNames = file.patches.map(patch => patch.name);
 
-    expect(patchNames).toEqual(["LEAD", "lead", "Lead"]);
-    expect(saved.map(entry => entry.action)).toEqual(["appended", "appended"]);
+    expect(patchNames).toStrictEqual(["LEAD", "lead", "Lead"]);
+    expect(saved.map(entry => entry.action)).toStrictEqual(["appended", "appended"]);
   });
 
   it("stays idempotent across reruns of the same batch", async () => {
@@ -241,7 +241,7 @@ describe("upsertPatches", () => {
     const { file } = await upsertPatches(driver, { path, patches });
     const patchNames = file.patches.map(patch => patch.name);
 
-    expect(patchNames).toEqual(["Lead", "Rhythm"]);
+    expect(patchNames).toStrictEqual(["Lead", "Rhythm"]);
   });
 
   // The whole point of the batch form: a set lands as one atomic write, not one cycle per patch.
@@ -310,9 +310,9 @@ describe("upsertPatches", () => {
     const existing = await upsertPatches(driver, { path: setPath, patches: [lead, clean] });
 
     expect(fresh.created).toBe(true);
-    expect(fresh.saved).toEqual([{ name: "Solo", action: "appended", patch: solo }]);
+    expect(fresh.saved).toStrictEqual([{ name: "Solo", action: "appended", patch: solo }]);
     expect(existing.created).toBe(false);
-    expect(existing.saved).toEqual([
+    expect(existing.saved).toStrictEqual([
       { name: "Lead", action: "replaced", patch: lead },
       { name: "Clean", action: "appended", patch: clean },
     ]);
@@ -358,8 +358,8 @@ describe("upsertPatches", () => {
       const { saved } = await upsertPatches(makeBuildingDriver(), { path, specs: [{ name: "One" }, { name: "Two" }] });
       const savedNames = (await loadFile(path)).patches.map(patch => patch.name);
 
-      expect(saved.map(entry => entry.patch)).toEqual([makePatch("One"), makePatch("Two")]);
-      expect(savedNames).toEqual(["One", "Two"]);
+      expect(saved.map(entry => entry.patch)).toStrictEqual([makePatch("One"), makePatch("Two")]);
+      expect(savedNames).toStrictEqual(["One", "Two"]);
     });
 
     // The same block tends to appear in every spec of a batch, so the driver's message alone
@@ -468,14 +468,14 @@ describe("resolvePatches", () => {
   it("returns every patch in file order when ref is omitted", () => {
     const selected = resolvePatches(patches);
 
-    expect(selected.map(entry => entry.index)).toEqual([0, 1, 2]);
-    expect(selected.map(entry => entry.patch)).toEqual(patches);
+    expect(selected.map(entry => entry.index)).toStrictEqual([0, 1, 2]);
+    expect(selected.map(entry => entry.patch)).toStrictEqual(patches);
   });
 
   it("returns the one patch a ref names, with the index it sits at", () => {
     const selected = resolvePatches(patches, "1");
 
-    expect(selected).toEqual([{ index: 1, patch: patches[1] }]);
+    expect(selected).toStrictEqual([{ index: 1, patch: patches[1] }]);
   });
 
   it("propagates a ref that names no patch", () => {
@@ -499,8 +499,8 @@ describe("copyPatch", () => {
 
     const copied = await copyPatch(driver, { src: srcPath, srcRef: "0", dst: dstPath, dstRef: "0" });
 
-    expect(copied).toEqual({ name: "Lead", fromIndex: 0, toIndex: 0 });
-    expect((await loadFile(dstPath)).patches).toEqual([source, makePatch("Keep")]);
+    expect(copied).toStrictEqual({ name: "Lead", fromIndex: 0, toIndex: 0 });
+    expect((await loadFile(dstPath)).patches).toStrictEqual([source, makePatch("Keep")]);
   });
 
   it("resolves both ends by patch name", async () => {
@@ -512,7 +512,7 @@ describe("copyPatch", () => {
 
     const copied = await copyPatch(driver, { src: srcPath, srcRef: "Lead", dst: dstPath, dstRef: "Target" });
 
-    expect(copied).toEqual({ name: "Lead", fromIndex: 1, toIndex: 0 });
+    expect(copied).toStrictEqual({ name: "Lead", fromIndex: 1, toIndex: 0 });
   });
 
   it("rejects a destination index past the end rather than leaving a hole in the array", async () => {
@@ -541,7 +541,7 @@ describe("createPatchFile", () => {
 
     expect(file.name).toBe("my-tones");
     expect(file.patches).toHaveLength(1);
-    expect(await loadFile(path)).toEqual(file);
+    expect(await loadFile(path)).toStrictEqual(file);
   });
 
   it("takes the given set name and patch count", async () => {

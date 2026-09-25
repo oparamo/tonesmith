@@ -153,18 +153,10 @@ repeated here.
   the envelope's own keys would let a block named `index` or `setName` shadow the tool's report, the
   same hazard nesting already closes at block level. Nothing else gets hoisted out of the patch
   either: a field carried twice can disagree with itself.
-- **Tests assert the data a message carries, never its wording.** Assert that a rejection names the
-  bad id and lists the valid ones; don't assert the sentence it says them in. Prose written for
-  agents gets reworded constantly, and a wording assertion turns every such edit into a test edit.
-- **Coverage thresholds are floors, not targets.** They sit well below the measured numbers
-  deliberately. Don't write tests to raise them, and don't ratchet them toward what the suite
-  currently scores: chasing the last uncovered branch is what produced the wording assertions above.
-- **cli and mcp test their own wiring, not core's behavior.** README states the rule; the decidable
-  criterion is that a surface test earns its place only if it can fail while core is entirely
-  correct. Reading a written file back through the driver to check a command's effect qualifies,
-  since that fails on a miswiring.
-- **Comments earn their line by explaining why:** the constraint that forced this shape, the bug it
-  prevents, the reason the obvious approach fails. A comment restating the code teaches nothing and
+- **Tests follow README's [Testing](README.md#testing) section.**
+- **A comment earns its line by telling the reader what the code can't:** the constraint that
+  forced this shape, the bug it prevents, the reason the obvious approach fails, a unit, an encoding,
+  the source of a magic value. A comment restating the code teaches nothing and
   goes stale on the next edit. State a present property, never history: no "used to," "before this
   fix," or "now does X," and no PR number as the reason. The bug a guard prevents is fair game
   phrased as a present fact; git owns the rest. Match the comment density of the file you're

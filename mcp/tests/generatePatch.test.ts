@@ -83,10 +83,10 @@ describe("generate_patch", () => {
     const echoed = saved.patch as unknown as { name: string; chain: string[]; amp: { type: string } };
     expect(echoed.name).toBe("Echo");
     expect(echoed.amp.type).toBe("JC-120");
-    expect(echoed.chain).toEqual(chain);
+    expect(echoed.chain).toStrictEqual(chain);
     // The entry says what happened to the patch and carries the patch; nothing of the patch is
     // lifted out beside it, which is what keeps this shape and read_patch's the same.
-    expect(Object.keys(saved).sort()).toEqual(["action", "name", "patch"]);
+    expect(Object.keys(saved).sort()).toStrictEqual(["action", "name", "patch"]);
   });
 
   // The reason `patches` is an array: a whole set is one call and one file write.
@@ -111,11 +111,11 @@ describe("generate_patch", () => {
     expect(isError, text).toBe(false);
     const file = await patchService.readPatchFile(gx1.driver, outPath);
     const patchNames = file.patches.map(patch => patch.name.trim());
-    expect(patchNames, "array order is file order").toEqual(["First", "Second", "Third"]);
+    expect(patchNames, "array order is file order").toStrictEqual(["First", "Second", "Third"]);
     expect(file.name).toBe("Album");
     expect(savedPatches(text)).toHaveLength(3);
     // The file half of the response, so a caller knows where the set stands without reading it back.
-    expect(responseOf(text).file).toEqual({ path: outPath, setName: "Album", total: 3, created: true });
+    expect(responseOf(text).file).toStrictEqual({ path: outPath, setName: "Album", total: 3, created: true });
   });
 
   it("reports each patch as appended or replaced within one call", async () => {
@@ -138,9 +138,9 @@ describe("generate_patch", () => {
 
     expect(isError, text).toBe(false);
     const actions = savedPatches(text).map(saved => `${saved.name.trim()}:${saved.action}`);
-    expect(actions).toEqual(["Lead:replaced", "Rhythm:appended"]);
+    expect(actions).toStrictEqual(["Lead:replaced", "Rhythm:appended"]);
     const file = await patchService.readPatchFile(gx1.driver, outPath);
-    expect(file.patches.map(patch => patch.name.trim())).toEqual(["Lead", "Rhythm"]);
+    expect(file.patches.map(patch => patch.name.trim())).toStrictEqual(["Lead", "Rhythm"]);
     expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(90);
   });
 
@@ -193,6 +193,6 @@ describe("generate_patch", () => {
     expect(read.isError, read.text).toBe(false);
     const body = JSON.parse(read.text) as { patch: { fx1: Record<string, unknown> } };
 
-    expect(echoed.fx1).toEqual(body.patch.fx1);
+    expect(echoed.fx1).toStrictEqual(body.patch.fx1);
   });
 });

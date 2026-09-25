@@ -88,7 +88,7 @@ describe("lookup", () => {
   it.each(["chain", "CHAIN"])("resolves %o to the chain with what the patch carries outside any block", (entry) => {
     const found = lookup(withControls, entry);
 
-    expect(found).toEqual({
+    expect(found).toStrictEqual({
       kind: "chain",
       chain: { ...withControls.chain, patchName: withControls.patchName, patchSettings: withControls.patchSettings },
     });
@@ -103,7 +103,7 @@ describe("lookup", () => {
   it("resolves a bare group id to the group", () => {
     const found = lookup(withControls, "DELAY");
 
-    expect(found).toEqual({ kind: "group", group: findGroup(withControls, "delay") });
+    expect(found).toStrictEqual({ kind: "group", group: findGroup(withControls, "delay") });
   });
 
   it("gives a type its block's controls ahead of its own params", () => {
@@ -111,6 +111,6 @@ describe("lookup", () => {
     const paramKeys = found.kind === "type" ? found.type.params?.map(param => param.key) : undefined;
 
     expect(found.kind).toBe("type");
-    expect(paramKeys).toEqual(["level", "gain"]);
+    expect(paramKeys).toStrictEqual(["level", "gain"]);
   });
 });

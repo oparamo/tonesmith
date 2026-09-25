@@ -51,7 +51,7 @@ describe("every driver's blocks take one shape", () => {
     expect(body.params, `${block} carries its controls under params`).toBeDefined();
 
     const extra = Object.keys(body).filter(key => key !== "params" && !SELECTORS.includes(key));
-    expect(extra, `${block} carries nothing beside its selectors and params`).toEqual([]);
+    expect(extra, `${block} carries nothing beside its selectors and params`).toStrictEqual([]);
   });
 });
 
@@ -66,7 +66,7 @@ describe("every driver's chain names the blocks a spec names", () => {
     // to be the same one: a chain naming blocks a spec cannot name is a chain nobody can edit.
     const built = driver.buildPatch({ name: "Chain" });
     const stored = present(built.chain, `${driver.id} stores the chain it built with`);
-    expect(new Set(stored)).toEqual(new Set(chain.defaultOrder));
+    expect(new Set(stored)).toStrictEqual(new Set(chain.defaultOrder));
   });
 });
 
@@ -95,7 +95,7 @@ describe("every driver's view shows the patch under the chain's own names", () =
     const view = driver.viewPatch(driver.buildPatch({ name: "View" }));
 
     const keys = view.blocks.map(block => block.key);
-    expect(new Set(keys), "the view covers every block the chain names").toEqual(
+    expect(new Set(keys), "the view covers every block the chain names").toStrictEqual(
       new Set(chain.defaultOrder)
     );
     for (const block of view.blocks) {
@@ -119,6 +119,6 @@ describe("every driver builds a patch as its file stores it", () => {
     const built = driver.buildPatch({ name: "Stored", [block]: body });
     const stored = storedAs(driver, built);
 
-    expect(JSON.parse(JSON.stringify(built))).toEqual(JSON.parse(JSON.stringify(stored)));
+    expect(JSON.parse(JSON.stringify(built))).toStrictEqual(JSON.parse(JSON.stringify(stored)));
   });
 });

@@ -126,8 +126,8 @@ describe("GX-1 catalog id coverage", () => {
     const catalogTypes = new Set(Object.keys(PARAMS_BY_TYPE[block]));
     const capabilityTypes = new Set(groupTypes(block).map(capType => capType.id));
 
-    expect(catalogTypes, `${block} catalog keys vs codec types`).toEqual(codecTypes);
-    expect(capabilityTypes, `${block} capabilities types vs codec types`).toEqual(codecTypes);
+    expect(catalogTypes, `${block} catalog keys vs codec types`).toStrictEqual(codecTypes);
+    expect(capabilityTypes, `${block} capabilities types vs codec types`).toStrictEqual(codecTypes);
   });
 
   // Selection-only / metadata-only blocks: capabilities must list every codec model id.
@@ -172,14 +172,10 @@ const assertTypeParity = (block: PerTypeBlock, type: string): void => {
   }
 };
 
-describe("GX-1 codec ↔ catalog param parity (per-type blocks)", () => {
-  for (const block of PER_TYPE_BLOCKS) {
-    describe(block.block, () => {
-      it.each(block.types)("%s: codec fields and catalog params match", (type) => {
-        assertTypeParity(block, type);
-      });
-    });
-  }
+describe.each(PER_TYPE_BLOCKS)("GX-1 codec ↔ catalog param parity, $block", (block) => {
+  it.each(block.types)("%s: codec fields and catalog params match", (type) => {
+    assertTypeParity(block, type);
+  });
 });
 
 // ── FX-slot DELAY: per-sub-algorithm codec ↔ catalog (nested under the fx DELAY type) ──
@@ -192,8 +188,8 @@ describe("GX-1 FX-slot DELAY per-sub-algorithm parity", () => {
     const catalogTypes = new Set(Object.keys(PARAMS_BY_TYPE.fxDelay));
     const subTypeIds = new Set((fxDelayType?.subTypes ?? []).map(subType => subType.id));
 
-    expect(catalogTypes, "fxDelay catalog keys vs codec sub-algorithms").toEqual(codecTypes);
-    expect(subTypeIds, "fx DELAY subTypes vs codec sub-algorithms").toEqual(codecTypes);
+    expect(catalogTypes, "fxDelay catalog keys vs codec sub-algorithms").toStrictEqual(codecTypes);
+    expect(subTypeIds, "fx DELAY subTypes vs codec sub-algorithms").toStrictEqual(codecTypes);
   });
 
   it.each(FX_DELAY_BLOCK.types)("%s: codec fields and catalog params match", (type) => {
@@ -329,7 +325,7 @@ const assertRepresentationParity = (block: PerTypeBlock, type: string, field: Fi
     expect(
       [...(field.table ?? [])],
       `${block.block} "${type}" field "${field.name}": codec table vs catalog values`,
-    ).toEqual([...param.values]);
+    ).toStrictEqual([...param.values]);
   }
 };
 
@@ -338,13 +334,20 @@ describe("GX-1 codec ↔ catalog representation parity", () => {
     assertRepresentationParity(block, type, field);
   });
 
-  it.each(SINGLE_SHAPE_BLOCKS)("%s", (block) => {
-    for (const field of fieldsFor(block) ?? []) {
-      const param = PARAMS_BY_BLOCK[block].find(candidate => normalize(candidate.name) === normalize(field.name));
-      expect(param, `${block} catalog has no param for codec field "${field.name}"`).toBeDefined();
-      expect(codecClass(field), `${block} field "${field.name}"`).toBe(param?.kind);
-      if (param?.kind === "discrete") expect([...(field.table ?? [])]).toEqual([...param.values]);
-    }
+  const singleShapeFields = SINGLE_SHAPE_BLOCKS.flatMap(block => (fieldsFor(block) ?? []).map(field => ({
+    title: `${block} ${field.name}`,
+    field,
+    param: PARAMS_BY_BLOCK[block].find(candidate => normalize(candidate.name) === normalize(field.name)),
+  })));
+  const discreteFields = singleShapeFields.flatMap(({ title, field, param }) =>
+    param?.kind === "discrete" ? [{ title, table: [...(field.table ?? [])], values: [...param.values] }] : []);
+
+  it.each(singleShapeFields)("$title is stored the way the catalog describes it", ({ field, param }) => {
+    expect(codecClass(field)).toBe(param?.kind);
+  });
+
+  it.each(discreteFields)("$title stores exactly the catalog's values", ({ table, values }) => {
+    expect(table).toStrictEqual(values);
   });
 });
 
@@ -434,7 +437,7 @@ describe("GX-1 FX subtype coverage", () => {
 
 describe("GX-1 chain capability", () => {
   it("defaultOrder equals the builder's DEFAULT_CHAIN", () => {
-    expect(gx1Capabilities.chain.defaultOrder).toEqual(DEFAULT_CHAIN);
+    expect(gx1Capabilities.chain.defaultOrder).toStrictEqual(DEFAULT_CHAIN);
   });
 
 });
@@ -455,7 +458,7 @@ describe("GX-1 patch-settings capability", () => {
   it("describes every setting the codec decodes, and no others", () => {
     const described = specs.map(spec => spec.key);
 
-    expect(described.sort()).toEqual([...codecFields].sort());
+    expect(described.sort()).toStrictEqual([...codecFields].sort());
   });
 
   it("stamps each setting with the key a decoded patch carries it under", () => {
@@ -472,7 +475,7 @@ describe("GX-1 patch-settings capability", () => {
 
     const rebuilt = driver.buildPatch({ name: "Test", ...settings }) as unknown as Record<string, unknown>;
 
-    for (const field of codecFields) expect(rebuilt[field]).toEqual(patch[field]);
+    for (const field of codecFields) expect(rebuilt[field]).toStrictEqual(patch[field]);
   });
 });
 
@@ -515,7 +518,7 @@ describe("GX-1 spec examples", () => {
   // One case per example, asserting everything an example has to be. A loop per property reports
   // the same broken example once per property, and counts the suite by properties checked rather
   // than by examples there are to get right.
-  it.each(examples)("$group $type carries a usable example", ({ group, subTypes, example }) => {
+  it.each(examples)("$group $type carries a usable example", ({ group, example }) => {
     expect(example, "every block-backed type shows one").toBeDefined();
     const [block] = Object.keys(example ?? {});
     const body = bodyOf(example);
@@ -523,29 +526,40 @@ describe("GX-1 spec examples", () => {
     expect(BLOCK_GROUPS[block as BlockName], "written under a real block key").toBe(group);
     expect(body.params, "carries its controls under the one key every block uses").toBeDefined();
 
-    // A type with sub-models opens on one, so an example leaving subType out shows a shape the
-    // caller has to work out for itself. Naming one is only truthful if it is the model the device
-    // opens with, which is what DEFAULT_SUBTYPES harvests and the defaults guard pins to the fixture.
-    if (subTypes.length > 0) expect(subTypes, "names one of the type's own sub-models").toContain(body.subType);
-    else expect(body.subType, "names no sub-model, having none").toBeUndefined();
-
     // The one check covering block key, nesting, defaults and the validator at once, so it goes last.
     const build = (): unknown => driver.buildPatch({ name: "Example", amp: { type: "TWIN" }, ...example });
     expect(build, "and builds as it stands").not.toThrow();
   });
 
+  // A type with sub-models opens on one, so an example leaving subType out shows a shape the
+  // caller has to work out for itself. Naming one is only truthful if it is the model the device
+  // opens with, which is what DEFAULT_SUBTYPES harvests and the defaults guard pins to the fixture.
+  it.each(examples.filter(({ subTypes }) => subTypes.length > 0))(
+    "$group $type's example names one of the type's own sub-models",
+    ({ subTypes, example }) => {
+      expect(subTypes).toContain(bodyOf(example).subType);
+    },
+  );
+
+  it.each(examples.filter(({ subTypes }) => subTypes.length === 0))(
+    "$group $type's example names no sub-model, having none",
+    ({ example }) => {
+      expect(bodyOf(example).subType).toBeUndefined();
+    },
+  );
+
   it("fills the values from the device's own factory defaults, not a guess", () => {
     const chorus = groupTypes("fx").find(capType => capType.id === "CHORUS");
     const example = chorus?.example?.fx1 as { params: Record<string, unknown> };
 
-    expect(example.params).toEqual(DEFAULTS_BY_TYPE.fx.CHORUS);
+    expect(example.params).toStrictEqual(DEFAULTS_BY_TYPE.fx.CHORUS);
   });
 
   it("takes its params from the sub-model where the sub-model owns them", () => {
     const delay = groupTypes("fx").find(capType => capType.id === "DELAY");
     const example = delay?.example?.fx1 as { subType: string; params: Record<string, unknown> };
 
-    expect(example.params).toEqual(DEFAULTS_BY_TYPE.fxDelay[example.subType]);
+    expect(example.params).toStrictEqual(DEFAULTS_BY_TYPE.fxDelay[example.subType]);
   });
 
   it("leaves the example off a group that names no block", () => {

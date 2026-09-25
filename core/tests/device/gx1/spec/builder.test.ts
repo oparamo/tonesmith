@@ -8,7 +8,8 @@ import { decodePatch, encodePatch, validateChain } from "../../../../src/device/
 import { bytesFromHex } from "../../../../src/device/gx1/format/codec/primitives";
 import { BLOCK_DEFAULTS, DEFAULTS_BY_TYPE, DEFAULT_SUBTYPES } from "../../../../src/device/gx1/catalog/defaults";
 import { PARAM_SUBTYPE_EFFECTS, DEFAULT_CHAIN } from "../../../../src/device/gx1/model";
-import { DEFAULT_INIT_FIXTURE, moveBefore, present, patchAt } from "../../../helpers";
+import { DEFAULT_INIT_FIXTURE, moveBefore, patchAt } from "../helpers";
+import { present } from "../../../helpers";
 
 const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
 
@@ -17,7 +18,7 @@ describe("basePatch", () => {
     const patch = basePatch("Lead");
 
     expect(patch.name).toBe("Lead");
-    expect(patch.chain).toEqual(DEFAULT_CHAIN);
+    expect(patch.chain).toStrictEqual(DEFAULT_CHAIN);
     expect(patch.memoryLevel).toBe(100);
     expect(patch.bpm).toBe(120);
     expect(patch.key).toBe("C");
@@ -30,7 +31,7 @@ describe("basePatch", () => {
 
     const patch = basePatch("Test", { chain: custom, key: "G", bpm: 90 });
 
-    expect(patch.chain).toEqual(custom);
+    expect(patch.chain).toStrictEqual(custom);
     expect(patch.key).toBe("G");
     expect(patch.bpm).toBe(90);
   });
@@ -52,8 +53,8 @@ describe("basePatch", () => {
 });
 
 describe("a reordered chain", () => {
-  // Real device values (a GX-1 was used to perform each reorder, then exported and
-  // byte-diffed), so a wrong MEMORY%CHAIN encoding fails this, not just self-consistency.
+  // Real device values (each reorder was made on a GX-1, exported and byte-diffed), so a wrong
+  // MEMORY%CHAIN encoding fails this, not just self-consistency.
   it("encodes an fx2-after-noiseGate reorder to the real device bytes", () => {
     const chain = moveBefore(DEFAULT_CHAIN, "fx2", "noiseGate");
     const patch = basePatch("Test", { chain });
@@ -61,7 +62,7 @@ describe("a reordered chain", () => {
     const encoded = encodePatch(patch);
     const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
 
-    expect(chainBytes).toEqual([1, 2, 3, 4, 5, 7, 9, 8, 6, 10, 0, 11, 12]);
+    expect(chainBytes).toStrictEqual([1, 2, 3, 4, 5, 7, 9, 8, 6, 10, 0, 11, 12]);
   });
 
   it("encodes a drive-before-fx1 reorder to the real device bytes", () => {
@@ -71,7 +72,7 @@ describe("a reordered chain", () => {
     const encoded = encodePatch(patch);
     const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
 
-    expect(chainBytes).toEqual([1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]);
+    expect(chainBytes).toStrictEqual([1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]);
   });
 });
 
@@ -119,7 +120,7 @@ describe("amp", () => {
     });
 
     expect(patch.amp).toMatchObject({ on: false, type: "JC-120" });
-    expect(patch.amp.params).toEqual({
+    expect(patch.amp.params).toStrictEqual({
       gain: 60, bass: 55, middle: 50, treble: 45,
       speaker: '4x12"', mic: "CND87", level: 90, solo: true, soloLevel: 80,
     });
@@ -133,7 +134,7 @@ describe("amp", () => {
     block(patch, "amp", { type: "TWIN" });
 
     expect(patch.amp).toMatchObject({ on: true, type: "TWIN" });
-    expect(patch.amp.params).toEqual(BLOCK_DEFAULTS.amp);
+    expect(patch.amp.params).toStrictEqual(BLOCK_DEFAULTS.amp);
   });
 
   it("keeps what the caller does set, defaulting only the rest", () => {
@@ -167,7 +168,7 @@ describe("drive", () => {
     });
 
     expect(patch.drive).toMatchObject({ on: false, type: "BLUES OD" });
-    expect(patch.drive.params).toEqual({
+    expect(patch.drive.params).toStrictEqual({
       drive: 70, tone: 60, level: 80, direct: 10, solo: true, soloLevel: 75,
     });
   });
@@ -241,7 +242,7 @@ describe("fx", () => {
 
     // WARP's fields are time/trigger/level. The sub-algorithm picks that field set but is not one
     // of them: it lives on the block, not among the params it selects.
-    expect(patch.fx1.params).toEqual({ time: 400, trigger: false, level: 80 });
+    expect(patch.fx1.params).toStrictEqual({ time: 400, trigger: false, level: 80 });
   });
 
   // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS), not FX_COM
@@ -288,7 +289,7 @@ describe("fx", () => {
 
     expect(setBogusType).not.toThrow();
     expect(patch.fx1.type).toBe("BOGUS TYPE");
-    expect(patch.fx1.params).toEqual({});
+    expect(patch.fx1.params).toStrictEqual({});
   });
 
   it("defaults unset GEQ bands to 0 dB instead of the signed-center raw byte", () => {
@@ -296,7 +297,7 @@ describe("fx", () => {
 
     block(patch, "fx1", { type: "HIGH GEQ", params: { level: 80, "4kHz": 5 } });
 
-    expect(patch.fx1.params).toEqual({
+    expect(patch.fx1.params).toStrictEqual({
       "250Hz": 0, "500Hz": 0, "1kHz": 0, "2kHz": 0, "4kHz": 5, "8kHz": 0, level: 80,
     });
   });
@@ -309,7 +310,7 @@ describe("noiseGate", () => {
     block(patch, "noiseGate", { params: { threshold: 40, release: 30 } });
 
     expect(patch.noiseGate.on).toBe(true);
-    expect(patch.noiseGate.params).toEqual({ threshold: 40, release: 30, detect: "INPUT" });
+    expect(patch.noiseGate.params).toStrictEqual({ threshold: 40, release: 30, detect: "INPUT" });
   });
 
   it("honors an explicit detect mode and on: false", () => {
@@ -328,7 +329,7 @@ describe("volume", () => {
 
     block(patch, "volume", { params: { position: 80, min: 10, max: 90, curve: "FAST" } });
 
-    expect(patch.volume.params).toEqual({ position: 80, min: 10, max: 90, curve: "FAST" });
+    expect(patch.volume.params).toStrictEqual({ position: 80, min: 10, max: 90, curve: "FAST" });
   });
 
   it("defaults curve to NORMAL", () => {
@@ -348,7 +349,7 @@ describe("pedalFx", () => {
     block(patch, "pedalFx", { type: "WAH", subType: "VO WAH", params: wahParams });
 
     expect(patch.pedalFx).toMatchObject({ on: true, type: "WAH", subType: "VO WAH" });
-    expect(patch.pedalFx.params).toEqual(wahParams);
+    expect(patch.pedalFx.params).toStrictEqual(wahParams);
   });
 
   it("fills every WAH param with real factory defaults when no params are passed", () => {
@@ -357,7 +358,7 @@ describe("pedalFx", () => {
     block(patch, "pedalFx", { type: "WAH", params: { level: 90 } });
 
     expect(patch.pedalFx.subType).toBe("CRY WAH");
-    expect(patch.pedalFx.params).toEqual({ level: 90, direct: 0, position: 100, min: 0, max: 100 });
+    expect(patch.pedalFx.params).toStrictEqual({ level: 90, direct: 0, position: 100, min: 0, max: 100 });
   });
 
   it("fills PEDAL BEND params, including the signed pitchMin/pitchMax, with real factory defaults", () => {
@@ -365,7 +366,7 @@ describe("pedalFx", () => {
 
     block(patch, "pedalFx", { type: "PEDAL BEND" });
 
-    expect(patch.pedalFx.params).toEqual({
+    expect(patch.pedalFx.params).toStrictEqual({
       pitchMin: 0, pitchMax: 24, position: 100, level: 100, direct: 0,
     });
   });
@@ -469,7 +470,7 @@ describe("reverb", () => {
     });
 
     expect(patch.reverb).toMatchObject({ on: false, type: "HALL M" });
-    expect(patch.reverb.params).toEqual({
+    expect(patch.reverb.params).toStrictEqual({
       time: 2.5, level: 80, preDelay: 10, tone: 5, density: 7, direct: 90,
     });
   });
@@ -536,7 +537,7 @@ describe("defaultFxParams (anchored to default-init.tsl)", () => {
     const compressorDefaults = defaultFxParams("COMPRESSOR");
 
     expect(patch.fx1.type).toBe("COMPRESSOR");
-    expect(compressorDefaults).toEqual({ sustain: 50, attack: 50, level: 60 });
+    expect(compressorDefaults).toStrictEqual({ sustain: 50, attack: 50, level: 60 });
     expect(patch.fx1.params).toMatchObject(compressorDefaults);
   });
 
@@ -544,17 +545,17 @@ describe("defaultFxParams (anchored to default-init.tsl)", () => {
     const paraEqDefaults = defaultFxParams("PARA. EQ");
 
     expect(patch.fx2.type).toBe("PARA. EQ");
-    expect(paraEqDefaults).toEqual({
+    expect(paraEqDefaults).toStrictEqual({
       lowGain: 0, highGain: 0, level: 0, midFreq: "4kHz", midGain: 0, lowCut: "FLAT", highCut: "FLAT",
     });
-    expect(patch.fx2.params).toEqual(paraEqDefaults);
+    expect(patch.fx2.params).toStrictEqual(paraEqDefaults);
   });
 
   it("matches the fixture's real CHORUS params (fx3)", () => {
     const chorusDefaults = defaultFxParams("CHORUS");
 
     expect(patch.fx3.type).toBe("CHORUS");
-    expect(chorusDefaults).toEqual({
+    expect(chorusDefaults).toStrictEqual({
       rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100,
     });
     expect(patch.fx3.params).toMatchObject(chorusDefaults);

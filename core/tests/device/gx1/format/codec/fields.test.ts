@@ -18,7 +18,7 @@ describe("u8", () => {
 
     field.encode(50, bytes);
 
-    expect(bytes).toEqual([50]);
+    expect(bytes).toStrictEqual([50]);
   });
 
   it("throws when encoding a value below 0", () => {
@@ -49,8 +49,8 @@ describe("signed", () => {
     field.encode(-20, low);
     field.encode(235, high);
 
-    expect(low).toEqual([0]);
-    expect(high).toEqual([255]);
+    expect(low).toStrictEqual([0]);
+    expect(high).toStrictEqual([255]);
   });
 
   it.each([
@@ -78,7 +78,7 @@ describe("scaled", () => {
 
     field.encode(4.5, bytes);
 
-    expect(bytes).toEqual([45]);
+    expect(bytes).toStrictEqual([45]);
   });
 
   it.each([
@@ -101,7 +101,7 @@ describe("nibblePair", () => {
 
     field.encode(200, bytes);
 
-    expect(bytes).toEqual([12, 8]);
+    expect(bytes).toStrictEqual([12, 8]);
     expect(field.decode(bytes)).toBe(200);
   });
 
@@ -126,7 +126,7 @@ describe("nibbleQuad", () => {
 
     field.encode(2000, bytes);
 
-    expect(bytes).toEqual([0, 7, 13, 0]);
+    expect(bytes).toStrictEqual([0, 7, 13, 0]);
     expect(field.decode(bytes)).toBe(2000);
   });
 
@@ -157,7 +157,7 @@ describe("lookup", () => {
 
     field.encode("BETA", bytes);
 
-    expect(bytes).toEqual([1]);
+    expect(bytes).toStrictEqual([1]);
   });
 
   it("throws when encoding a name not in the table", () => {
@@ -172,7 +172,7 @@ describe("lookup", () => {
 
     field.encode(field.decode(bytes), bytes);
 
-    expect(bytes).toEqual([7]);
+    expect(bytes).toStrictEqual([7]);
   });
 });
 
@@ -183,7 +183,7 @@ describe("encodeFields", () => {
 
     encodeFields(fields, { gain: 99 }, bytes);
 
-    expect(bytes).toEqual([99, 20]);
+    expect(bytes).toStrictEqual([99, 20]);
   });
 });
 
@@ -211,7 +211,7 @@ describe("namedAbove", () => {
 
     field.encode("1/4", bytes);
 
-    expect(bytes).toEqual([110]);
+    expect(bytes).toStrictEqual([110]);
   });
 
   it("encodes a number through the field it wraps", () => {
@@ -219,7 +219,7 @@ describe("namedAbove", () => {
 
     field.encode(60, bytes);
 
-    expect(bytes).toEqual([60]);
+    expect(bytes).toStrictEqual([60]);
   });
 
   it("throws for a name the list doesn't hold", () => {
@@ -245,6 +245,6 @@ describe("the device's two note orders", () => {
   });
 
   it("holds the same names in both", () => {
-    expect([...RATE_NOTE_VALUES]).toEqual([...TIME_NOTE_VALUES].reverse());
+    expect([...RATE_NOTE_VALUES]).toStrictEqual([...TIME_NOTE_VALUES].reverse());
   });
 });

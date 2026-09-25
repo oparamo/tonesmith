@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
 import importX, { createNodeResolver } from 'eslint-plugin-import-x';
+import vitest from '@vitest/eslint-plugin';
 
 const ternarySelector = 'ConditionalExpression:not(VariableDeclarator > ConditionalExpression):not(AssignmentExpression > ConditionalExpression):not(ArrowFunctionExpression > ConditionalExpression)';
 
@@ -124,6 +125,12 @@ export default tseslint.config(
       // (`import type { Patch }` beside `import { patchService }` from the same module), which is
       // the shape this codebase wants, so enabling it would trade a real convention for noise.
       'tonesmith/no-em-dash': 'error',
+      // A comment states what is true of the code now; how it got here is git's to hold. "now" itself
+      // is too common a word to ban, so it stays a review check.
+      'no-warning-comments': ['error', {
+        terms: ['no longer', 'used to', 'previously', 'formerly', 'anymore', 'originally', 'for now', 'todo', 'fixme'],
+        location: 'anywhere',
+      }],
       'tonesmith/file-name-case': 'error',
       // An import cycle leaves some module reading another's exports before they exist, and the layer
       // rules can't see one inside a single layer.
@@ -178,5 +185,32 @@ export default tseslint.config(
     { files: ['core/src/device/*/model/**'], forbidden: ['persistence', 'format', 'catalog', 'spec'], banFs: true },
     { files: ['core/src/device/*/format/**'], forbidden: ['persistence', 'catalog', 'spec'], banFs: true },
     { files: ['core/src/device/*/catalog/**'], forbidden: ['persistence', 'spec'], banFs: true },
+    // A unit suite for the shared layer runs against a fake driver or a hand-written catalog, so it
+    // keeps passing or failing on the shared code alone.
+    { files: ['core/tests/{service,persistence,common}/**'], forbidden: ['device'] },
   ]),
+  // README's Testing section, in the parts a rule can check. max-expects is left out on purpose: a
+  // count of assertions doesn't measure how many behaviors a test checks.
+  {
+    files: ['**/tests/**/*.ts', 'tools/**/*.test.ts'],
+    plugins: { vitest },
+    rules: {
+      'vitest/no-conditional-in-test': 'error',
+      'vitest/no-conditional-expect': 'error',
+      'vitest/no-conditional-tests': 'error',
+      // The drift guards assert through helpers named assert*, which the rule can't see into.
+      'vitest/expect-expect': ['error', { assertFunctionNames: ['expect', 'assert*'] }],
+      'vitest/no-standalone-expect': 'error',
+      'vitest/no-identical-title': 'error',
+      'vitest/valid-title': 'error',
+      'vitest/no-focused-tests': 'error',
+      'vitest/no-disabled-tests': 'error',
+      'vitest/prefer-each': 'error',
+      'vitest/prefer-hooks-on-top': 'error',
+      'vitest/no-duplicate-hooks': 'error',
+      'vitest/max-nested-describe': ['error', { max: 2 }],
+      'vitest/no-test-return-statement': 'error',
+      'vitest/prefer-strict-equal': 'error',
+    },
+  },
 );

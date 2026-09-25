@@ -7,7 +7,7 @@ import { bytesFromHex, hexFromBytes } from "../../../../../src/device/gx1/format
 import {
   DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW, DEFAULT_CHAIN,
 } from "../../../../../src/device/gx1/model";
-import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../../../helpers";
+import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
 const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
 
@@ -24,7 +24,7 @@ describe("Delay block symmetry (all types)", () => {
     const reencoded = encodeTypedBlock(TYPED_BLOCKS.delay, decoded);
     const reDecoded = decodeTypedBlock(TYPED_BLOCKS.delay, reencoded);
 
-    expect(reDecoded).toEqual(decoded);
+    expect(reDecoded).toStrictEqual(decoded);
   });
 });
 
@@ -42,7 +42,7 @@ describe("Reverb block symmetry (all types)", () => {
     const reencoded = encodeTypedBlock(TYPED_BLOCKS.reverb, decoded);
     const reDecoded = decodeTypedBlock(TYPED_BLOCKS.reverb, reencoded);
 
-    expect(reDecoded).toEqual(decoded);
+    expect(reDecoded).toStrictEqual(decoded);
   });
 });
 
@@ -68,7 +68,7 @@ describe("Chain block (real device values)", () => {
 
     const decoded = decodeChain(hexList);
 
-    expect(decoded).toEqual(DEFAULT_ORDER);
+    expect(decoded).toStrictEqual(DEFAULT_ORDER);
   });
 
   it("decodes an FX2/FX3 swap", () => {
@@ -76,7 +76,7 @@ describe("Chain block (real device values)", () => {
 
     const decoded = decodeChain(hexList);
 
-    expect(decoded).toEqual(FX2_FX3_SWAP_ORDER);
+    expect(decoded).toStrictEqual(FX2_FX3_SWAP_ORDER);
   });
 
   it("decodes an AMP/OD-DS swap", () => {
@@ -84,7 +84,7 @@ describe("Chain block (real device values)", () => {
 
     const decoded = decodeChain(hexList);
 
-    expect(decoded).toEqual(AMP_OD_DS_SWAP_ORDER);
+    expect(decoded).toStrictEqual(AMP_OD_DS_SWAP_ORDER);
   });
 
   it("encodes the default order back to the real device bytes", () => {
@@ -92,7 +92,7 @@ describe("Chain block (real device values)", () => {
 
     const encoded = encodeChain(DEFAULT_ORDER, originalHex);
 
-    expect(encoded).toEqual(originalHex);
+    expect(encoded).toStrictEqual(originalHex);
   });
 
   it("encodes an FX2/FX3 swap to the real device bytes", () => {
@@ -101,7 +101,7 @@ describe("Chain block (real device values)", () => {
 
     const encoded = encodeChain(FX2_FX3_SWAP_ORDER, originalHex);
 
-    expect(encoded).toEqual(expectedHex);
+    expect(encoded).toStrictEqual(expectedHex);
   });
 
   it("encodes an AMP/OD-DS swap to the real device bytes", () => {
@@ -110,7 +110,7 @@ describe("Chain block (real device values)", () => {
 
     const encoded = encodeChain(AMP_OD_DS_SWAP_ORDER, originalHex);
 
-    expect(encoded).toEqual(expectedHex);
+    expect(encoded).toStrictEqual(expectedHex);
   });
 
   it("preserves unused trailing bytes from the original param set", () => {
@@ -121,7 +121,7 @@ describe("Chain block (real device values)", () => {
     const result = bytesFromHex(encodedHex);
     const trailingBytes = result.slice(11);
 
-    expect(trailingBytes).toEqual([99, 42]);
+    expect(trailingBytes).toStrictEqual([99, 42]);
   });
 
   // The firmware stores the chain as a linked list keyed by block, so a repeat overwrites its own
@@ -169,7 +169,7 @@ describe("Patch settings", () => {
   it("decodes every setting from the device's factory bytes", () => {
     const decoded = decodeSettings(hexFromBytes(FACTORY_SETTING_BYTES));
 
-    expect(decoded).toEqual({
+    expect(decoded).toStrictEqual({
       memoryLevel: 100,
       bpm: 120,
       key: "C",
@@ -183,7 +183,7 @@ describe("Patch settings", () => {
 
     const reencoded = encodeSettings(decodeSettings(originalHex), originalHex);
 
-    expect(reencoded).toEqual(originalHex);
+    expect(reencoded).toStrictEqual(originalHex);
   });
 
   it("changes one setting and leaves the other bytes as they were", () => {
@@ -192,7 +192,7 @@ describe("Patch settings", () => {
 
     const result = bytesFromHex(encodeSettings(settings, originalHex));
 
-    expect(result).toEqual([6, 4, 7, 8, 7, 1, 0]);
+    expect(result).toStrictEqual([6, 4, 7, 8, 7, 1, 0]);
   });
 
   it("splits each 8-bit setting across its two nibbles at the top of its range", () => {
@@ -201,7 +201,7 @@ describe("Patch settings", () => {
 
     const result = bytesFromHex(encodeSettings(settings, originalHex));
 
-    expect(result).toEqual([12, 8, 15, 10, 0, 1, 0]);
+    expect(result).toStrictEqual([12, 8, 15, 10, 0, 1, 0]);
   });
 
   it("round-trips a setting stored across two nibbles", () => {
@@ -229,7 +229,7 @@ describe("Malformed/unmapped byte handling", () => {
 
     const decoded = decodeChain(hexList);
 
-    expect(decoded).toEqual([]);
+    expect(decoded).toStrictEqual([]);
   });
 
   it("encodeNoiseGate preserves an out-of-range detect byte instead of overwriting it", () => {
@@ -260,7 +260,7 @@ describe("Malformed/unmapped byte handling", () => {
     const encodedHex = encodeVolume(decoded);
     const result = bytesFromHex(encodedHex);
 
-    expect(result).toEqual(bytes);
+    expect(result).toStrictEqual(bytes);
   });
 
   it("encodeVolume preserves an out-of-range curve byte instead of overwriting it", () => {
@@ -282,7 +282,7 @@ describe("Malformed/unmapped byte handling", () => {
 
     const decoded = decodeTypedBlock(TYPED_BLOCKS.delay, hexList);
 
-    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
+    expect(decoded).toStrictEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
   });
 
   it("decodeReverb returns a bare on/type block for a byte outside the known REV_TYPES range", () => {
@@ -292,7 +292,7 @@ describe("Malformed/unmapped byte handling", () => {
 
     const decoded = decodeTypedBlock(TYPED_BLOCKS.reverb, hexList);
 
-    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
+    expect(decoded).toStrictEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
   });
 
   it("decodePedalFx returns a bare on/type block for a byte outside the known PFX_TYPES range", () => {
@@ -302,7 +302,7 @@ describe("Malformed/unmapped byte handling", () => {
 
     const decoded = decodePedalFx(hexList);
 
-    expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", subType: null, params: {}, [RAW]: bytes });
+    expect(decoded).toStrictEqual({ on: false, type: "UNKNOWN_250", subType: null, params: {}, [RAW]: bytes });
   });
 });
 
@@ -315,13 +315,13 @@ describe("Name block", () => {
 
     const reencoded = bytesFromHex(encodeName(decodeName(hexFromBytes(bytes))));
 
-    expect(reencoded).toEqual(bytes);
+    expect(reencoded).toStrictEqual(bytes);
   });
 
   it("pads a short name out to the full block with spaces", () => {
     const encoded = bytesFromHex(encodeName("AB"));
 
-    expect(encoded).toEqual([0x41, 0x42, ...new Array<number>(14).fill(0x20)]);
+    expect(encoded).toStrictEqual([0x41, 0x42, ...new Array<number>(14).fill(0x20)]);
   });
 
   it("throws on a name longer than the block rather than storing a truncation", () => {
@@ -378,7 +378,7 @@ describe("Real device values (default-init.tsl)", () => {
   const pfxBytes = bytesFromHex(rawBlock(patch, "MEMORY%PFX"));
 
   it("decodes the active chain order", () => {
-    expect(patch.chain).toEqual(DEFAULT_CHAIN);
+    expect(patch.chain).toStrictEqual(DEFAULT_CHAIN);
   });
 
   it("decodes the drive block", () => {

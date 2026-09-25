@@ -23,7 +23,7 @@ describe("writeFileAtomic", () => {
     await writeFileAtomic(path, new TextEncoder().encode("new"));
 
     expect(await readFile(path, "utf8")).toBe("new");
-    expect(await readdir(root)).toEqual(["set.tsl"]);
+    expect(await readdir(root)).toStrictEqual(["set.tsl"]);
   });
 
   // The point of the sibling file: the target is never opened for writing, so a write that cannot
@@ -39,6 +39,6 @@ describe("writeFileAtomic", () => {
 
     await expect(writeOverADirectory).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe("the library");
-    expect((await readdir(root)).sort()).toEqual(["blocked", "set.tsl"]);
+    expect((await readdir(root)).sort()).toStrictEqual(["blocked", "set.tsl"]);
   });
 });

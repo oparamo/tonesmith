@@ -193,15 +193,45 @@ parameters (`T`, `K`, `V`) and a loop index. Compounds on "sub" capitalize the n
 `subTypes`. Builder helpers take the name of what they configure, with no verb prefix: `block()`,
 `basePatch()`, not `setBlock()`.
 
-**Tests live in each package's `tests/` directory,** mirroring `src/`. `cli` and `mcp` treat
-`@tonesmith/core` as an external library: they test that they call it correctly and that their own
-contract holds, never re-testing what core does.
-
 **Dependency versions are exact.** No `^` or `~` in any `package.json`. `pnpm add` writes a range by
 default, so correct it after adding.
 
 **Consumer-visible changes need a changeset:** a published package's API, behavior, or output. Tests,
 lint config, and repo docs don't.
+
+### Testing
+
+Tests live in each package's `tests/` directory. The practices below come from Meszaros's *xUnit
+Test Patterns*, Khorikov's *Unit Testing Principles, Practices, and Patterns*, Beck's *Test
+Desiderata* and the Google Testing Blog. Lint enforces the mechanical ones.
+
+1. **One unit per unit suite.** A unit suite sits at the mirror path of one source module
+   (`src/service/specService.ts` is tested by `tests/service/specService.test.ts`) and asserts only
+   that module's behavior. A collaborator that does I/O, or whose logic is another unit's to test, is
+   faked: a fake driver, a hand-written catalog. Pure values such as constants and codec primitives
+   may run for real, as long as no assertion is about them.
+2. **One behavior per test.** A test has one reason to fail. Several `expect`s are fine when they
+   describe one outcome. The test's name states the behavior, so a failure reads without opening the
+   test.
+3. **Arrange, act, assert,** with one act per test and no loops or conditionals in the body; a table
+   of cases is an `it.each`.
+4. **Through the public interface.** Assert what a caller can observe, not internals or call order,
+   unless the call is the behavior (a file read exactly once).
+5. **Isolated and deterministic.** No state shared between tests, no dependence on their order, no
+   clock or network, a fresh temp directory per test, and each test fast enough not to notice.
+6. **Boundaries covered.** The minimum and maximum, empty input, and the value just past each limit.
+7. **Integration tests say so.** A test that crosses units on purpose (a round trip through a
+   device's real bytes, conformance across the driver roster, the CLI run end to end, MCP through a
+   client) lives in the package's `tests/integration/`, so its scope is plain from its path.
+8. **Assert data, never wording.** Check that a rejection names the bad id and lists the valid ones,
+   not the sentence it says them in; prose written for agents gets reworded constantly.
+9. **Surfaces test their own contract.** `cli` and `mcp` treat `@tonesmith/core` as an external
+   library: a surface test earns its place only if it can fail while core is entirely correct.
+   Reading a written file back through the driver to check a command's effect qualifies, since
+   that fails on a miswiring.
+10. **Coverage thresholds are floors, not targets.** They sit well below the measured numbers on
+    purpose. Don't write a test to raise them: chasing the last uncovered branch is what produces
+    wording assertions.
 
 `pnpm lint`, `pnpm build`, `pnpm test` and `pnpm coverage` should all be green before a pull request.
 

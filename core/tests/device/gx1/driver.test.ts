@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFile } from "node:fs/promises";
 import { driver } from "../../../src/device/gx1/driver";
-import { ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_PATCH_NAMES } from "../../helpers";
+import { ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_PATCH_NAMES } from "./helpers";
 
 describe("gx1 driver", () => {
   it("exposes its id, name, and capabilities", () => {
@@ -20,7 +20,7 @@ describe("gx1 driver", () => {
   it("parseFile decodes a real fixture", async () => {
     const file = driver.parseFile(await readFile(FIXTURE), FIXTURE);
 
-    expect(file.patches.map(patch => patch.name)).toEqual(ROCK_TONES_PATCH_NAMES);
+    expect(file.patches.map(patch => patch.name)).toStrictEqual(ROCK_TONES_PATCH_NAMES);
   });
 
   describe("serializeFile", () => {

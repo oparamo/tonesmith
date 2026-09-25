@@ -5,13 +5,13 @@ describe("hexFromBytes", () => {
   it("renders each byte as two uppercase hex digits", () => {
     const hex = hexFromBytes([0, 15, 16, 255]);
 
-    expect(hex).toEqual(["00", "0F", "10", "FF"]);
+    expect(hex).toStrictEqual(["00", "0F", "10", "FF"]);
   });
 
   it("round-trips every byte value through bytesFromHex", () => {
     const everyByte = Array.from({ length: 256 }, (_, byte) => byte);
 
-    expect(bytesFromHex(hexFromBytes(everyByte))).toEqual(everyByte);
+    expect(bytesFromHex(hexFromBytes(everyByte))).toStrictEqual(everyByte);
   });
 
   /** Each case renders as a plausible-looking hex pair when it is not checked first. */

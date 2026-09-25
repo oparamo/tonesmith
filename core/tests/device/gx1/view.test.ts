@@ -4,7 +4,8 @@ import { viewPatch } from "../../../src/device/gx1/view";
 import { blankPatch } from "../../../src/device/gx1/format/tsl";
 import { BLOCK_NAMES } from "../../../src/device/gx1/model";
 import type { Patch } from "../../../src/device/gx1/model";
-import { ROCK_TONES_FIXTURE as FIXTURE, patchAt, present } from "../../helpers";
+import { ROCK_TONES_FIXTURE as FIXTURE, patchAt } from "./helpers";
+import { present } from "../../helpers";
 
 const detail = (patch: Patch, label: string): string | undefined =>
   viewPatch(patch).details.find(entry => entry.label === label)?.value;
@@ -19,7 +20,7 @@ describe("gx1 patch view", () => {
 
     const keys = viewPatch(patch).blocks.map(block => block.key);
 
-    expect(keys).toEqual(patch.chain);
+    expect(keys).toStrictEqual(patch.chain);
   });
 
   // A chain decodes from a linked list that stops at its first terminator, so a file the unit did
@@ -31,7 +32,7 @@ describe("gx1 patch view", () => {
     const keys = viewPatch(patch).blocks.map(block => block.key);
 
     expect(keys[0]).toBe("amp");
-    expect(new Set(keys)).toEqual(new Set(BLOCK_NAMES));
+    expect(new Set(keys)).toStrictEqual(new Set(BLOCK_NAMES));
   });
 
   it("labels each block the way the device's panel does", async () => {
@@ -73,8 +74,8 @@ describe("gx1 patch view", () => {
     const view = viewPatch(patch);
     const amp = present(view.blocks.find(block => block.key === "amp"), "the amp block in the view");
 
-    expect(amp.params).toEqual(patch.amp.params);
-    expect(Object.getOwnPropertySymbols(amp)).toEqual([]);
-    expect(Object.keys(amp).sort()).toEqual(["key", "label", "on", "params", "subType", "type"]);
+    expect(amp.params).toStrictEqual(patch.amp.params);
+    expect(Object.getOwnPropertySymbols(amp)).toStrictEqual([]);
+    expect(Object.keys(amp).sort()).toStrictEqual(["key", "label", "on", "params", "subType", "type"]);
   });
 });

@@ -3,9 +3,8 @@ import { readFile } from "node:fs/promises";
 import { blankPatch, newFile, parseFile, serializeFile } from "../../../../src/device/gx1/format/tsl";
 import { RAW } from "../../../../src/device/gx1/model";
 import { DEFAULTS_BY_TYPE } from "../../../../src/device/gx1/catalog/defaults";
-import {
-  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES, DEFAULT_INIT_FIXTURE, present,
-} from "../../../helpers";
+import { ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES, DEFAULT_INIT_FIXTURE } from "../helpers";
+import { present } from "../../../helpers";
 
 describe("blankPatch", () => {
   it("uses 'NEW PATCH' as the default name", () => {
@@ -39,17 +38,17 @@ describe("blankPatch", () => {
     const blank = blankPatch(name);
 
     expect(factory.name).toBe(name);
-    expect(blank[RAW]).toEqual(factory[RAW]);
+    expect(blank[RAW]).toStrictEqual(factory[RAW]);
   });
 
   it("opens every block that has types at that type's factory defaults", () => {
     const patch = blankPatch();
 
-    expect(patch.delay.params).toEqual(DEFAULTS_BY_TYPE.delay[patch.delay.type]);
-    expect(patch.reverb.params).toEqual(DEFAULTS_BY_TYPE.reverb[patch.reverb.type]);
-    expect(patch.pedalFx.params).toEqual(DEFAULTS_BY_TYPE.pedalFx[patch.pedalFx.type]);
+    expect(patch.delay.params).toStrictEqual(DEFAULTS_BY_TYPE.delay[patch.delay.type]);
+    expect(patch.reverb.params).toStrictEqual(DEFAULTS_BY_TYPE.reverb[patch.reverb.type]);
+    expect(patch.pedalFx.params).toStrictEqual(DEFAULTS_BY_TYPE.pedalFx[patch.pedalFx.type]);
     for (const slot of ["fx1", "fx2", "fx3"] as const) {
-      expect(patch[slot].params, slot).toEqual(DEFAULTS_BY_TYPE.fx[patch[slot].type]);
+      expect(patch[slot].params, slot).toStrictEqual(DEFAULTS_BY_TYPE.fx[patch[slot].type]);
     }
   });
 });
@@ -83,7 +82,7 @@ describe("parseFile", () => {
     const file = parseFile(await readFile(FIXTURE), FIXTURE);
 
     expect(file.name).toBe(ROCK_TONES_SET_NAME);
-    expect(file.patches.map(patch => patch.name)).toEqual(ROCK_TONES_PATCH_NAMES);
+    expect(file.patches.map(patch => patch.name)).toStrictEqual(ROCK_TONES_PATCH_NAMES);
   });
 
   it("attaches the raw envelope via RAW symbol", async () => {
@@ -134,7 +133,7 @@ describe("serializeFile + parseFile round-trip", () => {
 
     const reloadedNames = reloaded.patches.map(patch => patch.name);
     const originalNames = original.patches.map(patch => patch.name);
-    expect(reloadedNames).toEqual(originalNames);
+    expect(reloadedNames).toStrictEqual(originalNames);
   });
 
   it("preserves all paramSet keys byte-for-byte", async () => {
@@ -149,7 +148,7 @@ describe("serializeFile + parseFile round-trip", () => {
     for (const [index, originalPatch] of origRaw.data[0].entries()) {
       const writtenParamSet = present(writtenRaw.data[0][index], `written patch ${index}`).paramSet;
       for (const key of Object.keys(originalPatch.paramSet)) {
-        expect(writtenParamSet[key], `patch ${index} key ${key}`).toEqual(originalPatch.paramSet[key]);
+        expect(writtenParamSet[key], `patch ${index} key ${key}`).toStrictEqual(originalPatch.paramSet[key]);
       }
     }
   });
