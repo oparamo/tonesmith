@@ -1,3 +1,5 @@
+import { SUB_TYPE_FIELD } from "../../../common/blockField";
+
 const FX_TYPES = [
   "COMPRESSOR", "LIMITER", "ENHANCER", "TOUCH WAH", "AUTO WAH", "FIXED WAH",
   "DEFRETTER", "SLOW GEAR", "AC. GTR SIM", "AC RESO", "SITAR SIM", "FEEDBACKER",
@@ -185,11 +187,6 @@ const ENHANCER_HIGH_FREQ = [
 // (+2nd, +3rd, +6th, etc.) are diatonic, so the actual semitone shift HARMONIST applies
 // depends on this key.
 const KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
-
-// The one name a sub-model selection goes by: in a codec field map, on a decoded block, and in a
-// patch spec. `type` is the block's own selector and never a sub-model's, so the two words each
-// mean exactly one thing.
-const SUB_TYPE_FIELD = "subType";
 
 // Effects whose sub-model selector lives in param-block byte p[0], read and written via
 // FX_PARAM_MAPS' lookup(SUB_TYPE_FIELD, 0, ...) field. Used by the decoder (to promote the

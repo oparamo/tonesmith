@@ -96,6 +96,11 @@ interface CapabilityType {
   params?: ParamSpec[];
   /** A spec fragment selecting this type, at factory defaults. Absent where the type names no block. */
   example?: PatchSpecExample;
+  /**
+   * The only blocks that offer this type, where its group describes blocks that don't all offer it.
+   * Absent means every block of the group does.
+   */
+  blocks?: string[];
 }
 
 /**
@@ -120,6 +125,23 @@ interface CapabilityGroup {
   example?: PatchSpecExample;
 }
 
+/** One block of the signal chain, as a patch spec names it. */
+interface ChainBlock {
+  /**
+   * What the device's own panel calls the block. A patch spec always writes the block's name; the
+   * label is what a manual, a photo of the unit, or a printout shows, and the two differ whenever a
+   * device's label is an abbreviation nobody would guess a key from.
+   */
+  label: string;
+  /**
+   * The capability group describing the block's types and controls. Blocks that are copies of one
+   * another, such as a device's effect slots, share one.
+   */
+  group: string;
+  /** False for a block the device keeps in the signal at all times, which takes no `on`. */
+  bypass: boolean;
+}
+
 /**
  * The device's signal-chain model: how blocks are ordered and how they're turned on/off. Every
  * device has one; it's the first thing to consult before building a patch. The block names and
@@ -130,12 +152,8 @@ interface ChainSpec {
   description: string;
   /** The canonical block order used when a patch doesn't specify one. */
   defaultOrder: string[];
-  /**
-   * Each block name mapped to what the device's own panel calls it. A patch spec always writes the
-   * name; the label is what a manual, a photo of the unit, or a printout shows, and the two differ
-   * whenever a device's label is an abbreviation nobody would guess a key from.
-   */
-  blocks: Record<string, string>;
+  /** Every block a patch spec may carry, by the name the spec writes it under. */
+  blocks: Record<string, ChainBlock>;
 }
 
 /**
@@ -186,5 +204,5 @@ type CapabilityLookup =
 
 export type {
   ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam, PatchSpecExample, CapabilityType,
-  CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities, ChainView, CapabilityLookup,
+  CapabilityGroup, ChainBlock, ChainSpec, PatchNameSpec, DeviceCapabilities, ChainView, CapabilityLookup,
 };

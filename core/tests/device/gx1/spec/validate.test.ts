@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { validateTypeParams } from "../../../../src/device/gx1/spec/validate";
+import { validateTypeParams } from "../../../../src/service/specService";
 import { validatePatchSpec } from "../../../../src/device/gx1/spec/build";
 import { gx1Capabilities } from "../../../../src/device/gx1/catalog/capabilities";
 
 describe("validateTypeParams", () => {
   it("reports nothing for an unknown group or type (defers to the builder/codec)", () => {
-    const issues = validateTypeParams({ group: "fx", type: "NOPE", values: { sustain: 200 } });
+    const issues = validateTypeParams(gx1Capabilities, { group: "fx", type: "NOPE", values: { sustain: 200 } });
 
     expect(issues).toEqual([]);
   });
 
   it("range-checks numeric params and ignores keys with no matching spec", () => {
-    const issues = validateTypeParams({
+    const issues = validateTypeParams(gx1Capabilities, {
       group: "fx", type: "COMPRESSOR", subType: "ORANGE",
       values: { sustain: 200, attack: 50, bogus: 5 },
     });
@@ -23,7 +23,7 @@ describe("validateTypeParams", () => {
   });
 
   it("merges a subType's own params (delay sub-algorithm) into the checked set", () => {
-    const issues = validateTypeParams({
+    const issues = validateTypeParams(gx1Capabilities, {
       group: "fx", type: "DELAY", subType: "MODULATE", values: { modRate: 500 },
     });
 
@@ -35,7 +35,7 @@ describe("validateTypeParams", () => {
   // and plays as the default. Naming the param that does carry the variant is the whole point of
   // rejecting it here rather than leaving it to the builder.
   it("rejects a subType on a type whose variant is an ordinary param, naming that param", () => {
-    const issues = validateTypeParams({ group: "fx", type: "PHASER", subType: "4 STAGE", values: {} });
+    const issues = validateTypeParams(gx1Capabilities, { group: "fx", type: "PHASER", subType: "4 STAGE", values: {} });
 
     expect(issues).toHaveLength(1);
     expect(issues[0], "should point at the param that carries the variant").toContain("params.stage");
@@ -43,7 +43,7 @@ describe("validateTypeParams", () => {
   });
 
   it("rejects a subType on a type with no variant at all", () => {
-    const issues = validateTypeParams({ group: "pedalFx", type: "PEDAL BEND", subType: "CRY WAH", values: {} });
+    const issues = validateTypeParams(gx1Capabilities, { group: "pedalFx", type: "PEDAL BEND", subType: "CRY WAH", values: {} });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toContain("PEDAL BEND");
@@ -53,7 +53,7 @@ describe("validateTypeParams", () => {
   // variants fall through to the codec's lookup and come back as `Unknown type value: "WOBBLE"`,
   // naming neither the block, nor the field, nor what it could have been.
   it("rejects a subType the type doesn't declare, listing the ones it does", () => {
-    const issues = validateTypeParams({ group: "fx", type: "COMPRESSOR", subType: "WOBBLE", values: {} });
+    const issues = validateTypeParams(gx1Capabilities, { group: "fx", type: "COMPRESSOR", subType: "WOBBLE", values: {} });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toContain("WOBBLE");
@@ -61,13 +61,13 @@ describe("validateTypeParams", () => {
   });
 
   it("accepts a subType the type declares", () => {
-    const issues = validateTypeParams({ group: "pfx", type: "WAH", subType: "CRY WAH", values: {} });
+    const issues = validateTypeParams(gx1Capabilities, { group: "pfx", type: "WAH", subType: "CRY WAH", values: {} });
 
     expect(issues).toEqual([]);
   });
 
   it("passes valid numeric and discrete values", () => {
-    const issues = validateTypeParams({
+    const issues = validateTypeParams(gx1Capabilities, {
       group: "delay", type: "ANALOG", values: { time: 360, highCut: "2kHz" },
     });
 
@@ -78,7 +78,7 @@ describe("validateTypeParams", () => {
   // ordinary stored values. Checking only the numeric half is what rejected a patch read straight
   // off the device as out of range.
   it("passes a tempo-synced param set to a note value", () => {
-    const issues = validateTypeParams({
+    const issues = validateTypeParams(gx1Capabilities, {
       group: "delay", type: "STANDARD", values: { time: "1/4" },
     });
 
@@ -86,7 +86,7 @@ describe("validateTypeParams", () => {
   });
 
   it("rejects a note value the device has no code for, listing the ones it does", () => {
-    const issues = validateTypeParams({
+    const issues = validateTypeParams(gx1Capabilities, {
       group: "delay", type: "STANDARD", values: { time: "1/5" },
     });
 
@@ -96,7 +96,7 @@ describe("validateTypeParams", () => {
   });
 
   it("still range-checks the numeric half of a tempo-synced param", () => {
-    const issues = validateTypeParams({
+    const issues = validateTypeParams(gx1Capabilities, {
       group: "delay", type: "STANDARD", values: { time: 2010 },
     });
 
@@ -105,7 +105,7 @@ describe("validateTypeParams", () => {
   });
 
   it("checks discrete-value membership", () => {
-    const issues = validateTypeParams({
+    const issues = validateTypeParams(gx1Capabilities, {
       group: "delay", type: "ANALOG", values: { highCut: "9kHz" },
     });
 

@@ -12,14 +12,14 @@
  * (and therefore the params surfaced here) stays in lockstep with the codec's field maps.
  */
 import type {
-  DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec, PatchSpecExample,
+  ChainBlock, DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec, PatchSpecExample,
 } from "../../../model";
 import {
   PARAMS_BY_TYPE, PARAMS_BY_BLOCK, PATCH_SETTINGS, FIELD_LABEL_ALIASES, type PerTypeBlockId,
 } from "./paramCatalog";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "./defaults";
 import type { ParamDefaults, BlockDefaults } from "./defaults";
-import { BLOCK_GROUPS, BLOCK_LABELS, DEFAULT_CHAIN, NAME_BYTES, onlyBlockFor } from "../model";
+import { ALWAYS_ON, BLOCK_GROUPS, BLOCK_LABELS, BLOCK_NAMES, DEFAULT_CHAIN, NAME_BYTES, onlyBlockFor } from "../model";
 import { PATCH_SETTING_FIELDS, fieldsFor } from "../format/codec";
 import type { FieldCodec } from "../format/codec";
 
@@ -278,7 +278,14 @@ const FX_META: CapabilityType[] = [
   { id: "OVERTONE",    name: "Overtone",      description: "FX3 only. Uses MDP technology to add new harmonics to the sound, producing richness and resonance not present in the original. Adds octave-up, octave-down, and detuned unison voices." },
 ];
 
-const FX_TYPES = withTypeParams("fx", FX_META);
+/** A type the device offers in one block only says which, so a consumer builds it where it plays. */
+const withOnlyBlock = (type: CapabilityType): CapabilityType => {
+  const onlyBlock = onlyBlockFor(type.id);
+  const scoped = onlyBlock === undefined ? type : { ...type, blocks: [onlyBlock] };
+  return scoped;
+};
+
+const FX_TYPES = withTypeParams("fx", FX_META).map(withOnlyBlock);
 
 // ---------------------------------------------------------------------------
 // OD/DS block: same models as the FX OD/DS subtype list
@@ -525,10 +532,16 @@ const withExamples = (groups: CapabilityGroup[]): CapabilityGroup[] =>
 // Assembled DeviceCapabilities
 // ---------------------------------------------------------------------------
 
+/** Every block a spec names: its panel label, the group describing it, and whether it can be bypassed. */
+const CHAIN_BLOCKS: Record<string, ChainBlock> = Object.fromEntries(BLOCK_NAMES.map(name => [
+  name,
+  { label: BLOCK_LABELS[name], group: BLOCK_GROUPS[name], bypass: !ALWAYS_ON.has(name) },
+]));
+
 const gx1Capabilities: DeviceCapabilities = {
   chain: {
     defaultOrder: [...DEFAULT_CHAIN],
-    blocks: { ...BLOCK_LABELS },
+    blocks: CHAIN_BLOCKS,
     description:
       "The signal chain is the ordered list of blocks the guitar signal passes through. Every block " +
       "is always in the chain. Its position and its on/off state are separate inputs, set " +
@@ -544,8 +557,10 @@ const gx1Capabilities: DeviceCapabilities = {
       "settings when you want it off but those params kept behind the bypass, so it can be " +
       "switched on later with them intact.\n\n" +
       `Default order: ${DEFAULT_CHAIN.join(", ")}.\n\n` +
-      "`blocks` maps each name above to what the device's own front panel calls that block, which " +
-      "is what a manual or a photo of the unit shows. Write the names, not the labels.",
+      "`blocks` describes each name above: its `label`, what the device's own front panel calls it " +
+      "(what a manual or a photo of the unit shows; write the names, not the labels), its `group`, " +
+      "the capability group listing its types and controls (fx1, fx2 and fx3 share fx), and " +
+      "`bypass`, false for the one block that can't be switched off.",
   },
   patchName: { maxLength: NAME_BYTES },
   patchSettings: withKeys(PATCH_SETTING_FIELDS, {}, PATCH_SETTINGS),

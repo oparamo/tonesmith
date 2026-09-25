@@ -11,7 +11,7 @@
  * not even a guess away from the name a caller writes, so the panel label lives here as a mapping
  * the driver owns rather than as the key itself.
  */
-import { SUB_TYPE_FIELD } from "./constants";
+import { ON_FIELD, PARAMS_FIELD, SELECTION_FIELDS, TYPE_FIELD } from "../../../common/blockField";
 
 /**
  * Every block a patch spec may carry, mapped to the capability group describing it. The three fx
@@ -47,15 +47,14 @@ const BLOCK_FOR_LABEL: Record<string, BlockName | undefined> = Object.fromEntrie
   Object.entries(BLOCK_LABELS).map(([block, label]) => [label, block as BlockName])
 );
 
-const TYPE_FIELD = "type";
-const ON_FIELD = "on";
-const PARAMS_FIELD = "params";
-
-/** The fields that select a block's shape rather than set one of its controls. */
-const SELECTION_FIELDS = new Set<string>([TYPE_FIELD, SUB_TYPE_FIELD, ON_FIELD]);
+/**
+ * The one block the device can't bypass: the volume block has no on/off byte to write. Every other
+ * block has one, so every other block can be left off.
+ */
+const ALWAYS_ON: ReadonlySet<BlockName> = new Set<BlockName>(["volume"]);
 
 export {
-  BLOCK_GROUPS, BLOCK_NAMES, BLOCK_LABELS, BLOCK_FOR_LABEL, SELECTION_FIELDS, onlyBlockFor,
+  BLOCK_GROUPS, BLOCK_NAMES, BLOCK_LABELS, BLOCK_FOR_LABEL, SELECTION_FIELDS, ALWAYS_ON, onlyBlockFor,
   ON_FIELD, PARAMS_FIELD, TYPE_FIELD,
 };
 export type { BlockName };

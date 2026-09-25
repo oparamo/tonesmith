@@ -8,7 +8,7 @@ for (const driver of drivers) {
 export type {
   FieldValue, PatchBlock, Patch, PatchFile, FieldEdit, FieldEdits, PatchDriver,
   PatchDetail, BlockView, PatchView,
-  DeviceCapabilities, CapabilityGroup, CapabilityType, ChainSpec, ChainView, CapabilityLookup,
+  DeviceCapabilities, CapabilityGroup, CapabilityType, ChainBlock, ChainSpec, ChainView, CapabilityLookup,
   PatchNameSpec, PatchSpecExample,
   ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam,
 } from "./model";

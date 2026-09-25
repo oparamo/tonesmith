@@ -1,4 +1,4 @@
-import type { ChainView, DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
+import type { ChainBlock, ChainView, DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "./color";
 
 /**
@@ -21,6 +21,12 @@ const printPatchSettings = (settings: ParamSpec[]): void => {
   console.info();
 };
 
+/** One chain block's line: the name a spec writes, the panel label, and the group describing it. */
+const printChainBlock = (name: string, block: ChainBlock): void => {
+  const alwaysOn = block.bypass ? "" : ", always on";
+  console.info(`  ${CYAN}${name.padEnd(10)}${RESET}  ${block.label.padEnd(8)}${DIM}group ${block.group}${alwaysOn}${RESET}`);
+};
+
 /**
  * Print the device's signal-chain model (default order, how ordering and bypass work) and what the
  * patch carries outside any block.
@@ -29,6 +35,9 @@ const printChain = (chain: ChainView): void => {
   console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
   console.info(`${YELLOW}Default order:${RESET} ${chain.defaultOrder.join(" → ")}\n`);
   console.info(chain.description);
+  console.info();
+  console.info(`${YELLOW}Blocks:${RESET}`);
+  for (const [name, block] of Object.entries(chain.blocks)) printChainBlock(name, block);
   console.info();
   console.info(`${YELLOW}Patch name:${RESET} up to ${chain.patchName.maxLength} characters\n`);
   printPatchSettings(chain.patchSettings);

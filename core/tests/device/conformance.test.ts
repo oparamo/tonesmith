@@ -70,6 +70,25 @@ describe("every driver's chain names the blocks a spec names", () => {
   });
 });
 
+describe("every driver's chain blocks point at the groups that describe them", () => {
+  it.each(drivers.map(driver => ({ id: driver.id, driver })))("$id", ({ driver }) => {
+    const { chain, groups } = driver.capabilities;
+    const groupIds = groups.map(group => group.id);
+
+    for (const [name, block] of Object.entries(chain.blocks)) {
+      expect(groupIds, `chain block "${name}" names a real group`).toContain(block.group);
+    }
+    // A type scoped to some blocks has to name blocks its own group describes, or the scope points
+    // a caller at a block that can never hold it.
+    for (const group of groups) {
+      const blocksOfGroup = Object.keys(chain.blocks).filter(name => chain.blocks[name]?.group === group.id);
+      for (const scoped of group.types.flatMap(type => type.blocks ?? [])) {
+        expect(blocksOfGroup, `${group.id} scopes a type to "${scoped}"`).toContain(scoped);
+      }
+    }
+  });
+});
+
 describe("every driver's view shows the patch under the chain's own names", () => {
   it.each(drivers.map(driver => ({ id: driver.id, driver })))("$id", ({ driver }) => {
     const { chain } = driver.capabilities;
@@ -80,7 +99,7 @@ describe("every driver's view shows the patch under the chain's own names", () =
       new Set(chain.defaultOrder)
     );
     for (const block of view.blocks) {
-      expect(block.label, `${block.key} is shown under its panel label`).toBe(chain.blocks[block.key]);
+      expect(block.label, `${block.key} is shown under its panel label`).toBe(chain.blocks[block.key]?.label);
       expect(block.params, `${block.key} carries its controls`).toBeDefined();
     }
   });
