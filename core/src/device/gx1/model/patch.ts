@@ -1,5 +1,5 @@
 import type { Patch as BasePatch, PatchFile as BasePatchFile } from "../../../model";
-import type { RAW } from ".";
+import type { RAW } from "./raw";
 import type { RawParamSet, TslEnvelope } from "./tsl";
 import type {
   FxBlock, DriveBlock, AmpBlock, NoiseGateBlock, VolumeBlock, DelayBlock, ReverbBlock, PedalFxBlock,

@@ -64,6 +64,13 @@ const fileNameCase = {
 const fsModules = ['fs', 'node:fs'];
 const allFsModules = [...fsModules, 'fs/promises', 'node:fs/promises'];
 
+// A file importing its own folder's barrel imports itself back through the re-export, which is an
+// import cycle that no layer rule sees.
+const ownBarrel = {
+  regex: '^\\.(/index)?$',
+  message: "Import the module itself: this folder's barrel re-exports this file.",
+};
+
 /** The patterns that match an import from any of the named folders, at any depth. */
 const folderPatterns = folders => folders.flatMap(folder => [`**/${folder}`, `**/${folder}/**`]);
 
@@ -80,6 +87,7 @@ const layerRules = layers => layers.map(({ files, forbidden, banFs = false }) =>
           ? { group: allFsModules, message: 'A driver converts bytes; file I/O belongs to core persistence.' }
           : { group: fsModules, importNamePattern: 'Sync$', message: 'Use the async version from node:fs/promises.' },
         { group: folderPatterns(forbidden), message: `This layer does not import from ${forbidden.join(', ')}.` },
+        ownBarrel,
       ],
     }],
   },
@@ -132,11 +140,14 @@ export default tseslint.config(
       // agent call waits behind a single read, and async is what lets calls on different files
       // overlap. CPU-bound work with no async counterpart isn't file I/O and isn't touched by this.
       'no-restricted-imports': ['error', {
-        patterns: [{
-          group: fsModules,
-          importNamePattern: 'Sync$',
-          message: 'Use the async version from node:fs/promises.',
-        }],
+        patterns: [
+          {
+            group: fsModules,
+            importNamePattern: 'Sync$',
+            message: 'Use the async version from node:fs/promises.',
+          },
+          ownBarrel,
+        ],
       }],
     },
   },

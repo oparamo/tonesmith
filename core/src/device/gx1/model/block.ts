@@ -1,5 +1,5 @@
 import type { PatchBlock } from "../../../model";
-import type { RAW } from ".";
+import type { RAW } from "./raw";
 import type { BlockParams } from "./tsl";
 
 /**
