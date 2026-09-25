@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePedalFx,
+  TYPED_BLOCKS, decodeTypedBlock, encodeTypedBlock, decodeChain, encodeChain, decodePedalFx,
   decodeSettings, encodeSettings, decodeNoiseGate, encodeNoiseGate, decodeVolume, encodeVolume, decodeName, encodeName,
-  decodeAmp, encodeAmp,
 } from "../../../../../src/device/gx1/format/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../../../src/device/gx1/format/codec/primitives";
 import {
@@ -21,9 +20,9 @@ describe("Delay block symmetry (all types)", () => {
     bytes[1] = DLY_TYPE_IDX[dlyType];
     const hexList = hexFromBytes(bytes);
 
-    const decoded = decodeDelay(hexList);
-    const reencoded = encodeDelay(decoded);
-    const reDecoded = decodeDelay(reencoded);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.delay, hexList);
+    const reencoded = encodeTypedBlock(TYPED_BLOCKS.delay, decoded);
+    const reDecoded = decodeTypedBlock(TYPED_BLOCKS.delay, reencoded);
 
     expect(reDecoded).toEqual(decoded);
   });
@@ -39,9 +38,9 @@ describe("Reverb block symmetry (all types)", () => {
     bytes[1] = REV_TYPE_IDX[revType];
     const hexList = hexFromBytes(bytes);
 
-    const decoded = decodeReverb(hexList);
-    const reencoded = encodeReverb(decoded);
-    const reDecoded = decodeReverb(reencoded);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.reverb, hexList);
+    const reencoded = encodeTypedBlock(TYPED_BLOCKS.reverb, decoded);
+    const reDecoded = decodeTypedBlock(TYPED_BLOCKS.reverb, reencoded);
 
     expect(reDecoded).toEqual(decoded);
   });
@@ -281,7 +280,7 @@ describe("Malformed/unmapped byte handling", () => {
     bytes[1] = 250;
     const hexList = hexFromBytes(bytes);
 
-    const decoded = decodeDelay(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.delay, hexList);
 
     expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
   });
@@ -291,7 +290,7 @@ describe("Malformed/unmapped byte handling", () => {
     bytes[1] = 250;
     const hexList = hexFromBytes(bytes);
 
-    const decoded = decodeReverb(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.reverb, hexList);
 
     expect(decoded).toEqual({ on: false, type: "UNKNOWN_250", params: {}, [RAW]: bytes });
   });
@@ -353,10 +352,10 @@ describe("Values the device has no byte for", () => {
   });
 
   it("encodeAmp names the control whose value is not a byte", () => {
-    const block = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
+    const block = decodeTypedBlock(TYPED_BLOCKS.amp, hexFromBytes(new Array<number>(13).fill(0)));
     block.params.gain = 500;
 
-    const encodeBadGain = () => encodeAmp(block);
+    const encodeBadGain = () => encodeTypedBlock(TYPED_BLOCKS.amp, block);
 
     expect(encodeBadGain).toThrow(/gain/);
   });
@@ -435,7 +434,7 @@ describe("Real device values (default-init.tsl)", () => {
     const modulateBytes = [...dlyBytes.slice(0, 1), DLY_TYPE_IDX.MODULATE, ...dlyBytes.slice(2)];
     const hexList = hexFromBytes(modulateBytes);
 
-    const decoded = decodeDelay(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.delay, hexList);
 
     expect(decoded.params).toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz", modRate: 50, modDepth: 30 });
   });
@@ -446,7 +445,7 @@ describe("Real device values (default-init.tsl)", () => {
     const analogBytes = [...dlyBytes.slice(0, 1), DLY_TYPE_IDX.ANALOG, ...dlyBytes.slice(2)];
     const hexList = hexFromBytes(analogBytes);
 
-    const decoded = decodeDelay(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.delay, hexList);
 
     expect(decoded.params).toMatchObject({ time: 400, feedback: 30, level: 50, highCut: "6.3kHz" });
   });
@@ -455,7 +454,7 @@ describe("Real device values (default-init.tsl)", () => {
     const warpBytes = [...dlyBytes.slice(0, 1), DLY_TYPE_IDX.WARP, ...dlyBytes.slice(2)];
     const hexList = hexFromBytes(warpBytes);
 
-    const decoded = decodeDelay(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.delay, hexList);
 
     expect(decoded).toMatchObject({ on: false, type: "WARP" });
     expect(decoded.params).toMatchObject({ time: 400, trigger: false, level: 50 });
@@ -465,7 +464,7 @@ describe("Real device values (default-init.tsl)", () => {
     const glitchBytes = [...dlyBytes.slice(0, 1), DLY_TYPE_IDX.GLITCH, ...dlyBytes.slice(2)];
     const hexList = hexFromBytes(glitchBytes);
 
-    const decoded = decodeDelay(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.delay, hexList);
 
     expect(decoded).toMatchObject({ on: false, type: "GLITCH" });
     expect(decoded.params).toMatchObject({ trigger: false, time: 50, glitch: 50, balance: 100 });
@@ -475,7 +474,7 @@ describe("Real device values (default-init.tsl)", () => {
     const shimmerBytes = [...revBytes.slice(0, 1), REV_TYPE_IDX.SHIMMER, ...revBytes.slice(2)];
     const hexList = hexFromBytes(shimmerBytes);
 
-    const decoded = decodeReverb(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.reverb, hexList);
 
     expect(decoded).toMatchObject({ on: false, type: "SHIMMER" });
     expect(decoded.params).toMatchObject({
@@ -487,7 +486,7 @@ describe("Real device values (default-init.tsl)", () => {
     const subDelayBytes = [...revBytes.slice(0, 1), REV_TYPE_IDX["SUB DELAY"], ...revBytes.slice(2)];
     const hexList = hexFromBytes(subDelayBytes);
 
-    const decoded = decodeReverb(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.reverb, hexList);
 
     expect(decoded).toMatchObject({ on: false, type: "SUB DELAY" });
     expect(decoded.params).toMatchObject({ time: 400, level: 50, feedback: 30, highCut: "6.3kHz" });
@@ -497,7 +496,7 @@ describe("Real device values (default-init.tsl)", () => {
     const teraEchoBytes = [...revBytes.slice(0, 1), REV_TYPE_IDX["TERA ECHO"], ...revBytes.slice(2)];
     const hexList = hexFromBytes(teraEchoBytes);
 
-    const decoded = decodeReverb(hexList);
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.reverb, hexList);
 
     expect(decoded).toMatchObject({ on: false, type: "TERA ECHO" });
     expect(decoded.params).toMatchObject({ tone: 0, level: 25, direct: 100, feedback: 30, spreadTime: 50, trigger: false });

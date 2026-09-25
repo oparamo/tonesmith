@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { decodeFxParams } from "../../../../src/device/gx1/format/codec/fxParams";
-import { decodeDelay, decodeReverb, decodePedalFx } from "../../../../src/device/gx1/format/codec/blocks";
+import { TYPED_BLOCKS, decodeTypedBlock, decodePedalFx } from "../../../../src/device/gx1/format/codec/blocks";
 import { bytesFromHex, hexFromBytes, lookupIndex } from "../../../../src/device/gx1/format/codec/primitives";
 import {
   FX_TYPES, FX_DLY_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
@@ -80,11 +80,11 @@ const harvestDefaults = (patch: Patch): Record<string, BlockDefaults> => {
     fxDelay: harvestFxDelay(fx1),
     delay: harvestByTypeByte({
       bytes: bytesFromHex(rawBlock(patch, "MEMORY%DLY")),
-      types: DLY_TYPES, typeIndex: DLY_TYPE_IDX, decode: decodeDelay,
+      types: DLY_TYPES, typeIndex: DLY_TYPE_IDX, decode: hexList => decodeTypedBlock(TYPED_BLOCKS.delay, hexList),
     }),
     reverb: harvestByTypeByte({
       bytes: bytesFromHex(rawBlock(patch, "MEMORY%REV")),
-      types: REV_TYPES, typeIndex: REV_TYPE_IDX, decode: decodeReverb,
+      types: REV_TYPES, typeIndex: REV_TYPE_IDX, decode: hexList => decodeTypedBlock(TYPED_BLOCKS.reverb, hexList),
     }),
     pedalFx: harvestByTypeByte({
       bytes: bytesFromHex(rawBlock(patch, "MEMORY%PFX")),

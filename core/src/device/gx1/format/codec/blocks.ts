@@ -11,8 +11,7 @@ import {
   FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW, TIME_NOTE_VALUES, SUB_TYPE_FIELD,
 } from "../../model";
 import type {
-  FxBlock, DriveBlock, DriveParams, AmpBlock, AmpParams, NoiseGateBlock, NoiseGateParams,
-  VolumeBlock, VolumeParams, DelayBlock, ReverbBlock, PedalFxBlock, PatchSettings,
+  BlockParams, FxBlock, NoiseGateBlock, NoiseGateParams, VolumeBlock, VolumeParams, PedalFxBlock, PatchSettings,
 } from "../../model";
 import {
   bytesFromHex, hexFromBytes, byteReader, lookupName, lookupIndex,
@@ -216,39 +215,6 @@ const DEFAULT_CURVE = "NORMAL";
 const volumeFieldsIn = (bytes: number[]): FieldCodec[] =>
   bytes.length > CURVE_BYTE ? VOLUME_FIELDS : VOLUME_FIELDS.filter(field => field.name !== "curve");
 
-// The params casts below are what the field list decodes to: the drift guards pin each list to the
-// block's catalog params, which the block types mirror.
-
-const decodeAmp = (hexList: string[]): AmpBlock => {
-  const bytes = bytesFromHex(hexList);
-  const at = byteReader(bytes, "AMP");
-  const params = decodeFields(AMP_FIELDS, bytes) as AmpParams;
-  return { on: Boolean(at(0)), type: lookupName(AMP_TYPES, at(1)), params, [RAW]: bytes };
-};
-
-const encodeAmp = (block: AmpBlock): string[] => {
-  const bytes = [...block[RAW]];
-  bytes[0] = Number(block.on);
-  bytes[1] = lookupIndex(AMP_TYPE_IDX, block.type, "AMP type");
-  encodeFields(AMP_FIELDS, block.params, bytes);
-  return hexFromBytes(bytes);
-};
-
-const decodeDrive = (hexList: string[]): DriveBlock => {
-  const bytes = bytesFromHex(hexList);
-  const at = byteReader(bytes, "OD/DS");
-  const params = decodeFields(DRIVE_FIELDS, bytes) as DriveParams;
-  return { on: Boolean(at(0)), type: lookupName(ODDS_TYPES, at(1)), params, [RAW]: bytes };
-};
-
-const encodeDrive = (block: DriveBlock): string[] => {
-  const bytes = [...block[RAW]];
-  bytes[0] = Number(block.on);
-  bytes[1] = lookupIndex(ODDS_IDX, block.type, "OD/DS type");
-  encodeFields(DRIVE_FIELDS, block.params, bytes);
-  return hexFromBytes(bytes);
-};
-
 const decodeNoiseGate = (hexList: string[]): NoiseGateBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "NS");
@@ -301,7 +267,7 @@ const encodeFxCom = (block: FxBlock): string[] => {
 
 // ── Delay block field maps (keyed by delay type) ──────────────────────────────
 //
-// Bytes 0–1 of the full block are [on, type], handled in decodeDelay/encodeDelay.
+// Bytes 0–1 of the full block are [on, type], handled by decodeTypedBlock/encodeTypedBlock.
 // All other offsets below are absolute byte positions within the full block.
 //
 // Many fields are shared across types at the same address (e.g. feedback/level/highCut
@@ -353,25 +319,6 @@ const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
 };
 
-const decodeDelay = (hexList: string[]): DelayBlock => {
-  const bytes = bytesFromHex(hexList);
-  const at = byteReader(bytes, "DELAY");
-  const delayType = lookupName(DLY_TYPES, at(1));
-  const fields = DELAY_TYPE_MAPS[delayType];
-  const params = fields ? decodeFields(fields, bytes) : {};
-  return { on: Boolean(at(0)), type: delayType, params, [RAW]: bytes };
-};
-
-const encodeDelay = (block: DelayBlock): string[] => {
-  const bytes = [...block[RAW]];
-  bytes[0] = Number(block.on);
-  bytes[1] = lookupIndex(DLY_TYPE_IDX, block.type, "DLY type");
-
-  const fields = DELAY_TYPE_MAPS[block.type];
-  if (fields) encodeFields(fields, block.params, bytes);
-  return hexFromBytes(bytes);
-};
-
 
 // ── Reverb block (keyed by reverb type) ──────────────────────────────────────
 //
@@ -406,25 +353,6 @@ const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
 };
 
-const decodeReverb = (hexList: string[]): ReverbBlock => {
-  const bytes = bytesFromHex(hexList);
-  const at = byteReader(bytes, "REVERB");
-  const reverbType = lookupName(REV_TYPES, at(1));
-  const fields = reverbFields(reverbType);
-  const params = fields ? decodeFields(fields, bytes) : {};
-  return { on: Boolean(at(0)), type: reverbType, params, [RAW]: bytes };
-};
-
-const encodeReverb = (block: ReverbBlock): string[] => {
-  const bytes = [...block[RAW]];
-  bytes[0] = Number(block.on);
-  bytes[1] = lookupIndex(REV_TYPE_IDX, block.type, "REV type");
-
-  const fields = reverbFields(block.type);
-  if (fields) encodeFields(fields, block.params, bytes);
-  return hexFromBytes(bytes);
-};
-
 // ── PFX (expression pedal effect: WAH / PEDAL BEND) block (14 bytes) ──────────
 //
 // Byte 3 is the bass-mode mirror of byte 2's wah model, out of scope in guitar mode, same
@@ -443,37 +371,77 @@ const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
 };
 
-const decodePedalFx = (hexList: string[]): PedalFxBlock => {
+// ── Blocks selected by a type byte ────────────────────────────────────────────
+//
+// AMP, OD/DS, DLY, REV and PFX share one layout: byte 0 is on/off, byte 1 indexes the block's type
+// table, and the rest are the fields the codec keeps for that type. They differ only in the table
+// and the field lists, so one table entry per block says what the two functions below need.
+
+/** What one type-selected block's bytes mean: its type table and the fields each type keeps. */
+interface TypedBlockCodec {
+  /** The device's own name for the block, which a rejected byte or type is reported under. */
+  label: string;
+  types: readonly string[];
+  typeIndex: Record<string, number>;
+  /** Undefined for a type the codec has no field list for, whose bytes pass through untouched. */
+  fieldsFor: (type: string) => FieldCodec[] | undefined;
+}
+
+const TYPED_BLOCKS = {
+  amp:     { label: "AMP",   types: AMP_TYPES,  typeIndex: AMP_TYPE_IDX, fieldsFor: () => AMP_FIELDS },
+  drive:   { label: "OD/DS", types: ODDS_TYPES, typeIndex: ODDS_IDX,     fieldsFor: () => DRIVE_FIELDS },
+  delay:   { label: "DLY",   types: DLY_TYPES,  typeIndex: DLY_TYPE_IDX, fieldsFor: (type: string) => DELAY_TYPE_MAPS[type] },
+  reverb:  { label: "REV",   types: REV_TYPES,  typeIndex: REV_TYPE_IDX, fieldsFor: reverbFields },
+  pedalFx: { label: "PFX",   types: PFX_TYPES,  typeIndex: PFX_TYPE_IDX, fieldsFor: (type: string) => PFX_TYPE_MAPS[type] },
+} satisfies Record<string, TypedBlockCodec>;
+
+type TypedBlockName = keyof typeof TYPED_BLOCKS;
+
+/** A type-selected block as its bytes read, before any block narrows what its params hold. */
+interface TypedBlock {
+  on: boolean;
+  type: string;
+  params: BlockParams;
+  [RAW]: number[];
+}
+
+// Each block's decoded params are what its field list decodes to: the drift guards pin every list
+// to the block's catalog params, which the block types mirror, so a caller may narrow the result.
+const decodeTypedBlock = (codec: TypedBlockCodec, hexList: string[]): TypedBlock => {
   const bytes = bytesFromHex(hexList);
-  const at = byteReader(bytes, "PFX");
-  const pedalFxType = lookupName(PFX_TYPES, at(1));
-  const fields = PFX_TYPE_MAPS[pedalFxType];
-  const stored = fields === undefined ? {} : decodeFields(fields, bytes);
-  const lifted = liftSubType(stored);
-  return {
-    on: Boolean(at(0)),
-    type: pedalFxType,
-    subType: lifted.subType,
-    params: lifted.params,
-    [RAW]: bytes,
-  };
+  const at = byteReader(bytes, codec.label);
+  const type = lookupName(codec.types, at(1));
+  const fields = codec.fieldsFor(type);
+  const params = fields === undefined ? {} : decodeFields(fields, bytes);
+  return { on: Boolean(at(0)), type, params, [RAW]: bytes };
 };
 
-const encodePedalFx = (block: PedalFxBlock): string[] => {
+const encodeTypedBlock = (codec: TypedBlockCodec, block: TypedBlock): string[] => {
   const bytes = [...block[RAW]];
   bytes[0] = Number(block.on);
-  bytes[1] = lookupIndex(PFX_TYPE_IDX, block.type, "PFX type");
-
-  const fields = PFX_TYPE_MAPS[block.type];
-  if (fields) encodeFields(fields, withStoredSubType(block.params, block.subType), bytes);
+  bytes[1] = lookupIndex(codec.typeIndex, block.type, `${codec.label} type`);
+  const fields = codec.fieldsFor(block.type);
+  if (fields) encodeFields(fields, block.params, bytes);
   return hexFromBytes(bytes);
 };
+
+/** PFX keeps the wah model among its params' bytes; the decoded block carries it as `subType`. */
+const decodePedalFx = (hexList: string[]): PedalFxBlock => {
+  const block = decodeTypedBlock(TYPED_BLOCKS.pedalFx, hexList);
+  const { subType, params } = liftSubType(block.params);
+  return { ...block, subType, params };
+};
+
+const encodePedalFx = (block: PedalFxBlock): string[] =>
+  encodeTypedBlock(TYPED_BLOCKS.pedalFx, { ...block, params: withStoredSubType(block.params, block.subType) });
 
 // ── Field lists by block ──────────────────────────────────────────────────────
 
 const SINGLE_SHAPE_FIELDS: Partial<Record<string, FieldCodec[]>> = {
-  amp: AMP_FIELDS, drive: DRIVE_FIELDS, noiseGate: NOISE_GATE_FIELDS, volume: VOLUME_FIELDS,
+  noiseGate: NOISE_GATE_FIELDS, volume: VOLUME_FIELDS,
 };
+
+const isTypedBlock = (group: string): group is TypedBlockName => group in TYPED_BLOCKS;
 
 /**
  * The field list a block's params are read and written through, by capability group id: the
@@ -481,13 +449,9 @@ const SINGLE_SHAPE_FIELDS: Partial<Record<string, FieldCodec[]>> = {
  * sub-algorithm). Undefined where the codec has no list for that selection.
  */
 const fieldsFor = (group: string, type = "", subType: string | null = null): FieldCodec[] | undefined => {
-  switch (group) {
-    case "fx": return fxFieldsFor(type, subType ?? "");
-    case "pedalFx": return PFX_TYPE_MAPS[type];
-    case "delay": return DELAY_TYPE_MAPS[type];
-    case "reverb": return reverbFields(type);
-    default: return SINGLE_SHAPE_FIELDS[group];
-  }
+  if (group === "fx") return fxFieldsFor(type, subType ?? "");
+  if (isTypedBlock(group)) return TYPED_BLOCKS[group].fieldsFor(type);
+  return SINGLE_SHAPE_FIELDS[group];
 };
 
 export {
@@ -495,13 +459,11 @@ export {
   decodeName, encodeName,
   decodeSettings, encodeSettings, PATCH_SETTING_FIELDS,
   decodeChain, encodeChain, validateChain,
-  decodeAmp, encodeAmp,
-  decodeDrive, encodeDrive,
+  TYPED_BLOCKS, decodeTypedBlock, encodeTypedBlock,
   decodeNoiseGate, encodeNoiseGate,
   decodeVolume, encodeVolume,
   decodeFxCom, encodeFxCom,
-  decodeDelay, encodeDelay,
-  decodeReverb, encodeReverb,
   decodePedalFx, encodePedalFx,
   DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS,
 };
+export type { TypedBlock, TypedBlockCodec };

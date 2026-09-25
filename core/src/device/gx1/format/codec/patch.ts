@@ -1,5 +1,5 @@
 import { RAW } from "../../model";
-import type { Patch, RawParamSet } from "../../model";
+import type { AmpBlock, DriveBlock, Patch, RawParamSet } from "../../model";
 import { bytesFromHex } from "./primitives";
 import { decodeFxParams, encodeFxParams } from "./fxParams";
 import { liftSubType, withStoredSubType } from "./fields";
@@ -7,13 +7,10 @@ import {
   decodeName, encodeName,
   decodeSettings, encodeSettings,
   decodeChain, encodeChain,
-  decodeAmp, encodeAmp,
-  decodeDrive, encodeDrive,
+  TYPED_BLOCKS, decodeTypedBlock, encodeTypedBlock,
   decodeNoiseGate, encodeNoiseGate,
   decodeVolume, encodeVolume,
   decodeFxCom, encodeFxCom,
-  decodeDelay, encodeDelay,
-  decodeReverb, encodeReverb,
   decodePedalFx, encodePedalFx,
 } from "./blocks";
 
@@ -53,13 +50,13 @@ const decodePatch = (raw: { memo?: string; paramSet: RawParamSet }): Patch => {
     memo:      raw.memo ?? "",
     chain:     decodeChain(rawBlock("MEMORY%CHAIN")),
     ...decodeSettings(rawBlock("MEMORY%OTHER")),
-    amp:       decodeAmp(rawBlock("MEMORY%AMP")),
-    drive:     decodeDrive(rawBlock("MEMORY%ODDS")),
+    amp:       decodeTypedBlock(TYPED_BLOCKS.amp, rawBlock("MEMORY%AMP")) as AmpBlock,
+    drive:     decodeTypedBlock(TYPED_BLOCKS.drive, rawBlock("MEMORY%ODDS")) as DriveBlock,
     noiseGate: decodeNoiseGate(rawBlock("MEMORY%NS")),
     volume:    decodeVolume(rawBlock("MEMORY%FV")),
     pedalFx:   decodePedalFx(rawBlock("MEMORY%PFX")),
-    delay:     decodeDelay(rawBlock("MEMORY%DLY")),
-    reverb:    decodeReverb(rawBlock("MEMORY%REV")),
+    delay:     decodeTypedBlock(TYPED_BLOCKS.delay, rawBlock("MEMORY%DLY")),
+    reverb:    decodeTypedBlock(TYPED_BLOCKS.reverb, rawBlock("MEMORY%REV")),
     fx1: { ...decodeFxCom(rawBlock("MEMORY%FX1_COM")), params: {} },
     fx2: { ...decodeFxCom(rawBlock("MEMORY%FX2_COM")), params: {} },
     fx3: { ...decodeFxCom(rawBlock("MEMORY%FX3_COM")), params: {} },
@@ -88,13 +85,13 @@ const encodePatch = (patch: Patch): { memo: string; paramSet: RawParamSet } => {
   paramSet["MEMORY%COM"]   = encodeName(patch.name);
   paramSet["MEMORY%CHAIN"] = encodeChain(patch.chain, rawBlock("MEMORY%CHAIN"));
   paramSet["MEMORY%OTHER"] = encodeSettings(patch, rawBlock("MEMORY%OTHER"));
-  paramSet["MEMORY%AMP"]   = encodeAmp(patch.amp);
-  paramSet["MEMORY%ODDS"]  = encodeDrive(patch.drive);
+  paramSet["MEMORY%AMP"]   = encodeTypedBlock(TYPED_BLOCKS.amp, patch.amp);
+  paramSet["MEMORY%ODDS"]  = encodeTypedBlock(TYPED_BLOCKS.drive, patch.drive);
   paramSet["MEMORY%NS"]    = encodeNoiseGate(patch.noiseGate);
   paramSet["MEMORY%FV"]    = encodeVolume(patch.volume);
   paramSet["MEMORY%PFX"]   = encodePedalFx(patch.pedalFx);
-  paramSet["MEMORY%DLY"]   = encodeDelay(patch.delay);
-  paramSet["MEMORY%REV"]   = encodeReverb(patch.reverb);
+  paramSet["MEMORY%DLY"]   = encodeTypedBlock(TYPED_BLOCKS.delay, patch.delay);
+  paramSet["MEMORY%REV"]   = encodeTypedBlock(TYPED_BLOCKS.reverb, patch.reverb);
 
   for (const slot of FX_SLOTS) {
     const block = patch[slot];

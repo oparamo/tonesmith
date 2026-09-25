@@ -28,7 +28,7 @@ import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../.
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../../src/device/gx1/format/codec/fxParams";
 import {
   PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PATCH_SETTING_FIELDS,
-  decodeAmp, decodeDrive, decodeNoiseGate, decodeVolume, fieldsFor,
+  TYPED_BLOCKS, decodeTypedBlock, decodeNoiseGate, decodeVolume, fieldsFor,
 } from "../../../../src/device/gx1/format/codec/blocks";
 import { hexFromBytes } from "../../../../src/device/gx1/format/codec/primitives";
 import type { CapabilityType, ParamSpec, PatchSpecExample } from "../../../../src/model";
@@ -225,13 +225,13 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
   // does not make the amp block's own field discoverable from an amp lookup, and a field outside the
   // catalog is invisible to describe_device and the CLI alike.
   it("amp", () => {
-    const decoded = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.amp, hexFromBytes(new Array<number>(13).fill(0)));
 
     assertBlockParity("amp", decodedParamNames(decoded));
   });
 
   it("drive", () => {
-    const decoded = decodeDrive(hexFromBytes(new Array<number>(8).fill(0)));
+    const decoded = decodeTypedBlock(TYPED_BLOCKS.drive, hexFromBytes(new Array<number>(8).fill(0)));
 
     assertBlockParity("drive", decodedParamNames(decoded));
   });
@@ -253,8 +253,8 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
 // actually emits, or a write naming that key lands nowhere.
 describe("GX-1 single-shape block param keys name a real decoded field", () => {
   const decodedBlocks = {
-    amp: decodeAmp(hexFromBytes(new Array<number>(13).fill(0))),
-    drive: decodeDrive(hexFromBytes(new Array<number>(8).fill(0))),
+    amp: decodeTypedBlock(TYPED_BLOCKS.amp, hexFromBytes(new Array<number>(13).fill(0))),
+    drive: decodeTypedBlock(TYPED_BLOCKS.drive, hexFromBytes(new Array<number>(8).fill(0))),
     noiseGate: decodeNoiseGate(hexFromBytes(new Array<number>(4).fill(0))),
     volume: decodeVolume(hexFromBytes(new Array<number>(4).fill(0))),
   };

@@ -7,6 +7,7 @@
 import type { Patch, BlockParams, PatchSettings } from "../model";
 import { blankPatch } from "../format/tsl";
 import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, DEFAULT_CHAIN } from "../model";
+import type { BlockName } from "../model";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../catalog/defaults";
 import type { ParamDefaults } from "../catalog/defaults";
 
@@ -39,35 +40,6 @@ const basePatch = (name: string, options: BasePatchOptions = {}): Patch => {
 const withDefaults = (defaults: ParamDefaults | undefined, params: BlockParams): BlockParams =>
   ({ ...defaults, ...params });
 
-interface AmpOptions {
-  type: string;
-  on?: boolean;
-  params?: BlockParams;
-}
-
-// The single-shape blocks assign into the params they already hold, since those carry every control
-// the block has whatever it is set to, and every one of them is overwritten here.
-
-const amp = (patch: Patch, options: AmpOptions): void => {
-  const { type, on = true, params = {} } = options;
-  patch.amp.on = on;
-  patch.amp.type = type;
-  Object.assign(patch.amp.params, BLOCK_DEFAULTS.amp, params);
-};
-
-interface DriveOptions {
-  type: string;
-  on?: boolean;
-  params?: BlockParams;
-}
-
-const drive = (patch: Patch, options: DriveOptions): void => {
-  const { type, on = true, params = {} } = options;
-  patch.drive.on = on;
-  patch.drive.type = type;
-  Object.assign(patch.drive.params, BLOCK_DEFAULTS.drive, params);
-};
-
 /**
  * The FX param defaults for switching a slot to `fxType`: the device's own factory values, so any
  * field the caller doesn't set gets a real default instead of inheriting whatever stale raw byte the
@@ -80,13 +52,35 @@ const defaultFxParams = (fxType: string, subType: string | null = null): ParamDe
   return { ...subDefaults };
 };
 
-interface FxOptions {
-  slot: "fx1" | "fx2" | "fx3";
-  type: string;
+/** What a spec sets on one block. Which of these a block reads depends on what the block has. */
+interface BlockOptions {
+  type?: string;
   subType?: string | null;
-  params?: BlockParams;
   on?: boolean;
+  params?: BlockParams;
 }
+
+/** Blocks with one set of controls whatever they are set to. */
+type SingleShapeBlock = "amp" | "drive" | "noiseGate" | "volume";
+
+/** Blocks whose controls are the chosen type's own. */
+type PerTypeBlock = Exclude<BlockName, SingleShapeBlock>;
+
+const SINGLE_SHAPE_BLOCKS: ReadonlySet<BlockName> = new Set<SingleShapeBlock>(["amp", "drive", "noiseGate", "volume"]);
+
+const isSingleShape = (name: BlockName): name is SingleShapeBlock => SINGLE_SHAPE_BLOCKS.has(name);
+
+/**
+ * A single-shape block assigns into the params it already holds, since those carry every control
+ * the block has whatever it is set to, and every one of them is overwritten here. The amp and the
+ * drive select a type; the noise gate has no type, and the foot volume has no bypass either.
+ */
+const singleShapeBlock = (patch: Patch, name: SingleShapeBlock, options: BlockOptions): void => {
+  const block = patch[name];
+  Object.assign(block.params, BLOCK_DEFAULTS[name], options.params);
+  if ("on" in block) block.on = options.on ?? true;
+  if ("type" in block && options.type !== undefined) block.type = options.type;
+};
 
 /**
  * The sub-model to build with: the caller's, or the one the device opens on. A type that has
@@ -94,97 +88,46 @@ interface FxOptions {
  * whatever byte the slot happened to be carrying, which is a different model for OD/DS and leaves
  * DELAY with no param defaults at all.
  */
-const selectedSubType = (block: "fx" | "pedalFx", type: string, subType: string | null): string | null => {
+const selectedSubType = (group: "fx" | "pedalFx", type: string, subType: string | null): string | null => {
   if (subType !== null) return subType;
-  const hasSubModels = block === "fx" ? PARAM_SUBTYPE_EFFECTS.has(type) : PFX_SUBTYPE_EFFECTS.has(type);
+  const hasSubModels = group === "fx" ? PARAM_SUBTYPE_EFFECTS.has(type) : PFX_SUBTYPE_EFFECTS.has(type);
   if (!hasSubModels) return null;
-  return DEFAULT_SUBTYPES[block]?.[type] ?? null;
+  return DEFAULT_SUBTYPES[group]?.[type] ?? null;
 };
 
-const fx = (patch: Patch, options: FxOptions): void => {
-  const { slot, type, subType = null, params = {}, on = true } = options;
-  const selected = selectedSubType("fx", type, subType);
-  const block = patch[slot];
-  block.on = on;
-  block.type = type;
-  block.subType = selected;
-  block.params = withDefaults(defaultFxParams(type, selected), params);
+/** The factory values a per-type block starts from for this selection. */
+const perTypeDefaults = (name: PerTypeBlock, type: string, subType: string | null): ParamDefaults | undefined => {
+  if (name === "delay" || name === "reverb" || name === "pedalFx") return DEFAULTS_BY_TYPE[name][type];
+  return defaultFxParams(type, subType);
 };
 
-interface NoiseGateOptions {
-  on?: boolean;
-  params?: BlockParams;
-}
-
-const noiseGate = (patch: Patch, options: NoiseGateOptions): void => {
-  const { on = true, params = {} } = options;
-  patch.noiseGate.on = on;
-  Object.assign(patch.noiseGate.params, BLOCK_DEFAULTS.noiseGate, params);
+/** The sub-model a per-type block ends up on, or null for a block that has none to select. */
+const subTypeFor = (name: PerTypeBlock, type: string, requested: string | null): string | null => {
+  if (name === "delay" || name === "reverb") return null;
+  const group = name === "pedalFx" ? "pedalFx" : "fx";
+  return selectedSubType(group, type, requested);
 };
-
-interface VolumeOptions {
-  params?: BlockParams;
-}
-
-const volume = (patch: Patch, options: VolumeOptions): void => {
-  Object.assign(patch.volume.params, BLOCK_DEFAULTS.volume, options.params);
-};
-
-interface PedalFxOptions {
-  type: string;
-  subType?: string;
-  on?: boolean;
-  params?: BlockParams;
-}
-
-/** Sets the expression pedal effect: WAH, whose `subType` picks the wah model, or PEDAL BEND. */
-const pedalFx = (patch: Patch, options: PedalFxOptions): void => {
-  const { type, subType, params = {}, on = true } = options;
-  const block = patch.pedalFx;
-  block.on = on;
-  block.type = type;
-  block.subType = selectedSubType("pedalFx", type, subType ?? null);
-  block.params = withDefaults(DEFAULTS_BY_TYPE.pedalFx[type], params);
-};
-
-interface DelayOptions {
-  type: string;
-  on?: boolean;
-  params?: BlockParams;
-}
 
 /**
- * Sets the delay block. Every control is optional because the types disagree about which they have:
- * TWIST has no TIME or FEEDBACK, GLITCH has no FEEDBACK or LEVEL, and WARP has no FEEDBACK or HIGH
- * CUT, so a caller building those types never has to invent values for controls they lack.
+ * Every control of a per-type block is optional, because the types disagree about which they have:
+ * delay's TWIST has no TIME or FEEDBACK, reverb's TERA ECHO has no TIME, so a caller never has to
+ * invent values for controls a type lacks.
  */
-const delay = (patch: Patch, options: DelayOptions): void => {
-  const { type, on = true, params = {} } = options;
-  patch.delay.on = on;
-  patch.delay.type = type;
-  patch.delay.params = withDefaults(DEFAULTS_BY_TYPE.delay[type], params);
+const perTypeBlock = (patch: Patch, name: PerTypeBlock, options: BlockOptions): void => {
+  const block = patch[name];
+  const type = options.type ?? block.type;
+  const subType = subTypeFor(name, type, options.subType ?? null);
+  block.on = options.on ?? true;
+  block.type = type;
+  if ("subType" in block) block.subType = subType;
+  block.params = withDefaults(perTypeDefaults(name, type, subType), options.params ?? {});
 };
 
-interface ReverbOptions {
-  type: string;
-  on?: boolean;
-  params?: BlockParams;
-}
-
-/** Sets the reverb block, on the same terms as `delay`: TERA ECHO has no TIME, SUB DELAY has no
- *  TONE, PRE-DELAY or DIRECT, and SHIMMER has no DENSITY or DIRECT. */
-const reverb = (patch: Patch, options: ReverbOptions): void => {
-  const { type, on = true, params = {} } = options;
-  patch.reverb.on = on;
-  patch.reverb.type = type;
-  patch.reverb.params = withDefaults(DEFAULTS_BY_TYPE.reverb[type], params);
+/** Sets one block from a validated spec, filling every control the spec leaves out with its factory value. */
+const block = (patch: Patch, name: BlockName, options: BlockOptions): void => {
+  if (isSingleShape(name)) singleShapeBlock(patch, name, options);
+  else perTypeBlock(patch, name, options);
 };
 
-export {
-  defaultFxParams,
-  basePatch, amp, drive, fx, noiseGate, volume, pedalFx, delay, reverb,
-};
-export type {
-  BasePatchOptions, AmpOptions, DriveOptions, FxOptions, NoiseGateOptions, VolumeOptions,
-  PedalFxOptions, DelayOptions, ReverbOptions,
-};
+export { defaultFxParams, basePatch, block };
+export type { BasePatchOptions, BlockOptions };

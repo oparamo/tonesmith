@@ -17,7 +17,7 @@ import {
 } from "../model";
 import type { BlockName } from "../model";
 import { validateChain } from "../format/codec";
-import { basePatch, amp, drive, fx, noiseGate, volume, pedalFx, delay, reverb } from "./builder";
+import { basePatch, block } from "./builder";
 import type { BasePatchOptions } from "./builder";
 import type { CapabilityGroup } from "../../../model";
 import type { Patch, BlockParams } from "../model";
@@ -217,23 +217,13 @@ const validatePatchSpec = (input: unknown): Issues => {
  * device offers one, an optional `subType` and `on`, and one `params` bag. The `type` cast covers
  * only what `validatePatchSpec` has just established and TypeScript cannot see.
  */
-const applyBlock = (patch: Patch, name: BlockName, block: Record<string, unknown>): void => {
-  const type = block[TYPE_FIELD] as string;
-  const on = block[ON_FIELD] as boolean | undefined;
-  const subType = (block[SUB_TYPE_FIELD] ?? undefined) as string | undefined;
-  const params = asRecord(block[PARAMS_FIELD]) as BlockParams;
+const applyBlock = (patch: Patch, name: BlockName, input: Record<string, unknown>): void => {
+  const type = input[TYPE_FIELD] as string;
+  const on = input[ON_FIELD] as boolean | undefined;
+  const subType = (input[SUB_TYPE_FIELD] ?? undefined) as string | undefined;
+  const params = asRecord(input[PARAMS_FIELD]) as BlockParams;
 
-  switch (name) {
-    case "amp": amp(patch, { type, on, params }); return;
-    case "drive": drive(patch, { type, on, params }); return;
-    case "noiseGate": noiseGate(patch, { on, params }); return;
-    case "volume": volume(patch, { params }); return;
-    case "pedalFx": pedalFx(patch, { type, subType, on, params }); return;
-    case "delay": delay(patch, { type, on, params }); return;
-    case "reverb": reverb(patch, { type, on, params }); return;
-    // The three fx slots take the same spec and differ only in which slot it lands in.
-    default: fx(patch, { slot: name, type, subType, on, params }); return;
-  }
+  block(patch, name, { type, subType, on, params });
 };
 
 /**
