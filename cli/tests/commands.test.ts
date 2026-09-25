@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, onTestFinished } from "vitest";
 import { Command } from "commander";
-import type { Patch, PatchDriver, DeviceCapabilities, RawPatch } from "@tonesmith/core";
-import { configureDeviceCommands } from "../src/common/commands";
+import type { Patch, PatchDriver, DeviceCapabilities } from "@tonesmith/core";
+import { configureDeviceCommands } from "../src/command";
 import { withTempDir } from "./helpers";
 
 const caps: DeviceCapabilities = {
@@ -18,12 +18,9 @@ const makeDriver = (overrides: Partial<PatchDriver> = {}): PatchDriver => ({
   parseFile: () => ({ name: "Set", device: "STUB", patches: [] }),
   serializeFile: () => new Uint8Array(),
   newFile: (setName: string) => ({ name: setName, device: "STUB", patches: [] }),
-  blankPatch: (name = "NEW") => ({ name }),
   buildPatch: (spec: unknown) => ({ name: (spec as { name: string }).name }),
   applyEdits: (_, edits) => Object.fromEntries(edits),
   viewPatch: (patch: Patch) => ({ name: patch.name, details: [], blocks: [] }),
-  decodePatch: (raw: RawPatch) => raw as unknown as Patch,
-  encodePatch: (patch: Patch) => patch as unknown as RawPatch,
   ...overrides,
 });
 

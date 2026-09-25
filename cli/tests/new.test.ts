@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
-import { gx1, patchUtils } from "@tonesmith/core";
+import { gx1, patchService } from "@tonesmith/core";
 import { runCli, emptyTempDir } from "./helpers";
 
 describe("gx1 new", () => {
@@ -15,7 +15,7 @@ describe("gx1 new", () => {
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
-    const created = await patchUtils.readPatchFile(gx1.driver, file);
+    const created = await patchService.readPatchFile(gx1.driver, file);
     expect(created.patches).toHaveLength(1);
     expect(created.name).toBe("my-tones");
   });
@@ -29,7 +29,7 @@ describe("gx1 new", () => {
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
-    const created = await patchUtils.readPatchFile(gx1.driver, file);
+    const created = await patchService.readPatchFile(gx1.driver, file);
     expect(created.patches).toHaveLength(3);
     expect(created.name).toBe("multi");
   });
@@ -42,7 +42,7 @@ describe("gx1 new", () => {
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
-    const created = await patchUtils.readPatchFile(gx1.driver, file);
+    const created = await patchService.readPatchFile(gx1.driver, file);
     expect(created.name).toBe("Custom Name");
   });
 

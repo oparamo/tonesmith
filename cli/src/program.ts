@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { registry } from "@tonesmith/core";
-import { configureDeviceCommands } from "./common";
+import { configureDeviceCommands } from "./command";
 import packageJson from "../package.json" with { type: "json" };
 
 const buildProgram = (): Command => {

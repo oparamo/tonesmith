@@ -1,5 +1,8 @@
+import { basename } from 'node:path';
 import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
+import importX, { createNodeResolver } from 'eslint-plugin-import-x';
+import vitest from '@vitest/eslint-plugin';
 
 const ternarySelector = 'ConditionalExpression:not(VariableDeclarator > ConditionalExpression):not(AssignmentExpression > ConditionalExpression):not(ArrowFunctionExpression > ConditionalExpression)';
 
@@ -38,9 +41,60 @@ const noEmDash = {
   },
 };
 
+// A file is named for what it holds, in the same camelCase as the names it exports, so a reader
+// finding `patchService` knows the file to open. Test and config files keep the `.test` and
+// `.config` suffixes Vitest and tsup look for.
+const camelCaseFileName = /^[a-z][a-zA-Z0-9]*(\.test|\.config)?\.ts$/u;
+
+const fileNameCase = {
+  meta: {
+    type: 'problem',
+    docs: { description: 'Require camelCase file names.' },
+    messages: { name: 'Name this file in camelCase, as its exports are named: "{{name}}".' },
+  },
+  create(context) {
+    return {
+      Program(node) {
+        const name = basename(context.filename);
+        if (!camelCaseFileName.test(name)) context.report({ node, messageId: 'name', data: { name } });
+      },
+    };
+  },
+};
+
+// A file importing its own folder's barrel imports itself back through the re-export. no-cycle
+// ignores a type-only import, since it is erased at build, so this keeps the pattern out of the
+// types as well.
+const ownBarrel = {
+  regex: '^\\.(/index)?$',
+  message: "Import the module itself: this folder's barrel re-exports this file.",
+};
+
 // Both spellings Node accepts for the fs modules, so a bare "fs" can't slip past either rule.
 const fsModules = ['fs', 'node:fs'];
 const allFsModules = [...fsModules, 'fs/promises', 'node:fs/promises'];
+
+/** The patterns that match an import from any of the named folders, at any depth. */
+const folderPatterns = folders => folders.flatMap(folder => [`**/${folder}`, `**/${folder}/**`]);
+
+/**
+ * One config block per layer, naming the folders its files may not import from: the layers above
+ * it, which depend on it and not the other way round. Drivers additionally have no fs module at all.
+ */
+const layerRules = layers => layers.map(({ files, forbidden, banFs = false }) => ({
+  files,
+  rules: {
+    'no-restricted-imports': ['error', {
+      patterns: [
+        banFs
+          ? { group: allFsModules, message: 'A driver converts bytes; file I/O belongs to core persistence.' }
+          : { group: fsModules, importNamePattern: 'Sync$', message: 'Use the async version from node:fs/promises.' },
+        { group: folderPatterns(forbidden), message: `This layer does not import from ${forbidden.join(', ')}.` },
+        ownBarrel,
+      ],
+    }],
+  },
+}));
 
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/coverage/**'] },
@@ -53,7 +107,14 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    plugins: { sonarjs, tonesmith: { rules: { 'no-em-dash': noEmDash } } },
+    settings: {
+      // no-cycle follows each import into the file it names, so it has to parse TypeScript and
+      // resolve an extensionless relative path to its .ts file.
+      'import-x/parsers': { '@typescript-eslint/parser': ['.ts'] },
+      'import-x/extensions': ['.ts', '.js'],
+      'import-x/resolver-next': [createNodeResolver({ extensions: ['.ts', '.js', '.json'] })],
+    },
+    plugins: { sonarjs, 'import-x': importX, tonesmith: { rules: { 'no-em-dash': noEmDash, 'file-name-case': fileNameCase } } },
     rules: {
       // Clean Code, enforced rather than reviewed. F1: parameter objects past three arguments.
       // Library callbacks that dictate their own arity (commander's .action) disable it inline.
@@ -61,9 +122,19 @@ export default tseslint.config(
       // G5: two functions with identical bodies are one function and a caller.
       'sonarjs/no-identical-functions': 'error',
       // Deliberately absent: 'no-duplicate-imports'. It fires on the type/value import split
-      // (`import type { Patch }` beside `import { patchUtils }` from the same module), which is
+      // (`import type { Patch }` beside `import { patchService }` from the same module), which is
       // the shape this codebase wants, so enabling it would trade a real convention for noise.
       'tonesmith/no-em-dash': 'error',
+      // A comment states what is true of the code now; how it got here is git's to hold. "now" itself
+      // is too common a word to ban, so it stays a review check.
+      'no-warning-comments': ['error', {
+        terms: ['no longer', 'used to', 'previously', 'formerly', 'anymore', 'originally', 'for now', 'todo', 'fixme'],
+        location: 'anywhere',
+      }],
+      'tonesmith/file-name-case': 'error',
+      // An import cycle leaves some module reading another's exports before they exist, and the layer
+      // rules can't see one inside a single layer.
+      'import-x/no-cycle': 'error',
       '@typescript-eslint/no-unused-vars': ['error', {
         vars: 'all',
         args: 'all',
@@ -88,28 +159,58 @@ export default tseslint.config(
       // agent call waits behind a single read, and async is what lets calls on different files
       // overlap. CPU-bound work with no async counterpart isn't file I/O and isn't touched by this.
       'no-restricted-imports': ['error', {
-        patterns: [{
-          group: fsModules,
-          importNamePattern: 'Sync$',
-          message: 'Use the async version from node:fs/promises.',
-        }],
+        patterns: [
+          {
+            group: fsModules,
+            importNamePattern: 'Sync$',
+            message: 'Use the async version from node:fs/promises.',
+          },
+          ownBarrel,
+        ],
       }],
     },
   },
-  {
+  // Folders are layers, and each imports only the layers below it. A later block replaces
+  // no-restricted-imports rather than adding to it, so every block restates the sync-fs ban.
+  ...layerRules([
+    // The shared layer knows no device: only the roster and the composition root name one, so a
+    // second device never needs a shared file edited to make room for it.
+    { files: ['core/src/service/**'], forbidden: ['device'] },
+    { files: ['core/src/persistence/**'], forbidden: ['service', 'device'] },
+    { files: ['core/src/model/**', 'core/src/common/**'], forbidden: ['service', 'persistence', 'device'] },
     // Drivers convert bytes and never touch the disk. Core owns every read and write, which is what
     // lets it lock one file's read-change-write as a unit; a driver doing its own I/O would sit
-    // outside that lock and could lose a concurrent edit. This replaces the rule above for these
-    // files rather than adding to it, which is safe only because banning the modules outright
-    // covers the Sync names too.
-    files: ['core/src/devices/**'],
+    // outside that lock and could lose a concurrent edit.
+    { files: ['core/src/device/**'], forbidden: ['persistence'], banFs: true },
+    { files: ['core/src/device/*/model/**'], forbidden: ['persistence', 'format', 'catalog', 'spec'], banFs: true },
+    { files: ['core/src/device/*/format/**'], forbidden: ['persistence', 'catalog', 'spec'], banFs: true },
+    { files: ['core/src/device/*/catalog/**'], forbidden: ['persistence', 'spec'], banFs: true },
+    // A unit suite for the shared layer runs against a fake driver or a hand-written catalog, so it
+    // keeps passing or failing on the shared code alone.
+    { files: ['core/tests/{service,persistence,common}/**'], forbidden: ['device'] },
+  ]),
+  // README's Testing section, in the parts a rule can check. max-expects is left out on purpose: a
+  // count of assertions doesn't measure how many behaviors a test checks.
+  {
+    files: ['**/tests/**/*.ts', 'tools/**/*.test.ts'],
+    plugins: { vitest },
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [{
-          group: allFsModules,
-          message: 'A driver converts bytes; file I/O belongs to core patchUtils.',
-        }],
-      }],
+      'vitest/no-conditional-in-test': 'error',
+      'vitest/no-conditional-expect': 'error',
+      'vitest/no-conditional-tests': 'error',
+      // The drift guards assert through helpers named assert*, which the rule can't see into.
+      'vitest/expect-expect': ['error', { assertFunctionNames: ['expect', 'assert*'] }],
+      'vitest/no-standalone-expect': 'error',
+      'vitest/no-identical-title': 'error',
+      'vitest/valid-title': 'error',
+      'vitest/no-focused-tests': 'error',
+      'vitest/no-disabled-tests': 'error',
+      'vitest/prefer-each': 'error',
+      'vitest/prefer-hooks-on-top': 'error',
+      'vitest/no-duplicate-hooks': 'error',
+      'vitest/max-nested-describe': ['error', { max: 2 }],
+      'vitest/no-test-return-statement': 'error',
+      'vitest/prefer-strict-equal': 'error',
     },
   },
 );

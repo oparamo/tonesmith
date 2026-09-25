@@ -2,7 +2,7 @@
  * What the command does with its arguments, not which edits a device accepts.
  *
  * Dot-paths, value coercion and every rejection are `@tonesmith/core`'s, proven in
- * `core/tests/patch-utils.test.ts` and the gx1 edit validator's suite. What `addWrite` owns is
+ * `core/tests/service/patchService.test.ts` and the gx1 edit validator's suite. What `addWrite` owns is
  * reading `path=value` off the argv, and turning a driver throw into a message and exit 1.
  */
 import { describe, it, expect, afterEach } from "vitest";

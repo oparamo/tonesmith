@@ -2,7 +2,7 @@
 "@tonesmith/core": major
 ---
 
-`patchUtils.upsertPatches(driver, path, patches, setName?)` becomes
+`patchService.upsertPatches(driver, path, patches, setName?)` becomes
 `upsertPatches(driver, request)`.
 
 A path, an array and an optional name sat in a row where only the driver was distinguishable by

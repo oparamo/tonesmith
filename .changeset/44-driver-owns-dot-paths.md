@@ -8,7 +8,7 @@ What a dot-path means is the device's own knowledge, so the driver is what answe
 
 `PatchDriver.validateFields(patch, edits)` becomes `applyEdits(patch, edits)`, which takes the
 edits as `[path, value]` pairs, applies them in the order given, and returns what each one wrote
-keyed by path. `patchUtils.applyFieldEdits`, `setByPath` and `coerceValue` are gone: core split a
+keyed by path. `patchService.applyFieldEdits`, `setByPath` and `coerceValue` are gone: core split a
 path on `.` and walked the decoded object literally, then handed the result to the driver to judge,
 so the path vocabulary was the decoded shape and two layers each held half the answer. The GX-1
 driver was re-deriving the same structural split for itself to do its half.

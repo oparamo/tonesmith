@@ -1,4 +1,4 @@
-import { messageOf } from "./errors";
+import { messageOf } from "@tonesmith/core";
 
 const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });
 

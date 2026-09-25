@@ -13,7 +13,7 @@ const printedUnder = async (isTTY: boolean): Promise<string> => {
   process.stdout.isTTY = isTTY;
   vi.resetModules();
 
-  const { printGroups } = await import("../src/common/capabilities-print");
+  const { printGroups } = await import("../src/common/capabilitiesPrint");
   const lines: string[] = [];
   vi.spyOn(console, "info").mockImplementation((...args: unknown[]) => {
     lines.push(args.map(String).join(" "));

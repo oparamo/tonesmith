@@ -1,19 +1,8 @@
 import { afterEach, beforeEach } from "vitest";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { parseFile } from "../src/devices/gx1/tsl";
-import { RAW } from "../src/devices/gx1/common";
-import type { Patch } from "../src/devices/gx1/types";
-
-/** Both fixtures anchored off this file, so no suite hand-counts its own way up the tree. */
-const REPO_ROOT = resolve(import.meta.dirname, "../..");
-const ROCK_TONES_FIXTURE = resolve(REPO_ROOT, "fixtures/gx1/rock-tones.tsl");
-const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "fixtures/gx1/default-init.tsl");
-
-/** What the committed fixture holds, so a suite can assert its contents rather than that it has any. */
-const ROCK_TONES_SET_NAME = "Rock Tones";
-const ROCK_TONES_PATCH_NAMES = ["SWORD LEAD", "DROPTUNE RIFF", "GLASSY DIST", "FAT DIST"];
+import { join } from "node:path";
+import type { Patch, PatchDriver } from "../src/model";
 
 /**
  * A value the suite has already established is there: a patch of a committed fixture, a raw block
@@ -23,23 +12,6 @@ const ROCK_TONES_PATCH_NAMES = ["SWORD LEAD", "DROPTUNE RIFF", "GLASSY DIST", "F
 const present = <T>(value: T | undefined, what: string): T => {
   if (value === undefined) throw new Error(`Expected ${what}, got nothing`);
   return value;
-};
-
-/** The patch at `index` of the fixture at `path`. */
-const patchAt = async (path: string, index = 0): Promise<Patch> => {
-  const bytes = await readFile(path);
-  return present(parseFile(bytes, path).patches[index], `patch ${index} of ${path}`);
-};
-
-/** One raw block of a decoded patch, by the name the file gives it (`"MEMORY%DLY"`). */
-const rawBlock = (patch: Patch, key: string): string[] =>
-  present(patch[RAW][key], `${key} of the decoded patch`);
-
-/** `chain` with `block` moved to sit immediately before `before`, for building a reordered chain. */
-const moveBefore = (chain: readonly string[], block: string, before: string): string[] => {
-  const without = chain.filter(name => name !== block);
-  const index = without.indexOf(before);
-  return [...without.slice(0, index), block, ...without.slice(index)];
 };
 
 /** Whether a path exists. Only a missing file answers no; any other failure is rethrown. */
@@ -77,7 +49,11 @@ const scratchFile = (basename: string): (() => string) => {
   return () => join(dir(), basename);
 };
 
-export {
-  ROCK_TONES_FIXTURE, DEFAULT_INIT_FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
-  present, patchAt, rawBlock, moveBefore, pathExists, scratchDir, scratchFile,
+/** `patch` as a file stores it: saved into a file of its own through the driver's format and read back. */
+const storedAs = <T extends Patch>(driver: PatchDriver<T>, patch: T): T => {
+  const file = driver.newFile("Stored", 0);
+  file.patches.push(patch);
+  return present(driver.parseFile(driver.serializeFile(file), "stored").patches[0], "the stored patch");
 };
+
+export { present, pathExists, scratchDir, scratchFile, storedAs };

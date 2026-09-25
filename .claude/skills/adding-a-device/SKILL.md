@@ -110,7 +110,7 @@ thing before referencing it, so the finished spec reads top to bottom in a singl
 to no jumping around.
 
 Keep FORMAT.md to the **byte-layout narrative**: offsets, encoding families, per-field byte homes.
-The **param surface** (names, value ranges, descriptions) belongs to `param-catalog.ts` (step 5),
+The **param surface** (names, value ranges, descriptions) belongs to `paramCatalog.ts` (step 5),
 so don't duplicate ranges or descriptions here. Field names in the byte maps are fine, since they
 are the byte layout, and they're what the drift guard reconciles against the catalog.
 
@@ -124,48 +124,60 @@ name its internal files, paths, or implementation details.
 
 ## 3. Scaffold the core driver
 
-Create `core/src/devices/<id>/` with:
-- `types/`: type definitions split by domain, plus a barrel `index.ts`
-- `common/`: shared internals, plus a barrel `index.ts`. `constants.ts` holds ordered lookup
-  arrays, with reverse-index maps derived via `Object.fromEntries(list.map((v, i) => [v, i]))`,
-  and `raw.ts` holds a unique symbol for stashing a decoded patch's original raw bytes
-- `codec/`: the encode/decode pipeline, split into primitives, field codecs, per-block
-  codecs, and a top-level patch composer, plus a barrel `index.ts`. Every block's controls are a
-  `FieldCodec` list, fixed-shape blocks included, and one `fieldsFor(group, type, subType)` says
-  which list applies
-- a file-format module (`parseFile` / `serializeFile` / `blankPatch` / `newFile`), named after
-  the device's own patch-file format rather than a borrowed name. It converts bytes to a decoded
-  file and back and never touches the disk: core's `patchUtils` does every read and write, and lint
-  rejects a filesystem import under `devices/`
-- `builder.ts`: high-level construction helpers, named after the block they configure with no
-  "set" prefix. Each takes the patch plus one options object, with the block's controls in a
-  `params` bag. Builders take input the spec validator has already checked, and fill what it leaves
-  out with factory defaults
-- `factory-patch.ts`: the factory-default export's raw blocks, which `blankPatch` starts every
-  patch from, so a block a spec leaves out sits at the device's own values rather than zeros
-- `defaults.ts`: each block type's factory defaults, authored in step 4 from the
-  factory-default fixture. The builder fills any param the caller didn't set from here
-- `param-domain.ts`: the value domains a param spec derives from (numeric interval, enum,
-  lookup table, boolean, and a numeric interval that also takes a named set of values, for a
-  control the device stores as a name above its ceiling), so a param's human range string,
-  machine value list, and numeric bounds are authored once and can't disagree
-- `param-catalog.ts`: the param surface (per block/type, param name + range + description),
-  the in-repo ground truth capabilities derives from and the drift guard checks the codec
-  against; authored in step 5 (see there for what it's built from)
-- `driver.ts`: exports a `PatchDriver<T>` object (the contract lives in
-  `core/src/types/driver.ts`) wiring the codec, file-format and spec functions together. A
-  driver never self-registers
+Create `core/src/device/<id>/`, laid out in the layers ARCHITECTURE.md draws for a device. Each
+layer imports only the ones below it, and lint enforces that:
+
+- `model/`: the device's vocabulary, plus a barrel `index.ts`. The decoded patch and block types,
+  split by domain; `constants.ts` with the ordered lookup arrays, and reverse-index maps derived
+  via `Object.fromEntries(list.map((v, i) => [v, i]))`; the block names, their panel labels and the
+  capability group each belongs to; and `raw.ts`, the unique symbol a decoded patch keeps its
+  original raw bytes under. Block field names (`type`, `subType`, `on`, `params`) come from core's
+  `common/blockField.ts` rather than being redefined
+- `format/`: bytes to model and back, never the disk (core's `persistence/` does every read and
+  write, and lint rejects any fs or persistence import under `device/`):
+  - `<format>.ts`: `parseFile` / `serializeFile` / `newFile`, named after the device's own
+    patch-file format rather than a borrowed name
+  - `factoryPatch.ts`: the factory-default export's raw blocks, which every blank patch starts
+    from, so a block a spec leaves out sits at the device's own values rather than zeros
+  - `codec/`: primitives, field codecs, per-block codecs and a top-level patch composer, plus a
+    barrel. Every block's controls are a `FieldCodec` list, and one `fieldsFor(group, type,
+    subType)` says which list applies. Blocks sharing a byte layout share one codec driven by a
+    table of what differs, as gx1's `TYPED_BLOCKS` does
+- `catalog/`: what the device offers:
+  - `paramDomain.ts`: the value domains a param spec derives from (numeric interval, enum, lookup
+    table, boolean, and a numeric interval that also takes a named set of values, for a control the
+    device stores as a name above its ceiling), so a param's range string, value list and bounds
+    are authored once and can't disagree
+  - `paramCatalog.ts`: the param surface (per block/type, name + range + description), the
+    in-repo ground truth; authored in step 5
+  - `capabilities.ts`: the `DeviceCapabilities` core and every consumer read, including each chain
+    block's `label`, `group` and `bypass`, and `blocks` on any type only some blocks offer. Core's
+    `specService` checks specs and edits from this alone, so a device fact missing here is a check
+    nobody makes
+  - `defaults.ts`: each block type's factory defaults, harvested in step 4
+- `spec/`: building and editing:
+  - `builder.ts`: `basePatch` and a `block(patch, name, options)` builder that fills whatever a
+    validated spec leaves out with factory defaults
+  - `build.ts`: `buildPatch`, which runs the device's own checks (what no catalog can express,
+    such as the characters a name may use) and core's `specService.validateSpec`, then builds
+  - `edits.ts`: `applyEdits`, a call into core's `specService.applyEdits` with the device's
+    capabilities and `buildPatch`
+- `view.ts`: the patch as a person reads it, behind `PatchDriver.viewPatch`
+- `driver.ts`: the `PatchDriver<T>` object (the port lives in `core/src/model/driver.ts`) wiring
+  the layers together. A driver never self-registers
 - `index.ts`: the device's public barrel, exporting the driver, the patch and block types, and
   `RAW`
+
+File names are camelCase and folder names singular; lint rejects anything else.
 
 **Round-trip byte preservation is non-negotiable**: the codec must start from the original raw
 bytes and overwrite only the byte indices it has actually decoded. Anything not yet understood
 passes through untouched, so an incomplete format spec never corrupts a file.
 
 Then wire it up with exactly two lines outside the device directory:
-- one roster line in `core/src/devices/index.ts` (the registration loop in `core/src/index.ts`
+- one roster line in `core/src/device/index.ts` (the registration loop in `core/src/index.ts`
   picks it up from there)
-- one namespace re-export in `core/src/index.ts`: `export * as <id> from "./devices/<id>"`
+- one namespace re-export in `core/src/index.ts`: `export * as <id> from "./device/<id>"`
 
 ## 4. Prove the codec round-trips, then harvest defaults
 
@@ -192,7 +204,7 @@ control, so it belongs in its own table. The alternatives are both wrong: leavin
 of an example omits a field the block takes, and naming the first model in the list ships a value
 the device never chose as a factory default.
 
-Write byte-for-byte round-trip tests in `core/tests/devices/<id>/`, mirroring the source
+Write byte-for-byte round-trip tests in `core/tests/device/<id>/`, mirroring the source
 layout: decode the fixture, re-encode it, and assert the output bytes match the input exactly.
 Add targeted tests for individual field codecs and any lookup-table edge cases (an
 unknown or out-of-range raw value should decode to a clearly labeled sentinel rather than
@@ -201,12 +213,12 @@ surfaces, the driver and exported helpers, never internals.
 
 ## 5. Author the param catalog, then capabilities
 
-Author the param surface **once**, in `core/src/devices/<id>/param-catalog.ts`, then build
+Author the param surface **once**, in `core/src/device/<id>/catalog/paramCatalog.ts`, then build
 capabilities on top of it. Don't hand-write param ranges twice.
 
-1. **`param-catalog.ts`**: from the parameter reference captured in step 1, write the param
+1. **`paramCatalog.ts`**: from the parameter reference captured in step 1, write the param
    surface as, per block/type, ordered params of `{ name, range, description }`, each built from a
-   `param-domain.ts` domain rather than a hand-written range string. This is the in-repo ground
+   `paramDomain.ts` domain rather than a hand-written range string. This is the in-repo ground
    truth for what params the device actually has; verify each param's presence and range against
    the vendor's own ground-truth data where available (kept out of the repo and described
    generically, per step 2's discretion rule), since its completeness is what makes the drift
@@ -277,16 +289,17 @@ can't be a CI dependency.
   onboarding a device touches zero files under `mcp/`. `list_devices`, `read_patch`,
   `write_fields`, `describe_device`, and `copy_patch` / `create_patch_file` pick the new device up
   automatically once its driver is in the core roster, same as the CLI. `generate_patch` needs one
-  thing from the driver: implement `buildPatch(spec)` (see `core/src/devices/gx1/spec/` for the
-  current instance), which validates a plain spec object against the device's own capability
-  catalog, builds the patch, and owns its own rejection messages. Every bypassable block must
-  accept a bare `{ on: false }`: wrap it with the `bypassable` helper so a bypass folds into the
-  omitted case and writes identical bytes. Once `buildPatch` is in place, verify `generate_patch`
+  thing from the driver: implement `buildPatch(spec)` (see `core/src/device/gx1/spec/` for the
+  current instance), which runs the device's own checks, hands the rest to core's
+  `specService.validateSpec`, and builds the patch. Core's checks read the device's capabilities,
+  so a bare `{ on: false }` folds into leaving the block out wherever the chain marks the block
+  `bypass: true`, with no code in the driver. Once `buildPatch` is in place, verify `generate_patch`
   through the MCP server, not the CLI (per CLAUDE.md's Conventions). The response echoes each
   built patch plus its resolved chain, so a caller never needs a follow-up read to confirm a
   write. `write_fields` and the CLI's `write` use the driver's other method, `applyEdits(patch,
-  edits)`: a dot-path's segments are the device's own field names, so the driver resolves each
-  segment, reads the value into the field it names, and reports every problem at once.
+  edits)`, which is a one-line call into core's `specService.applyEdits` with the device's
+  capabilities and `buildPatch`: core resolves each path, coerces its value, re-seeds a block whose
+  type changes, and reports every problem at once.
 - **Tests**: behavior tests in `cli/tests/` and `mcp/tests/`, exercising every CLI command and
   MCP tool against the fixture from step 4, including error paths (bad ref, bad field path,
   unknown device).
@@ -317,10 +330,10 @@ the device lists in `README.md` and `CLAUDE.md`'s Project section.
 The GX-1 driver is the existing device to read for concrete examples of this layout, not to
 copy from. Useful pointers:
 - `core/docs/gx1/FORMAT.md`: a finished example of the step-2 write-up structure.
-- `core/src/devices/gx1/`: a finished example of the step-3 and step-5 file layout.
+- `core/src/device/gx1/`: a finished example of the step-3 and step-5 file layout.
 - `fixtures/gx1/rock-tones.tsl`: a finished example of the step-4 round-trip fixture, and
   `core/tests/fixtures/gx1/default-init.tsl` of the factory-default one.
-- `core/src/devices/gx1/view.ts`, `core/src/devices/gx1/spec/`: finished examples of step 6.
+- `core/src/device/gx1/view.ts`, `core/src/device/gx1/spec/`: finished examples of step 6.
 
 A new device's file extension, envelope shape, byte encodings, and terminology will differ from
 GX-1's in ways that matter. Expect to discover them, not assume them.

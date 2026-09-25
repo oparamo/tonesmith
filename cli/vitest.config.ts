@@ -9,7 +9,6 @@ export default defineConfig({
       include: ["src/**"],
       exclude: [
         "src/**/index.ts",
-        "src/**/types/**",
       ],
       // Floors, not targets. See core/vitest.config.ts.
       thresholds: {
