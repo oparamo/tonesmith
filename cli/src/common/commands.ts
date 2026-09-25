@@ -2,8 +2,8 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { FieldEdits, Patch, PatchDriver } from "@tonesmith/core";
 import { patchUtils, capabilityUtils } from "@tonesmith/core";
-import { printChain, printGroups, printGroup, printType } from "./capabilities-print";
-import { printPatch } from "./patch-print";
+import { printChain, printGroups, printGroup, printType } from "./capabilitiesPrint";
+import { printPatch } from "./patchPrint";
 
 /**
  * Splits a "path=value" argument at the first "=", so a value containing one survives intact.

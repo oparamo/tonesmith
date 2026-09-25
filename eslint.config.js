@@ -102,7 +102,7 @@ export default tseslint.config(
     // outside that lock and could lose a concurrent edit. This replaces the rule above for these
     // files rather than adding to it, which is safe only because banning the modules outright
     // covers the Sync names too.
-    files: ['core/src/devices/**'],
+    files: ['core/src/device/**'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [{

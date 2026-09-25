@@ -1,4 +1,4 @@
 export * from "./color";
-export * from "./capabilities-print";
-export * from "./patch-print";
+export * from "./capabilitiesPrint";
+export * from "./patchPrint";
 export * from "./commands";

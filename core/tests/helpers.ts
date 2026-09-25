@@ -2,9 +2,9 @@ import { afterEach, beforeEach } from "vitest";
 import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseFile } from "../src/devices/gx1/tsl";
-import { RAW } from "../src/devices/gx1/common";
-import type { Patch } from "../src/devices/gx1/types";
+import { parseFile } from "../src/device/gx1/format/tsl";
+import { RAW } from "../src/device/gx1/model";
+import type { Patch } from "../src/device/gx1/model";
 
 /** Both fixtures anchored off this file, so no suite hand-counts its own way up the tree. */
 const REPO_ROOT = resolve(import.meta.dirname, "../..");

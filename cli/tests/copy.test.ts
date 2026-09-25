@@ -1,6 +1,6 @@
 /**
  * A pass-through to `patchUtils.copyPatch`, which owns resolving both refs, replacing the slot and
- * refusing an index past the end, all proven in `core/tests/patch-utils.test.ts`. What is left is
+ * refusing an index past the end, all proven in `core/tests/service/patchService.test.ts`. What is left is
  * that the command wires four operands through in the right order and reports where the patch went.
  */
 import { describe, it, expect, afterEach } from "vitest";

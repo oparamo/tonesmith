@@ -1,5 +1,5 @@
-import { drivers } from "./devices";
-import { registerDriver } from "./registry";
+import { drivers } from "./device";
+import { registerDriver } from "./service/registry";
 
 for (const driver of drivers) {
   registerDriver(driver);
@@ -11,9 +11,9 @@ export type {
   DeviceCapabilities, CapabilityGroup, CapabilityType, ChainSpec, ChainView, CapabilityLookup,
   PatchNameSpec, PatchSpecExample,
   ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam,
-} from "./types";
-export * as patchUtils from "./patch-utils";
-export * as capabilityUtils from "./capability-utils";
-export * as registry from "./registry";
+} from "./model";
+export * as patchUtils from "./service/patchService";
+export * as capabilityUtils from "./service/capabilityService";
+export * as registry from "./service/registry";
 
-export * as gx1 from "./devices/gx1";
+export * as gx1 from "./device/gx1";

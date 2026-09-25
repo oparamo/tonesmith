@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach, type MockInstance } from "vitest";
 import type { BlockView, PatchView } from "@tonesmith/core";
-import { printPatch } from "../src/common/patch-print";
+import { printPatch } from "../src/common/patchPrint";
 
 const capturedOutput = (info: MockInstance<(message?: unknown) => void>): string =>
   info.mock.calls.map(call => String(call[0])).join("\n");
