@@ -4,6 +4,8 @@ TypeScript toolkit for reading, editing, and building presets for guitar multi-e
 processors. Every device plugs in as a self-contained driver behind the same core library,
 CLI, and MCP server, so the surfaces below work identically for any supported device.
 
+tonesmith was built with the help of AI coding tools; [AI_DISCLOSURE.md](AI_DISCLOSURE.md) says how.
+
 ## Supported devices
 
 | Device    | id    | Patch file format |
