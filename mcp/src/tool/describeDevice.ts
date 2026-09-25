@@ -1,8 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { CapabilityGroup, CapabilityType, DeviceCapabilities } from "@tonesmith/core";
-import { capabilityService, registry } from "@tonesmith/core";
-import { attempt, deviceField, messageOf, ok } from "../common";
+import { capabilityService, registry, messageOf } from "@tonesmith/core";
+import { attempt, deviceField, ok } from "../common";
 
 /**
  * A group listing is an index, not a data dump: every type's full param specs would run to tens of

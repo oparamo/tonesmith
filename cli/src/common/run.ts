@@ -1,3 +1,5 @@
+import { messageOf } from "@tonesmith/core";
+
 /**
  * Runs one command's work, turning a throw into a printed message and a failing exit code. Setting
  * the code rather than calling process.exit lets the runtime finish flushing stdout, so a failure
@@ -7,8 +9,7 @@ const run = async (action: () => void | Promise<void>): Promise<void> => {
   try {
     await action();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message);
+    console.error(messageOf(error));
     process.exitCode = 1;
   }
 };
