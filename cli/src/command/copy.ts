@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
-import { patchUtils } from "@tonesmith/core";
+import { patchService } from "@tonesmith/core";
 import { run } from "../common";
 
 const addCopy = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => {
@@ -10,7 +10,7 @@ const addCopy = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =>
     // eslint-disable-next-line max-params -- commander passes one argument per declared operand
     .action((src: string, srcRef: string, dst: string, dstRef: string) =>
       run(async () => {
-        const copied = await patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
+        const copied = await patchService.copyPatch(driver, { src, srcRef, dst, dstRef });
         console.info(`Copied '${copied.name}' → ${dst} patch ${copied.toIndex}`);
       })
     );

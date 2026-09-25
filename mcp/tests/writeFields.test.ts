@@ -8,7 +8,7 @@
  * call.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { gx1, patchUtils } from "@tonesmith/core";
+import { gx1, patchService } from "@tonesmith/core";
 import { connectClient, withTempDir, patchAt, present } from "./helpers";
 
 describe("write_fields", () => {
@@ -25,7 +25,7 @@ describe("write_fields", () => {
     const { isError } = await client.callTool("write_fields", input);
 
     expect(isError).toBe(false);
-    const file = await patchUtils.readPatchFile(gx1.driver, temp.fixture);
+    const file = await patchService.readPatchFile(gx1.driver, temp.fixture);
     expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(88);
   });
 
@@ -55,7 +55,7 @@ describe("write_fields", () => {
     const { isError, text } = await client.callTool("write_fields", input);
 
     expect(isError, text).toBe(false);
-    const file = await patchUtils.readPatchFile(gx1.driver, temp.fixture);
+    const file = await patchService.readPatchFile(gx1.driver, temp.fixture);
     expect(file.name).toBe("Renamed Set");
   });
 
@@ -68,7 +68,7 @@ describe("write_fields", () => {
     const { isError, text } = await client.callTool("write_fields", input);
 
     expect(isError, text).toBe(false);
-    const file = await patchUtils.readPatchFile(gx1.driver, temp.fixture);
+    const file = await patchService.readPatchFile(gx1.driver, temp.fixture);
     expect(file.name).toBe("Both");
     expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(55);
   });

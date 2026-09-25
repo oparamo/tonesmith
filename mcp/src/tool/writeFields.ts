@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { patchUtils, registry } from "@tonesmith/core";
+import { patchService, registry } from "@tonesmith/core";
 import type { FieldEdits } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
@@ -50,7 +50,7 @@ const registerWriteFields = (server: McpServer): void => {
     ({ file, device, ref, fields, setName }) => attempt(async () => {
       const driver = registry.getDriver(device);
       const edits = fields === undefined ? undefined : Object.entries(fields);
-      const report = await patchUtils.editPatchFile(driver, file, { ref, fields: edits, setName });
+      const report = await patchService.editPatchFile(driver, file, { ref, fields: edits, setName });
 
       const changes: string[] = [];
       if (report.index !== undefined && report.applied !== undefined) {

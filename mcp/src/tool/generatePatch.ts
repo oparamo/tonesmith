@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { patchUtils, registry } from "@tonesmith/core";
+import { patchService, registry } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
 const inputSchema = z.object({
@@ -43,7 +43,7 @@ needed.`,
     },
     ({ device, outPath, setName, patches }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const { file, created, saved } = await patchUtils.upsertPatches(driver, {
+      const { file, created, saved } = await patchService.upsertPatches(driver, {
         path: outPath, specs: patches, setName,
       });
 

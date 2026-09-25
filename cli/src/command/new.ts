@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { Patch, PatchDriver } from "@tonesmith/core";
-import { patchUtils } from "@tonesmith/core";
+import { patchService } from "@tonesmith/core";
 import { run } from "../common";
 
 /**
@@ -24,7 +24,7 @@ const addNew = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void => 
     .option("--count <n>", "how many blank patches it opens with", parseCount)
     .action((file: string, options: { setName?: string; count?: number }) =>
       run(async () => {
-        const patchFile = await patchUtils.createPatchFile(driver, file, {
+        const patchFile = await patchService.createPatchFile(driver, file, {
           setName: options.setName,
           patchCount: options.count,
         });

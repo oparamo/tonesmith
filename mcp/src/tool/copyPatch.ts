@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { patchUtils, registry } from "@tonesmith/core";
+import { patchService, registry } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
 const registerCopyPatch = (server: McpServer): void => {
@@ -28,7 +28,7 @@ const registerCopyPatch = (server: McpServer): void => {
     },
     ({ device, src, srcRef, dst, dstRef }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const copied = await patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
+      const copied = await patchService.copyPatch(driver, { src, srcRef, dst, dstRef });
       return ok(
         `Copied "${copied.name}" from ${src} patch ${copied.fromIndex} into ${dst} patch ${copied.toIndex}.`
       );

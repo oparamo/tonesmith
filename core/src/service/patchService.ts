@@ -1,7 +1,5 @@
-import { access, readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
-import { writeFileAtomic } from "../persistence/atomicWrite";
-import { withFileLock } from "../persistence/fileLock";
+import { readPatchFile, updatePatchFile, upsertPatchFile, writeNewPatchFile } from "../persistence/patchFileRepository";
 import { messageOf } from "../common/error";
 import type { FieldEdit, FieldEdits, Patch, PatchFile, PatchDriver } from "../model";
 
@@ -83,53 +81,6 @@ const resolvePatches = <T extends Patch>(patches: T[], ref?: string): SelectedPa
   ref !== undefined
     ? [resolvePatch(patches, ref)]
     : patches.map((patch, index) => ({ index, patch }));
-
-/**
- * Reads and decodes the patch file at `path`. Needs no lock: every write lands by rename, so a read
- * sees a whole file, old or new, never one partway written.
- */
-const readPatchFile = async <T extends Patch>(driver: PatchDriver<T>, path: string): Promise<PatchFile<T>> => {
-  const bytes = await readFile(path);
-  return driver.parseFile(bytes, path);
-};
-
-/** Only core writes a patch file, and only from inside a locked operation, so no write can race. */
-const writePatchFile = <T extends Patch>(driver: PatchDriver<T>, file: PatchFile<T>, path: string): Promise<void> =>
-  writeFileAtomic(path, driver.serializeFile(file));
-
-/**
- * Reads `path`, runs `change` on it and writes it back, holding the file's lock throughout, and
- * returns what `change` returned. This is the one read-change-write shape an existing file goes
- * through, so no caller can await something between the read and the write and lose an edit.
- */
-const updatePatchFile = <T extends Patch, R>(
-  driver: PatchDriver<T>,
-  path: string,
-  change: (file: PatchFile<T>) => R,
-): Promise<R> =>
-  withFileLock(path, async () => {
-    const file = await readPatchFile(driver, path);
-    const result = change(file);
-    await writePatchFile(driver, file, path);
-    return result;
-  });
-
-/** Whether a filesystem call failed because nothing exists at the path, as opposed to any other reason. */
-const isMissingFile = (error: unknown): boolean => (error as NodeJS.ErrnoException).code === "ENOENT";
-
-/** Reads `path`, or starts a fresh empty file named `setName` when it doesn't exist yet. */
-const readExistingOrNew = async <T extends Patch>(
-  driver: PatchDriver<T>,
-  path: string,
-  setName: string,
-): Promise<{ file: PatchFile<T>; created: boolean }> => {
-  try {
-    return { file: await readPatchFile(driver, path), created: false };
-  } catch (error) {
-    if (!isMissingFile(error)) throw error;
-    return { file: driver.newFile(setName, 0), created: true };
-  }
-};
 
 /** Where to save, and what to name the patch set: a fresh file takes it, an existing one is renamed. */
 interface UpsertTarget {
@@ -213,6 +164,17 @@ const requireDistinctNames = (patches: readonly Patch[]): void => {
   }
 };
 
+/** Puts one patch in the file: in place of the patch that has its name, or after every other. */
+const savePatch = <T extends Patch>(file: PatchFile<T>, patch: T): SavedPatch<T> => {
+  const index = file.patches.findIndex(existing => hasName(existing, patch.name));
+  if (index >= 0) {
+    file.patches[index] = patch;
+    return { name: patch.name, action: "replaced", patch };
+  }
+  file.patches.push(patch);
+  return { name: patch.name, action: "appended", patch };
+};
+
 /**
  * Saves every patch into the file at `path`, keyed by name: a patch whose name already exists
  * replaces it, otherwise it is appended, in array order. Creates the file and any missing parent
@@ -235,25 +197,11 @@ const upsertPatches = async <T extends Patch>(
   if (first === undefined) throw new Error("No patches to save: give at least one.");
   requireDistinctNames(patches);
 
-  // Not updatePatchFile: a missing file is a start here rather than an error, and the lock has to
-  // cover that decision too, or two first saves to one path would each start a file of their own.
-  return withFileLock(path, async () => {
-    const { file, created } = await readExistingOrNew(driver, path, setName ?? first.name);
+  const { result, created } = await upsertPatchFile(driver, { path, setName: setName ?? first.name }, file => {
     if (setName !== undefined) file.name = setName;
-
-    const saved = patches.map((patch): SavedPatch<T> => {
-      const index = file.patches.findIndex(existing => hasName(existing, patch.name));
-      if (index >= 0) {
-        file.patches[index] = patch;
-        return { name: patch.name, action: "replaced", patch };
-      }
-      file.patches.push(patch);
-      return { name: patch.name, action: "appended", patch };
-    });
-
-    await writePatchFile(driver, file, path);
-    return { file, created, saved };
+    return { file, saved: patches.map(patch => savePatch(file, patch)) };
   });
+  return { ...result, created };
 };
 
 /** Which patch a copy moved, and where, so each surface can word its own confirmation. */
@@ -357,20 +305,6 @@ const DEFAULT_NEW_PATCH_COUNT = 1;
  */
 const MAX_NEW_PATCHES = 500;
 
-/**
- * Whether `path` is free to create. Only a missing file counts as free: a permission error says
- * nothing about what sits there, so it is rethrown rather than read as room to write.
- */
-const isPathFree = async (path: string): Promise<boolean> => {
-  try {
-    await access(path);
-    return false;
-  } catch (error) {
-    if (!isMissingFile(error)) throw error;
-    return true;
-  }
-};
-
 const requireUsableCount = (patchCount: number): void => {
   if (!Number.isInteger(patchCount) || patchCount < 1 || patchCount > MAX_NEW_PATCHES) {
     throw new Error(
@@ -393,15 +327,9 @@ const createPatchFile = async <T extends Patch>(
   requireUsableCount(patchCount);
   const setName = options.setName ?? basename(path, extname(path));
 
-  // The check and the write share one lock, or two creates on one path could both find it free.
-  return withFileLock(path, async () => {
-    const pathFree = await isPathFree(path);
-    if (!pathFree) throw new Error(`${path} already exists, refusing to overwrite it.`);
-
-    const file = driver.newFile(setName, patchCount);
-    await writePatchFile(driver, file, path);
-    return file;
-  });
+  const file = driver.newFile(setName, patchCount);
+  await writeNewPatchFile(driver, path, file);
+  return file;
 };
 
 export {

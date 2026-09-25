@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { PatchFile } from "@tonesmith/core";
-import { patchUtils, registry } from "@tonesmith/core";
+import { patchService, registry } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
 /**
@@ -54,10 +54,10 @@ const registerReadPatch = (server: McpServer): void => {
     },
     ({ file, device, ref, limit, offset }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const patchFile = await patchUtils.readPatchFile(driver, file);
+      const patchFile = await patchService.readPatchFile(driver, file);
 
       if (ref !== undefined) {
-        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
+        const { index, patch } = patchService.resolvePatch(patchFile.patches, ref);
         // The patch sits under its own key rather than spread across the envelope, here and in
         // `page`, so a block named `index` or `setName` cannot shadow what the read reports.
         return ok(JSON.stringify({ setName: patchFile.name, index, patch }));

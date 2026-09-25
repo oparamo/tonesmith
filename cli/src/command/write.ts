@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { FieldEdits, Patch, PatchDriver } from "@tonesmith/core";
-import { patchUtils } from "@tonesmith/core";
+import { patchService } from "@tonesmith/core";
 import { run } from "../common";
 
 /**
@@ -28,7 +28,7 @@ const addWrite = <T extends Patch>(cmd: Command, driver: PatchDriver<T>): void =
     .action((file: string, ref: string, fields: string[]) =>
       run(async () => {
         const edits = fields.map(parseFieldAssignment);
-        const { index, applied = {} } = await patchUtils.editPatchFile(driver, file, { ref, fields: edits });
+        const { index, applied = {} } = await patchService.editPatchFile(driver, file, { ref, fields: edits });
         console.info(`Wrote ${file}, patch ${String(index)} updated: ${describeApplied(applied)}`);
       })
     );

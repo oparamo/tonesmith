@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { patchUtils, registry } from "@tonesmith/core";
+import { patchService, registry } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
 const registerCreatePatchFile = (server: McpServer): void => {
@@ -18,8 +18,8 @@ const registerCreatePatchFile = (server: McpServer): void => {
         setName: z.string().optional().describe(
           "Name for the patch set the file holds. Defaults to the filename without its extension."
         ),
-        patchCount: z.number().int().min(1).max(patchUtils.MAX_NEW_PATCHES).optional().describe(
-          `How many blank patches to start with (default 1, at most ${patchUtils.MAX_NEW_PATCHES}).`
+        patchCount: z.number().int().min(1).max(patchService.MAX_NEW_PATCHES).optional().describe(
+          `How many blank patches to start with (default 1, at most ${patchService.MAX_NEW_PATCHES}).`
         ),
       }),
       // It writes, but only where there is no file: an existing one is refused rather than replaced.
@@ -27,7 +27,7 @@ const registerCreatePatchFile = (server: McpServer): void => {
     },
     ({ device, file, setName, patchCount }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const created = await patchUtils.createPatchFile(driver, file, { setName, patchCount });
+      const created = await patchService.createPatchFile(driver, file, { setName, patchCount });
       return ok(
         `Created ${file} with ${created.patches.length} blank patch(es), set name "${created.name}".`
       );

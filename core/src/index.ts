@@ -12,8 +12,8 @@ export type {
   PatchNameSpec, PatchSpecExample,
   ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam,
 } from "./model";
-export * as patchUtils from "./service/patchService";
-export * as capabilityUtils from "./service/capabilityService";
+export * as patchService from "./service/patchService";
+export * as capabilityService from "./service/capabilityService";
 export * as registry from "./service/registry";
 
 export * as gx1 from "./device/gx1";

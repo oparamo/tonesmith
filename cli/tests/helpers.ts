@@ -3,7 +3,7 @@ import type { Command } from "commander";
 import { access, copyFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gx1, patchUtils } from "@tonesmith/core";
+import { gx1, patchService } from "@tonesmith/core";
 import { buildProgram } from "../src/program";
 
 const FIXTURE = join(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
@@ -97,7 +97,7 @@ const pathExists = async (path: string): Promise<boolean> => {
 
 /** The patch at `index` of the file at `path`, read back through the driver. */
 const patchAt = async (path: string, index = 0): Promise<gx1.Patch> => {
-  const file = await patchUtils.readPatchFile(gx1.driver, path);
+  const file = await patchService.readPatchFile(gx1.driver, path);
   return present(file.patches[index], `patch ${index} of ${path}`);
 };
 

@@ -7,10 +7,10 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
-import { gx1, patchUtils } from "@tonesmith/core";
+import { gx1, patchService } from "@tonesmith/core";
 import { connectClient, emptyTempDir, present, FIXTURE } from "./helpers";
 
-const expected = await patchUtils.readPatchFile(gx1.driver, FIXTURE);
+const expected = await patchService.readPatchFile(gx1.driver, FIXTURE);
 
 interface PageResponse {
   setName: string;

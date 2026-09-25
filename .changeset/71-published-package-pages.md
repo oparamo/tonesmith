@@ -10,7 +10,7 @@ visitor looks for.
 `@tonesmith/core`'s usage examples now run. Its `buildPatch` example wrote a block's controls as
 fields on the block, which the validator rejects, and its read example reached for `patch.amp.gain`
 where a decoded block keeps its controls under `params`. Its "what it exposes" list named four
-functions that are not exported (`patchUtils.applyFieldEdits`, `coerceValue`, `setByPath`, and
+functions that are not exported (`patchService.applyFieldEdits`, `coerceValue`, `setByPath`, and
 `patchView.presentPatch`) and left out the `PatchDriver` methods that replaced them. It also states
 the block shape once, since that is what both corrected examples turn on.
 

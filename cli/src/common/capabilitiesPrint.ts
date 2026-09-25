@@ -131,7 +131,7 @@ const printExample = (example: CapabilityType["example"]): void => {
 
 /**
  * Print full detail for a single type: description, models, subTypes, params. `capType` comes from
- * `capabilityUtils.lookup`, whose params already lead with the block's own controls.
+ * `capabilityService.lookup`, whose params already lead with the block's own controls.
  */
 const printType = (group: CapabilityGroup, capType: CapabilityType): void => {
   console.info(`\n${BOLD}${capType.name}${RESET}  ${DIM}[${group.id} / ${capType.id}]${RESET}\n`);

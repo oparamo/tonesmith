@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
-import { gx1, patchUtils } from "@tonesmith/core";
+import { gx1, patchService } from "@tonesmith/core";
 import { connectClient, emptyTempDir, pathExists, patchAt, present } from "./helpers";
 
 interface SavedPatch {
@@ -109,7 +109,7 @@ describe("generate_patch", () => {
     const { text, isError } = await client.callTool("generate_patch", input);
 
     expect(isError, text).toBe(false);
-    const file = await patchUtils.readPatchFile(gx1.driver, outPath);
+    const file = await patchService.readPatchFile(gx1.driver, outPath);
     const patchNames = file.patches.map(patch => patch.name.trim());
     expect(patchNames, "array order is file order").toEqual(["First", "Second", "Third"]);
     expect(file.name).toBe("Album");
@@ -139,7 +139,7 @@ describe("generate_patch", () => {
     expect(isError, text).toBe(false);
     const actions = savedPatches(text).map(saved => `${saved.name.trim()}:${saved.action}`);
     expect(actions).toEqual(["Lead:replaced", "Rhythm:appended"]);
-    const file = await patchUtils.readPatchFile(gx1.driver, outPath);
+    const file = await patchService.readPatchFile(gx1.driver, outPath);
     expect(file.patches.map(patch => patch.name.trim())).toEqual(["Lead", "Rhythm"]);
     expect(present(file.patches[0], "patch 0").amp.params.gain).toBe(90);
   });

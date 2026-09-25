@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { CapabilityGroup, CapabilityType, DeviceCapabilities } from "@tonesmith/core";
-import { capabilityUtils, registry } from "@tonesmith/core";
+import { capabilityService, registry } from "@tonesmith/core";
 import { attempt, deviceField, messageOf, ok } from "../common";
 
 /**
@@ -63,7 +63,7 @@ const viewForEntry = (
   includeParams: boolean | undefined,
 ): object => {
   const { group, type } = splitEntry(entry);
-  const found = capabilityUtils.lookup(capabilities, group, type);
+  const found = capabilityService.lookup(capabilities, group, type);
   if (found.kind === "chain") return found.chain;
   if (found.kind === "type") return found.type;
 
@@ -107,7 +107,7 @@ const exampleEntries = (capabilities: DeviceCapabilities): string[] => {
       return entry;
     })
     .slice(0, 2);
-  return [capabilityUtils.CHAIN_ENTRY, ...bareGroup, ...namedTypes];
+  return [capabilityService.CHAIN_ENTRY, ...bareGroup, ...namedTypes];
 };
 
 const deviceSummary = (capabilities: DeviceCapabilities): object => ({

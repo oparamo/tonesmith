@@ -1,12 +1,12 @@
 /**
- * A pass-through to `patchUtils.copyPatch`, so there is little here that is the tool's own.
+ * A pass-through to `patchService.copyPatch`, so there is little here that is the tool's own.
  * Resolving either ref, replacing the slot, and refusing an index past the end are
  * `@tonesmith/core`'s and are proven in `core/tests/service/patchService.test.ts`. What is left is that the
  * tool reaches the driver at all, and that a driver throw comes back as a tool error.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { writeFile } from "node:fs/promises";
-import { gx1, patchUtils } from "@tonesmith/core";
+import { gx1, patchService } from "@tonesmith/core";
 import { join } from "node:path";
 import { connectClient, withTempDir, patchAt, present } from "./helpers";
 
@@ -30,7 +30,7 @@ describe("copy_patch", () => {
 
     expect(result.isError).toBe(false);
     expect((await patchAt(destination)).name).toBe(sourceName);
-    const written = await patchUtils.readPatchFile(gx1.driver, destination);
+    const written = await patchService.readPatchFile(gx1.driver, destination);
     expect(present(written.patches, "the destination's patches")).toHaveLength(1);
   });
 
