@@ -19,11 +19,11 @@ which walks from format reverse-engineering to CLI/MCP wiring.
 
 Three packages, published from this repo. Take the one that matches how you want to work.
 
-| Package                                                              | What it is                                             | Install                       |
-|----------------------------------------------------------------------|--------------------------------------------------------|-------------------------------|
-| [`@tonesmith/cli`](https://www.npmjs.com/package/@tonesmith/cli)      | Command line: read a patch, edit a field, copy one      | `pnpm add -g @tonesmith/cli`  |
-| [`@tonesmith/mcp`](https://www.npmjs.com/package/@tonesmith/mcp)      | MCP server, so an agent can build patches for you       | `pnpm add -g @tonesmith/mcp`  |
-| [`@tonesmith/core`](https://www.npmjs.com/package/@tonesmith/core)    | The library the other two are built on                  | `pnpm add @tonesmith/core`    |
+| Package                                                            | What it is                                         | Install                      |
+|--------------------------------------------------------------------|----------------------------------------------------|------------------------------|
+| [`@tonesmith/cli`](https://www.npmjs.com/package/@tonesmith/cli)   | Command line: read a patch, edit a field, copy one | `pnpm add -g @tonesmith/cli` |
+| [`@tonesmith/mcp`](https://www.npmjs.com/package/@tonesmith/mcp)   | MCP server, so an agent can build patches for you  | `pnpm add -g @tonesmith/mcp` |
+| [`@tonesmith/core`](https://www.npmjs.com/package/@tonesmith/core) | The library the other two are built on             | `pnpm add @tonesmith/core`   |
 
 ```bash
 tonesmith gx1 read my-tones.tsl   # from @tonesmith/cli
@@ -115,15 +115,15 @@ From a working copy instead, use `"command": "node"` with
 
 MCP tools:
 
-| Tool                  | Description                                                                                         |
-|-----------------------|-----------------------------------------------------------------------------------------------------|
-| `list_devices`        | List supported devices                                                                              |
-| `read_patch`          | Read one patch, or page through a whole file                                                        |
-| `write_fields`        | Edit fields in an existing patch by dot-path, applied as one batch, and rename the patch set        |
-| `describe_device`     | Look up a device's capability metadata (chain, groups, types, params). `items` takes a list, so one call covers many lookups |
-| `generate_patch`      | Build one or more patches from structured parameters and save them in one write. The per-patch spec comes from `describe_device` |
-| `copy_patch`          | Copy a patch into a slot in another file, replacing what was there                                  |
-| `create_patch_file`   | Start an empty patch file of blank patches at the device's factory defaults                         |
+| Tool                | Description                                                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `list_devices`      | List supported devices                                                                                                           |
+| `read_patch`        | Read one patch, or page through a whole file                                                                                     |
+| `write_fields`      | Edit fields in an existing patch by dot-path, applied as one batch, and rename the patch set                                     |
+| `describe_device`   | Look up a device's capability metadata (chain, groups, types, params). `items` takes a list, so one call covers many lookups     |
+| `generate_patch`    | Build one or more patches from structured parameters and save them in one write. The per-patch spec comes from `describe_device` |
+| `copy_patch`        | Copy a patch into a slot in another file, replacing what was there                                                               |
+| `create_patch_file` | Start an empty patch file of blank patches at the device's factory defaults                                                      |
 
 ## Converting documentation to Markdown
 

@@ -10,13 +10,13 @@ that adds, removes or moves a box updates its diagram in the same pull request.
 Every folder under `src/` is a layer named for its role, and a layer imports only the layers below
 it in this table.
 
-| Layer              | Where                                                                                     | Pattern             |
-|--------------------|-------------------------------------------------------------------------------------------|---------------------|
-| Surface            | cli `command/`; mcp `tool/` and `prompt/`                                                 | Driving adapters    |
-| Service            | core `service/`: `patchService`, `capabilityService`, `specService`, `registry`           | Use cases, Registry |
-| Data               | core `persistence/`: `patchFileRepository`, `fileLock`, `atomicWrite`                     | Repository          |
-| Models             | core `model/`: patch, capabilities, the view a person reads, and `PatchDriver`            | Port                |
-| Plugins            | core `device/<id>/`, one per supported device, listed in `device/index.ts`                | Driven adapters     |
+| Layer   | Where                                                                           | Pattern             |
+|---------|---------------------------------------------------------------------------------|---------------------|
+| Surface | cli `command/`; mcp `tool/` and `prompt/`                                       | Driving adapters    |
+| Service | core `service/`: `patchService`, `capabilityService`, `specService`, `registry` | Use cases, Registry |
+| Data    | core `persistence/`: `patchFileRepository`, `fileLock`, `atomicWrite`           | Repository          |
+| Models  | core `model/`: patch, capabilities, the view a person reads, and `PatchDriver`  | Port                |
+| Plugins | core `device/<id>/`, one per supported device, listed in `device/index.ts`      | Driven adapters     |
 
 Files are camelCase and named for their domain, and folders under `src/` are singular. Each package
 also has a `common/` of pieces its layers share, which imports none of them.
