@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, onTestFinished } from "vitest";
 import { Command } from "commander";
 import type { Patch, PatchDriver, DeviceCapabilities, RawPatch } from "@tonesmith/core";
-import { configureDeviceCommands } from "../src/common/commands";
+import { configureDeviceCommands } from "../src/command";
 import { withTempDir } from "./helpers";
 
 const caps: DeviceCapabilities = {
