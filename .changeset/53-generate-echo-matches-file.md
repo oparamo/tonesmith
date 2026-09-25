@@ -5,16 +5,14 @@
 
 The patch `generate_patch` echoes back is the patch the file holds.
 
-The builder fills one struct per block covering every type, so echoing that struct reported params
-the chosen type does not have: a TERA ECHO reverb came back carrying `time`, `density` and
-`preDelay`, none of which it has, and a SHIMMER reverb came back with `density` and `direct`. The
-bytes were always right, so reading the file back disagreed with the echo. The echo now round-trips
-through the codec first, which is what makes it what a `read_patch` would return. That is what the
-tool promises in the first place: the response is the confirmation, and no follow-up read is needed.
+A TERA ECHO reverb has no `time`, `density` or `preDelay`, and a SHIMMER reverb has no `density` or
+`direct`; the echo carries none of them, and neither does a read of the saved file. `buildPatch`
+returns a patch exactly as a file stores it, and the echo is the patch `upsertPatches` saved, so the
+response is the confirmation the tool promises and no follow-up read is needed.
 
-That round trip also happens before the file is written, so a patch the codec cannot store fails the
-call with the file as it was, rather than after it has been replaced on disk.
+Every spec is built before the file is read, so a spec the driver rejects fails the call with the
+file as it was, naming the spec's position and name.
 
 A batch that names the same patch twice is rejected, naming the name and both positions.
-`patchUtils.upsertPatches` keys on the name, so the second patch replaced the first and the response
-reported two saves into a file holding one of them.
+`patchUtils.upsertPatches` keys on the name, so the second patch would replace the first and the
+response would report two saves into a file holding one of them.

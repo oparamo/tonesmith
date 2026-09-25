@@ -57,6 +57,12 @@ and its resolved chain, so nothing has to be read back to confirm it.
 A device's blocks, types and params live in `describe_device` rather than in any tool's schema, so
 `describe_device` is always the call that answers "what can this device do".
 
+## Prompt
+
+`build_patch` takes a `device` (completed from the supported ids), a `description` of the tone in
+your own words, and the `outPath` to save it in. Clients that show prompts as slash commands offer
+it as one; it hands the request to the agent, which carries out the build as above.
+
 ## License
 
 MIT. See [LICENSE.md](./LICENSE.md).

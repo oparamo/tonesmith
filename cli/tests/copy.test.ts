@@ -7,28 +7,28 @@ import { describe, it, expect, afterEach } from "vitest";
 import { runCli, withTempDir, patchAt } from "./helpers";
 
 describe("gx1 copy", () => {
-  let src: ReturnType<typeof withTempDir>;
-  let dst: ReturnType<typeof withTempDir>;
-  afterEach(() => { src.cleanup(); dst.cleanup(); });
+  let src: Awaited<ReturnType<typeof withTempDir>>;
+  let dst: Awaited<ReturnType<typeof withTempDir>>;
+  afterEach(async () => { await src.cleanup(); await dst.cleanup(); });
 
   it("copies the named source patch into the named destination slot", async () => {
-    src = withTempDir();
-    dst = withTempDir();
-    const srcName = patchAt(src.fixture, 2).name;
-    const displaced = patchAt(dst.fixture).name;
+    src = await withTempDir();
+    dst = await withTempDir();
+    const srcName = (await patchAt(src.fixture, 2)).name;
+    const displaced = (await patchAt(dst.fixture)).name;
     expect(srcName, "the fixture must differ at these two slots for the copy to show").not.toBe(displaced);
 
     const { info, error, exitCode } = await runCli(["gx1", "copy", src.fixture, "2", dst.fixture, "0"]);
 
     const errorOutput = error.join("\n");
     expect(exitCode, errorOutput).toBeUndefined();
-    expect(patchAt(dst.fixture).name).toBe(srcName);
+    expect((await patchAt(dst.fixture)).name).toBe(srcName);
     expect(info.join("\n"), "says which slot it landed in").toContain(dst.fixture);
   });
 
   it("prints a driver rejection and exits 1", async () => {
-    src = withTempDir();
-    dst = withTempDir();
+    src = await withTempDir();
+    dst = await withTempDir();
 
     const { error, exitCode } = await runCli(["gx1", "copy", src.fixture, "No Such Patch", dst.fixture, "0"]);
 

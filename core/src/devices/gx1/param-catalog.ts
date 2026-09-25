@@ -11,10 +11,11 @@
  *
  * Two shapes, mirroring how the codec models each block:
  *  - `PARAMS_BY_TYPE[block][type]` for blocks whose params vary by the selected type
- *    (`fx`, `pfx`, `delay`, `reverb`). Keys are the type ids used in the codec/constants.
- *  - `PARAMS_BY_BLOCK[block]` for single-shape blocks (`amp`, `odds`, `ns`, `fv`).
+ *    (`fx`, `pedalFx`, `delay`, `reverb`). Keys are the type ids used in the codec/constants.
+ *  - `PARAMS_BY_BLOCK[block]` for single-shape blocks (`amp`, `drive`, `noiseGate`, `volume`).
  *
- * Selection-only blocks (`cab`, `mic`) have no params and don't appear here.
+ * The `cab` and `mic` capability groups describe the values of amp's `speaker` and `mic` params,
+ * which are catalogued here with the rest of amp's.
  *
  * Each param is authored as `def(name, domain, description)`: the domain (see `param-domain.ts`)
  * is the single source, and the human `range` string, machine `values` list, and numeric
@@ -533,7 +534,7 @@ type SingleShapeBlockId = keyof typeof PARAMS_BY_BLOCK;
 const FIELD_LABEL_ALIASES: Record<PerTypeBlockId, Record<string, Record<string, string>>> = {
   fx: {
     "FEEDBACKER": { octFeedback: "OCT F-BACK" },
-    // The stage count (4/8/12) is the codec's numeric "stage" field, but the device labels it TYPE.
+    // The stage count (4/8/12 STAGE) is the codec's "stage" lookup, but the device labels it TYPE.
     "PHASER": { stage: "TYPE" },
     "ROTARY": { speed: "SPEED SELECT" },
     "OCTAVE": { minus1Oct: "-1 OCT", minus2Oct: "-2 OCT" },

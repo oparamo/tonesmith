@@ -31,6 +31,7 @@ const registerReadPatch = (server: McpServer): void => {
   server.registerTool(
     "read_patch",
     {
+      title: "Read patches",
       description:
         "Read decoded patches from a patch file. The patch itself arrives under `patch`, beside " +
         "`setName`, the name of the patch set the file holds. Naming a `ref` returns that one " +
@@ -51,9 +52,9 @@ const registerReadPatch = (server: McpServer): void => {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ file, device, ref, limit, offset }) => attempt(() => {
+    ({ file, device, ref, limit, offset }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const patchFile = driver.readFile(file);
+      const patchFile = await patchUtils.readPatchFile(driver, file);
 
       if (ref !== undefined) {
         const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);

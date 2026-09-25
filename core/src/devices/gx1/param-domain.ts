@@ -8,9 +8,9 @@ type RangeDomain = { kind: "range"; min: number; max: number } & RangeOpts;
 /**
  * A param's value domain, the single authored source of its range. The human `range` string, the
  * machine-readable `values` list, and the numeric `min`/`max` bounds all derive from it via
- * `def()`, so they can't drift from each other. That is what lets the MCP generate schema read
- * bounds structurally, with no parsing of an English range string, and lets describe_device
- * surface exact enum values, all from one declaration.
+ * `def()`, so they can't drift from each other. That is what lets the spec validator check bounds
+ * structurally, with no parsing of an English range string, and lets describe_device surface exact
+ * enum values, all from one declaration.
  *
  * Kinds:
  *  - `range`:   a numeric interval, the only kind that yields machine `min`/`max` bounds.
@@ -52,20 +52,25 @@ const bool = (): Domain => ({ kind: "boolean" });
 
 const fmt = (n: number, decimals?: number): string => (decimals === undefined ? String(n) : n.toFixed(decimals));
 
+/** A numeric interval as the parameter guide writes it: "0-100", "-12-+12 semitones", "0-100%". */
+const intervalText = (domain: Omit<RangeDomain, "kind">): string => {
+  const max = fmt(domain.max, domain.decimals);
+  const signedMax = domain.min < 0 && domain.max > 0 ? `+${max}` : max;
+  const base = `${fmt(domain.min, domain.decimals)}-${signedMax}`;
+  if (domain.percent) return `${base}%`;
+  if (domain.unit) return `${base} ${domain.unit}`;
+  return base;
+};
+
 /** Renders a domain to its human `range` string (matches the device parameter-guide wording). */
 const rangeText = (domain: Domain): string => {
   if (domain.kind === "enum") return domain.values.join(", ");
   if (domain.kind === "boolean") return "true, false";
   if (domain.kind === "lookup") return domain.display;
-  const signedMax = domain.min < 0 && domain.max > 0 ? `+${fmt(domain.max, domain.decimals)}` : fmt(domain.max, domain.decimals);
-  const base = `${fmt(domain.min, domain.decimals)}-${signedMax}`;
-  let out = base;
-  if (domain.percent) out = `${base}%`;
-  else if (domain.unit) out = `${base} ${domain.unit}`;
+  if (domain.kind === "range") return intervalText(domain);
   // The ends of the list rather than all 18 of it, since `values` carries the full set and the two
   // ends are what say which way the device counts: a rate runs from the longest note down.
-  if (domain.kind === "notes") out = `${out}, or a note value from ${domain.values[0]} to ${domain.values.at(-1)}`;
-  return out;
+  return `${intervalText(domain)}, or a note value from ${domain.values[0]} to ${domain.values.at(-1)}`;
 };
 
 /** Builds a ParamSpec from a name + domain + description, deriving range / values / bounds. */

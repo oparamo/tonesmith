@@ -164,7 +164,27 @@ interface DeviceCapabilities {
   groups: CapabilityGroup[];
 }
 
+/**
+ * The chain together with everything the patch carries outside any block: the name limit and the
+ * patch settings. A caller that only ever browses groups meets neither, so the chain is where both
+ * are shown.
+ */
+interface ChainView extends ChainSpec {
+  patchName: PatchNameSpec;
+  patchSettings: ParamSpec[];
+}
+
+/**
+ * What a capability lookup names: the chain, a whole group, or one type in a group. A type arrives
+ * with its group's block controls ahead of its own params, since those apply whichever type is
+ * selected and a view without them hides every control the block carries outside its types.
+ */
+type CapabilityLookup =
+  | { kind: "chain"; chain: ChainView }
+  | { kind: "group"; group: CapabilityGroup }
+  | { kind: "type"; group: CapabilityGroup; type: CapabilityType };
+
 export type {
   ParamSpec, NumericParam, DiscreteParam, BooleanParam, NumericOrNamedParam, PatchSpecExample, CapabilityType,
-  CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities,
+  CapabilityGroup, ChainSpec, PatchNameSpec, DeviceCapabilities, ChainView, CapabilityLookup,
 };

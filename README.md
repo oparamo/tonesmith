@@ -4,13 +4,15 @@ TypeScript toolkit for reading, editing, and building presets for guitar multi-e
 processors. Every device plugs in as a self-contained driver behind the same core library,
 CLI, and MCP server, so the surfaces below work identically for any supported device.
 
+tonesmith was built with the help of AI coding tools; [AI_DISCLOSURE.md](AI_DISCLOSURE.md) says how.
+
 ## Supported devices
 
 | Device    | id    | Patch file format |
 |-----------|-------|-------------------|
 | BOSS GX-1 | `gx1` | `.tsl`            |
 
-New devices are onboarded with the `add-device` skill (`.claude/skills/add-device/SKILL.md`),
+New devices are onboarded with the `adding-a-device` skill (`.claude/skills/adding-a-device/SKILL.md`),
 which walks from format reverse-engineering to CLI/MCP wiring.
 
 ## Packages
@@ -209,4 +211,4 @@ lint config, and repo docs don't.
 
 ## Roadmap
 
-Additional devices, onboarded via the add-device skill (`.claude/skills/add-device/SKILL.md`).
+Additional devices, onboarded via the adding-a-device skill (`.claude/skills/adding-a-device/SKILL.md`).

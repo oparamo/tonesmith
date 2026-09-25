@@ -1,43 +1,20 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchUtils, registry } from "@tonesmith/core";
-import type { FieldValue, Patch, PatchDriver } from "@tonesmith/core";
+import type { FieldEdits } from "@tonesmith/core";
 import { attempt, deviceField, ok } from "../common";
 
-/** Rejects an input that asks for no change at all, or for a patch edit without naming the patch. */
-const requireSomethingToChange = (ref?: string, fields?: object, setName?: string): void => {
-  if (fields === undefined && setName === undefined) {
-    throw new Error(
-      "Nothing to change: pass `fields` (with `ref`) to edit a patch, `setName` to rename " +
-        "the patch set, or both."
-    );
-  }
-  if (fields !== undefined && ref === undefined) {
-    throw new Error("`ref` is required alongside `fields`, since it selects which patch to edit.");
-  }
-};
-
-/**
- * Applies a batch of dot-path edits to one patch and reports what landed. Every edit lands in
- * memory before anything is written, so a rejected edit anywhere in the set leaves the file
- * exactly as it was rather than half-applied. The report reads the values back out of the edit
- * rather than re-deriving them, so what it says is what the patch now holds.
- */
-const editPatch = <T extends Patch>(
-  driver: PatchDriver<T>,
-  patch: T,
-  fields: Record<string, FieldValue>,
-): string => {
-  const applied = driver.applyEdits(patch, Object.entries(fields));
-  return Object.entries(applied)
+/** What the edit wrote, read back from core's report so it says what the patch now holds. */
+const describeApplied = (applied: FieldEdits): string =>
+  Object.entries(applied)
     .map(([field, value]) => `${field} = ${JSON.stringify(value)}`)
     .join(", ");
-};
 
 const registerWriteFields = (server: McpServer): void => {
   server.registerTool(
     "write_fields",
     {
+      title: "Edit patch fields",
       description:
         "Edit a patch file: one or more fields of a single patch, the name of the patch set, or " +
         "both. Patch fields use dot-notation, counted from the patch read_patch returns under " +
@@ -68,26 +45,20 @@ const registerWriteFields = (server: McpServer): void => {
       }),
       // It edits a file the caller already has, which is the destructive case: the values it
       // replaces are gone.
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    ({ file, device, ref, fields, setName }) => attempt(() => {
-      requireSomethingToChange(ref, fields, setName);
-
+    ({ file, device, ref, fields, setName }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const patchFile = driver.readFile(file);
+      const edits = fields === undefined ? undefined : Object.entries(fields);
+      const report = await patchUtils.editPatchFile(driver, file, { ref, fields: edits, setName });
+
       const changes: string[] = [];
-
-      if (fields !== undefined && ref !== undefined) {
-        const { index, patch } = patchUtils.resolvePatch(patchFile.patches, ref);
-        changes.push(`patch ${index}: ${editPatch(driver, patch, fields)}`);
+      if (report.index !== undefined && report.applied !== undefined) {
+        changes.push(`patch ${report.index}: ${describeApplied(report.applied)}`);
       }
-
-      if (setName !== undefined) {
-        patchFile.name = setName;
-        changes.push(`set name = ${JSON.stringify(setName)}`);
+      if (report.setName !== undefined) {
+        changes.push(`set name = ${JSON.stringify(report.setName)}`);
       }
-
-      driver.writeFile(patchFile, file);
       return ok(`Updated ${file}: ${changes.join("; ")}`);
     })
   );

@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { readFile } from "node:fs/promises";
 import { driver } from "../../../src/devices/gx1/driver";
-import {
-  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_PATCH_NAMES, present, scratchFile,
-} from "../../helpers";
+import { ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_PATCH_NAMES, present } from "../../helpers";
 
 describe("gx1 driver", () => {
   it("exposes its id, name, and capabilities", () => {
@@ -24,14 +23,14 @@ describe("gx1 driver", () => {
     expect(file.patches).toHaveLength(2);
   });
 
-  it("readFile decodes a real fixture", () => {
-    const file = driver.readFile(FIXTURE);
+  it("parseFile decodes a real fixture", async () => {
+    const file = driver.parseFile(await readFile(FIXTURE), FIXTURE);
 
     expect(file.patches.map(patch => patch.name)).toEqual(ROCK_TONES_PATCH_NAMES);
   });
 
-  it("encodePatch/decodePatch round-trip a patch through the driver", () => {
-    const file = driver.readFile(FIXTURE);
+  it("encodePatch/decodePatch round-trip a patch through the driver", async () => {
+    const file = driver.parseFile(await readFile(FIXTURE), FIXTURE);
     const patch = present(file.patches[0], "patch 0 of the fixture");
 
     const encoded = driver.encodePatch(patch);
@@ -40,15 +39,12 @@ describe("gx1 driver", () => {
     expect(decoded.name).toBe(patch.name);
   });
 
-  describe("writeFile", () => {
-    const tmpPath = scratchFile("driver-set.tsl");
-
-    it("writes a file that can be read back", () => {
+  describe("serializeFile", () => {
+    it("produces bytes parseFile can read back", () => {
       const file = driver.newFile("Driver Set");
 
-      driver.writeFile(file, tmpPath());
+      const loaded = driver.parseFile(driver.serializeFile(file), "round-trip");
 
-      const loaded = driver.readFile(tmpPath());
       expect(loaded.name).toBe("Driver Set");
     });
   });

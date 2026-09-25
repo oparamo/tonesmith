@@ -4,6 +4,8 @@ import { bytesFromHex } from "../../../src/devices/gx1/codec/primitives";
 import { FX_TYPES, FX_DLY_TYPES } from "../../../src/devices/gx1/common";
 import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
 
+const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
+
 // ── Per-effect-type symmetry tests ────────────────────────────────────────────
 //
 // For each FX type, decode a zero byte array, re-encode the decoded params, then
@@ -110,6 +112,16 @@ describe("Unknown FX type handling", () => {
     expect(encodeWithBadPitch, "names the value it refused").toThrow(/999/);
     expect(encodeWithBadPitch, "and the field it refused it for").toThrow(/pitch/);
   });
+
+  it("indexTable writes back a byte past the end of its table as it found it", () => {
+    const original = new Array<number>(251).fill(0);
+    original[179 + 1] = 60;
+    const params = decodeFxParams("PITCH SHIFT", original);
+
+    const encoded = encodeFxParams("PITCH SHIFT", params, original);
+
+    expect(bytesFromHex(encoded)).toEqual(original);
+  });
 });
 
 
@@ -123,7 +135,7 @@ describe("Unknown FX type handling", () => {
 // exercises genuine device data for every field checked below.
 
 describe("Real device values (default-init.tsl)", () => {
-  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const patch = defaultInitPatch;
   const fx1Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX1"));
   const fx2Bytes = bytesFromHex(rawBlock(patch, "MEMORY%FX2"));
   const fx3aBytes = bytesFromHex(rawBlock(patch, "MEMORY%FX3A"));

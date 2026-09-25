@@ -16,7 +16,8 @@ to real booleans now.
 
 `write` takes fully qualified `field=value` pairs (`key=G`) instead of a separate `<block>`
 argument, so it can target top-level `Patch` scalars, matching what the MCP tool always accepted.
-A pair with no `=` in it is rejected naming the argument as typed: `write f.tsl 0 amp.params.gain`
+`write` reports each value as the driver wrote it, so `amp.params.gain=045` reports
+`amp.params.gain=45`. A pair with no `=` in it is rejected naming the argument as typed: `write f.tsl 0 amp.params.gain`
 sliced at index -1 and reported `amp.params.gai` as an unknown field while listing `gain` among the
 valid ones.
 
@@ -29,7 +30,10 @@ behind the bypass. A patch's `memo` prints too, when it has one.
 **`capabilities` treats the chain like the groups it is listed beside.** It matched `chain`
 case-sensitively while every real group matches either case, so `capabilities CHAIN` failed with a
 list that did not mention chain; and `capabilities chain bogus` printed the chain while
-`capabilities amp bogus` errored. Both now behave the way the neighboring groups do.
+`capabilities amp bogus` errored. Both now behave the way the neighboring groups do. The chain
+view shows the patch name limit alongside the settings the patch carries itself.
+Every param `capabilities` prints carries its `write` key, a block's own controls and a
+sub-algorithm's params included, where only a type's params and the patch settings carried one.
 
 **Color is gated on a terminal reading the output.** The escape sequences were unconditional, so
 `capabilities fx > types.txt` filled the file with them and a pipe carried them into whatever read

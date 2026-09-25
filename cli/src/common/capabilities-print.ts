@@ -1,5 +1,14 @@
-import type { DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
+import type { ChainView, DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "./color";
+
+/**
+ * One param's line: its label, its range, and its `key`. The key is the name the param answers to in
+ * a `write` dot-path, so a param printed without it is one the CLI can't be told to set.
+ */
+const printParam = (param: ParamSpec, indent = "  "): void => {
+  const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
+  console.info(`${indent}${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
+};
 
 /**
  * Print the settings the patch carries itself. They belong to no group, so the chain view is where
@@ -8,20 +17,21 @@ import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "./color";
 const printPatchSettings = (settings: ParamSpec[]): void => {
   if (settings.length === 0) return;
   console.info(`${YELLOW}Patch settings:${RESET}`);
-  for (const setting of settings) {
-    const keyTag = setting.key ? `  ${GREEN}${setting.key}${RESET}` : "";
-    console.info(`  ${setting.name.padEnd(14)} ${DIM}${setting.range}${RESET}${keyTag}`);
-  }
+  for (const setting of settings) printParam(setting);
   console.info();
 };
 
-/** Print the device's signal-chain model: default order, plus how ordering and bypass work. */
-const printChain = (caps: DeviceCapabilities): void => {
+/**
+ * Print the device's signal-chain model (default order, how ordering and bypass work) and what the
+ * patch carries outside any block.
+ */
+const printChain = (chain: ChainView): void => {
   console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
-  console.info(`${YELLOW}Default order:${RESET} ${caps.chain.defaultOrder.join(" → ")}\n`);
-  console.info(caps.chain.description);
+  console.info(`${YELLOW}Default order:${RESET} ${chain.defaultOrder.join(" → ")}\n`);
+  console.info(chain.description);
   console.info();
-  printPatchSettings(caps.patchSettings);
+  console.info(`${YELLOW}Patch name:${RESET} up to ${chain.patchName.maxLength} characters\n`);
+  printPatchSettings(chain.patchSettings);
 };
 
 /** Print a summary table of all groups (id, name, type count), led by a chain pointer. */
@@ -41,9 +51,7 @@ const printGroups = (caps: DeviceCapabilities): void => {
 const printBlockControls = (params: CapabilityGroup["params"]): void => {
   if (!params || params.length === 0) return;
   console.info(`${YELLOW}Block controls:${RESET}`);
-  for (const param of params) {
-    console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}`);
-  }
+  for (const param of params) printParam(param);
   console.info();
 };
 
@@ -82,9 +90,7 @@ const printGroup = (group: CapabilityGroup): void => {
 // the type's shared list.
 const printSubTypeParams = (params: CapabilityType["params"]): void => {
   if (!params || params.length === 0) return;
-  for (const param of params) {
-    console.info(`      ${param.name.padEnd(12)} ${DIM}${param.range}${RESET}`);
-  }
+  for (const param of params) printParam(param, "      ");
 };
 
 const printTypeSubTypes = (subTypes: CapabilityType["subTypes"]): void => {
@@ -102,10 +108,7 @@ const printTypeParams = (params: CapabilityType["params"]): void => {
   if (!params || params.length === 0) return;
   console.info(`\n${YELLOW}Parameters:${RESET}`);
   for (const param of params) {
-    // `key` is the name this param answers to in `write` dot-paths, and `range` is only a summary
-    // for lookup params. Without both, the printed param can't actually be set from the CLI.
-    const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
-    console.info(`  ${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
+    printParam(param);
     console.info(`  ${"".padEnd(14)} ${param.description}`);
     // A param that takes named values gets them listed whether or not it also takes a number:
     // `range` summarizes the list, and the exact spelling is what a write has to match.
@@ -126,7 +129,10 @@ const printExample = (example: CapabilityType["example"]): void => {
   console.info(JSON.stringify(example, null, 2));
 };
 
-/** Print full detail for a single type: description, models, subTypes, params. */
+/**
+ * Print full detail for a single type: description, models, subTypes, params. `capType` comes from
+ * `capabilityUtils.lookup`, whose params already lead with the block's own controls.
+ */
 const printType = (group: CapabilityGroup, capType: CapabilityType): void => {
   console.info(`\n${BOLD}${capType.name}${RESET}  ${DIM}[${group.id} / ${capType.id}]${RESET}\n`);
   console.info(capType.description);
@@ -137,8 +143,7 @@ const printType = (group: CapabilityGroup, capType: CapabilityType): void => {
 
   printTypeSubTypes(capType.subTypes);
 
-  const params = [...(group.params ?? []), ...(capType.params ?? [])];
-  printTypeParams(params);
+  printTypeParams(capType.params);
   printExample(capType.example);
 
   console.info();

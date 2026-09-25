@@ -83,8 +83,5 @@ const unknownParamLine = (keys: string[], block: BlockContext): string => {
   return `${quoted(keys)} ${noun} of ${block.group} ${block.type ?? ""}`.trimEnd() + ".";
 };
 
-export {
-  asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine, unknownParamLine,
-  PARAMS_FIELD, SUB_TYPE_FIELD, TYPE_FIELD,
-};
+export { asRecord, blockContext, misplacedLine, shapeSkeleton, unknownLine, unknownParamLine };
 export type { BlockContext };

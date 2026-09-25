@@ -12,7 +12,7 @@ and a path whose root did not exist at all crashed with a raw `TypeError` instea
 message. Every segment of a path must now exist, and a path that goes wrong names the valid fields
 at the level it went wrong, so a near miss like `amp.params.mid` points at `middle`.
 
-`resolvePatchIndex` rejects an index past the end of the file rather than returning it. Callers
+A patch reference rejects an index past the end of the file rather than returning it. Callers
 index straight into the patch array with the result, so an unchecked index read as `undefined` or,
 when writing, left a hole in the array that encoded as a corrupt file.
 
@@ -22,11 +22,12 @@ caller arrives here as an empty string, so it selected the first patch and, on a
 it. `"0x1"` and `"2.0"` rounded into indices nobody spelled out. An index is digits with an optional
 sign, an empty reference is refused, and anything else is looked up as a name. Ruling the index out
 is also what makes a patch named `"808"` reachable, since a digits-only reference is read as an
-index first and falls through to the name when the file has no such slot.
+index first and falls through to the name when the file has no such slot. A name matches exactly,
+case included, in a reference and in a save alike: the device stores "Lead" and "LEAD" as two
+patches, and a reference that ignored case left a file holding both with neither reachable by name.
 
-The builders reject an unknown param key for the block's current type, listing the keys that type
-does accept (`... is not valid for type "ROTARY" (valid keys: speed, slowRate, ...)`). A key that
-means something else for this type used to write its byte anyway.
+A patch spec naming a param the block's current type does not have is rejected, with the keys that
+type does accept. A key that means something else for this type used to write its byte anyway.
 
 Three paths inside the codec did the same thing one level lower, returning normally without writing
 the bytes they were handed. The FX param encoder gave back the original bytes whenever the effect
@@ -36,9 +37,9 @@ skipped their byte when the value was not one the device names, so a `detect` of
 `Updated` and changed nothing. All three throw now, and both selectors go through the same lookup as
 every other enum in the codec.
 
-That lookup is also the inverse of the one decode uses, sentinel included. A byte outside a table's
-range decodes to `UNKNOWN_<n>`, and that name now encodes back to the byte it came from rather than
-throwing, so a value this codec cannot name survives a read and write cycle instead of blocking the
+Every lookup in the codec is also the inverse of the one decode uses, sentinel included. A byte
+outside a table's range decodes to `UNKNOWN_<n>`, and that name encodes back to the byte it came
+from rather than throwing, so a value this codec cannot name survives a read and write cycle instead of blocking the
 write. `NoiseGateBlock.detect` and `VolumeBlock.curve` are typed `string` to match, as every other
 decoded selector already was.
 

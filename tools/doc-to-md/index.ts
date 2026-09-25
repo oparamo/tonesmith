@@ -9,7 +9,7 @@
  * detected from the content itself (PDF magic bytes); --format overrides.
  * Prints to stdout when -o is omitted.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { fetchDocument } from "./fetch.js";
 import { detectFormat, toMarkdown } from "./convert.js";
 
@@ -26,11 +26,11 @@ const formatFlagIndex = flagArgs.indexOf("--format");
 const formatOverride = formatFlagIndex !== -1 ? flagArgs[formatFlagIndex + 1] : undefined;
 
 const isUrl = /^https?:\/\//.test(source);
-const bytes = isUrl ? await fetchDocument(source) : new Uint8Array(readFileSync(source));
+const bytes = isUrl ? await fetchDocument(source) : new Uint8Array(await readFile(source));
 const markdown = await toMarkdown(bytes, detectFormat(bytes, formatOverride));
 
 if (outPath) {
-  writeFileSync(outPath, markdown, "utf-8");
+  await writeFile(outPath, markdown, "utf-8");
   console.info(`Wrote: ${outPath} (${markdown.length.toLocaleString()} chars)`);
 } else {
   console.info(markdown);

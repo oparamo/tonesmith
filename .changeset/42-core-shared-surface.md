@@ -13,6 +13,12 @@ replaced a pair of near-identical implementations, one per surface, which is als
 `read` stopped printing `type=<model>` in an fx slot's params line when the label already shows the
 model.
 
+`capabilityUtils.lookup(caps, groupId, typeId?)` resolves what the CLI's `capabilities` and MCP's
+`describe_device` both answer: the chain, a group, or one type. A type comes with its block's own
+controls ahead of its params, and the chain with the patch name limit and the patch settings. Both
+surfaces match `chain` in either case, the way they match group ids, and both refuse a type under
+the chain. `CHAIN_ENTRY` is the name the chain answers to.
+
 `configureDeviceCommands(cmd, driver)` builds the CLI's commands from a `PatchDriver<T>` rather
 than from GX-1 specifically, and the MCP server registers its device-agnostic tools once. Adding a
 device means adding a `core/src/devices/<id>/` folder and one line in the core roster, with no

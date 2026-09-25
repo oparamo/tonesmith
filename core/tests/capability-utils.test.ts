@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { DeviceCapabilities } from "../src/types";
-import { findGroup, findType } from "../src/capability-utils";
+import type { DeviceCapabilities, ParamSpec } from "../src/types";
+import { findGroup, findType, lookup } from "../src/capability-utils";
 
 const caps: DeviceCapabilities = {
   chain: { description: "Signal chain", defaultOrder: ["amp", "delay"], blocks: {} },
@@ -68,5 +68,49 @@ describe("findType", () => {
 
     expect(findMissingType).toThrow(/MISSING/);
     expect(findMissingType, "names the types that do exist").toThrow(/JC-120, TWIN/);
+  });
+});
+
+describe("lookup", () => {
+  const numeric = (key: string): ParamSpec =>
+    ({ kind: "numeric", name: key.toUpperCase(), key, range: "0-100", description: key, min: 0, max: 100 });
+
+  const withControls: DeviceCapabilities = {
+    ...caps,
+    patchSettings: [numeric("tempo")],
+    groups: caps.groups.map(group => group.id !== "amp" ? group : {
+      ...group,
+      params: [numeric("level")],
+      types: group.types.map(capType => ({ ...capType, params: [numeric("gain")] })),
+    }),
+  };
+
+  it.each(["chain", "CHAIN"])("resolves %o to the chain with what the patch carries outside any block", (entry) => {
+    const found = lookup(withControls, entry);
+
+    expect(found).toEqual({
+      kind: "chain",
+      chain: { ...withControls.chain, patchName: withControls.patchName, patchSettings: withControls.patchSettings },
+    });
+  });
+
+  it("refuses a type on the chain, naming it", () => {
+    const lookupChainType = () => lookup(withControls, "chain", "bogus");
+
+    expect(lookupChainType).toThrow(/bogus/);
+  });
+
+  it("resolves a bare group id to the group", () => {
+    const found = lookup(withControls, "DELAY");
+
+    expect(found).toEqual({ kind: "group", group: findGroup(withControls, "delay") });
+  });
+
+  it("gives a type its block's controls ahead of its own params", () => {
+    const found = lookup(withControls, "amp", "twin");
+    const paramKeys = found.kind === "type" ? found.type.params?.map(param => param.key) : undefined;
+
+    expect(found.kind).toBe("type");
+    expect(paramKeys).toEqual(["level", "gain"]);
   });
 });

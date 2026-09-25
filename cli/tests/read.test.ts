@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { gx1 } from "@tonesmith/core";
+import { gx1, patchUtils } from "@tonesmith/core";
 import { runCli, present, FIXTURE } from "./helpers";
 
-const expected = gx1.driver.readFile(FIXTURE);
+const expected = await patchUtils.readPatchFile(gx1.driver, FIXTURE);
 const firstPatch = present(expected.patches[0], "fixture patch 0");
 const secondPatch = present(expected.patches[1], "fixture patch 1");
 

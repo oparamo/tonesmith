@@ -1,21 +1,14 @@
+/**
+ * Assembles a patch from input `spec/` has already validated against the capability catalog, the
+ * only way anything reaches these functions. They check nothing again: the drift guards hold the
+ * catalog and the codec field maps equal, so a key the catalog accepted is a field the codec writes.
+ * What they add is the device's own factory value for every control the caller left out.
+ */
 import type { Patch, BlockParams, PatchSettings } from "./types";
 import { blankPatch } from "./tsl";
-import {
-  PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD, DEFAULT_CHAIN, onlyBlockFor,
-} from "./common";
-import {
-  DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PFX_TYPE_MAPS, FX_PARAM_MAPS,
-  FX_DELAY_TYPE_MAPS, validateChain, type FieldCodec,
-} from "./codec";
-import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES, type ParamDefaults } from "./defaults";
-
-/** Returns a new chain array with `node` relocated to sit immediately before `beforeNode`. */
-const moveBefore = (chain: string[], node: string, beforeNode: string): string[] => {
-  const without = chain.filter(n => n !== node);
-  const index = without.indexOf(beforeNode);
-  if (index < 0) throw new Error(`moveBefore: ${beforeNode} not found in chain`);
-  return [...without.slice(0, index), node, ...without.slice(index)];
-};
+import { PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, DEFAULT_CHAIN } from "./common";
+import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "./defaults";
+import type { ParamDefaults } from "./defaults";
 
 /**
  * The patch-level inputs a spec may carry, each one optional: a blank patch already opens at the
@@ -28,11 +21,7 @@ interface BasePatchOptions extends Partial<PatchSettings> {
 
 const basePatch = (name: string, options: BasePatchOptions = {}): Patch => {
   const patch = blankPatch(name);
-  const chain = options.chain ?? DEFAULT_CHAIN;
-  // The same check `encodeChain` runs at the byte boundary, called here so a bad order is rejected
-  // while the caller still has the spec in hand rather than several blocks later.
-  validateChain(chain);
-  patch.chain = chain;
+  patch.chain = [...(options.chain ?? DEFAULT_CHAIN)];
   patch.memoryLevel = options.memoryLevel ?? patch.memoryLevel;
   patch.bpm = options.bpm ?? patch.bpm;
   patch.key = options.key ?? patch.key;
@@ -42,23 +31,13 @@ const basePatch = (name: string, options: BasePatchOptions = {}): Patch => {
 };
 
 /**
- * Applies one single-shape block's params, giving every control the caller left unset the device's
- * own factory value. Assigning the defaults first rather than only where the block is missing a
- * property is what makes this safe on a patch built up call after call: the block already carries a
- * value for every control, so "unset" has to mean "what the caller supplied", not "what isn't there
- * yet". These blocks have no field map to check names against, so the factory defaults stand in:
- * they cover every control the block has and nothing else.
+ * A type's params at factory values, with what the caller supplied over the top. Built fresh rather
+ * than merged into what the block already holds, so switching a block's type leaves none of the
+ * previous type's fields behind: the types of one block share a byte range, and a stale `pitch` left
+ * over from SHIMMER would read back as a control SUB DELAY does not have.
  */
-const applyBlockParams = (target: BlockParams, block: string, params: BlockParams): void => {
-  const defaults = BLOCK_DEFAULTS[block] ?? {};
-  const valid = new Set(Object.keys(defaults));
-  for (const key of Object.keys(params)) {
-    if (!valid.has(key)) {
-      throw new Error(`${block} param "${key}" is not one of its controls (valid keys: ${[...valid].join(", ")})`);
-    }
-  }
-  Object.assign(target, defaults, params);
-};
+const withDefaults = (defaults: ParamDefaults | undefined, params: BlockParams): BlockParams =>
+  ({ ...defaults, ...params });
 
 interface AmpOptions {
   type: string;
@@ -66,11 +45,14 @@ interface AmpOptions {
   params?: BlockParams;
 }
 
+// The single-shape blocks assign into the params they already hold, since those carry every control
+// the block has whatever it is set to, and every one of them is overwritten here.
+
 const amp = (patch: Patch, options: AmpOptions): void => {
   const { type, on = true, params = {} } = options;
   patch.amp.on = on;
   patch.amp.type = type;
-  applyBlockParams(patch.amp.params, "amp", params);
+  Object.assign(patch.amp.params, BLOCK_DEFAULTS.amp, params);
 };
 
 interface DriveOptions {
@@ -83,66 +65,20 @@ const drive = (patch: Patch, options: DriveOptions): void => {
   const { type, on = true, params = {} } = options;
   patch.drive.on = on;
   patch.drive.type = type;
-  applyBlockParams(patch.drive.params, "drive", params);
+  Object.assign(patch.drive.params, BLOCK_DEFAULTS.drive, params);
 };
 
 /**
- * Resolve an FX type's field map. DELAY is per-sub-algorithm (its fields depend on `subType`);
- * every other FX type has one flat map. Returns undefined when the map isn't known.
+ * The FX param defaults for switching a slot to `fxType`: the device's own factory values, so any
+ * field the caller doesn't set gets a real default instead of inheriting whatever stale raw byte the
+ * slot was carrying, which for a GEQ band reads as -20 dB rather than the 0 dB it ships at. DELAY's
+ * params depend on its sub-algorithm, so its defaults are that sub-algorithm's.
  */
-const fxFieldMap = (fxType: string, subType: string | null): FieldCodec[] | undefined => {
-  if (fxType !== "DELAY") return FX_PARAM_MAPS[fxType];
-  if (subType == null) return undefined;
-  return FX_DELAY_TYPE_MAPS[subType];
+const defaultFxParams = (fxType: string, subType: string | null = null): ParamDefaults => {
+  if (fxType !== "DELAY") return { ...DEFAULTS_BY_TYPE.fx[fxType] };
+  const subDefaults = subType === null ? undefined : DEFAULTS_BY_TYPE.fxDelay[subType];
+  return { ...subDefaults };
 };
-
-/**
- * The FX param defaults for switching a slot to `fxType`: the device's own factory values from
- * DEFAULTS_BY_TYPE, so any field the caller doesn't set gets a real default instead of inheriting
- * whatever stale raw byte the slot was carrying, which for a GEQ band reads as -20 dB rather than
- * the 0 dB it ships at. DELAY is per-sub-algorithm (its defaults live under fxDelay).
- */
-const defaultFxParams = (fxType: string, subType: string | null = null): Record<string, string | number | boolean> => {
-  if (fxType === "DELAY") {
-    const subDefaults = subType == null ? undefined : DEFAULTS_BY_TYPE.fxDelay[subType];
-    return { ...(subDefaults ?? {}) };
-  }
-  return { ...(DEFAULTS_BY_TYPE.fx[fxType] ?? {}) };
-};
-
-/**
- * The field set a block's params are checked against: `fields` are the codec fields of the block's
- * current `type`, and `label` prefixes the error a bad key raises. Every block funnels its named
- * controls and its `params` record through one bag, so this is the only list either is judged by.
- */
-interface ParamKeySpec {
-  label: string;
-  type: string;
-  fields: FieldCodec[] | undefined;
-}
-
-/**
- * Rejects any key that isn't a field of the current type. Without this a typo'd or type-mismatched
- * param writes a byte offset that means something else for this type, and silently corrupts an
- * unrelated field on encode. It is also what stops a named control the type has no field for, such
- * as a TIME on TWIST, from being accepted and then dropped.
- */
-const validateParamKeys = (keys: Iterable<string>, spec: ParamKeySpec): void => {
-  const validNames = new Set((spec.fields ?? []).map(field => field.name));
-  for (const key of keys) {
-    if (!validNames.has(key)) {
-      const valid = [...validNames].join(", ");
-      throw new Error(`${spec.label} param "${key}" is not valid for type "${spec.type}" (valid keys: ${valid})`);
-    }
-  }
-};
-
-/** A ParamKeySpec plus the sub-model selection to fold into the block's params bag. */
-interface SubTypeSpec extends ParamKeySpec {
-  subType?: string | null;
-  /** The params key that carries the selection, absent when the type has no sub-model. */
-  field?: string;
-}
 
 interface FxOptions {
   slot: "fx1" | "fx2" | "fx3";
@@ -159,50 +95,20 @@ interface FxOptions {
  * DELAY with no param defaults at all.
  */
 const selectedSubType = (block: "fx" | "pedalFx", type: string, subType: string | null): string | null => {
-  if (subType != null) return subType;
+  if (subType !== null) return subType;
   const hasSubModels = block === "fx" ? PARAM_SUBTYPE_EFFECTS.has(type) : PFX_SUBTYPE_EFFECTS.has(type);
   if (!hasSubModels) return null;
-  const defaults = block === "fx" ? DEFAULT_SUBTYPES.fx : DEFAULT_SUBTYPES.pedalFx;
-  return defaults?.[type] ?? null;
-};
-
-/**
- * Rejects a sub-model a block cannot store, before it silently does nothing. A type with no
- * sub-model rejects the value rather than dropping it: nothing downstream would encode it, so the
- * patch saves without complaint and plays as the default, which is the one failure a caller cannot
- * see. Naming the selector among the params is rejected on the same terms: a decoded block carries
- * the selection once, under `subType`, and that is the only copy the codec writes from.
- */
-const checkSubType = (params: BlockParams, spec: SubTypeSpec): void => {
-  const { label, type, subType, field } = spec;
-  if (field !== undefined) {
-    if (!(field in params)) return;
-    throw new Error(`${label} sub-model for type "${type}" is set as params.${field}; set it as subType instead`);
-  }
-  if (subType == null) return;
-  const valid = (spec.fields ?? []).map(codecField => codecField.name).join(", ");
-  throw new Error(
-    `${label} type "${type}" has no subType (got "${subType}"); if that names one of this ` +
-    `type's params, pass it in params instead (valid keys: ${valid})`
-  );
+  return DEFAULT_SUBTYPES[block]?.[type] ?? null;
 };
 
 const fx = (patch: Patch, options: FxOptions): void => {
   const { slot, type, subType = null, params = {}, on = true } = options;
-  const onlySlot = onlyBlockFor(type);
-  if (onlySlot !== undefined && onlySlot !== slot) {
-    throw new Error(`${type} is a ${onlySlot} effect; this device has nowhere to store it in ${slot}.`);
-  }
   const selected = selectedSubType("fx", type, subType);
   const block = patch[slot];
   block.on = on;
   block.type = type;
   block.subType = selected;
-  const keySpec: ParamKeySpec = { label: slot, type, fields: fxFieldMap(type, selected) };
-  const field = PARAM_SUBTYPE_EFFECTS.has(type) ? SUB_TYPE_FIELD : undefined;
-  checkSubType(params, { ...keySpec, subType: selected, field });
-  validateParamKeys(Object.keys(params), keySpec);
-  block.params = { ...defaultFxParams(type, selected), ...params };
+  block.params = withDefaults(defaultFxParams(type, selected), params);
 };
 
 interface NoiseGateOptions {
@@ -213,7 +119,7 @@ interface NoiseGateOptions {
 const noiseGate = (patch: Patch, options: NoiseGateOptions): void => {
   const { on = true, params = {} } = options;
   patch.noiseGate.on = on;
-  applyBlockParams(patch.noiseGate.params, "noiseGate", params);
+  Object.assign(patch.noiseGate.params, BLOCK_DEFAULTS.noiseGate, params);
 };
 
 interface VolumeOptions {
@@ -221,34 +127,7 @@ interface VolumeOptions {
 }
 
 const volume = (patch: Patch, options: VolumeOptions): void => {
-  applyBlockParams(patch.volume.params, "volume", options.params ?? {});
-};
-
-/** A ParamKeySpec plus the type's factory values, everything needed to fill a block's params bag. */
-interface BlockTypeSpec extends ParamKeySpec {
-  defaults: ParamDefaults;
-}
-
-/**
- * The params to store for a block's current type: every field of that type at its real factory
- * value, with what the caller supplied over the top.
- *
- * Built fresh rather than merged into what the block already holds, so switching a block's type
- * leaves none of the previous type's fields behind. That matters because the types of one block
- * share a byte range: a stale `pitch` left over from SHIMMER means nothing to SUB DELAY, and the
- * decoded patch would show a control the chosen type does not have.
- *
- * `defaults` covers every field the codec map produces; it is harvested from the same maps and
- * locked to them by the defaults drift guard.
- */
-const typedParams = (params: BlockParams, spec: BlockTypeSpec): BlockParams => {
-  validateParamKeys(Object.keys(params), spec);
-  const factory: BlockParams = {};
-  for (const field of spec.fields ?? []) {
-    const value = spec.defaults[field.name];
-    if (value !== undefined) factory[field.name] = value;
-  }
-  return { ...factory, ...params };
+  Object.assign(patch.volume.params, BLOCK_DEFAULTS.volume, options.params);
 };
 
 interface PedalFxOptions {
@@ -258,24 +137,14 @@ interface PedalFxOptions {
   params?: BlockParams;
 }
 
-/** Sets the expression pedal effect: "WAH" (subType picks the wah model, plus
- *  level/direct/position/min/max) or "PEDAL BEND" (pitchMin/pitchMax/position/level/direct). */
+/** Sets the expression pedal effect: WAH, whose `subType` picks the wah model, or PEDAL BEND. */
 const pedalFx = (patch: Patch, options: PedalFxOptions): void => {
   const { type, subType, params = {}, on = true } = options;
   const block = patch.pedalFx;
   block.on = on;
   block.type = type;
-  const selected = selectedSubType("pedalFx", type, subType ?? null);
-  block.subType = selected;
-  const typeSpec: BlockTypeSpec = {
-    label: "pedalFx",
-    type,
-    fields: PFX_TYPE_MAPS[type],
-    defaults: DEFAULTS_BY_TYPE.pedalFx[type] ?? {},
-  };
-  const field = PFX_SUBTYPE_EFFECTS.has(type) ? SUB_TYPE_FIELD : undefined;
-  checkSubType(params, { ...typeSpec, subType: selected, field });
-  block.params = typedParams(params, typeSpec);
+  block.subType = selectedSubType("pedalFx", type, subType ?? null);
+  block.params = withDefaults(DEFAULTS_BY_TYPE.pedalFx[type], params);
 };
 
 interface DelayOptions {
@@ -287,21 +156,13 @@ interface DelayOptions {
 /**
  * Sets the delay block. Every control is optional because the types disagree about which they have:
  * TWIST has no TIME or FEEDBACK, GLITCH has no FEEDBACK or LEVEL, and WARP has no FEEDBACK or HIGH
- * CUT. Requiring every control would force a caller building those types to invent values the
- * encoder silently drops, so a control the chosen type has no field for is rejected by name instead.
+ * CUT, so a caller building those types never has to invent values for controls they lack.
  */
 const delay = (patch: Patch, options: DelayOptions): void => {
   const { type, on = true, params = {} } = options;
-  const block = patch.delay;
-  block.on = on;
-  block.type = type;
-  const typeSpec: BlockTypeSpec = {
-    label: "delay",
-    type,
-    fields: DELAY_TYPE_MAPS[type],
-    defaults: DEFAULTS_BY_TYPE.delay[type] ?? {},
-  };
-  block.params = typedParams(params, typeSpec);
+  patch.delay.on = on;
+  patch.delay.type = type;
+  patch.delay.params = withDefaults(DEFAULTS_BY_TYPE.delay[type], params);
 };
 
 interface ReverbOptions {
@@ -314,23 +175,13 @@ interface ReverbOptions {
  *  TONE, PRE-DELAY or DIRECT, and SHIMMER has no DENSITY or DIRECT. */
 const reverb = (patch: Patch, options: ReverbOptions): void => {
   const { type, on = true, params = {} } = options;
-  const block = patch.reverb;
-  block.on = on;
-  block.type = type;
-  const fields = (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
-    ? REV_TYPE_MAPS.STANDARD
-    : REV_TYPE_MAPS[type];
-  const typeSpec: BlockTypeSpec = {
-    label: "reverb",
-    type,
-    fields,
-    defaults: DEFAULTS_BY_TYPE.reverb[type] ?? {},
-  };
-  block.params = typedParams(params, typeSpec);
+  patch.reverb.on = on;
+  patch.reverb.type = type;
+  patch.reverb.params = withDefaults(DEFAULTS_BY_TYPE.reverb[type], params);
 };
 
 export {
-  moveBefore, defaultFxParams,
+  defaultFxParams,
   basePatch, amp, drive, fx, noiseGate, volume, pedalFx, delay, reverb,
 };
 export type {

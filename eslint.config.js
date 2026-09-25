@@ -38,6 +38,10 @@ const noEmDash = {
   },
 };
 
+// Both spellings Node accepts for the fs modules, so a bare "fs" can't slip past either rule.
+const fsModules = ['fs', 'node:fs'];
+const allFsModules = [...fsModules, 'fs/promises', 'node:fs/promises'];
+
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/coverage/**'] },
   ...tseslint.configs.strictTypeChecked,
@@ -68,7 +72,7 @@ export default tseslint.config(
         caughtErrorsIgnorePattern: '^_$',
       }],
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
-      'sonarjs/cognitive-complexity': ['error', 10],
+      'sonarjs/cognitive-complexity': ['error', 6],
       'no-nested-ternary': 'error',
       'no-unneeded-ternary': 'error',
       'max-depth': ['error', 4],
@@ -79,6 +83,32 @@ export default tseslint.config(
       'no-restricted-syntax': ['error', {
         selector: ternarySelector,
         message: 'Assign this ternary to a variable before using it.',
+      }],
+      // Every file operation awaits. A sync call blocks the MCP server's one thread, so every other
+      // agent call waits behind a single read, and async is what lets calls on different files
+      // overlap. CPU-bound work with no async counterpart isn't file I/O and isn't touched by this.
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: fsModules,
+          importNamePattern: 'Sync$',
+          message: 'Use the async version from node:fs/promises.',
+        }],
+      }],
+    },
+  },
+  {
+    // Drivers convert bytes and never touch the disk. Core owns every read and write, which is what
+    // lets it lock one file's read-change-write as a unit; a driver doing its own I/O would sit
+    // outside that lock and could lose a concurrent edit. This replaces the rule above for these
+    // files rather than adding to it, which is safe only because banning the modules outright
+    // covers the Sync names too.
+    files: ['core/src/devices/**'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: allFsModules,
+          message: 'A driver converts bytes; file I/O belongs to core patchUtils.',
+        }],
       }],
     },
   },

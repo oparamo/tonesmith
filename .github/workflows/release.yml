@@ -16,21 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      # pnpm's version comes from `packageManager` in the root package.json, as in ci.yml.
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup
+      - uses: changesets/action@v2
         with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - uses: changesets/action@v1
-        with:
-          version: pnpm changeset version
-          publish: pnpm release
-          createGithubReleases: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version-script: pnpm changeset version
+          publish-script: pnpm release
+          create-github-releases: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}

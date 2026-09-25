@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as gx1 from "../../../../src/devices/gx1";
-import { moveBefore } from "../../../../src/devices/gx1/builder";
 import { BLOCK_NAMES, DEFAULT_CHAIN } from "../../../../src/devices/gx1/common";
-import { ROCK_TONES_FIXTURE, patchAt } from "../../../helpers";
+import { ROCK_TONES_FIXTURE, moveBefore, patchAt } from "../../../helpers";
 
 describe("buildPatch", () => {
   it("builds every block the spec names, defaults filled in", () => {
@@ -17,6 +16,18 @@ describe("buildPatch", () => {
     expect(patch.delay.params.time).toBe(400);
     expect(patch.reverb.params.pitch).toBe(12);
     expect(patch.chain).toEqual(DEFAULT_CHAIN);
+  });
+
+  // A TERA ECHO reverb has no TIME, DENSITY or PRE-DELAY. The blank patch's reverb does, and a
+  // patch carrying them would show settings its file never stores.
+  it("builds a type with only the fields that type stores", () => {
+    const patch = gx1.driver.buildPatch({
+      name: "Tera",
+      reverb: { type: "TERA ECHO", params: { level: 60, direct: 100, spreadTime: 50, feedback: 40, trigger: false } },
+    });
+
+    expect(Object.keys(patch.reverb.params)).not.toContain("time");
+    expect(Object.keys(patch.reverb.params)).not.toContain("density");
   });
 
   // A sub-model goes in under one name and has to come back out under the same one, so a caller
@@ -62,8 +73,8 @@ describe("buildPatch", () => {
   // The same round trip over a patch the device itself wrote, which is where it first failed: a
   // tempo-synced delay came back as a code above the param's ceiling and was rejected as a time
   // nobody could have set.
-  it("takes a patch read off the device back as a spec, tempo-synced values included", () => {
-    const read = patchAt(ROCK_TONES_FIXTURE, 0);
+  it("takes a patch read off the device back as a spec, tempo-synced values included", async () => {
+    const read = await patchAt(ROCK_TONES_FIXTURE, 0);
 
     const rebuilt = gx1.driver.buildPatch({ ...read });
 

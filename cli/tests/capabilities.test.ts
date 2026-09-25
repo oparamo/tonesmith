@@ -29,6 +29,13 @@ describe("gx1 capabilities", () => {
     }
   });
 
+  // The name belongs to no block either, and a limit found by being rejected costs a built patch.
+  it("prints the patch name limit alongside the chain", async () => {
+    const output = await capabilitiesOutput("chain");
+
+    expect(output).toContain(String(gx1.driver.capabilities.patchName.maxLength));
+  });
+
   // The settings sit in no group, so the chain view is the only page that can print them.
   it("prints the settings the patch itself holds alongside the chain", async () => {
     const output = await capabilitiesOutput("chain");
@@ -75,6 +82,13 @@ describe("gx1 capabilities", () => {
     expect(output).toContain("HIGH CUT");
     expect(output).toContain("2.5kHz");
     expect(output).toContain("FLAT");
+  });
+
+  it("prints a block control's write key and a sub-algorithm param's", async () => {
+    const [amp, fxDelay] = await Promise.all([capabilitiesOutput("amp"), capabilitiesOutput("fx", "delay")]);
+
+    expect(amp, "the amp's SOLO LEVEL control").toContain("soloLevel");
+    expect(fxDelay, "MODULATE's MOD RATE").toContain("modRate");
   });
 
   it("prints the block controls for a group with no selectable types", async () => {

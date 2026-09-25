@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { readFile } from "../../../src/devices/gx1/tsl";
+import { readFile } from "node:fs/promises";
+import { parseFile } from "../../../src/devices/gx1/tsl";
 import { decodePatch, encodePatch } from "../../../src/devices/gx1/codec";
 import { RAW } from "../../../src/devices/gx1/common";
 import { ROCK_TONES_FIXTURE as FIXTURE, present } from "../../helpers";
 
-const file = readFile(FIXTURE);
-const rawFileContents = readFileSync(FIXTURE, "utf8");
-const raw = JSON.parse(rawFileContents) as {
+const fixtureBytes = await readFile(FIXTURE);
+const file = parseFile(fixtureBytes, FIXTURE);
+const raw = JSON.parse(new TextDecoder().decode(fixtureBytes)) as {
   data: [{ paramSet: Record<string, string[]> }[], unknown[]];
 };
 

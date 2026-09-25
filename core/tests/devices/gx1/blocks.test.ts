@@ -2,12 +2,15 @@ import { describe, it, expect } from "vitest";
 import {
   decodeDelay, encodeDelay, decodeReverb, encodeReverb, decodeChain, encodeChain, decodePedalFx,
   decodeSettings, encodeSettings, decodeNoiseGate, encodeNoiseGate, decodeVolume, encodeVolume, decodeName, encodeName,
+  decodeAmp, encodeAmp,
 } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import {
   DLY_TYPES, REV_TYPES, DLY_TYPE_IDX, REV_TYPE_IDX, PFX_TYPE_IDX, RAW, DEFAULT_CHAIN,
 } from "../../../src/devices/gx1/common";
 import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
+
+const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
 
 // ── Delay block symmetry tests ────────────────────────────────────────────────
 
@@ -348,6 +351,15 @@ describe("Values the device has no byte for", () => {
 
     expect(encodeBadCurve).toThrow(/BOGUS/);
   });
+
+  it("encodeAmp names the control whose value is not a byte", () => {
+    const block = decodeAmp(hexFromBytes(new Array<number>(13).fill(0)));
+    block.params.gain = 500;
+
+    const encodeBadGain = () => encodeAmp(block);
+
+    expect(encodeBadGain).toThrow(/gain/);
+  });
 });
 
 
@@ -361,7 +373,7 @@ describe("Values the device has no byte for", () => {
 // still exercises genuine device data for every field checked below.
 
 describe("Real device values (default-init.tsl)", () => {
-  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const patch = defaultInitPatch;
   const dlyBytes = bytesFromHex(rawBlock(patch, "MEMORY%DLY"));
   const revBytes = bytesFromHex(rawBlock(patch, "MEMORY%REV"));
   const pfxBytes = bytesFromHex(rawBlock(patch, "MEMORY%PFX"));

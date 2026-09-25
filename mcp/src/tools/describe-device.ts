@@ -62,26 +62,13 @@ const viewForEntry = (
   entry: string,
   includeParams: boolean | undefined,
 ): object => {
-  // "chain" carries what belongs to the patch rather than to any group: the name limit, and the
-  // settings written beside the name. A caller asking only for groups would never meet either, and
-  // finding one out by being rejected costs a patch already built.
-  if (entry === "chain") {
-    const { patchName, patchSettings } = capabilities;
-    return { ...capabilities.chain, patchName, patchSettings };
-  }
-
   const { group, type } = splitEntry(entry);
-  const matched = capabilityUtils.findGroup(capabilities, group);
+  const found = capabilityUtils.lookup(capabilities, group, type);
+  if (found.kind === "chain") return found.chain;
+  if (found.kind === "type") return found.type;
 
-  if (type === undefined) {
-    const view = includeParams === true ? fullGroup(matched) : groupIndex(matched);
-    return view;
-  }
-
-  // A block's own controls apply to whichever type is selected, and they live on the group, so a
-  // type view that omitted them would hide every control the block carries outside its types.
-  const found = capabilityUtils.findType(matched, type);
-  return { ...found, params: [...(matched.params ?? []), ...(found.params ?? [])] };
+  const view = includeParams === true ? fullGroup(found.group) : groupIndex(found.group);
+  return view;
 };
 
 /**
@@ -120,7 +107,7 @@ const exampleEntries = (capabilities: DeviceCapabilities): string[] => {
       return entry;
     })
     .slice(0, 2);
-  return ["chain", ...bareGroup, ...namedTypes];
+  return [capabilityUtils.CHAIN_ENTRY, ...bareGroup, ...namedTypes];
 };
 
 const deviceSummary = (capabilities: DeviceCapabilities): object => ({
@@ -144,6 +131,7 @@ const registerDescribeDevice = (server: McpServer): void => {
   server.registerTool(
     "describe_device",
     {
+      title: "Describe device",
       description:
         "Return capability metadata for a device: its signal chain, every block with the types " +
         "and models it offers, and every param with its key, range, and allowed values. Naming " +

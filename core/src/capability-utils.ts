@@ -1,4 +1,10 @@
-import type { DeviceCapabilities, CapabilityGroup, CapabilityType } from "./types";
+import type { DeviceCapabilities, CapabilityGroup, CapabilityType, CapabilityLookup } from "./types";
+
+/**
+ * The name the chain answers to wherever a group id is accepted. It sits beside the groups in every
+ * listing, so it matches the way they do: case-insensitively.
+ */
+const CHAIN_ENTRY = "chain";
 
 /** Case-insensitive lookup; throws when no group matches. */
 const findGroup = (caps: DeviceCapabilities, id: string): CapabilityGroup => {
@@ -27,4 +33,25 @@ const findType = (group: CapabilityGroup, id: string): CapabilityType => {
   return found;
 };
 
-export { findGroup, findType };
+/**
+ * Resolves what a caller asked to see: the chain, a group, or a type within a group. A type id on
+ * the chain is refused, the way an unknown type in a group is, rather than ignored.
+ */
+const lookup = (caps: DeviceCapabilities, groupId: string, typeId?: string): CapabilityLookup => {
+  if (groupId.toLowerCase() === CHAIN_ENTRY) {
+    if (typeId !== undefined) {
+      throw new Error(`The chain has no types, so there is no "${typeId}" to show.`);
+    }
+    const { chain, patchName, patchSettings } = caps;
+    return { kind: "chain", chain: { ...chain, patchName, patchSettings } };
+  }
+
+  const group = findGroup(caps, groupId);
+  if (typeId === undefined) return { kind: "group", group };
+
+  const found = findType(group, typeId);
+  const params = [...(group.params ?? []), ...(found.params ?? [])];
+  return { kind: "type", group, type: { ...found, params } };
+};
+
+export { CHAIN_ENTRY, findGroup, findType, lookup };

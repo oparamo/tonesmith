@@ -10,7 +10,6 @@
  * and paste it into defaults.ts.
  */
 import { describe, it, expect } from "vitest";
-import { blankPatch } from "../../../src/devices/gx1/tsl";
 import { decodeFxParams } from "../../../src/devices/gx1/codec/fx-params";
 import { decodeDelay, decodeReverb, decodePedalFx } from "../../../src/devices/gx1/codec/blocks";
 import { bytesFromHex, hexFromBytes, lookupIndex } from "../../../src/devices/gx1/codec/primitives";
@@ -22,6 +21,8 @@ import {
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../../../src/devices/gx1/defaults";
 import type { Patch } from "../../../src/devices/gx1/types";
 import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../../helpers";
+
+const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
 
 // The FX-slot DELAY's sub-algorithm selector, at absolute offset 212 within the FX block (FORMAT.md).
 const FX_DELAY_SUBALGO_OFFSET = 212;
@@ -134,7 +135,7 @@ const harvestBlockDefaults = (patch: Patch): Record<string, ParamDefaults> =>
 const SINGLE_SHAPE_BLOCKS = ["amp", "drive", "noiseGate", "volume"] as const;
 
 describe("GX-1 defaults ↔ fixture drift guard", () => {
-  const patch = patchAt(DEFAULT_INIT_FIXTURE);
+  const patch = defaultInitPatch;
 
   it("DEFAULTS_BY_TYPE matches the factory defaults harvested from default-init.tsl", () => {
     expect(DEFAULTS_BY_TYPE).toEqual(harvestDefaults(patch));
@@ -146,29 +147,5 @@ describe("GX-1 defaults ↔ fixture drift guard", () => {
 
   it("BLOCK_DEFAULTS matches the single-shape blocks in default-init.tsl", () => {
     expect(BLOCK_DEFAULTS).toEqual(harvestBlockDefaults(patch));
-  });
-
-  // A blank patch is documented as opening at the device's factory defaults, and create_patch_file
-  // hands that straight to a caller. A drift here would have the amp open on at TRNSPRNT with LEVEL
-  // 100, and the OD/DS block open all-zeroed, which decodes as MID BOOST at drive 0 and tone -50.
-  it("blankPatch opens the single-shape blocks at those same defaults", () => {
-    const blank = blankPatch("Blank");
-
-    for (const block of SINGLE_SHAPE_BLOCKS) {
-      expect(blank[block], `${block} should open at its factory default`).toEqual(patch[block]);
-    }
-  });
-
-  // These blocks are preserved verbatim rather than decoded, so the guard reads their bytes. Zero
-  // is a value here, not an absence: it sets memoryLevel to a silent 0 and bpm to 0, below the 40
-  // the device accepts, and leaves every footswitch and assign slot unassigned.
-  it("blankPatch opens the undecoded fixed-shape blocks at the factory bytes", () => {
-    const blank = blankPatch("Blank");
-    const assignSlots = Array.from({ length: 8 }, (_, slot) => `MEMORY%ASGN${slot + 1}`);
-
-    for (const key of ["MEMORY%OTHER", "MEMORY%CTL", ...assignSlots]) {
-      expect(rawBlock(blank, key), `${key} should open at its factory bytes`)
-        .toEqual(rawBlock(patch, key));
-    }
   });
 });

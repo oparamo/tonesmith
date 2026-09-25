@@ -382,8 +382,8 @@ describe("applyEdits reads each block's selection off the patch it just edited",
  * carrying values nobody chose.
  */
 describe("applyEdits survives the round trip through the device's own bytes", () => {
-  it("reads a switched slot back as the type and values the edit asked for", () => {
-    const patch = patchAt(ROCK_TONES_FIXTURE);
+  it("reads a switched slot back as the type and values the edit asked for", async () => {
+    const patch = await patchAt(ROCK_TONES_FIXTURE);
 
     applyTo(patch, { "fx1.type": "DELAY", "fx1.subType": "STANDARD", "fx1.params.time": 400 });
     const reread = gx1.driver.decodePatch(gx1.driver.encodePatch(patch));

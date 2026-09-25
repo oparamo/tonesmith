@@ -27,7 +27,7 @@ import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../s
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../src/devices/gx1/codec/fx-params";
 import {
   PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PATCH_SETTING_FIELDS,
-  decodeAmp, decodeDrive, decodeNoiseGate, decodeVolume,
+  decodeAmp, decodeDrive, decodeNoiseGate, decodeVolume, fieldsFor,
 } from "../../../src/devices/gx1/codec/blocks";
 import { hexFromBytes } from "../../../src/devices/gx1/codec/primitives";
 import type { CapabilityType, ParamSpec, PatchSpecExample } from "../../../src/types";
@@ -248,9 +248,8 @@ describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
   });
 });
 
-// Single-shape blocks are hand-decoded, so capabilities derives their param `key` from the catalog
-// label rather than reading it off a codec field map. That derivation is only safe if every key it
-// produces is a field the decoder actually emits, which is what this checks.
+// Every key capabilities stamps on a single-shape block's params has to be a field its decoder
+// actually emits, or a write naming that key lands nowhere.
 describe("GX-1 single-shape block param keys name a real decoded field", () => {
   const decodedBlocks = {
     amp: decodeAmp(hexFromBytes(new Array<number>(13).fill(0))),
@@ -281,8 +280,9 @@ describe("GX-1 single-shape block param keys name a real decoded field", () => {
 // bug) and the trigger/solo drift between strings, numbers, and booleans, all without a
 // hand-maintained list, so a new effect/field can't silently reintroduce the class. An
 // `indexTable` field is the one exception, since its mixed string/number table answers to no
-// single kind. (amp/odds/ns/fv are hand-decoded, not FieldCodec maps, so they're covered by their
-// own round-trip guards above rather than here.)
+// single kind.
+
+const SINGLE_SHAPE_BLOCKS = ["amp", "drive", "noiseGate", "volume"] as const;
 
 const NUMERIC_KINDS = new Set(["u8", "signed", "scaled", "nibblePair", "nibbleQuad"]);
 
@@ -335,6 +335,15 @@ const assertRepresentationParity = (block: PerTypeBlock, type: string, field: Fi
 describe("GX-1 codec ↔ catalog representation parity", () => {
   it.each(representationChecks)("$title", ({ block, type, field }) => {
     assertRepresentationParity(block, type, field);
+  });
+
+  it.each(SINGLE_SHAPE_BLOCKS)("%s", (block) => {
+    for (const field of fieldsFor(block) ?? []) {
+      const param = PARAMS_BY_BLOCK[block].find(candidate => normalize(candidate.name) === normalize(field.name));
+      expect(param, `${block} catalog has no param for codec field "${field.name}"`).toBeDefined();
+      expect(codecClass(field), `${block} field "${field.name}"`).toBe(param?.kind);
+      if (param?.kind === "discrete") expect([...(field.table ?? [])]).toEqual([...param.values]);
+    }
   });
 });
 

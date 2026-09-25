@@ -7,6 +7,7 @@ const registerCopyPatch = (server: McpServer): void => {
   server.registerTool(
     "copy_patch",
     {
+      title: "Copy patch",
       description:
         "Copy one patch into a slot in another patch file, replacing whatever sits there. Both " +
         "files must already exist. To add a patch without displacing one, build it with " +
@@ -23,11 +24,11 @@ const registerCopyPatch = (server: McpServer): void => {
       }),
       // Replacing the patch in the destination slot is the whole operation, so it is destructive
       // by design rather than by accident.
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    ({ device, src, srcRef, dst, dstRef }) => attempt(() => {
+    ({ device, src, srcRef, dst, dstRef }) => attempt(async () => {
       const driver = registry.getDriver(device);
-      const copied = patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
+      const copied = await patchUtils.copyPatch(driver, { src, srcRef, dst, dstRef });
       return ok(
         `Copied "${copied.name}" from ${src} patch ${copied.fromIndex} into ${dst} patch ${copied.toIndex}.`
       );

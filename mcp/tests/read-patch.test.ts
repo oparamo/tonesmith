@@ -7,10 +7,10 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
-import { gx1 } from "@tonesmith/core";
+import { gx1, patchUtils } from "@tonesmith/core";
 import { connectClient, emptyTempDir, present, FIXTURE } from "./helpers";
 
-const expected = gx1.driver.readFile(FIXTURE);
+const expected = await patchUtils.readPatchFile(gx1.driver, FIXTURE);
 
 interface PageResponse {
   setName: string;
@@ -84,10 +84,10 @@ describe("read_patch", () => {
   // A device library runs to hundreds of patches at roughly 1.4 KB each decoded, which is a
   // response no caller asked for and some clients refuse outright.
   it("returns a bounded page of a large file, saying how many there are and how to reach the rest", async () => {
-    const temp = emptyTempDir();
+    const temp = await emptyTempDir();
     const file = join(temp.dir, "library.tsl");
     const client = await connectClient();
-    close = async () => { await client.close(); temp.cleanup(); };
+    close = async () => { await client.close(); await temp.cleanup(); };
     await client.callTool("create_patch_file", { device: "gx1", file, patchCount: 25 });
 
     const { text, isError } = await client.callTool("read_patch", { device: "gx1", file });

@@ -6,6 +6,7 @@ const registerListDevices = (server: McpServer): void => {
   server.registerTool(
     "list_devices",
     {
+      title: "List devices",
       description: "List all supported guitar processor devices and their IDs.",
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

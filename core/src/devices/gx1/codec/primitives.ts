@@ -46,17 +46,35 @@ const lookupName = (table: readonly string[], index: number, label = ""): string
 /** Matches a `lookupName` sentinel and captures the index it was built from. */
 const SENTINEL_INDEX = /^UNKNOWN_.*?(-?\d+)$/;
 
+/** The index a `lookupName` sentinel was built from, or undefined for anything else. */
+const sentinelIndex = (value: unknown): number | undefined => {
+  const digits = typeof value === "string" ? SENTINEL_INDEX.exec(value)?.[1] : undefined;
+  const index = digits === undefined ? undefined : Number(digits);
+  return index;
+};
+
 /**
  * The inverse of `lookupName`, sentinel included: a name invented for an index outside the table
  * reads back as that index, so a byte this codec cannot name still survives a round trip. Any
  * other unknown name throws, since there is no byte to write for it.
  */
 const lookupIndex = (tableMap: Record<string, number>, name: string, label = ""): number => {
-  const index = tableMap[name];
-  if (index !== undefined) return index;
-  const sentinel = SENTINEL_INDEX.exec(name)?.[1];
-  if (sentinel === undefined) throw new Error(`Unknown ${label}: "${name}"`);
-  return Number(sentinel);
+  const index = tableMap[name] ?? sentinelIndex(name);
+  if (index === undefined) throw new Error(`Unknown ${label}: "${name}"`);
+  return index;
+};
+
+/**
+ * `lookupIndex` for a field codec, which holds its table as a list: a value's position in `table`,
+ * or the index a sentinel was built from. A file can carry a byte past the end of any table, and
+ * every save re-encodes every patch in the file, so a sentinel this refused would leave the whole
+ * file unsaveable, whichever patch the save was for.
+ */
+const tableIndex = (table: readonly (string | number)[], value: unknown, label: string): number => {
+  const position = table.indexOf(value as string | number);
+  const index = position >= 0 ? position : sentinelIndex(value);
+  if (index === undefined) throw new Error(`Unknown ${label} value: ${JSON.stringify(value)}`);
+  return index;
 };
 
 /**
@@ -70,5 +88,5 @@ const toUnsigned = (value: number, center = 50): number => value + center;
 
 export {
   bytesFromHex, hexFromBytes, byteAt, byteReader,
-  lookupName, lookupIndex, shownValue, toSigned, toUnsigned,
+  lookupName, lookupIndex, tableIndex, shownValue, toSigned, toUnsigned,
 };

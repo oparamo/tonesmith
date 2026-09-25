@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { blankPatch, newFile, readFile, writeFile } from "../../../src/devices/gx1/tsl";
+import { readFile } from "node:fs/promises";
+import { blankPatch, newFile, parseFile, serializeFile } from "../../../src/devices/gx1/tsl";
 import { RAW } from "../../../src/devices/gx1/common";
+import { DEFAULTS_BY_TYPE } from "../../../src/devices/gx1/defaults";
 import {
-  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES,
-  present, scratchDir, scratchFile,
+  ROCK_TONES_FIXTURE as FIXTURE, ROCK_TONES_SET_NAME, ROCK_TONES_PATCH_NAMES, DEFAULT_INIT_FIXTURE, present,
 } from "../../helpers";
 
 describe("blankPatch", () => {
@@ -29,6 +28,29 @@ describe("blankPatch", () => {
     expect(patch.amp).toMatchObject({ on: false, type: "NATURAL" });
     expect(patch.noiseGate.on).toBe(false);
     expect(patch.drive).toMatchObject({ on: false, type: "OVERDRIVE" });
+  });
+
+  // A block left out of a spec keeps what the blank patch opened with, and is switched on later
+  // with it, so every block has to open at the device's own values rather than zeros.
+  it("carries the device's factory-default patch byte for byte, apart from its name", async () => {
+    const factory = present(parseFile(await readFile(DEFAULT_INIT_FIXTURE), "default-init").patches[0], "the factory patch");
+    const name = "INIT MEMORY";
+
+    const blank = blankPatch(name);
+
+    expect(factory.name).toBe(name);
+    expect(blank[RAW]).toEqual(factory[RAW]);
+  });
+
+  it("opens every block that has types at that type's factory defaults", () => {
+    const patch = blankPatch();
+
+    expect(patch.delay.params).toEqual(DEFAULTS_BY_TYPE.delay[patch.delay.type]);
+    expect(patch.reverb.params).toEqual(DEFAULTS_BY_TYPE.reverb[patch.reverb.type]);
+    expect(patch.pedalFx.params).toEqual(DEFAULTS_BY_TYPE.pedalFx[patch.pedalFx.type]);
+    for (const slot of ["fx1", "fx2", "fx3"] as const) {
+      expect(patch[slot].params, slot).toEqual(DEFAULTS_BY_TYPE.fx[patch[slot].type]);
+    }
   });
 });
 
@@ -56,22 +78,22 @@ describe("newFile", () => {
   });
 });
 
-describe("readFile", () => {
-  it("returns the set and every patch the fixture holds, in file order", () => {
-    const file = readFile(FIXTURE);
+describe("parseFile", () => {
+  it("returns the set and every patch the fixture holds, in file order", async () => {
+    const file = parseFile(await readFile(FIXTURE), FIXTURE);
 
     expect(file.name).toBe(ROCK_TONES_SET_NAME);
     expect(file.patches.map(patch => patch.name)).toEqual(ROCK_TONES_PATCH_NAMES);
   });
 
-  it("attaches the raw envelope via RAW symbol", () => {
-    const file = readFile(FIXTURE);
+  it("attaches the raw envelope via RAW symbol", async () => {
+    const file = parseFile(await readFile(FIXTURE), FIXTURE);
 
     expect(file[RAW].device).toBe("GX-1");
   });
 
-  it("names the driver that read it", () => {
-    const file = readFile(FIXTURE);
+  it("names the driver that read it", async () => {
+    const file = parseFile(await readFile(FIXTURE), FIXTURE);
 
     expect(file.device).toBe("gx1");
   });
@@ -80,60 +102,49 @@ describe("readFile", () => {
   // a TypeError from whichever field the codec reaches for first, naming neither the file nor
   // what is wrong with it.
   describe("a file that is not one of this device's", () => {
-    const badPath = scratchFile("not-a-patch-file.tsl");
-
-    const readWritten = (contents: unknown) => {
-      writeFileSync(badPath(), JSON.stringify(contents));
-      return () => readFile(badPath());
-    };
+    const parseGiven = (contents: unknown) => () =>
+      parseFile(new TextEncoder().encode(JSON.stringify(contents)), "not-a-patch-file.tsl");
 
     it("rejects JSON that is not a patch file at all", () => {
-      const read = readWritten({ hello: "world" });
+      const parse = parseGiven({ hello: "world" });
 
-      expect(read).toThrow(badPath());
+      expect(parse).toThrow("not-a-patch-file.tsl");
     });
 
     it("rejects a file another device wrote, naming the device it holds", () => {
-      const read = readWritten({ name: "Set", formatRev: "0000", device: "GT-1000", data: [[], []] });
+      const parse = parseGiven({ name: "Set", formatRev: "0000", device: "GT-1000", data: [[], []] });
 
-      expect(read).toThrow(/GT-1000/);
+      expect(parse).toThrow(/GT-1000/);
     });
 
     it("rejects a patch missing a block the codec reads", () => {
       const patch = { paramSet: { "MEMORY%COM": ["41"] } };
-      const read = readWritten({ name: "Set", formatRev: "0000", device: "GX-1", data: [[patch], []] });
+      const parse = parseGiven({ name: "Set", formatRev: "0000", device: "GX-1", data: [[patch], []] });
 
-      expect(read).toThrow(/MEMORY%/);
+      expect(parse).toThrow(/MEMORY%/);
     });
   });
 });
 
-describe("writeFile + readFile round-trip", () => {
-  const scratch = scratchDir();
-  const tmpPath = (): string => join(scratch(), "written-set.tsl");
+describe("serializeFile + parseFile round-trip", () => {
+  it("round-trips with identical patch names", async () => {
+    const original = parseFile(await readFile(FIXTURE), FIXTURE);
 
-  it("written file can be read back with identical patch names", () => {
-    const original = readFile(FIXTURE);
-
-    writeFile(original, tmpPath());
-    const reloaded = readFile(tmpPath());
+    const reloaded = parseFile(serializeFile(original), "round-trip");
 
     const reloadedNames = reloaded.patches.map(patch => patch.name);
     const originalNames = original.patches.map(patch => patch.name);
     expect(reloadedNames).toEqual(originalNames);
   });
 
-  it("written file preserves all paramSet keys byte-for-byte", () => {
-    const original = readFile(FIXTURE);
+  it("preserves all paramSet keys byte-for-byte", async () => {
+    const fixtureBytes = await readFile(FIXTURE);
+    const original = parseFile(fixtureBytes, FIXTURE);
 
-    writeFile(original, tmpPath());
-
-    const origFileContents = readFileSync(FIXTURE, "utf8");
-    const origRaw = JSON.parse(origFileContents) as {
+    const origRaw = JSON.parse(new TextDecoder().decode(fixtureBytes)) as {
       data: [{ paramSet: Record<string, string[]> }[], unknown[]];
     };
-    const writtenFileContents = readFileSync(tmpPath(), "utf8");
-    const writtenRaw = JSON.parse(writtenFileContents) as typeof origRaw;
+    const writtenRaw = JSON.parse(new TextDecoder().decode(serializeFile(original))) as typeof origRaw;
 
     for (const [index, originalPatch] of origRaw.data[0].entries()) {
       const writtenParamSet = present(writtenRaw.data[0][index], `written patch ${index}`).paramSet;
@@ -146,30 +157,19 @@ describe("writeFile + readFile round-trip", () => {
   it("writes a blank file and reads it back", () => {
     const file = newFile("Test Set", 2);
 
-    writeFile(file, tmpPath());
-    const reloaded = readFile(tmpPath());
+    const reloaded = parseFile(serializeFile(file), "round-trip");
 
     expect(reloaded.patches).toHaveLength(2);
     expect(reloaded.name).toBe("Test Set");
   });
 
-  // PatchDriver.writeFile takes a device-agnostic PatchFile, which anyone can assemble by hand;
-  // this writer starts from the bytes the file was read as and has none for such a file.
-  it("refuses a file it never read, naming the path and the reason", () => {
+  // PatchDriver.serializeFile takes a device-agnostic PatchFile, which anyone can assemble by
+  // hand; this writer starts from the bytes the file was parsed from and has none for such a file.
+  it("refuses a file it never parsed", () => {
     const assembled = { name: "Set", device: "GX-1", patches: newFile("Set", 1).patches };
 
-    const writeAssembled = () => { writeFile(assembled, tmpPath()); };
+    const serializeAssembled = () => serializeFile(assembled);
 
-    expect(writeAssembled).toThrow(tmpPath());
-    expect(existsSync(tmpPath()), "nothing written").toBe(false);
-  });
-
-  it("creates missing parent directories", () => {
-    const nestedPath = join(scratch(), "sub", "patch.tsl");
-    const file = newFile("Nested Set", 1);
-
-    writeFile(file, nestedPath);
-
-    expect(existsSync(nestedPath)).toBe(true);
+    expect(serializeAssembled).toThrow();
   });
 });

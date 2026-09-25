@@ -10,21 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      # pnpm's version comes from `packageManager` in the root package.json. That field and this
-      # action's `version` input are mutually exclusive: setting both fails the job.
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm coverage
 
-      # tools/ is outside the workspace builds, so nothing above type-checks or runs it.
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
       - run: pnpm exec tsc --noEmit -p tools/tsconfig.json
       - run: pnpm test:tools

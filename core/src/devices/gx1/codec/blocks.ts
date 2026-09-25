@@ -1,27 +1,27 @@
 import {
   AMP_TYPES, AMP_TYPE_IDX,
-  SP_TYPES, SP_TYPE_IDX,
-  MIC_TYPES, MIC_TYPE_IDX,
+  SP_TYPES,
+  MIC_TYPES,
   ODDS_TYPES, ODDS_IDX,
   DLY_TYPES, DLY_TYPE_IDX,
   REV_TYPES, REV_TYPE_IDX,
   PFX_TYPES, PFX_TYPE_IDX, WAH_TYPES,
   CHAIN_SLOT_ORDER, CHAIN_VALUE_TO_BLOCK, CHAIN_BLOCK_TO_VALUE, CHAIN_TERMINATOR, DEFAULT_CHAIN,
-  NS_DETECT, NS_DETECT_IDX, FV_CURVE, FV_CURVE_IDX, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES,
-  FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW, TIME_NOTE_VALUES,
+  NS_DETECT, FV_CURVE, TWIST_MODES, SPACE_ECHO_HEAD, KEY_NAMES,
+  FREQ_HIGH_CUT, NAME_BYTES, LAST_STORABLE_CHAR, charsAbove, RAW, TIME_NOTE_VALUES, SUB_TYPE_FIELD,
 } from "../common";
 import type {
-  FxBlock, DriveBlock, AmpBlock, NoiseGateBlock, VolumeBlock, DelayBlock, ReverbBlock,
-  PedalFxBlock, PatchSettings,
+  FxBlock, DriveBlock, DriveParams, AmpBlock, AmpParams, NoiseGateBlock, NoiseGateParams,
+  VolumeBlock, VolumeParams, DelayBlock, ReverbBlock, PedalFxBlock, PatchSettings,
 } from "../types";
 import {
-  bytesFromHex, hexFromBytes, byteReader, lookupName, lookupIndex, toSigned, toUnsigned,
+  bytesFromHex, hexFromBytes, byteReader, lookupName, lookupIndex,
 } from "./primitives";
 import {
   u8, signed, lookup, bool, scaled, nibblePair, nibbleQuad, namedAbove, syncedTime,
   decodeFields, encodeFields, liftSubType, withStoredSubType, type FieldCodec,
 } from "./fields";
-import { decodeFxType, encodeFxType } from "./fx-params";
+import { decodeFxType, encodeFxType, fxFieldsFor } from "./fx-params";
 
 // ── Name block ────────────────────────────────────────────────────────────────
 
@@ -177,141 +177,102 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
 };
 
 
-// ── AMP block (13 bytes) ──────────────────────────────────────────────────────
+// ── Single-shape blocks: AMP, OD/DS, NS, FV ───────────────────────────────────
 //
-// Layout: [on, type, type_bass, gain, level, bass, middle, treble, speaker,
-//          sp_type_bass, mic, solo, soloLevel]
-// Bytes 2 and 9 are the bass-mode mirrors of type/speaker, out of scope in guitar
-// mode, same pattern as FX_COM's byte 2 (see decodeFxCom below).
+// Each holds one fixed set of controls whatever else the patch does. Bytes before the first
+// control are the block's own on/type selectors, read and written by the decoders below.
+//
+// AMP:   [on, type, type_bass, gain, level, bass, middle, treble, speaker, sp_type_bass, mic, solo,
+//         soloLevel]. Bytes 2 and 9 are the bass-mode mirrors of type and speaker, out of scope in
+//         guitar mode, the same pattern as FX_COM's byte 2.
+// OD/DS: [on, type, drive, tone, level, direct, solo, soloLevel]
+// NS:    [on, threshold, release, detect]
+// FV:    [position, min, max, curve]; no on/off byte, since the block is always in the signal.
+
+const AMP_FIELDS: FieldCodec[] = [
+  u8("gain", 3), u8("level", 4), u8("bass", 5), u8("middle", 6), u8("treble", 7),
+  lookup("speaker", 8, SP_TYPES), lookup("mic", 10, MIC_TYPES), bool("solo", 11), u8("soloLevel", 12),
+];
+
+const DRIVE_FIELDS: FieldCodec[] = [
+  u8("drive", 2), signed("tone", 3), u8("level", 4), u8("direct", 5), bool("solo", 6), u8("soloLevel", 7),
+];
+
+const NOISE_GATE_FIELDS: FieldCodec[] = [
+  u8("threshold", 1), u8("release", 2), lookup("detect", 3, NS_DETECT),
+];
+
+/** The FV byte holding the curve, which a 3-byte FV block has no room for. */
+const CURVE_BYTE = 3;
+
+const VOLUME_FIELDS: FieldCodec[] = [
+  u8("position", 0), u8("min", 1), u8("max", 2), lookup("curve", CURVE_BYTE, FV_CURVE),
+];
+
+/** The curve a 3-byte FV block plays with, having no byte to store another. */
+const DEFAULT_CURVE = "NORMAL";
+
+/** The FV fields a block of this length can store: all of them, or all but the curve. */
+const volumeFieldsIn = (bytes: number[]): FieldCodec[] =>
+  bytes.length > CURVE_BYTE ? VOLUME_FIELDS : VOLUME_FIELDS.filter(field => field.name !== "curve");
+
+// The params casts below are what the field list decodes to: the drift guards pin each list to the
+// block's catalog params, which the block types mirror.
 
 const decodeAmp = (hexList: string[]): AmpBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "AMP");
-  return {
-    on:   Boolean(at(0)),
-    type: lookupName(AMP_TYPES, at(1)),
-    params: {
-      gain:      at(3),
-      level:     at(4),
-      bass:      at(5),
-      middle:    at(6),
-      treble:    at(7),
-      speaker:   lookupName(SP_TYPES,  at(8)),
-      mic:       lookupName(MIC_TYPES, at(10)),
-      solo:      Boolean(at(11)),
-      soloLevel: at(12),
-    },
-    [RAW]: bytes,
-  };
+  const params = decodeFields(AMP_FIELDS, bytes) as AmpParams;
+  return { on: Boolean(at(0)), type: lookupName(AMP_TYPES, at(1)), params, [RAW]: bytes };
 };
 
 const encodeAmp = (block: AmpBlock): string[] => {
   const bytes = [...block[RAW]];
-  const { params } = block;
-  bytes[0]  = Number(block.on);
-  bytes[1]  = lookupIndex(AMP_TYPE_IDX, block.type,     "AMP type");
-  bytes[3]  = params.gain;
-  bytes[4]  = params.level;
-  bytes[5]  = params.bass;
-  bytes[6]  = params.middle;
-  bytes[7]  = params.treble;
-  bytes[8]  = lookupIndex(SP_TYPE_IDX,  params.speaker, "SP type");
-  bytes[10] = lookupIndex(MIC_TYPE_IDX, params.mic,     "MIC type");
-  bytes[11] = Number(params.solo);
-  bytes[12] = params.soloLevel;
+  bytes[0] = Number(block.on);
+  bytes[1] = lookupIndex(AMP_TYPE_IDX, block.type, "AMP type");
+  encodeFields(AMP_FIELDS, block.params, bytes);
   return hexFromBytes(bytes);
 };
-
-
-// ── OD/DS block (8 bytes) ─────────────────────────────────────────────────────
-//
-// Layout: [on, type, drive, tone(signed), level, direct, solo, soloLevel]
 
 const decodeDrive = (hexList: string[]): DriveBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "OD/DS");
-  return {
-    on:   Boolean(at(0)),
-    type: lookupName(ODDS_TYPES, at(1)),
-    params: {
-      drive:     at(2),
-      tone:      toSigned(at(3)),
-      level:     at(4),
-      direct:    at(5),
-      solo:      Boolean(at(6)),
-      soloLevel: at(7),
-    },
-    [RAW]: bytes,
-  };
+  const params = decodeFields(DRIVE_FIELDS, bytes) as DriveParams;
+  return { on: Boolean(at(0)), type: lookupName(ODDS_TYPES, at(1)), params, [RAW]: bytes };
 };
 
 const encodeDrive = (block: DriveBlock): string[] => {
   const bytes = [...block[RAW]];
-  const { params } = block;
   bytes[0] = Number(block.on);
   bytes[1] = lookupIndex(ODDS_IDX, block.type, "OD/DS type");
-  bytes[2] = params.drive;
-  bytes[3] = toUnsigned(params.tone);
-  bytes[4] = params.level;
-  bytes[5] = params.direct;
-  bytes[6] = Number(params.solo);
-  bytes[7] = params.soloLevel;
+  encodeFields(DRIVE_FIELDS, block.params, bytes);
   return hexFromBytes(bytes);
 };
-
-
-// ── NS (noise suppressor) block (4 bytes) ─────────────────────────────────────
 
 const decodeNoiseGate = (hexList: string[]): NoiseGateBlock => {
   const bytes = bytesFromHex(hexList);
   const at = byteReader(bytes, "NS");
-  return {
-    on: Boolean(at(0)),
-    params: {
-      threshold: at(1),
-      release:   at(2),
-      detect:    lookupName(NS_DETECT, at(3)),
-    },
-    [RAW]: bytes,
-  };
+  const params = decodeFields(NOISE_GATE_FIELDS, bytes) as NoiseGateParams;
+  return { on: Boolean(at(0)), params, [RAW]: bytes };
 };
 
 const encodeNoiseGate = (block: NoiseGateBlock): string[] => {
   const bytes = [...block[RAW]];
-  const { params } = block;
   bytes[0] = Number(block.on);
-  bytes[1] = params.threshold;
-  bytes[2] = params.release;
-  bytes[3] = lookupIndex(NS_DETECT_IDX, params.detect, "NS detect");
+  encodeFields(NOISE_GATE_FIELDS, block.params, bytes);
   return hexFromBytes(bytes);
 };
 
-
-// ── FV (foot volume) block (3–4 bytes) ───────────────────────────────────────
-
 const decodeVolume = (hexList: string[]): VolumeBlock => {
   const bytes = bytesFromHex(hexList);
-  const at = byteReader(bytes, "FV");
-  const curve = bytes.length > 3 ? lookupName(FV_CURVE, at(3)) : "NORMAL";
-  return {
-    params: {
-      position: at(0),
-      min:      at(1),
-      max:      at(2),
-      curve,
-    },
-    [RAW]: bytes,
-  };
+  const decoded = decodeFields(volumeFieldsIn(bytes), bytes);
+  const params = { ...decoded, curve: decoded.curve ?? DEFAULT_CURVE } as VolumeParams;
+  return { params, [RAW]: bytes };
 };
 
 const encodeVolume = (block: VolumeBlock): string[] => {
   const bytes = [...block[RAW]];
-  const { params } = block;
-  bytes[0] = params.position;
-  bytes[1] = params.min;
-  bytes[2] = params.max;
-  // A 3-byte FV block predates the curve control and has no byte to write it to.
-  if (bytes.length > 3) bytes[3] = lookupIndex(FV_CURVE_IDX, params.curve, "FV curve");
+  encodeFields(volumeFieldsIn(bytes), block.params, bytes);
   return hexFromBytes(bytes);
 };
 
@@ -319,8 +280,7 @@ const encodeVolume = (block: VolumeBlock): string[] => {
 // ── FX_COM block (on/type header + bass-mode type mirror, 3 bytes) ────────────
 //
 // Byte 2 is the bass-mode mirror of byte 1's type selector and never carries a subtype for any
-// effect. Effects that have their own sub-model (COMPRESSOR, LIMITER, AC RESO, CHORUS,
-// CLASSIC-VIBE, HUMANIZER, OD/DS) store it in the FX param block itself (see
+// effect. An effect with its own sub-model stores it in the FX param block itself (see
 // PARAM_SUBTYPE_EFFECTS in common/constants.ts), not here. Out of scope in guitar mode, so
 // byte 2 is always passed through untouched.
 
@@ -474,7 +434,7 @@ const encodeReverb = (block: ReverbBlock): string[] => {
 
 const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "WAH": [
-    lookup("subType", 2, WAH_TYPES), u8("level", 4), u8("direct", 5),
+    lookup(SUB_TYPE_FIELD, 2, WAH_TYPES), u8("level", 4), u8("direct", 5),
     u8("position", 6), u8("min", 7), u8("max", 8),
   ],
   "PEDAL BEND": [
@@ -509,7 +469,29 @@ const encodePedalFx = (block: PedalFxBlock): string[] => {
   return hexFromBytes(bytes);
 };
 
+// ── Field lists by block ──────────────────────────────────────────────────────
+
+const SINGLE_SHAPE_FIELDS: Partial<Record<string, FieldCodec[]>> = {
+  amp: AMP_FIELDS, drive: DRIVE_FIELDS, noiseGate: NOISE_GATE_FIELDS, volume: VOLUME_FIELDS,
+};
+
+/**
+ * The field list a block's params are read and written through, by capability group id: the
+ * block's one list, or the list for the type it is set to (and for an fx slot's DELAY, its
+ * sub-algorithm). Undefined where the codec has no list for that selection.
+ */
+const fieldsFor = (group: string, type = "", subType: string | null = null): FieldCodec[] | undefined => {
+  switch (group) {
+    case "fx": return fxFieldsFor(type, subType ?? "");
+    case "pedalFx": return PFX_TYPE_MAPS[type];
+    case "delay": return DELAY_TYPE_MAPS[type];
+    case "reverb": return reverbFields(type);
+    default: return SINGLE_SHAPE_FIELDS[group];
+  }
+};
+
 export {
+  fieldsFor,
   decodeName, encodeName,
   decodeSettings, encodeSettings, PATCH_SETTING_FIELDS,
   decodeChain, encodeChain, validateChain,
