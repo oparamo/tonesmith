@@ -1,3 +1,5 @@
+// The composition root: the one place the roster is registered and the public surface assembled.
+// Drivers don't register themselves, so importing a device module has no side effect.
 import { drivers } from "./device";
 import { registerDriver } from "./service/registry";
 

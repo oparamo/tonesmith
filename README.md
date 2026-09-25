@@ -137,16 +137,10 @@ pnpm doc-to-md <url> -o out.md         # write to a file instead
 pnpm doc-to-md manual.pdf -o out.md    # local PDF manual to Markdown
 ```
 
-## Repository layout
+## Architecture
 
-```tree
-core/            @tonesmith/core: device-agnostic types, registry, and utils; one driver per device under src/devices/<id>/
-cli/             @tonesmith/cli:  commands and printing, all device-agnostic; a device is picked up from the core roster
-mcp/             @tonesmith/mcp:  MCP tools, all device-agnostic; a device is picked up from the core roster
-tools/           repo tooling (doc-to-md); not published
-fixtures/<id>/   one committed real patch-file export per device, the round-trip test baseline
-core/docs/<id>/  captured device documentation + FORMAT.md, the reverse-engineered format spec
-```
+[ARCHITECTURE.md](ARCHITECTURE.md) covers the layers, the patterns they follow, the repository layout,
+and a diagram for how the packages fit and for each package inside.
 
 ## Development
 
@@ -162,14 +156,14 @@ pnpm clean        # remove dist/ directories
 
 The conventions below aren't checked by lint, and they're what makes a change look like it belongs.
 
-**Devices plug in; nothing else changes.** Adding one means a `core/src/devices/<id>/` driver, one
+**Devices plug in; nothing else changes.** Adding one means a `core/src/device/<id>/` driver, one
 roster line, and a fixture. The CLI and the MCP server pick the device up from the core roster, so
 neither package gains a file. No entry-point file and no shared module is edited to make room for it. Drivers don't self-register: `core/src/index.ts`
 is the composition root and iterates the roster. Consumers call through the `PatchDriver` interface
 rather than importing a device's own functions.
 
-**The shared layer stays device-agnostic.** `Patch`, `PatchFile`, `PatchDriver` and `RawPatch` are
-the vocabulary everywhere outside `devices/<id>/`. One device's block names and file extension never
+**The shared layer stays device-agnostic.** `Patch`, `PatchFile` and `PatchDriver` are the
+vocabulary everywhere outside `device/<id>/`. One device's block names and file extension never
 reach core's shared modules, the CLI's shared commands, or an MCP tool, in code or in the prose they
 carry: an example spelled out of one device's blocks is an example that fails on every other one.
 
@@ -184,9 +178,11 @@ block-level keys; everything else a block has goes under `params`. It is the sha
 reads back as, the shape a spec is written in, and the shape a dot-path addresses, so a consumer
 learns it once rather than per block.
 
-**Files group by domain, not by file type,** and are named for their role rather than the type inside
-them: `driver.ts`, `builder.ts`, `constants.ts`, never `Gx1Driver.ts`. Types live beside the runtime
-code they describe.
+**Folders are layers named for their role; files are named for their domain.** A folder under `src/`
+is a layer (`service/`, `persistence/`, `model/`, a device's `format/`) and imports only the layers
+below it, which lint enforces. Folder names are singular. File names are camelCase, spelled like
+what they export and never after the type inside them: `patchService.ts`, `builder.ts`, never
+`Gx1Driver.ts`. ARCHITECTURE.md lists the layers.
 
 **Exports go at the bottom,** as one trailing `export { … }` / `export type { … }` block, so a file's
 public surface reads without skimming the whole file. Barrel files are the exception.
@@ -194,8 +190,8 @@ public surface reads without skimming the whole file. Barrel files are the excep
 **Names are camelCase and spelled out.** Every variable, parameter and property gets a name that says
 what it is: `highCut`, not `high_cut`; `ampParams`, not `a`. The only single letters are generic type
 parameters (`T`, `K`, `V`) and a loop index. Compounds on "sub" capitalize the noun: `subType`,
-`subTypes`. Builder helpers take the name of what they configure, with no verb prefix: `amp()`,
-`delay()`, not `setAmp()`.
+`subTypes`. Builder helpers take the name of what they configure, with no verb prefix: `block()`,
+`basePatch()`, not `setBlock()`.
 
 **Tests live in each package's `tests/` directory,** mirroring `src/`. `cli` and `mcp` treat
 `@tonesmith/core` as an external library: they test that they call it correctly and that their own

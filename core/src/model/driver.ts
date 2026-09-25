@@ -8,6 +8,11 @@ type FieldEdit = readonly [path: string, value: FieldValue];
 /** What a batch of edits wrote, keyed by the path that wrote it. */
 type FieldEdits = Record<string, FieldValue>;
 
+/**
+ * The port every device adapter implements: all core and its consumers ever ask of a device. A
+ * device is added by implementing this and naming it in the roster, so nothing outside its own
+ * folder learns anything about it.
+ */
 interface PatchDriver<T extends Patch = Patch> {
   readonly id: string;
   readonly name: string;

@@ -46,176 +46,63 @@ intent, and FORMAT.md for numbers.
 
 Each device's committed round-trip fixture lives at `fixtures/<id>/`.
 
-## Repository layout
-
-Every `devices/<id>/` directory below follows one fixed per-device shape (gx1 is the current
-instance and structural reference; the adding-a-device skill enforces the shape for new devices).
-Adding a device means adding that directory plus one roster line; the CLI and MCP server read the
-roster, so nothing else in this tree changes.
-
-```text
-fixtures/<id>/              one committed real patch-file export per device, in the device's own
-                            native format: the round-trip baseline shared by core/cli/mcp tests
-
-core/                       @tonesmith/core
-  src/
-    types/                  device-agnostic type definitions (barrel: types/index.ts)
-      patch.ts              Patch, PatchFile, RawPatch
-      driver.ts             PatchDriver<T> interface (includes capabilities field)
-      capabilities.ts       DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec
-      view.ts               PatchView / BlockView / PatchDetail: a patch as a person reads it,
-                            composed by the driver and rendered by whoever displays it
-    registry.ts             registerDriver / getDriver (throws on unknown id) / listDrivers
-    patch-utils.ts          every file operation, async: readPatchFile, editPatchFile,
-                            upsertPatches, copyPatch, createPatchFile, plus resolvePatch /
-                            resolvePatches. editPatchFile owns the read-edit-write; what a dot-path
-                            means stays the driver's (applyEdits). upsertPatches saves patches as
-                            given, or builds them from specs first
-    file-lock.ts            withFileLock, internal: one queue per file, so two read-change-writes
-                            on one file take turns instead of losing an edit
-    capability-utils.ts     findGroup / findType, and lookup: the chain, a group, or a type (with
-                            its block's controls), whichever a caller names
-    atomic-write.ts         writeFileAtomic: sibling file then rename, so a write can never
-                            truncate a patch library it fails partway through
-    devices/index.ts        driver roster, one line per device
-    devices/<id>/           per-device driver, always this shape:
-      types/                device type definitions split by domain (barrel: index.ts)
-      common/               constants.ts (ordered lookup arrays + reverse-index maps), blocks.ts
-                            (which blocks a spec may name, and where each keeps its controls, read
-                            by both the spec validator and capabilities), raw.ts (unique symbol
-                            attaching original raw bytes to decoded objects), barrel
-      codec/                encode/decode pipeline: primitives, then field codecs, then per-block
-                            codecs, then top-level decodePatch/encodePatch (barrel: index.ts)
-      <format>.ts           the file format, bytes in and out (parseFile / serializeFile /
-                            blankPatch / newFile), named after it (gx1: tsl.ts). No disk I/O
-      factory-patch.ts      the device's factory-default patch as raw blocks, which every blank
-                            patch starts from, so a block left out of a spec is at factory settings
-      builder.ts            high-level patch-construction helpers
-      defaults.ts           each block type's real factory defaults, harvested from a
-                            factory-default export; the builder fills unset params from here
-      param-domain.ts       the value domains a ParamSpec derives from, so a param's human range
-                            string, machine value list, and numeric bounds are authored once
-      param-catalog.ts      per block/type param surface (name + range + description) plus the
-                            patch's own settings, the in-repo param ground truth; capabilities
-                            derives from it and the codec-to-catalog drift guard checks against it
-      capabilities.ts       the device's DeviceCapabilities metadata (structure/models/subtypes;
-                            each type's params come from param-catalog.ts)
-      driver.ts             PatchDriver<T> object wiring codec + file I/O together
-      view.ts               the device's blocks in reading order, under its own panel labels,
-                            behind PatchDriver.viewPatch
-      spec/                 validates a patch spec against the device's own capability catalog and
-                            builds it: validate.ts checks blocks, types and values; errors.ts
-                            composes the rejection messages; build.ts assembles the validated spec
-                            via builder.ts (barrel: index.ts). Backs PatchDriver.buildPatch.
-                            paths.ts + edits.ts are the dot-path edit surface behind
-                            PatchDriver.applyEdits: where a path lands, and whether what landed
-                            is something the device can store
-      index.ts              device barrel, and the whole published surface for the device: driver,
-                            patch and block types, RAW. Nothing else leaves the device folder
-    index.ts                registers the roster; public re-exports + one namespace per device
-  tests/                    mirrors src/: shared-util suites + devices/<id>/ suites (codec
-                            round-trip, plus the codec-to-catalog and defaults drift guards)
-    helpers.ts              fixture paths and contents off one anchor, `present`, and
-                            scratchDir / scratchFile, which register their own cleanup hooks. Named
-                            apart from cli's and mcp's withTempDir, which return a manual `cleanup`
-    fixtures/<id>/          supplementary per-device fixtures (gx1: default-init.tsl, a
-                            factory-default clean baseline complementing the root fixture)
-  docs/<id>/                captured manuals as subject-sized Markdown + FORMAT.md (the
-                            reverse-engineered binary format spec)
-
-cli/                        @tonesmith/cli  (bin: tonesmith)
-  src/
-    common/                 every piece of the CLI, all device-agnostic (barrel: common/index.ts)
-      commands.ts           configureDeviceCommands: shared read / write / copy / new /
-                            capabilities, one registrar per command
-      capabilities-print.ts color printer for DeviceCapabilities
-      patch-print.ts        color printer for a driver's PatchView, so a device ships with no CLI
-                            code of its own
-      color.ts              the SGR constants both printers share, and the one gate that turns
-                            them off when stdout is not a terminal
-    program.ts              buildProgram(), assembling the commander program over
-                            registry.listDrivers()
-    index.ts                bin entry: shebang + buildProgram().parse()
-  tests/                    behavior tests (in-process commander, per-command suites)
-
-mcp/                        @tonesmith/mcp  (bin: tonesmith-mcp)
-  src/
-    common/                 pieces every tool registration shares (barrel: common/index.ts):
-                            response.ts (ok / err), attempt.ts (runs a handler's work, turning a
-                            throw into an error response), errors.ts (messageOf), schemas.ts (the
-                            shared `device` input field)
-    instructions.ts         server-onboarding text sent to every client at initialize, written as
-                            the two-call path for building patches rather than a tool inventory
-    tools/                  tool registrations, all device-agnostic (barrel: tools/index.ts):
-                            list_devices, read_patch, write_fields, describe_device, copy_patch,
-                            create_patch_file, generate_patch
-    prompts/                prompt registrations (barrel: prompts/index.ts): build_patch, a person's
-                            slash-command entry to the build workflow, with `device` completion
-    server.ts               buildServer(), registering the tools and prompts
-    index.ts                bin entry: shebang + buildServer() over stdio
-  tests/                    behavior tests (MCP InMemoryTransport, per-tool suites)
-
-tools/                      repo tooling, not published and not exposed through MCP; a shared
-                            tsconfig.json + vitest.config.ts cover every script under tools/
-  doc-to-md/                URL or local file to Markdown (HTML or PDF, sniffed from content):
-                            index.ts (CLI wiring), convert.ts (detect + convert), fetch.ts (GET bytes)
-```
-
 ## Architecture
 
-```text
-patch file (device-native format)
-  → readPatchFile()  core reads the bytes, hands them to the driver
-  → parseFile()      driver parses its file envelope, calls decodePatch() on each patch
-  → decodePatch()    raw bytes to a decoded Patch object (every known block decoded)
-  → encodePatch()    Patch to raw bytes (start from the original bytes, overwrite known indices)
-  → serializeFile()  driver writes the envelope back to bytes
-  → writeFileAtomic  core writes them to disk, under the file's lock when it read them first
-```
+[ARCHITECTURE.md](ARCHITECTURE.md) is the map: the layers and which way they import, the patterns
+they follow, the repository layout file by file, and a diagram for how the packages fit and for each
+package inside. Read it before moving or adding a file; a change that moves a box updates its
+diagram. Every `device/<id>/` follows one fixed shape (gx1 is the reference; the adding-a-device
+skill enforces it), and adding a device means that folder plus one roster line.
 
 **Key design rules** (apply to every device driver):
 
-- **Round-trip byte preservation:** each device's `codec/patch.ts` starts from the original raw
+- **Round-trip byte preservation:** each device's `format/codec/patch.ts` starts from the original raw
   hex bytes (stashed under the `RAW` symbol) and overwrites only the byte indices it knows.
   Unknown and unused bytes pass through untouched, which prevents file corruption from format
   fields not yet reverse-engineered.
 
-- **Lookup tables:** defined as ordered `const` arrays in the device's `common/constants.ts`;
+- **Lookup tables:** defined as ordered `const` arrays in the device's `model/constants.ts`;
   reverse-index maps (`AMP_TYPE_IDX`, etc.) are derived with
   `Object.fromEntries(list.map((v,i) => [v,i]))`.
 
-- **Builder functions:** named after the block they configure, no "set" prefix; scaffolding helpers
-  (gx1's `basePatch`) are the naming exception. Each takes the patch plus one options object. Every
-  block carries its controls in a `params` bag, whether or not they vary by type. Builders are
-  internal and take input `spec/` has already validated against the catalog, so they check nothing
-  again: they fill what the caller left out with factory defaults. A consumer builds a patch from a
-  spec through `PatchDriver.buildPatch`.
+- **Builder functions:** named after what they configure, no "set" prefix: gx1's `basePatch` and
+  `block(patch, name, options)`, which takes one path for blocks with a single shape of controls and
+  another for blocks whose controls are the chosen type's. Every block carries its controls in a
+  `params` bag. Builders are internal and take input `spec/` has already validated against the
+  catalog, so they check nothing again: they fill what the caller left out with factory defaults. A
+  consumer builds a patch from a spec through `PatchDriver.buildPatch`.
 - **Every block's layout is a field list.** A block's controls are `FieldCodec`s, whether the block
   has one fixed set or one set per type, and the codec's `fieldsFor` is the one place that says which
   list a block, type and sub-model use. Capabilities stamps each param's `key` from it, and the drift
   guards compare it against the catalog.
 
 - **`write` dot-notation:** `fx1.params.rate=50` walks the decoded patch object; each segment
-  after splitting on `.` navigates one level deeper. The walk belongs to the driver
-  (`PatchDriver.applyEdits`), since a path's segments are the device's own field names and a device
-  free to present them differently needs somewhere to say so. A `type` edit re-seeds its block to
-  that type's factory settings as it lands, so the paths after it find fields of the new type; none
-  of the previous effect's values survive for the codec to read back under the new field map.
+  after splitting on `.` navigates one level deeper. `PatchDriver.applyEdits` stays the driver's
+  method, so a device free to present its paths differently has somewhere to say so, but the walk,
+  the value checks and the re-seed are core's `specService`, which a driver calls with its own
+  capabilities and `buildPatch`. A `type` edit re-seeds its block to that type's factory settings as
+  it lands, so the paths after it find fields of the new type; none of the previous effect's values
+  survive for the codec to read back under the new field map.
+- **The catalog carries what core checks against.** `specService` reads nothing but a driver's
+  `DeviceCapabilities`: which group describes each chain block, whether it can be bypassed, and which
+  blocks a type is limited to all live there as data. A check that needs a device fact the catalog
+  can't express (the characters a name may use, the order a chain may take) stays in the driver's
+  `spec/`.
 
 Device-specific byte layouts, field names, and value tables do **not** live here. They would bloat
 this file and go stale as devices are added. When you need that detail for a device, read its
-`core/docs/<id>/FORMAT.md` (byte-level format spec) and `core/src/devices/<id>/types/` (current
+`core/docs/<id>/FORMAT.md` (byte-level format spec) and `core/src/device/<id>/model/` (current
 decoded-patch field lists) directly; don't duplicate any of it into this file.
 
 ## Conventions
 
 Decisions that tooling can't check and are expensive to relitigate. The structural conventions (how
-a device plugs in, the device-agnostic shared layer, the `driver.ts` / `index.ts` split, domain
-grouping, naming, exports at the bottom) live in README.md's Contributing section and apply here;
+a device plugs in, the device-agnostic shared layer, the `driver.ts` / `index.ts` split, layer
+folders, naming, exports at the bottom) live in README.md's Contributing section and apply here;
 what follows is what that section doesn't cover. Mechanical rules are already enforced as
 `eslint.config.js` errors (at most three parameters, no duplicate function bodies, no em dashes,
 ternaries assigned before use, cognitive complexity 6, no sync fs calls, no fs imports in a
-driver), so they aren't repeated here.
+driver, layers importing only downward, camelCase file names), so they aren't repeated here.
 
 - **The driver supplies the view; the CLI only renders it.** `PatchDriver.viewPatch` returns the
   patch as a person reads it; one printer in `cli/src/common/` walks it, so a device ships no CLI
@@ -228,8 +115,10 @@ driver), so they aren't repeated here.
   surface is its only caller today. Lint can't see duplication across packages, so this is the
   check.
 - **A change to a file is one core operation.** Anything that reads a file, changes it and writes
-  it back belongs in `patch-utils.ts`, built on `updatePatchFile` (or `withFileLock` where a missing
-  file is a start rather than an error), so the lock spans the whole sequence. A surface composing
+  it back belongs in `service/patchService.ts`, built on one of `patchFileRepository`'s locked
+  operations (`updatePatchFile`, or `upsertPatchFile` where a missing file is a start rather than an
+  error), so the lock spans the whole sequence. Nothing outside `persistence/` reads or writes a
+  patch file. A surface composing
   its own read and write would reopen the lost-edit race the lock closes, and would duplicate logic
   the other surface needs too. The lock is not re-entrant: no locked operation calls another.
 - **`type` and `subType` each mean one thing, everywhere.** `type` is the block's own selector,
@@ -246,10 +135,10 @@ driver), so they aren't repeated here.
   block: a reference tempo, an output trim, a musical key. `groups` doesn't cross-check these, so an
   omitted one surfaces only when a consumer stumbles on it in an existing patch. They're ordinary
   catalog params, validated like a block's params on both write paths.
-- **`param-catalog.ts`, `capabilities.ts`, and `types/` are three views of one truth**, not
+- **`paramCatalog.ts`, `capabilities.ts`, and `model/`'s decoded types are three views of one truth**, not
   triplication to collapse: the catalog is the param ground truth, capabilities the structure an
   agent browses, the types the decoded shape. The drift guards
-  (`core/tests/devices/<id>/capabilities.test.ts` and the defaults guard) keep the three in sync, so
+  (`core/tests/device/<id>/catalog/capabilities.test.ts` and the defaults guard) keep the three in sync, so
   they stay even when other defensive tests go.
 - **A device's block catalog never enters the tool schema.** `tools/list` loads on every request,
   so a per-device generate tool would scale that resident cost with the roster instead of holding it
