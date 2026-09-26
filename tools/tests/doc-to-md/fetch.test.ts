@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { fetchDocument } from "./fetch";
+import { fetchDocument } from "../../doc-to-md/fetch";
 
 describe("fetchDocument", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
@@ -7,20 +7,31 @@ describe("fetchDocument", () => {
   it("returns the response body bytes on success", async () => {
     const body = new TextEncoder().encode("<html>hi</html>");
     const response = { ok: true, arrayBuffer: () => Promise.resolve(body.buffer) };
-    const fetchMock = vi.fn().mockResolvedValue(response);
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
 
     const bytes = await fetchDocument("https://example.com/page");
 
     expect(new TextDecoder().decode(bytes)).toBe("<html>hi</html>");
+  });
+
+  // Some manual hosts refuse a request with no User-Agent, or answer a bare fetch with a
+  // different document than a browser gets, so the request identifies itself and asks for what it
+  // can convert.
+  it("asks with an identifying User-Agent and an Accept for html and pdf", async () => {
+    const response = { ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDocument("https://example.com/page");
+
     expect(fetchMock).toHaveBeenCalledWith(
       "https://example.com/page",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          "User-Agent": expect.any(String) as string,
+      {
+        headers: {
+          "User-Agent": "tonesmith-doc-to-md (+https://github.com/oparamo/tonesmith)",
           "Accept": "text/html,application/xhtml+xml,application/pdf",
-        }) as Record<string, string>,
-      }),
+        },
+      },
     );
   });
 

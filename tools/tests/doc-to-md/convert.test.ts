@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectFormat, toMarkdown } from "./convert";
+import { detectFormat, toMarkdown } from "../../doc-to-md/convert";
 
 const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
 
@@ -40,13 +40,19 @@ describe("detectFormat", () => {
     expect(detectFormat(encode("<html><body>hi</body></html>"))).toBe("html");
   });
 
-  it("lets an explicit override win over content sniffing", () => {
-    expect(detectFormat(encode("<html></html>"), "pdf")).toBe("pdf");
-    expect(detectFormat(makePdf("x"), "html")).toBe("html");
+  it.each([
+    [encode("<html></html>"), "pdf"],
+    [makePdf("x"), "html"],
+  ] as const)("lets an explicit override win over content sniffing", (bytes, format) => {
+    expect(detectFormat(bytes, format)).toBe(format);
   });
 
   it("rejects an unknown format override", () => {
     expect(() => detectFormat(encode("hi"), "docx")).toThrow(/docx/);
+  });
+
+  it.each([encode(""), encode("%PDF")])("treats bytes shorter than the PDF signature as html", (bytes) => {
+    expect(detectFormat(bytes)).toBe("html");
   });
 });
 
