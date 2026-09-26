@@ -14,7 +14,6 @@ const DEFAULT_INIT_FIXTURE = resolve(import.meta.dirname, "../../fixtures/gx1/de
 const ROCK_TONES_SET_NAME = "Rock Tones";
 const ROCK_TONES_PATCH_NAMES = ["SWORD LEAD", "DROPTUNE RIFF", "GLASSY DIST", "FAT DIST"];
 
-/** The patch at `index` of the fixture at `path`. */
 const patchAt = async (path: string, index = 0): Promise<Patch> => {
   const bytes = await readFile(path);
   return present(parseFile(bytes, path).patches[index], `patch ${index} of ${path}`);

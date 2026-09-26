@@ -14,22 +14,11 @@ import {
   decodeFields, encodeFields, type FieldCodec,
 } from "./fields";
 
-// ── FX type encode / decode ───────────────────────────────────────────────────
-//
-// FX_COM byte 2 is always the bass-mode type mirror, never a subtype. See
-// PARAM_SUBTYPE_EFFECTS in model/constants.ts for where each effect's own
-// sub-model selector actually lives (the FX param block itself).
-
 const decodeFxType = (hi: number): string => lookupName(FX_TYPES, hi, "FX");
 
 const encodeFxType = (fxName: string): number => lookupIndex(FX_TYPE_IDX, fxName, "FX type");
 
 
-// ── FX parameter field maps ───────────────────────────────────────────────────
-//
-// Each key maps an FX type name to an ordered list of FieldCodec descriptors. One table
-// drives both decode (bytes → params) and encode (params → bytes).
-//
 // Byte offsets are 0-based within the per-slot FX param block (the 251-byte block
 // stored under MEMORY%FX1 / FX2 / FX3). Unmapped byte positions come from the original
 // bytes and pass through unchanged on round-trip.
@@ -102,12 +91,9 @@ const FX_PARAM_OFFSETS: Partial<Record<string, number>> = {
 };
 
 const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
-  // COMPRESSOR: p[0]=subType (stored in param block, NOT FX_COM byte[2]),
-  // p[1]=sustain, p[2]=attack, p[3]=level.
   "COMPRESSOR": [
     lookup(SUB_TYPE_FIELD, 0, COMP_TYPES), u8("sustain", 1), u8("attack", 2), u8("level", 3),
   ],
-  // LIMITER: p[0]=subType (stored in param block), then params shifted by one.
   "LIMITER": [
     lookup(SUB_TYPE_FIELD, 0, LIM_TYPES),
     u8("threshold", 1), u8("ratio", 2), u8("level", 3), u8("attack", 4), u8("release", 5),
@@ -139,7 +125,6 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("500Hz", 3, 20), signed("1kHz",  4, 20), signed("2kHz",  5, 20),
     signed("level", 6, 20),
   ],
-  // All bands and level use signed(center=20). Band order: standard frequency order.
   "HIGH GEQ": [
     signed("250Hz", 0, 20), signed("500Hz", 1, 20), signed("1kHz", 2, 20),
     signed("2kHz",  3, 20), signed("4kHz",  4, 20), signed("8kHz", 5, 20),
@@ -164,7 +149,6 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "AC. GTR SIM": [
     signed("high", 0), u8("body", 1), signed("low", 2), u8("level", 3),
   ],
-  // AC RESO: p[0]=subType (stored in param block), then params shifted by one.
   "AC RESO": [
     lookup(SUB_TYPE_FIELD, 0, ACRESO_TYPES),
     u8("reso", 1), signed("tone", 2), u8("level", 3),
@@ -177,10 +161,9 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     u8("sens", 0), u8("depth", 1), signed("tone", 2), u8("level", 3),
     u8("reso", 4), u8("buzz", 5), u8("direct", 6),
   ],
-  // OD/DS: p[0]=subType (stored in param block, like COMPRESSOR/LIMITER/etc.), then params
-  // shifted by one. solo/soloLevel are this FX-slot instance's own solo boost, distinct
-  // from the dedicated MEMORY%ODDS block's solo (the device exposes "FX1 SOLO"/"FX2
-  // SOLO"/"FX3 SOLO" as separate footswitch functions from "OD/DS SOLO").
+  // solo/soloLevel are this FX-slot instance's own solo boost, distinct from the dedicated
+  // MEMORY%ODDS block's solo (the device exposes "FX1 SOLO"/"FX2 SOLO"/"FX3 SOLO" as separate
+  // footswitch functions from "OD/DS SOLO").
   "OD/DS": [
     lookup(SUB_TYPE_FIELD, 0, ODDS_TYPES),
     u8("drive", 1), signed("tone", 2), u8("level", 3), u8("direct", 4),
@@ -192,7 +175,6 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "OVERTONE": [
     u8("lower", 0), u8("upper", 1), u8("unison", 2), u8("direct", 3), u8("detune", 4),
   ],
-  // CHORUS: p[0]=subType (stored in param block), then params shifted by one.
   // preDelay stored as index × 0.5ms (e.g. 8 → 4.0ms).
   "CHORUS": [
     lookup(SUB_TYPE_FIELD, 0, CHORUS_TYPES),
@@ -201,7 +183,6 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "FLANGER": [
     syncedRate("rate", 0), u8("depth", 1), u8("reso", 2), u8("manual", 3), u8("level", 4), u8("direct", 5),
   ],
-  // PHASER: p[0] selects the stage count as a plain enum (raw 0/1/2 = 4/8/12 STAGE).
   "PHASER": [
     lookup("stage", 0, PHASER_STAGES),
     syncedRate("rate", 1), u8("depth", 2), u8("reso", 3), u8("manual", 4), u8("level", 5), u8("direct", 6),
@@ -209,9 +190,9 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "SCRIPT PH": [
     syncedRate("rate", 0), u8("depth", 1), u8("level", 2),
   ],
-  // CLASSIC-VIBE: p[0]=subType (stored in param block), then params shifted by one. The device's
-  // own table labels it MODE; it is a sub-model here because its two values are named variants
-  // worth describing, which is what decides the difference (see CLAUDE.md's Conventions).
+  // CLASSIC-VIBE: the device's own table labels the selector MODE; it is a sub-model here
+  // because its two values are named variants worth describing, which is what decides the
+  // difference (see CLAUDE.md's Conventions).
   "CLASSIC-VIBE": [
     lookup(SUB_TYPE_FIELD, 0, VIBE_MODES),
     syncedRate("rate", 1), u8("depth", 2), u8("level", 3),
@@ -234,20 +215,17 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     bool("intelligent", 0),
     u8("freq", 1), syncedRate("modRate", 2), u8("modDepth", 3), u8("level", 4), u8("direct", 5),
   ],
-  // HUMANIZER: p[0]=subType (stored in param block), then params shifted by one. Labeled MODE by
-  // the device, a sub-model here for the same reason as CLASSIC-VIBE above.
+  // HUMANIZER: labeled MODE by the device, a sub-model here for the same reason as CLASSIC-VIBE above.
   "HUMANIZER": [
     lookup(SUB_TYPE_FIELD, 0, HUM_MODES),
     lookup("vowel1", 1, HUM_VOWELS), lookup("vowel2", 2, HUM_VOWELS),
     u8("sens", 3), syncedRate("rate", 4), u8("manual", 5), u8("level", 6),
   ],
-  // PITCH SHIFT: preDelay is a 16-bit value across 4 bytes (max ~300ms), not a plain u8.
   "PITCH SHIFT": [
     lookup("mode", 0, PITCH_SHIFT_MODES), indexTable("pitch", 1, PITCH_SHIFT_PITCH_TABLE),
     namedAbove(nibbleQuad("preDelay", 2), 300, TIME_NOTE_VALUES),
     u8("level", 6), u8("feedback", 7), u8("direct", 8),
   ],
-  // HARMONIST: preDelay is a 16-bit value across 4 bytes, same as PITCH SHIFT.
   "HARMONIST": [
     lookup("harmony", 0, HARMONIST_HR),
     namedAbove(nibbleQuad("preDelay", 1), 300, TIME_NOTE_VALUES),
@@ -272,9 +250,8 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
     signed("pitch", 0, 12),
   ],
   // DELAY as an FX slot type is per-sub-algorithm; see FX_DELAY_TYPE_MAPS below.
-  // REVERB as an FX slot type (separate from the dedicated REV block). Its 5 types are
-  // its own set (HALL S/HALL M/PLATE/ROOM/STUDIO, NOT the dedicated block's REV_TYPES),
-  // and all 5 share this one field set, so it stays a single flat map.
+  // REVERB as an FX slot type has its own five types (FX_REV_TYPES, not the dedicated REV
+  // block's), all sharing this one field set, so it stays a single flat map.
   "REVERB": [
     lookup(SUB_TYPE_FIELD, 0, FX_REV_TYPES), scaled("time", 1, 0.1),
     nibblePair("preDelay", 2), u8("level", 4), u8("direct", 5),
@@ -285,7 +262,7 @@ const FX_PARAM_MAPS: Partial<Record<string, FieldCodec[]>> = {
 // like the dedicated DLY block it is modeled per-subtype rather than with one flat
 // map. Offsets are 0-based within the DELAY param block (FX_PARAM_OFFSETS["DELAY"]); every
 // sub-algorithm's byte homes are distinct (no offset reuse), verified against the device's
-// address table. p[0] is promoted to block.subType via PARAM_SUBTYPE_EFFECTS.
+// address table. p[0] is the `subType` field, which decode lifts onto block.subType.
 const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
   "STANDARD": [
     lookup(SUB_TYPE_FIELD, 0, FX_DLY_TYPES), syncedTime("time", 1),
@@ -310,8 +287,6 @@ const FX_DELAY_TYPE_MAPS: Record<string, FieldCodec[]> = {
   ],
 };
 
-
-// ── Public decode / encode ────────────────────────────────────────────────────
 
 /** The one FX type that selects its field map by sub-algorithm rather than having one flat map. */
 const PER_SUB_ALGORITHM_TYPE = "DELAY";

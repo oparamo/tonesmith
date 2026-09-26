@@ -22,8 +22,6 @@ import {
 } from "./fields";
 import { decodeFxType, encodeFxType, fxFieldsFor } from "./fxParams";
 
-// ── Name block ────────────────────────────────────────────────────────────────
-
 /**
  * The device writes ASCII, but "ascii" masks bit 7 in both directions, so a byte above 0x7F comes
  * back as a different character and is written back as that one. "latin1" is the same encoding
@@ -61,13 +59,7 @@ const encodeName = (name: string): string[] => {
 };
 
 
-// ── OTHER block: the patch's own settings (7 bytes) ──────────────────────────
-//
-// Not a signal block. Two of these reach the sound through other blocks rather than
-// on their own: `key` resolves HARMONIST_HR's diatonic scale degrees to semitones, and
-// `bpm` is the tempo every note-valued control plays against, so a delay set to 1/4
-// means nothing without it.
-
+// MEMORY%OTHER, 7 bytes: the patch's own settings.
 const PATCH_SETTING_FIELDS: FieldCodec[] = [
   nibblePair("memoryLevel", 0),
   nibblePair("bpm", 2),
@@ -98,12 +90,6 @@ const encodeSettings = (settings: PatchSettings, originalHex: string[]): string[
   return hexFromBytes(bytes);
 };
 
-
-// ── Chain block ───────────────────────────────────────────────────────────────
-//
-// A linked list, not a positional array: byte 0 holds the firmware value of whichever
-// block comes first; each block's own slot holds the firmware value of whatever comes
-// immediately after it. CHAIN_TERMINATOR means "connects to OUTPUT."
 
 /** Byte holding what follows `name`. Byte 0 names the first block, so a block's slot is its position + 1. */
 const nextSlotFor = (name: string): number => {
@@ -176,7 +162,7 @@ const encodeChain = (names: string[], originalHexList: string[]): string[] => {
 };
 
 
-// ── Single-shape blocks: AMP, OD/DS, NS, FV ───────────────────────────────────
+// Single-shape blocks: AMP, OD/DS, NS, FV.
 //
 // Each holds one fixed set of controls whatever else the patch does. Bytes before the first
 // control are the block's own on/type selectors, read and written by the decoders below.
@@ -243,7 +229,7 @@ const encodeVolume = (block: VolumeBlock): string[] => {
 };
 
 
-// ── FX_COM block (on/type header + bass-mode type mirror, 3 bytes) ────────────
+// FX_COM, 3 bytes: on, type, and the bass-mode type mirror.
 //
 // Byte 2 is the bass-mode mirror of byte 1's type selector and never carries a subtype for any
 // effect. An effect with its own sub-model stores it in the FX param block itself (see
@@ -265,14 +251,12 @@ const encodeFxCom = (block: FxBlock): string[] => {
 };
 
 
-// ── Delay block field maps (keyed by delay type) ──────────────────────────────
-//
 // Bytes 0–1 of the full block are [on, type], handled by decodeTypedBlock/encodeTypedBlock.
 // All other offsets below are absolute byte positions within the full block.
 //
-// Many fields are shared across types at the same address (e.g. feedback/level/highCut
-// at 6/7/8 for every "clean" delay type, or trigger/level at 21/25 shared by WARP,
-// TWIST, and GLITCH) rather than each type getting its own compact, contiguous layout.
+// Many fields are shared across types at the same address (feedback/level/highCut at 6/7/8
+// for every "clean" delay type, trigger at 21 for WARP, TWIST and GLITCH, level at 25 for
+// WARP and TWIST) rather than each type getting its own compact, contiguous layout.
 
 const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   "STANDARD": [
@@ -320,8 +304,6 @@ const DELAY_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
 };
 
 
-// ── Reverb block (keyed by reverb type) ──────────────────────────────────────
-//
 // All offsets below are absolute byte positions within the full block. As with the
 // delay block, several fields are shared across types at the same address (tone at
 // 3, level at 5, direct at 8, preDelay at 6, feedback at 16) rather than each type
@@ -353,7 +335,7 @@ const REV_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
 };
 
-// ── PFX (expression pedal effect: WAH / PEDAL BEND) block (14 bytes) ──────────
+// PFX, 14 bytes: the expression pedal effect, WAH or PEDAL BEND.
 //
 // Byte 3 is the bass-mode mirror of byte 2's wah model, out of scope in guitar mode, same
 // pattern as AMP/FX_COM's other bass-mode mirror bytes. Both WAH's and
@@ -371,8 +353,6 @@ const PFX_TYPE_MAPS: Partial<Record<string, FieldCodec[]>> = {
   ],
 };
 
-// ── Blocks selected by a type byte ────────────────────────────────────────────
-//
 // AMP, OD/DS, DLY, REV and PFX share one layout: byte 0 is on/off, byte 1 indexes the block's type
 // table, and the rest are the fields the codec keeps for that type. They differ only in the table
 // and the field lists, so one table entry per block says what the two functions below need.
@@ -434,8 +414,6 @@ const decodePedalFx = (hexList: string[]): PedalFxBlock => {
 
 const encodePedalFx = (block: PedalFxBlock): string[] =>
   encodeTypedBlock(TYPED_BLOCKS.pedalFx, { ...block, params: withStoredSubType(block.params, block.subType) });
-
-// ── Field lists by block ──────────────────────────────────────────────────────
 
 const SINGLE_SHAPE_FIELDS: Partial<Record<string, FieldCodec[]>> = {
   noiseGate: NOISE_GATE_FIELDS, volume: VOLUME_FIELDS,
