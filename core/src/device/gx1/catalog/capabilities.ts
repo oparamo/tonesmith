@@ -2,10 +2,10 @@
  * GX-1 capability/description data.
  *
  * This module owns the *structural + sonic* metadata for each block: type ids/names, sonic
- * descriptions, the real-world `models` a type emulates, and nested subTypes. It does NOT
- * own parameter data: every `params` list is derived from `paramCatalog.ts` (the single
- * source of truth for the device's param surface). Type `id` values must match the string
- * constants in `constants.ts` (which drive the codec).
+ * descriptions, the real-world `models` a type emulates, and nested subTypes. It owns no
+ * parameter data: every `params` list is derived from `paramCatalog.ts` (the single source of
+ * truth for the device's param surface). Type `id` values must match the string
+ * constants in `model/constants.ts` (which drive the codec).
  *
  * This assembled object is what the CLI (`capabilities` command) and MCP (`describe_device`
  * tool) consume. The drift-guard tests in `capabilities.test.ts` enforce that the catalog
@@ -71,10 +71,6 @@ const FX_DELAY_SUBTYPES: CapabilityType[] = withTypeParams("fxDelay", [
   { id: "TWIST",    name: "Twist",    description: "Aggressive rotational delay effect. Works well with distortion for extreme sounds." },
   { id: "GLITCH",   name: "Glitch",   description: "Machine gun-like stuttering delay effect." },
 ]);
-
-// ---------------------------------------------------------------------------
-// FX1/FX2/FX3 structural metadata (params come from the catalog)
-// ---------------------------------------------------------------------------
 
 const FX_META: CapabilityType[] = [
   {
@@ -287,17 +283,9 @@ const withOnlyBlock = (type: CapabilityType): CapabilityType => {
 
 const FX_TYPES = withTypeParams("fx", FX_META).map(withOnlyBlock);
 
-// ---------------------------------------------------------------------------
-// OD/DS block: same models as the FX OD/DS subtype list
-// ---------------------------------------------------------------------------
-
 const oddsFxType = FX_META.find(type => type.id === "OD/DS");
 if (!oddsFxType?.subTypes) throw new Error('"OD/DS" pedal models not found in FX_META');
 const ODDS_TYPES = oddsFxType.subTypes;
-
-// ---------------------------------------------------------------------------
-// AMP models
-// ---------------------------------------------------------------------------
 
 const AMP_TYPES: CapabilityType[] = [
   { id: "TRNSPRNT",    name: "Transparent",       description: "Extremely flat response across a broad frequency range. Good for acoustic guitar or any signal where you want zero amp coloration." },
@@ -325,10 +313,6 @@ const AMP_TYPES: CapabilityType[] = [
   { id: "BGNR UB",     name: "Bogner Überschall", description: "Models the high-gain channel of a Bogner Uberschall: tight, aggressive, high-gain German tone.", models: "Bogner Uberschall" },
 ];
 
-// ---------------------------------------------------------------------------
-// Speaker cabinets
-// ---------------------------------------------------------------------------
-
 const CAB_TYPES: CapabilityType[] = [
   { id: "OFF",      name: "Off",      description: "Speaker simulator disabled." },
   { id: "ORIGINAL", name: "Original", description: "Built-in speaker of the selected amp type." },
@@ -349,10 +333,6 @@ const CAB_TYPES: CapabilityType[] = [
   { id: "USER8",    name: "User 8",   description: "User-loaded IR cabinet." },
 ];
 
-// ---------------------------------------------------------------------------
-// Microphones
-// ---------------------------------------------------------------------------
-
 const MIC_TYPES: CapabilityType[] = [
   { id: "DYN57",    name: "Dynamic 57",    description: "Models the Shure SM57, the standard dynamic mic for guitar amplifiers.", models: "Shure SM57" },
   { id: "DYN421",   name: "Dynamic 421",   description: "Models the Sennheiser MD-421, a dynamic mic with extended low end.", models: "Sennheiser MD-421" },
@@ -364,10 +344,6 @@ const MIC_TYPES: CapabilityType[] = [
   { id: "BLEND B",  name: "Blend B",       description: "SM57 and Royer R-121 blended at equal volumes, balancing brightness and warmth.", models: "Shure SM57 + Royer R-121 (equal mix)" },
   { id: "BLEND C",  name: "Blend C",       description: "SM57 and Royer R-121 blended with the R-121 proportionally louder. Warmer and darker.", models: "Shure SM57 + Royer R-121 (R-121 dominant)" },
 ];
-
-// ---------------------------------------------------------------------------
-// Delay types (params per type come from the catalog)
-// ---------------------------------------------------------------------------
 
 const DELAY_META: CapabilityType[] = [
   { id: "STANDARD",    name: "Standard",    description: "Classic digital delay: repeats the sound to create an echo." },
@@ -383,10 +359,6 @@ const DELAY_META: CapabilityType[] = [
   { id: "GLITCH",      name: "Glitch",      description: "Machine gun-like stuttering delay effect." },
 ];
 
-// ---------------------------------------------------------------------------
-// Reverb types (params per type come from the catalog)
-// ---------------------------------------------------------------------------
-
 const REV_META: CapabilityType[] = [
   { id: "HALL S",    name: "Hall S",    description: "Concert hall reverb, clear and spacious with a short tail." },
   { id: "HALL M",    name: "Hall M",    description: "Concert hall reverb, mild with a medium tail." },
@@ -399,10 +371,6 @@ const REV_META: CapabilityType[] = [
   { id: "SUB DELAY", name: "Sub Delay", description: "Long delay (up to 2000 ms) used as a reverb-in-series to add depth." },
   { id: "TERA ECHO", name: "Tera Echo", description: "MDP-powered unique ambience that changes character in response to picking dynamics." },
 ];
-
-// ---------------------------------------------------------------------------
-// PFX (expression pedal effect) types
-// ---------------------------------------------------------------------------
 
 const PFX_META: CapabilityType[] = [
   {
@@ -424,10 +392,6 @@ const PFX_META: CapabilityType[] = [
     description: "Expression-pedal-controlled pitch bend, like a whammy pedal.",
   },
 ];
-
-// ---------------------------------------------------------------------------
-// Spec examples
-// ---------------------------------------------------------------------------
 
 // Widened views of the defaults, so a group with none reads as undefined rather than as a lookup
 // TypeScript believes always resolves.
@@ -527,10 +491,6 @@ const withExamples = (groups: CapabilityGroup[]): CapabilityGroup[] =>
     if (group.types.length === 0) return withGroupExample(group);
     return { ...group, types: group.types.map(type => withTypeExample(group, type)) };
   });
-
-// ---------------------------------------------------------------------------
-// Assembled DeviceCapabilities
-// ---------------------------------------------------------------------------
 
 /** Every block a spec names: its panel label, the group describing it, and whether it can be bypassed. */
 const CHAIN_BLOCKS: Record<string, ChainBlock> = Object.fromEntries(BLOCK_NAMES.map(name => [

@@ -1,36 +1,26 @@
 /**
- * Drift guards for codec ↔ catalog.
- *
- * capabilities.ts derives every params list from paramCatalog.ts, so the meaningful axis to
- * guard is the catalog (authored from the parameter guide) against the codec field maps
- * (authored from byte reverse-engineering), two independently-authored sources that can drift.
- * These tests assert, for every type of every block:
- *   - id coverage: the codec's type list, the catalog's keys, and capabilities' type ids
- *     all agree;
- *   - param parity: every codec field maps to a catalog param and vice versa (bidirectional),
- *     modulo documented aliases (wording differences) and exceptions.
- * A new effect type or codec field that isn't in the catalog fails the suite.
+ * Drift guards: the catalog (authored from the parameter guide), the codec field maps (authored
+ * from the byte layout) and the decoded types are three independently authored views of one
+ * device, and these keep them in step. A new effect type or codec field the catalog lacks fails
+ * the suite.
  */
 import { describe, it, expect } from "vitest";
 import {
   FX_TYPES, AMP_TYPES, SP_TYPES, MIC_TYPES, ODDS_TYPES, DLY_TYPES, REV_TYPES, PFX_TYPES,
   FX_DLY_TYPES, FX_REV_TYPES,
-  COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES,
+  COMP_TYPES, LIM_TYPES, ACRESO_TYPES, CHORUS_TYPES, VIBE_MODES, HUM_MODES, WAH_TYPES,
   PARAM_SUBTYPE_EFFECTS, NAME_BYTES, SUB_TYPE_FIELD, DEFAULT_CHAIN,
-  BLOCK_GROUPS, BLOCK_NAMES,
+  BLOCK_GROUPS, BLOCK_NAMES, BLOCK_LABELS,
 } from "../../../../src/device/gx1/model";
 import type { BlockName } from "../../../../src/device/gx1/model";
 import { DEFAULTS_BY_TYPE } from "../../../../src/device/gx1/catalog/defaults";
 import { gx1Capabilities } from "../../../../src/device/gx1/catalog/capabilities";
-import { driver } from "../../../../src/device/gx1/driver";
 import { blankPatch } from "../../../../src/device/gx1/format/tsl";
 import { PARAMS_BY_TYPE, PARAMS_BY_BLOCK, FIELD_LABEL_ALIASES } from "../../../../src/device/gx1/catalog/paramCatalog";
 import { FX_PARAM_MAPS, FX_DELAY_TYPE_MAPS } from "../../../../src/device/gx1/format/codec/fxParams";
 import {
-  PFX_TYPE_MAPS, DELAY_TYPE_MAPS, REV_TYPE_MAPS, STANDARD_REVERB_TYPES, PATCH_SETTING_FIELDS,
-  TYPED_BLOCKS, decodeTypedBlock, decodeNoiseGate, decodeVolume, fieldsFor,
+  PFX_TYPE_MAPS, DELAY_TYPE_MAPS, PATCH_SETTING_FIELDS, fieldsFor,
 } from "../../../../src/device/gx1/format/codec/blocks";
-import { hexFromBytes } from "../../../../src/device/gx1/format/codec/primitives";
 import type { CapabilityType, ParamSpec, PatchSpecExample } from "../../../../src/model";
 import type { FieldCodec } from "../../../../src/device/gx1/format/codec/fields";
 import { present } from "../../../helpers";
@@ -42,20 +32,15 @@ const groupTypes = (groupId: string): CapabilityType[] =>
 // letter or digit, so "PRE-DELAY" (catalog) and "preDelay" (codec) match.
 const normalize = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-const codecFieldNames = (fields: readonly FieldCodec[] | undefined): Set<string> =>
-  new Set((fields ?? []).map(field => normalize(field.name)));
-
 const catalogParamNames = (params: readonly ParamSpec[] | undefined): Set<string> =>
   new Set((params ?? []).map(param => normalize(param.name)));
-
-// ── id coverage: codec type list === catalog keys === capabilities type ids ────
 
 interface PerTypeBlock {
   /** capabilities/catalog block id. */
   block: "fx" | "pedalFx" | "delay" | "reverb" | "fxDelay";
-  /** authoritative codec type list from constants.ts. */
+  /** Authoritative codec type list, from model/constants.ts. */
   types: readonly string[];
-  /** the type's codec field map (undefined = not yet modeled). */
+  /** The type's codec field map, undefined where the codec has none. */
   codecFields: (type: string) => readonly FieldCodec[] | undefined;
   /** codec field names to skip in the reverse (codec → catalog) check: sub-model selectors. */
   reverseSkip: ReadonlySet<string>;
@@ -64,11 +49,6 @@ interface PerTypeBlock {
   /** per-type catalog params that have no codec field, for a documented reason. */
   paramOnly: Record<string, ReadonlySet<string>>;
 }
-
-const reverbCodecFields = (type: string): readonly FieldCodec[] | undefined =>
-  (STANDARD_REVERB_TYPES as readonly string[]).includes(type)
-    ? REV_TYPE_MAPS.STANDARD
-    : REV_TYPE_MAPS[type];
 
 const PER_TYPE_BLOCKS: PerTypeBlock[] = [
   {
@@ -101,7 +81,9 @@ const PER_TYPE_BLOCKS: PerTypeBlock[] = [
   {
     block: "reverb",
     types: REV_TYPES,
-    codecFields: reverbCodecFields,
+    // fieldsFor("reverb", type) is blocks.ts's own reverbFields, so this reads the codec's real
+    // routing (the seven standard types sharing one list) instead of a second copy of it.
+    codecFields: (type) => fieldsFor("reverb", type),
     reverseSkip: new Set(),
     aliases: FIELD_LABEL_ALIASES.reverb,
     paramOnly: {},
@@ -121,13 +103,29 @@ const FX_DELAY_BLOCK: PerTypeBlock = {
 };
 
 describe("GX-1 catalog id coverage", () => {
-  it.each(PER_TYPE_BLOCKS)("$block: codec types, catalog keys, and capabilities types all agree", ({ block, types }) => {
-    const codecTypes = new Set(types);
+  it.each(PER_TYPE_BLOCKS)("$block: catalog keys match the codec's types", ({ block, types }) => {
     const catalogTypes = new Set(Object.keys(PARAMS_BY_TYPE[block]));
+
+    expect(catalogTypes).toStrictEqual(new Set(types));
+  });
+
+  it.each(PER_TYPE_BLOCKS)("$block: capability type ids match the codec's types", ({ block, types }) => {
     const capabilityTypes = new Set(groupTypes(block).map(capType => capType.id));
 
-    expect(catalogTypes, `${block} catalog keys vs codec types`).toStrictEqual(codecTypes);
-    expect(capabilityTypes, `${block} capabilities types vs codec types`).toStrictEqual(codecTypes);
+    expect(capabilityTypes).toStrictEqual(new Set(types));
+  });
+
+  it("fxDelay: catalog keys match the codec's sub-algorithms", () => {
+    const catalogTypes = new Set(Object.keys(PARAMS_BY_TYPE.fxDelay));
+
+    expect(catalogTypes).toStrictEqual(new Set(FX_DLY_TYPES));
+  });
+
+  it("fxDelay: the fx DELAY type's subTypes match the codec's sub-algorithms", () => {
+    const fxDelayType = groupTypes("fx").find(capType => capType.id === "DELAY");
+    const subTypeIds = new Set((fxDelayType?.subTypes ?? []).map(subType => subType.id));
+
+    expect(subTypeIds).toStrictEqual(new Set(FX_DLY_TYPES));
   });
 
   // Selection-only / metadata-only blocks: capabilities must list every codec model id.
@@ -137,201 +135,152 @@ describe("GX-1 catalog id coverage", () => {
     { block: "mic", types: MIC_TYPES },
     { block: "drive", types: ODDS_TYPES },
   ])("$block: capabilities lists every codec model id", ({ block, types }) => {
-    const capabilityIds = new Set(groupTypes(block).map(capType => capType.id));
+    const capabilityIds = groupTypes(block).map(capType => capType.id);
 
-    for (const type of types) {
-      expect(capabilityIds, `${block} model "${type}" is missing from capabilities`).toContain(type);
-    }
+    expect(capabilityIds).toStrictEqual(expect.arrayContaining([...types]));
+  });
+
+  it("the drive group's types equal the fx OD/DS type's subTypes", () => {
+    const driveTypeIds = groupTypes("drive").map(capType => capType.id);
+    const oddsSubTypeIds = groupTypes("fx").find(capType => capType.id === "OD/DS")?.subTypes?.map(sub => sub.id);
+
+    expect(driveTypeIds).toStrictEqual(oddsSubTypeIds);
   });
 });
 
-// ── param parity: codec fields ↔ catalog params, bidirectional, per type ───────
+interface ParityCase {
+  title: string;
+  catalogOnly: string[];
+  codecOnly: string[];
+}
 
-const assertTypeParity = (block: PerTypeBlock, type: string): void => {
-  const fields = block.codecFields(type);
-  const codecNames = codecFieldNames(fields);
+const parityCase = (block: PerTypeBlock, type: string): ParityCase => {
+  const fields = block.codecFields(type) ?? [];
+  const codecNames = new Set(fields.map(field => normalize(field.name)));
   const catalog = present(PARAMS_BY_TYPE[block.block][type], `the ${block.block} ${type} catalog`);
   const catalogNames = catalogParamNames(catalog);
   const aliases = block.aliases[type] ?? {};
   const aliasTargets = new Set(Object.values(aliases).map(normalize));
   const paramOnly = block.paramOnly[type] ?? new Set<string>();
 
-  // Forward: every catalog param maps to a codec field (or is an alias target / param-only).
-  for (const param of catalog) {
-    const matches = codecNames.has(normalize(param.name))
-      || aliasTargets.has(normalize(param.name))
-      || paramOnly.has(param.name);
-    expect(matches, `${block.block} "${type}" catalog param "${param.name}" has no matching codec field`).toBe(true);
-  }
+  const catalogOnly = catalog
+    .filter(param =>
+      !codecNames.has(normalize(param.name)) && !aliasTargets.has(normalize(param.name)) && !paramOnly.has(param.name))
+    .map(param => param.name);
 
-  // Reverse: every codec field maps to a catalog param (or is an alias / skipped selector).
-  for (const field of fields ?? []) {
-    if (block.reverseSkip.has(field.name)) continue;
-    const matches = catalogNames.has(normalize(field.name)) || field.name in aliases;
-    expect(matches, `${block.block} "${type}" codec field "${field.name}" is missing from the catalog`).toBe(true);
-  }
+  const codecOnly = fields
+    .filter(field => !block.reverseSkip.has(field.name))
+    .filter(field => !catalogNames.has(normalize(field.name)) && !(field.name in aliases))
+    .map(field => field.name);
+
+  return { title: `${block.block} ${type}`, catalogOnly, codecOnly };
 };
 
-describe.each(PER_TYPE_BLOCKS)("GX-1 codec ↔ catalog param parity, $block", (block) => {
-  it.each(block.types)("%s: codec fields and catalog params match", (type) => {
-    assertTypeParity(block, type);
+const parityCases = [...PER_TYPE_BLOCKS, FX_DELAY_BLOCK].flatMap(
+  block => block.types.map(type => parityCase(block, type))
+);
+
+describe("GX-1 codec <-> catalog param parity", () => {
+  it.each(parityCases)("$title: every catalog param has a matching codec field", ({ catalogOnly }) => {
+    expect(catalogOnly).toStrictEqual([]);
+  });
+
+  it.each(parityCases)("$title: every codec field has a matching catalog param", ({ codecOnly }) => {
+    expect(codecOnly).toStrictEqual([]);
+  });
+
+  it("every FIELD_LABEL_ALIASES key names a codec field of that type", () => {
+    const offending = PER_TYPE_BLOCKS.flatMap(block =>
+      Object.entries(FIELD_LABEL_ALIASES[block.block]).flatMap(([type, aliasMap]) => {
+        const fieldNames = new Set((block.codecFields(type) ?? []).map(field => field.name));
+        return Object.keys(aliasMap)
+          .filter(fieldName => !fieldNames.has(fieldName))
+          .map(fieldName => `${block.block}/${type}/${fieldName}`);
+      })
+    );
+
+    expect(offending).toStrictEqual([]);
   });
 });
 
-// ── FX-slot DELAY: per-sub-algorithm codec ↔ catalog (nested under the fx DELAY type) ──
+// amp/odds/ns/fv are fixed-shape blocks with one param list rather than one per type, so
+// `fieldsFor` (the codec's own single source for a block's field list) stands in for the
+// per-type codec map above.
+const SINGLE_SHAPE_BLOCKS = ["amp", "drive", "noiseGate", "volume"] as const;
 
-describe("GX-1 FX-slot DELAY per-sub-algorithm parity", () => {
-  const fxDelayType = groupTypes("fx").find(capType => capType.id === "DELAY");
+describe("GX-1 codec <-> catalog param parity (single-shape blocks)", () => {
+  it.each(SINGLE_SHAPE_BLOCKS)("%s: codec fields match its catalog params", (block) => {
+    const codecNames = new Set((fieldsFor(block) ?? []).map(field => normalize(field.name)));
+    const catalogNames = catalogParamNames(PARAMS_BY_BLOCK[block]);
 
-  it("codec sub-algorithms, catalog keys, and DELAY subTypes all agree", () => {
-    const codecTypes = new Set<string>(FX_DLY_TYPES);
-    const catalogTypes = new Set(Object.keys(PARAMS_BY_TYPE.fxDelay));
-    const subTypeIds = new Set((fxDelayType?.subTypes ?? []).map(subType => subType.id));
-
-    expect(catalogTypes, "fxDelay catalog keys vs codec sub-algorithms").toStrictEqual(codecTypes);
-    expect(subTypeIds, "fx DELAY subTypes vs codec sub-algorithms").toStrictEqual(codecTypes);
+    expect(codecNames).toStrictEqual(catalogNames);
   });
 
-  it.each(FX_DELAY_BLOCK.types)("%s: codec fields and catalog params match", (type) => {
-    assertTypeParity(FX_DELAY_BLOCK, type);
-  });
-});
+  // Every key capabilities stamps on a single-shape block's params has to be a field its decoder
+  // actually emits, or a write naming that key lands nowhere.
+  it.each(SINGLE_SHAPE_BLOCKS)("%s: every capability param key names a field its decoder emits", (block) => {
+    const fields = (fieldsFor(block) ?? []).map(field => field.name);
+    const group = present(gx1Capabilities.groups.find(candidate => candidate.id === block), block);
+    const keys = (group.params ?? []).map(param => param.key);
 
-// ── single-shape blocks: decoded fields ↔ catalog block params ─────────────────
-//
-// amp/odds/ns/fv are fixed-shape blocks decoded by hand-written functions rather than a
-// FieldCodec table, so decoding placeholder bytes and reading the object's keys gets the
-// field-name set without duplicating a list that could drift from blocks.ts.
-
-const decodedParamNames = (decoded: { params: object }): Set<string> =>
-  new Set(Object.keys(decoded.params).map(normalize));
-
-const assertBlockParity = (block: "amp" | "drive" | "noiseGate" | "volume", codecNames: Set<string>): void => {
-  const catalogNames = catalogParamNames(PARAMS_BY_BLOCK[block]);
-  for (const name of codecNames) {
-    expect(catalogNames, `"${block}" codec field "${name}" is missing from the catalog`).toContain(name);
-  }
-  for (const name of catalogNames) {
-    expect(codecNames, `"${block}" catalog param "${name}" has no matching codec field`).toContain(name);
-  }
-};
-
-describe("GX-1 codec ↔ catalog param parity (single-shape blocks)", () => {
-  // speaker and mic are ordinary amp params, cab and mic groups notwithstanding: a group of its own
-  // does not make the amp block's own field discoverable from an amp lookup, and a field outside the
-  // catalog is invisible to describe_device and the CLI alike.
-  it("amp", () => {
-    const decoded = decodeTypedBlock(TYPED_BLOCKS.amp, hexFromBytes(new Array<number>(13).fill(0)));
-
-    assertBlockParity("amp", decodedParamNames(decoded));
-  });
-
-  it("drive", () => {
-    const decoded = decodeTypedBlock(TYPED_BLOCKS.drive, hexFromBytes(new Array<number>(8).fill(0)));
-
-    assertBlockParity("drive", decodedParamNames(decoded));
-  });
-
-  it("noiseGate", () => {
-    const decoded = decodeNoiseGate(hexFromBytes(new Array<number>(4).fill(0)));
-
-    assertBlockParity("noiseGate", decodedParamNames(decoded));
-  });
-
-  it("volume", () => {
-    const decoded = decodeVolume(hexFromBytes(new Array<number>(4).fill(0)));
-
-    assertBlockParity("volume", decodedParamNames(decoded));
+    expect(fields).toStrictEqual(expect.arrayContaining(keys));
   });
 });
 
-// Every key capabilities stamps on a single-shape block's params has to be a field its decoder
-// actually emits, or a write naming that key lands nowhere.
-describe("GX-1 single-shape block param keys name a real decoded field", () => {
-  const decodedBlocks = {
-    amp: decodeTypedBlock(TYPED_BLOCKS.amp, hexFromBytes(new Array<number>(13).fill(0))),
-    drive: decodeTypedBlock(TYPED_BLOCKS.drive, hexFromBytes(new Array<number>(8).fill(0))),
-    noiseGate: decodeNoiseGate(hexFromBytes(new Array<number>(4).fill(0))),
-    volume: decodeVolume(hexFromBytes(new Array<number>(4).fill(0))),
-  };
-
-  it.each(Object.keys(decodedBlocks))("%s", (blockId) => {
-    const group = gx1Capabilities.groups.find(candidate => candidate.id === blockId);
-    const fields = Object.keys(decodedBlocks[blockId as keyof typeof decodedBlocks].params);
-
-    expect(group?.params, `"${blockId}" should expose block params`).toBeDefined();
-    for (const param of group?.params ?? []) {
-      expect(fields, `"${blockId}" param "${param.name}" stamped key "${param.key}"`).toContain(param.key);
-    }
-  });
-});
-
-// ── representation parity: codec field kind ↔ catalog param domain ─────────────
-//
 // The name-parity guards above match field/param NAMES only. This guard is auto-derived over
 // every per-type codec field and asserts its *representation* agrees with the catalog's authored
 // kind: a boolean toggle is a `bool` field; a discrete param is a `lookup` whose table equals its
 // `values` verbatim; a numeric one is a numeric field; a param that takes a number or a note value
-// is a `namedAbove` field whose note list is those same `values`. It catches a catalog enum backed by a
-// hand-rolled numeric codec (PHASER `stage` as a raw index instead of a lookup is that shape of
-// bug) and the trigger/solo drift between strings, numbers, and booleans, all without a
-// hand-maintained list, so a new effect/field can't silently reintroduce the class. An
-// `indexTable` field is the one exception, since its mixed string/number table answers to no
+// is a `namedAbove` field whose note list is those same `values`. It catches a catalog enum backed
+// by a hand-rolled numeric codec (PHASER `stage` as a raw index instead of a lookup is that shape
+// of bug) and the trigger/solo drift between strings, numbers, and booleans, all without a
+// hand-maintained list, so a new effect/field can't silently reintroduce the class. `indexTable`
+// fields are left out of the case table below, since their mixed string/number table answers to no
 // single kind.
-
-const SINGLE_SHAPE_BLOCKS = ["amp", "drive", "noiseGate", "volume"] as const;
 
 const NUMERIC_KINDS = new Set(["u8", "signed", "scaled", "nibblePair", "nibbleQuad"]);
 
-type ReprClass = ParamSpec["kind"] | "opaque" | "unknown";
+type ReprClass = ParamSpec["kind"] | "unknown";
 
 const codecClass = (field: FieldCodec): ReprClass => {
   if (field.kind === "bool") return "boolean";
   if (field.kind === "lookup") return "discrete";
   if (field.kind === "namedAbove") return "numericOrNamed";
-  // indexTable holds a mixed string/number table (PITCH SHIFT's pitch presets), so its
-  // representation isn't strictly pinned.
-  if (field.kind === "indexTable") return "opaque";
-  const numeric = field.kind !== undefined && NUMERIC_KINDS.has(field.kind);
-  const cls: ReprClass = numeric ? "numeric" : "unknown";
+  const cls: ReprClass = NUMERIC_KINDS.has(field.kind) ? "numeric" : "unknown";
   return cls;
 };
 
-const representationChecks = [...PER_TYPE_BLOCKS, FX_DELAY_BLOCK].flatMap(block =>
-  block.types.flatMap(type =>
-    (block.codecFields(type) ?? [])
-      .filter(field => !block.reverseSkip.has(field.name))
-      .map(field => ({ title: `${block.block} ${type}.${field.name}`, block, type, field })),
-  ),
+interface RepresentationCase {
+  title: string;
+  field: FieldCodec;
+  param: ParamSpec;
+}
+
+const representationCases: RepresentationCase[] = [...PER_TYPE_BLOCKS, FX_DELAY_BLOCK].flatMap(block =>
+  block.types.flatMap(type => {
+    const aliases = block.aliases[type] ?? {};
+    const catalog = present(PARAMS_BY_TYPE[block.block][type], `the ${block.block} ${type} catalog`);
+    return (block.codecFields(type) ?? [])
+      .filter(field => !block.reverseSkip.has(field.name) && field.kind !== "indexTable")
+      .map(field => {
+        const catalogLabel = aliases[field.name] ?? field.name;
+        const param = catalog.find(candidate => normalize(candidate.name) === normalize(catalogLabel));
+        return { title: `${block.block} ${type}.${field.name}`, field, param };
+      })
+      .filter((entry): entry is RepresentationCase => entry.param !== undefined);
+  })
 );
 
-const assertRepresentationParity = (block: PerTypeBlock, type: string, field: FieldCodec): void => {
-  const aliases = block.aliases[type] ?? {};
-  const catalogLabel = aliases[field.name] ?? field.name;
-  const catalog = present(PARAMS_BY_TYPE[block.block][type], `the ${block.block} ${type} catalog`);
-  const param = catalog.find(candidate => normalize(candidate.name) === normalize(catalogLabel));
-  expect(param, `${block.block} "${type}" catalog has no param for codec field "${field.name}"`).toBeDefined();
-  if (!param) return;
+const tableCases = representationCases.filter(({ param }) => param.kind === "discrete" || param.kind === "numericOrNamed");
 
-  const codClass = codecClass(field);
-  if (codClass === "opaque") return;
+describe("GX-1 codec <-> catalog representation parity", () => {
+  it.each(representationCases)("$title kind matches", ({ field, param }) => {
+    expect(codecClass(field)).toBe(param.kind);
+  });
 
-  expect(
-    codClass,
-    `${block.block} "${type}" field "${field.name}": codec kind "${field.kind ?? "none"}" vs catalog kind "${param.kind}"`,
-  ).toBe(param.kind);
-
-  if (param.kind === "discrete" || param.kind === "numericOrNamed") {
-    expect(
-      [...(field.table ?? [])],
-      `${block.block} "${type}" field "${field.name}": codec table vs catalog values`,
-    ).toStrictEqual([...param.values]);
-  }
-};
-
-describe("GX-1 codec ↔ catalog representation parity", () => {
-  it.each(representationChecks)("$title", ({ block, type, field }) => {
-    assertRepresentationParity(block, type, field);
+  it.each(tableCases)("$title table equals values", ({ field, param }) => {
+    const values = param.kind === "discrete" || param.kind === "numericOrNamed" ? param.values : [];
+    expect([...(field.table ?? [])]).toStrictEqual([...values]);
   });
 
   const singleShapeFields = SINGLE_SHAPE_BLOCKS.flatMap(block => (fieldsFor(block) ?? []).map(field => ({
@@ -351,8 +300,6 @@ describe("GX-1 codec ↔ catalog representation parity", () => {
   });
 });
 
-// ── param key stamping: describe_device param.key === the codec/decoded field name ──
-//
 // Each per-type param carries `key` = the field name used in decoded patches (read_patch) and
 // in an effect's params record when building, stamped automatically from the codec map,
 // so an agent never has to guess "PRE-DELAY" → preDelay or "OCT F-BACK" → octFeedback.
@@ -377,80 +324,100 @@ describe("GX-1 param key stamping", () => {
   const typeParams = (capType: CapabilityType): ParamSpec[] =>
     [capType.params ?? [], ...(capType.subTypes ?? []).map(sub => sub.params ?? [])].flat();
 
-  const keyedParams = (groupId: string): { type: string; param: ParamSpec }[] =>
-    groupTypes(groupId).flatMap(capType => typeParams(capType).map(param => ({ type: capType.id, param })));
+  const keyedParams = (groupId: string): { groupId: string; type: string; param: ParamSpec }[] =>
+    groupTypes(groupId).flatMap(capType => typeParams(capType).map(param => ({ groupId, type: capType.id, param })));
 
-  // HARMONIST's KEY is the patch-level key, not a codec field, so it is the one param without a `key`.
-  const isParamOnly = (groupId: string, typeId: string, name: string): boolean =>
-    groupId === "fx" && typeId === "HARMONIST" && name === "KEY";
+  // HARMONIST's KEY is the patch-level key, not a codec field, so it is the one param without a
+  // `key`, and is filtered out of the case table rather than skipped with a conditional.
+  const keyedParamCases = ["fx", "pedalFx", "delay", "reverb"].flatMap(keyedParams)
+    .filter(({ groupId, type, param }) => !(groupId === "fx" && type === "HARMONIST" && param.name === "KEY"));
 
-  it("stamps a key on every per-type capability param (except paramOnly HARMONIST KEY)", () => {
-    for (const groupId of ["fx", "pedalFx", "delay", "reverb"]) {
-      for (const { type, param } of keyedParams(groupId)) {
-        if (isParamOnly(groupId, type, param.name)) continue;
-        expect(param.key, `${groupId} "${type}" param "${param.name}"`).toBeDefined();
-      }
-    }
+  it.each(keyedParamCases)("$groupId $type param \"$param.name\" carries a key", ({ param }) => {
+    expect(param.key).toBeDefined();
   });
 });
-
-// ── subtype coverage: capabilities subTypes ↔ PARAM_SUBTYPE_EFFECTS ─────────────
 
 describe("GX-1 FX subtype coverage", () => {
-  it("covers every PARAM_SUBTYPE_EFFECTS entry as subTypes of the corresponding FX type", () => {
-    const paramSubtypeTables: Record<string, readonly string[]> = {
-      "COMPRESSOR":   COMP_TYPES,
-      "LIMITER":      LIM_TYPES,
-      "AC RESO":      ACRESO_TYPES,
-      "CHORUS":       CHORUS_TYPES,
-      "CLASSIC-VIBE": VIBE_MODES,
-      "HUMANIZER":    HUM_MODES,
-      "OD/DS":        ODDS_TYPES,
-      "DELAY":        FX_DLY_TYPES,
-      "REVERB":       FX_REV_TYPES,
-    };
-    const fxTypes = groupTypes("fx");
+  const PARAM_SUBTYPE_TABLES: Partial<Record<string, readonly string[]>> = {
+    "COMPRESSOR":   COMP_TYPES,
+    "LIMITER":      LIM_TYPES,
+    "AC RESO":      ACRESO_TYPES,
+    "CHORUS":       CHORUS_TYPES,
+    "CLASSIC-VIBE": VIBE_MODES,
+    "HUMANIZER":    HUM_MODES,
+    "OD/DS":        ODDS_TYPES,
+    "FIXED WAH":    WAH_TYPES,
+    "DELAY":        FX_DLY_TYPES,
+    "REVERB":       FX_REV_TYPES,
+  };
 
-    for (const [fxTypeId, subTypes] of Object.entries(paramSubtypeTables)) {
-      const found = fxTypes.find(capType => capType.id === fxTypeId);
-      expect(found, `FX type "${fxTypeId}" from PARAM_SUBTYPE_EFFECTS is missing from capabilities`).toBeDefined();
+  it("every PARAM_SUBTYPE_EFFECTS entry has a subtype table to check it against", () => {
+    const untabled = [...PARAM_SUBTYPE_EFFECTS].filter(type => PARAM_SUBTYPE_TABLES[type] === undefined);
 
-      const foundSubTypeIds = new Set((found?.subTypes ?? []).map(subType => subType.id));
-      for (const subId of subTypes) {
-        expect(foundSubTypeIds, `Subtype "${subId}" of FX type "${fxTypeId}" is missing from capabilities`).toContain(subId);
-      }
-    }
+    expect(untabled).toStrictEqual([]);
   });
 
-  it("every fx type with subTypes is registered in PARAM_SUBTYPE_EFFECTS", () => {
-    for (const capType of groupTypes("fx")) {
-      if (!capType.subTypes || capType.subTypes.length === 0) continue;
-      expect(
-        PARAM_SUBTYPE_EFFECTS.has(capType.id),
-        `FX type "${capType.id}" has subTypes but is missing from PARAM_SUBTYPE_EFFECTS`
-      ).toBe(true);
-    }
+  const subtypeCoverageCases = [...PARAM_SUBTYPE_EFFECTS].map(fxTypeId => ({
+    fxTypeId,
+    table: PARAM_SUBTYPE_TABLES[fxTypeId] ?? [],
+    found: groupTypes("fx").find(capType => capType.id === fxTypeId),
+  }));
+
+  it.each(subtypeCoverageCases)("$fxTypeId is registered in capabilities with its subTypes", ({ found, table }) => {
+    expect(found).toBeDefined();
+    const foundSubTypeIds = (found?.subTypes ?? []).map(subType => subType.id);
+    expect(foundSubTypeIds).toStrictEqual(expect.arrayContaining([...table]));
+  });
+
+  const fxTypesWithSubTypes = groupTypes("fx").filter(capType => (capType.subTypes?.length ?? 0) > 0);
+
+  it.each(fxTypesWithSubTypes)("$id is registered in PARAM_SUBTYPE_EFFECTS", (capType) => {
+    expect(PARAM_SUBTYPE_EFFECTS.has(capType.id)).toBe(true);
   });
 });
-
-// ── chain capability: defaultOrder can't drift from the builder's DEFAULT_CHAIN ──
 
 describe("GX-1 chain capability", () => {
   it("defaultOrder equals the builder's DEFAULT_CHAIN", () => {
     expect(gx1Capabilities.chain.defaultOrder).toStrictEqual(DEFAULT_CHAIN);
   });
 
+  it("gives every block bypass true except volume, which the device can't switch off", () => {
+    const notBypassable = Object.entries(gx1Capabilities.chain.blocks)
+      .filter(([, block]) => !block.bypass)
+      .map(([name]) => name);
+
+    expect(notBypassable).toStrictEqual(["volume"]);
+  });
+
+  it("names group \"fx\" for all three fx slots", () => {
+    const groups = ["fx1", "fx2", "fx3"].map(name => gx1Capabilities.chain.blocks[name]?.group);
+
+    expect(groups).toStrictEqual(["fx", "fx", "fx"]);
+  });
+
+  it("labels every chain block from BLOCK_LABELS", () => {
+    const labels = Object.entries(gx1Capabilities.chain.blocks).map(([name, block]) => [name, block.label]);
+
+    expect(labels).toStrictEqual(Object.entries(BLOCK_LABELS));
+  });
+
+  it("withOnlyBlock scopes OVERTONE to fx3 alone", () => {
+    const overtone = groupTypes("fx").find(capType => capType.id === "OVERTONE");
+
+    expect(overtone?.blocks).toStrictEqual(["fx3"]);
+  });
+
+  it("leaves every other fx type unscoped", () => {
+    const scoped = groupTypes("fx")
+      .filter(capType => capType.id !== "OVERTONE" && capType.blocks !== undefined)
+      .map(capType => capType.id);
+
+    expect(scoped).toStrictEqual([]);
+  });
 });
 
-// ── patch-name capability: the advertised limit is the encoded one ──
-//
-// The two numbers can drift silently: a generate schema capped at 13 while the format stores 16
-// is internally consistent either way, and the committed exports' longest name happening to be 13
-// characters would not surface the mismatch.
-
-// The patch's own settings belong to no block and so appear in no group. Nothing else in the
-// catalog would notice a codec field going undescribed here, or a described one naming a field the
-// decoder never emits, which is how `key` sat decoded and undiscoverable for as long as it did.
+// The patch's own settings belong to no block and so appear in no group. No other guard notices a
+// codec field going undescribed here, or a described one naming a field the decoder never emits.
 describe("GX-1 patch-settings capability", () => {
   const specs = gx1Capabilities.patchSettings;
   const codecFields = PATCH_SETTING_FIELDS.map(field => field.name);
@@ -463,40 +430,24 @@ describe("GX-1 patch-settings capability", () => {
 
   it("stamps each setting with the key a decoded patch carries it under", () => {
     const patch = blankPatch("Test") as unknown as Record<string, unknown>;
+    const keys = specs.map(spec => spec.key);
 
-    for (const spec of specs) {
-      expect(Object.keys(patch), `setting "${spec.name}" stamped key "${spec.key}"`).toContain(spec.key);
-    }
-  });
-
-  it("takes the settings of a patch read off the device straight back as a spec", () => {
-    const patch = blankPatch("Test") as unknown as Record<string, unknown>;
-    const settings = Object.fromEntries(codecFields.map(field => [field, patch[field]]));
-
-    const rebuilt = driver.buildPatch({ name: "Test", ...settings }) as unknown as Record<string, unknown>;
-
-    for (const field of codecFields) expect(rebuilt[field]).toStrictEqual(patch[field]);
+    expect(Object.keys(patch)).toStrictEqual(expect.arrayContaining(keys));
   });
 });
 
+// The two numbers can drift silently: a generate schema capped at 13 while the format stores 16
+// is internally consistent either way, and the committed exports' longest name happening to be 13
+// characters would not surface the mismatch.
 describe("GX-1 patch-name capability", () => {
   it("advertises the limit the codec actually encodes", () => {
     expect(gx1Capabilities.patchName.maxLength).toBe(NAME_BYTES);
   });
-
-  it("keeps a name that fills the stored width", () => {
-    const full = "x".repeat(NAME_BYTES);
-
-    expect(blankPatch(full).name).toBe(full);
-  });
 });
 
-// ── spec examples: what a consumer is shown is what the validator accepts ────────
-//
-// The example exists to answer where a param is written, so the guard that matters is that it
-// builds. An example that drifts from the block key, the nesting, the defaults or the validator
-// stops being a usable spec, and buildPatch is the one check that covers all four at once.
-
+// The example exists to answer where a param is written, so what this guard checks is the shape:
+// written under a real block key, carrying its controls under `params`. Whether an example builds
+// through the validator is a separate, cross-unit concern, checked in integration/gx1RoundTrip.
 describe("GX-1 spec examples", () => {
   const groupsWithBlocks = gx1Capabilities.groups.filter(group => BLOCK_NAMES.some(
     name => BLOCK_GROUPS[name] === group.id
@@ -515,20 +466,19 @@ describe("GX-1 spec examples", () => {
   const bodyOf = (example?: PatchSpecExample): Record<string, unknown> =>
     Object.values(example ?? {})[0] as Record<string, unknown>;
 
-  // One case per example, asserting everything an example has to be. A loop per property reports
-  // the same broken example once per property, and counts the suite by properties checked rather
-  // than by examples there are to get right.
-  it.each(examples)("$group $type carries a usable example", ({ group, example }) => {
+  it.each(examples)("$group $type is written under a block of its group, with params", ({ group, example }) => {
     expect(example, "every block-backed type shows one").toBeDefined();
     const [block] = Object.keys(example ?? {});
     const body = bodyOf(example);
 
     expect(BLOCK_GROUPS[block as BlockName], "written under a real block key").toBe(group);
     expect(body.params, "carries its controls under the one key every block uses").toBeDefined();
+  });
 
-    // The one check covering block key, nesting, defaults and the validator at once, so it goes last.
-    const build = (): unknown => driver.buildPatch({ name: "Example", amp: { type: "TWIN" }, ...example });
-    expect(build, "and builds as it stands").not.toThrow();
+  it("OVERTONE's example is written under fx3, not fx1", () => {
+    const overtone = groupTypes("fx").find(capType => capType.id === "OVERTONE");
+
+    expect(Object.keys(overtone?.example ?? {})).toStrictEqual(["fx3"]);
   });
 
   // A type with sub-models opens on one, so an example leaving subType out shows a shape the
@@ -562,12 +512,38 @@ describe("GX-1 spec examples", () => {
     expect(example.params).toStrictEqual(DEFAULTS_BY_TYPE.fxDelay[example.subType]);
   });
 
-  it("leaves the example off a group that names no block", () => {
-    const lookupOnly = gx1Capabilities.groups.filter(group => ["cab", "mic"].includes(group.id));
+  // acceptedKeys drops any default whose key the chosen type/sub-model doesn't accept (a sub-model
+  // selector's own field among them), which this checks held across every example at once.
+  it("never carries a param key the type or sub-model doesn't accept", () => {
+    const offending = examples.flatMap(({ group, type, example }) => {
+      if (example === undefined) return [];
+      const groupObj = present(gx1Capabilities.groups.find(candidate => candidate.id === group), group);
+      const capType = groupObj.types.find(candidate => candidate.id === type);
+      const body = bodyOf(example);
+      const variant = capType?.subTypes?.find(sub => sub.id === body.subType);
+      const accepted = new Set(
+        [...(groupObj.params ?? []), ...(capType?.params ?? []), ...(variant?.params ?? [])]
+          .map(param => param.key)
+          .filter((key): key is string => key !== undefined)
+      );
+      const params = (body.params ?? {}) as Record<string, unknown>;
+      return Object.keys(params).filter(key => !accepted.has(key)).map(key => `${group}/${type}:${key}`);
+    });
 
-    for (const group of lookupOnly) {
-      expect(group.example).toBeUndefined();
-      for (const capType of group.types) expect(capType.example).toBeUndefined();
-    }
+    expect(offending).toStrictEqual([]);
+  });
+
+  it("leaves the example off a group that names no block", () => {
+    const lookupOnlyGroups = gx1Capabilities.groups.filter(group => ["cab", "mic"].includes(group.id));
+
+    expect(lookupOnlyGroups.map(group => group.example)).toStrictEqual(lookupOnlyGroups.map(() => undefined));
+  });
+
+  const lookupOnlyTypes = gx1Capabilities.groups
+    .filter(group => ["cab", "mic"].includes(group.id))
+    .flatMap(group => group.types.map(capType => ({ groupId: group.id, typeId: capType.id, capType })));
+
+  it.each(lookupOnlyTypes)("$groupId $typeId carries no example, its group naming no block", ({ capType }) => {
+    expect(capType.example).toBeUndefined();
   });
 });

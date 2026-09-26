@@ -10,8 +10,9 @@
  *    from the documented device.
  *
  * Two shapes, mirroring how the codec models each block:
- *  - `PARAMS_BY_TYPE[block][type]` for blocks whose params vary by the selected type
- *    (`fx`, `pedalFx`, `delay`, `reverb`). Keys are the type ids used in the codec/constants.
+ *  - `PARAMS_BY_TYPE[block][type]` for blocks whose params vary by the selected type (`fx`,
+ *    `pedalFx`, `delay`, `reverb`, and `fxDelay` for the FX-slot DELAY's sub-algorithms). Keys are
+ *    the type ids used in the codec/constants.
  *  - `PARAMS_BY_BLOCK[block]` for single-shape blocks (`amp`, `drive`, `noiseGate`, `volume`).
  *
  * The `cab` and `mic` capability groups describe the values of amp's `speaker` and `mic` params,
@@ -28,8 +29,6 @@ import {
 } from "../model";
 import { def, num, oneOf, lookupOf, bool, orNotes } from "./paramDomain";
 
-// ── Shared param fragments (identical across many types, defined once) ────────
-
 // Every modulation rate and pre-delay the device can sync to the patch tempo, so the note values
 // are authored once rather than beside each effect that offers one.
 const SYNCED_RATE = orNotes(num(0, 100), RATE_NOTE_VALUES);
@@ -41,8 +40,6 @@ const OD_SOLO: ParamSpec[] = [
   def("SOLO", bool(), "Temporary level boost for solo sections."),
   def("SOLO LEVEL", num(0, 100), "Output volume while SOLO is engaged."),
 ];
-
-// ── FX1/FX2/FX3, per effect type ──────────────────────────────────────────────
 
 const FX_PARAMS: Record<string, ParamSpec[]> = {
   "COMPRESSOR": [
@@ -319,8 +316,6 @@ const FX_PARAMS: Record<string, ParamSpec[]> = {
   ],
 };
 
-// ── PFX (expression pedal effect), per type ───────────────────────────────────
-
 const PFX_PARAMS: Record<string, ParamSpec[]> = {
   "WAH": [
     def("LEVEL", num(0, 100), "Volume of the wah effect."),
@@ -338,8 +333,6 @@ const PFX_PARAMS: Record<string, ParamSpec[]> = {
   ],
 };
 
-// ── Delay (dedicated block), per type ─────────────────────────────────────────
-//
 // Sourced from gx1_parameter_guide.md; every field matches DELAY_TYPE_MAPS in codec/blocks.ts.
 
 const DLY_TIME: ParamSpec = def("TIME", orNotes(num(1, 2000, { unit: "ms" }), TIME_NOTE_VALUES), "Delay time.");
@@ -391,8 +384,6 @@ const DELAY_PARAMS: Record<string, ParamSpec[]> = {
   "GLITCH": DLY_GLITCH_PARAMS,
 };
 
-// ── FX-slot DELAY (an FX1/2/3 effect), per sub-algorithm ──────────────────────
-//
 // Distinct from the dedicated DLY block above: only 5 sub-algorithms, and STANDARD/MODULATE/
 // WARP/TWIST/GLITCH share their param sets with the dedicated block's same-named types.
 // Matches FX_DELAY_TYPE_MAPS in codec/fxParams.ts.
@@ -405,11 +396,9 @@ const FX_DELAY_PARAMS: Record<string, ParamSpec[]> = {
   "GLITCH": DLY_GLITCH_PARAMS,
 };
 
-// ── Reverb (dedicated block), per type ────────────────────────────────────────
-//
 // Sourced from gx1_parameter_guide.md; matches REV_TYPE_MAPS in codec/blocks.ts. The 7
 // standard spaces share one field set; SHIMMER/SUB DELAY/TERA ECHO each differ. TERA ECHO's
-// device label "S-TIME" is the codec's `spreadTime` field (aliased in the drift guard).
+// device label "S-TIME" is the codec's `spreadTime` field (see FIELD_LABEL_ALIASES below).
 
 const REV_STANDARD_PARAMS: ParamSpec[] = [
   def("TIME", num(0.1, 10, { unit: "s", decimals: 1 }), "Reverb decay time."),
@@ -452,8 +441,6 @@ const REVERB_PARAMS: Record<string, ParamSpec[]> = {
   ],
 };
 
-// ── Single-shape blocks (params are the same regardless of the selected model) ─
-
 const AMP_PARAMS: ParamSpec[] = [
   def("GAIN", num(0, 120), "Amp distortion/gain."),
   def("BASS", num(0, 100), "Low-frequency tone (50 = flat)."),
@@ -485,8 +472,6 @@ const FV_PARAMS: ParamSpec[] = [
   def("MAX", num(0, 100), "Volume at toe position (pedal fully depressed)."),
   def("CURVE", oneOf("SLOW1", "SLOW2", "NORMAL", "FAST"), "Volume response curve: how volume changes relative to pedal movement."),
 ];
-
-// ── Assembled catalog ─────────────────────────────────────────────────────────
 
 /** Blocks whose params vary by the selected type: `[block][type] -> params`. */
 const PARAMS_BY_TYPE = {

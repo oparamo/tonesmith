@@ -19,6 +19,7 @@ import {
   PARAM_SUBTYPE_EFFECTS, PFX_SUBTYPE_EFFECTS, SUB_TYPE_FIELD,
 } from "../../../../src/device/gx1/model";
 import { DEFAULTS_BY_TYPE, BLOCK_DEFAULTS, DEFAULT_SUBTYPES } from "../../../../src/device/gx1/catalog/defaults";
+import type { ParamDefaults, BlockDefaults } from "../../../../src/device/gx1/catalog/defaults";
 import type { Patch } from "../../../../src/device/gx1/model";
 import { DEFAULT_INIT_FIXTURE, patchAt, rawBlock } from "../helpers";
 
@@ -26,9 +27,6 @@ const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
 
 // The FX-slot DELAY's sub-algorithm selector, at absolute offset 212 within the FX block (FORMAT.md).
 const FX_DELAY_SUBALGO_OFFSET = 212;
-
-type ParamDefaults = Record<string, string | number | boolean>;
-type BlockDefaults = Record<string, ParamDefaults>;
 
 const omit = (obj: object, keys: string[]): ParamDefaults =>
   Object.fromEntries(Object.entries(obj).filter(([key]) => !keys.includes(key)));
