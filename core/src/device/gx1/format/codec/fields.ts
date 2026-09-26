@@ -2,8 +2,6 @@ import { toSigned, toUnsigned, byteAt, lookupName, tableIndex, shownValue } from
 import { SUB_TYPE_FIELD, TIME_NOTE_VALUES, RATE_NOTE_VALUES } from "../../model";
 import type { BlockParams } from "../../model";
 
-// ── Value guards ──────────────────────────────────────────────────────────────
-
 type Bounds = readonly [min: number, max: number];
 
 const BYTE_RANGE: Bounds = [0, 255];
@@ -26,8 +24,6 @@ const intWithin = (name: string, value: unknown, bounds: Bounds): number => {
   return within;
 };
 
-// ── FieldCodec interface ───────────────────────────────────────────────────────
-
 /**
  * One named parameter within a binary block. The decode/encode pair are strict inverses:
  * encode(decode(bytes)) restores the original bytes at the mapped offset, the invariant the
@@ -38,18 +34,13 @@ const intWithin = (name: string, value: unknown, bounds: Bounds): number => {
  */
 interface FieldCodec {
   readonly name: string;
-  /** Present on fields built by the constructors below; hand-written FieldCodec
-   * object literals may omit it. */
-  readonly kind?: "u8" | "signed" | "lookup" | "bool" | "scaled" | "nibblePair" | "nibbleQuad"
+  readonly kind: "u8" | "signed" | "lookup" | "bool" | "scaled" | "nibblePair" | "nibbleQuad"
     | "indexTable" | "namedAbove";
   readonly center?: number;
   readonly table?: readonly (string | number)[];
   decode(bytes: number[]): string | number | boolean;
   encode(value: string | number | boolean, bytes: number[]): void;
 }
-
-
-// ── Field constructors ────────────────────────────────────────────────────────
 
 /** A raw unsigned byte: decoded value is identical to the stored byte. */
 const u8 = (name: string, offset: number): FieldCodec => ({
@@ -60,9 +51,9 @@ const u8 = (name: string, offset: number): FieldCodec => ({
 });
 
 /**
- * A signed/biased byte: raw value is stored as (decoded + center).
- * Used for EQ gains (center=50 or 20), pitch offsets (center=24 or 12),
- * and any parameter that is "zero" at a non-zero byte value.
+ * A signed/biased byte: raw value is stored as (decoded + center), for a parameter whose zero
+ * sits at a non-zero byte: EQ gains and tones (center 50 or 20), pitch offsets (24 or 12), and
+ * values counted from 1 (center -1).
  */
 const signed = (name: string, offset: number, center = 50): FieldCodec => ({
   name,
@@ -104,23 +95,24 @@ const bool = (name: string, offset: number): FieldCodec => ({
 });
 
 /**
- * A scaled byte: raw byte × factor gives the decoded value (rounded to 1 decimal).
- * Used for time values stored as tenths of seconds (factor=0.1).
+ * A scaled byte: raw byte × factor gives the decoded value (rounded to 1 decimal). Used for
+ * reverb times in tenths of a second (factor 0.1) and CHORUS pre-delay in half milliseconds
+ * (factor 0.5).
  */
 const scaled = (name: string, offset: number, factor: number): FieldCodec => ({
   name,
   kind: "scaled",
   decode: bytes => Math.round(byteAt(bytes, offset, name) * factor * 10) / 10,
   encode: (value, bytes) => {
-    /** A fraction is legal here, which is what the factor is for, so only the stored byte is bounded. */
+    // A fraction is legal here, which is what the factor is for, so only the stored byte is bounded.
     const scaledRange: Bounds = [0, 255 * factor];
     bytes[offset] = Math.round(numberWithin(name, value, scaledRange) / factor);
   },
 });
 
 /**
- * An 8-bit value split across two consecutive bytes, one hex digit (nibble)
- * per byte, most-significant first. Used for reverb pre-delay (max 200ms).
+ * An 8-bit value split across two consecutive bytes, one hex digit (nibble) per byte,
+ * most-significant first. Used for reverb pre-delay (max 200 ms), memory level and BPM.
  */
 const nibblePair = (name: string, offset: number): FieldCodec => ({
   name,
@@ -189,8 +181,6 @@ const syncedTime = (name: string, offset: number): FieldCodec =>
 /** A tempo-syncable modulation rate: 0-100, then note values counting down from the longest. */
 const syncedRate = (name: string, offset: number): FieldCodec =>
   namedAbove(u8(name, offset), 100, RATE_NOTE_VALUES);
-
-// ── Generic walkers ───────────────────────────────────────────────────────────
 
 const decodeFields = (fields: FieldCodec[], bytes: number[]): BlockParams =>
   Object.fromEntries(fields.map(field => [field.name, field.decode(bytes)]));
