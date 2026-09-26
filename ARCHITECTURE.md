@@ -215,7 +215,7 @@ flowchart LR
   server --> tool["tool/<br/>seven tools"]
   server --> prompt["prompt/<br/>build_patch"]
   server --> instructions["instructions.ts"]
-  tool --> common["common/<br/>attempt · response · schemas"]
+  tool --> common["common/<br/>response · schemas"]
   tool --> core["@tonesmith/core"]
   prompt --> core
 ```
@@ -286,18 +286,22 @@ core/                         @tonesmith/core
                               factoryPatch.ts, codec/ (primitives, fields, per-block, patch)
         model/                decoded types, lookup tables and reverse indexes, block names and
                               labels, RAW (the symbol original bytes travel under)
-  tests/                      mirrors src/, plus device/conformance.test.ts over the whole roster
-    helpers.ts                fixture paths, `present`, `storedAs`, scratchDir / scratchFile
+  tests/                      one unit suite per module, at src/'s mirror path
+    integration/              suites that cross units on purpose: conformance over the whole
+                              roster, and each device's byte and spec round trips
+    helpers.ts                `present`, `storedAs`, scratchDir; device/<id>/helpers.ts holds
+                              that device's fixtures
     fixtures/<id>/            supplementary fixtures (gx1: default-init.tsl, the factory default)
   docs/<id>/                  captured manuals as Markdown, and FORMAT.md, the byte-level format spec
 
 cli/                          @tonesmith/cli (bin: tonesmith)
   src/
-    index.ts                  bin entry: buildProgram().parse()
+    index.ts                  bin entry: buildProgram().parseAsync()
     program.ts                one subcommand per registered driver
     command/                  one file per command, and configureDeviceCommands in index.ts
     common/                   patchPrint, capabilitiesPrint, color (the terminal gate), run
-  tests/                      in-process commander, one suite per command
+  tests/                      command/ and common/ mirror src/ against a fake driver;
+                              integration/ runs every command against a real device
 
 mcp/                          @tonesmith/mcp (bin: tonesmith-mcp)
   src/
@@ -307,9 +311,13 @@ mcp/                          @tonesmith/mcp (bin: tonesmith-mcp)
     tool/                     list_devices, read_patch, write_fields, describe_device, copy_patch,
                               create_patch_file, generate_patch
     prompt/                   build_patch, with device completion
-    common/                   attempt (a throw becomes an error response), response, schemas
-  tests/                      MCP InMemoryTransport, one suite per tool
+    common/                   response, schemas
+  tests/                      tool/, prompt/ and common/ mirror src/, each tool through an
+                              in-memory MCP client against a fake driver; integration/ runs a
+                              real device's session and response sizes
 
 tools/                        repo tooling, not published
   doc-to-md/                  an HTML page or PDF, URL or local file, to Markdown
+  tests/                      doc-to-md's suites, and testLayout.test.ts: every source module in
+                              core, cli and mcp has a unit suite at its mirror path
 ```

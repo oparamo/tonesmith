@@ -204,12 +204,14 @@ control, so it belongs in its own table. The alternatives are both wrong: leavin
 of an example omits a field the block takes, and naming the first model in the list ships a value
 the device never chose as a factory default.
 
-Write byte-for-byte round-trip tests in `core/tests/device/<id>/`, mirroring the source
-layout: decode the fixture, re-encode it, and assert the output bytes match the input exactly.
-Add targeted tests for individual field codecs and any lookup-table edge cases (an
+Tests follow README's Testing section. Each module under `core/src/device/<id>/` gets a unit
+suite at its mirror path under `core/tests/device/<id>/` (the layout test in `tools/tests/` fails
+on one without it), with targeted cases for each field codec and lookup-table edge case (an
 unknown or out-of-range raw value should decode to a clearly labeled sentinel rather than
-throwing). Tests are BDD-style (`describe` behavior, `it` does-X) and assert through public
-surfaces, the driver and exported helpers, never internals.
+throwing). The byte-for-byte round trip, decoding the fixture, re-encoding it and asserting the
+output bytes match the input exactly, crosses the format and codec on purpose, so it goes in
+`core/tests/integration/`. `core/tests/integration/conformance.test.ts` picks the driver up from
+the roster with no edit.
 
 ## 5. Author the param catalog, then capabilities
 
@@ -300,9 +302,9 @@ can't be a CI dependency.
   edits)`, which is a one-line call into core's `specService.applyEdits` with the device's
   capabilities and `buildPatch`: core resolves each path, coerces its value, re-seeds a block whose
   type changes, and reports every problem at once.
-- **Tests**: behavior tests in `cli/tests/` and `mcp/tests/`, exercising every CLI command and
-  MCP tool against the fixture from step 4, including error paths (bad ref, bad field path,
-  unknown device).
+- **Tests**: the cli and mcp unit suites run against a fake driver, so a new device adds nothing
+  to them. Their `tests/integration/` suites run every command and tool against a real device's
+  fixture; add the new device there alongside gx1.
 
 ## 7. Changesets and docs
 
