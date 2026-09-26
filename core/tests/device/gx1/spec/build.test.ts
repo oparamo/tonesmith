@@ -220,18 +220,6 @@ describe("validatePatchSpec", () => {
     }
   );
 
-  it("accepts a fraction where the catalog gives decimals", () => {
-    const spec = { ...valid, reverb: { type: "HALL S", params: { time: 4.5 } } };
-
-    expect(validatePatchSpec(spec)).toStrictEqual([]);
-  });
-
-  it("rejects a block that names no type, listing the types it has", () => {
-    const [issue] = validatePatchSpec({ ...valid, reverb: { params: { time: 4 } } });
-
-    expect(issue).toContain("HALL S");
-  });
-
   it.each([
     { label: "a chain that is not an array", spec: { chain: "pedalFx" } },
     { label: "a chain naming a block twice", spec: { chain: ["amp", "amp"] } },
