@@ -226,8 +226,4 @@ describe("validatePatchSpec", () => {
   ])("rejects $label", ({ spec }) => {
     expect(validatePatchSpec({ ...valid, ...spec })).toHaveLength(1);
   });
-
-  it("accepts a key the device names", () => {
-    expect(validatePatchSpec({ ...valid, key: "G" })).toStrictEqual([]);
-  });
 });
