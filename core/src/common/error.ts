@@ -1,6 +1,6 @@
 /**
- * The message carried by anything thrown. JavaScript lets a throw be any value at all, and a message
- * that reads "[object Object]" tells the caller nothing about what went wrong.
+ * The message carried by anything thrown. A throw can be any value: an Error gives its message
+ * without the "Error: " prefix `String()` would add, and anything else is stringified.
  */
 const messageOf = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error);

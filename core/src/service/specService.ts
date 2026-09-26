@@ -42,11 +42,10 @@ const groupOrUndefined = (caps: DeviceCapabilities, id: string): CapabilityGroup
 };
 
 /**
- * Matches a type id exactly, case-insensitive, never by a name prefix: `capabilityService.findType`
- * offers that fallback for a person typing a display name at the CLI or an agent guessing from
- * `describe_device`, but a spec or an edit path is data a caller is expected to have gotten from
- * the catalog verbatim, and a prefix match would let "ECH" build against ECHO's fields today and
- * something else entirely once a device grows a type ECHO would have prefixed.
+ * Matches a type id exactly, ignoring case, never by a name prefix. `capabilityService.findType`
+ * offers that fallback to a person typing a display name, but a spec or an edit is data copied from
+ * the catalog, and a prefix would pass validation only for the codec to reject the id later
+ * without listing the ones that exist.
  */
 const typeOrUndefined = (group: CapabilityGroup, id: string): CapabilityType | undefined => {
   if (id.length === 0) return undefined;
@@ -594,8 +593,7 @@ const coerceValue = (value: FieldValue, existing: unknown, named: ReadonlySet<st
   if (typeof value !== "string" || holdsText) return value;
   if (value === "true") return true;
   if (value === "false") return false;
-  // "" and Number("") is 0, not NaN, so an empty or blank value would otherwise silently become
-  // the number 0 rather than surface as the wrong kind of value for the field it is going into.
+  // Number("") is 0, not NaN, so a blank value has to be caught before it becomes a stored 0.
   const asNumber = value.trim().length === 0 ? NaN : Number(value);
   const result = Number.isNaN(asNumber) ? value : asNumber;
   return result;
