@@ -297,6 +297,10 @@ describe("setBlocks", () => {
     expect(setBlocks(CATALOG, { slot2: { type: "ECHO" }, slot1: { type: "ECHO" } })).toStrictEqual(["slot1", "slot2"]);
   });
 
+  it("drops a spec key the chain doesn't list", () => {
+    expect(setBlocks(CATALOG, { bogus: { type: "ECHO" } })).toStrictEqual([]);
+  });
+
   it("keeps a block whose spec is an empty object, which is not a bare bypass", () => {
     expect(setBlocks(CATALOG, { slot1: {} })).toStrictEqual(["slot1"]);
   });
