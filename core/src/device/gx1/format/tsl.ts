@@ -81,8 +81,17 @@ const parseEnvelope = (source: string, parsed: unknown): TslEnvelope => {
   return envelope as TslEnvelope;
 };
 
+/** Bytes with no envelope to read at all, one rejection short of every other check in this file. */
+const parseJson = (source: string, bytes: Uint8Array): unknown => {
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new Error(`Cannot read ${source}: it is not valid JSON.`);
+  }
+};
+
 const parseFile = (bytes: Uint8Array, source: string): PatchFile => {
-  const envelope = parseEnvelope(source, JSON.parse(new TextDecoder().decode(bytes)));
+  const envelope = parseEnvelope(source, parseJson(source, bytes));
   return {
     name:      envelope.name,
     formatRev: envelope.formatRev,

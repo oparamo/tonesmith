@@ -1,11 +1,3 @@
-/**
- * The device's own factory-default patch, block by block as hex, from `default-init.tsl`: an export
- * of a patch the GX-1 had just initialized. A blank patch starts here so that every block opens at
- * the values the device itself gives it, including the blocks whose bytes mean something different
- * per type. Those carry every type's factory values side by side (the shadow bytes FORMAT.md
- * describes), so a block switched to any type still finds its factory settings there. The name block
- * is left out: a blank patch always writes its own. `tsl.test.ts` holds this to the fixture.
- */
 /** The fx param block, which the factory patch carries identically in all three slots. */
 const FX_PARAM_BLOCK =
   "0032323C0032323C0A00001E0A1932323232323232320304640032643231001414141714001D1414" +
@@ -16,6 +8,14 @@ const FX_PARAM_BLOCK =
   "32640004320518306464000A00000109001E32193200000032323232323264011E010E1E64323232" +
   "3200003232320032323200";
 
+/**
+ * The device's own factory-default patch, block by block as hex, from `default-init.tsl`: an export
+ * of a patch the GX-1 had just initialized. A blank patch starts here so that every block opens at
+ * the values the device itself gives it, including the blocks whose bytes mean something different
+ * per type. Those carry every type's factory values side by side (the shadow bytes FORMAT.md
+ * describes), so a block switched to any type still finds its factory settings there. The name block
+ * is left out: a blank patch always writes its own. `factoryPatch.test.ts` holds this to the fixture.
+ */
 const FACTORY_BLOCKS: Readonly<Record<string, string>> = {
   "MEMORY%CHAIN": "0102030407060908050A000B0C",
   "MEMORY%FX1_COM": "000000",
