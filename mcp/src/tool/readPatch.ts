@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { PatchFile } from "@tonesmith/core";
 import { patchService, registry } from "@tonesmith/core";
-import { attempt, deviceField, ok } from "../common";
+import { deviceField, ok } from "../common";
 
 /**
  * How many patches one read returns when the caller doesn't say. A decoded patch runs to roughly
@@ -14,17 +14,15 @@ const DEFAULT_LIMIT = 20;
 
 const MAX_LIMIT = 100;
 
-/** One window of a file's patches, with what it took to reach the ones outside it. */
+/** One window of a file's patches, with the offset that reaches the rest. */
 const page = (file: PatchFile, offset: number, limit: number): object => {
   const window = file.patches.slice(offset, offset + limit);
   const patches = window.map((patch, position) => ({ index: offset + position, patch }));
 
   const next = offset + window.length;
   const remaining = file.patches.length - next;
-  const more = remaining > 0
-    ? `${remaining} more patch(es) in this file: call again with offset: ${next}.`
-    : undefined;
-  return { setName: file.name, total: file.patches.length, offset, patches, more };
+  const nextOffset = remaining > 0 ? next : undefined;
+  return { setName: file.name, total: file.patches.length, offset, patches, nextOffset };
 };
 
 const registerReadPatch = (server: McpServer): void => {
@@ -35,8 +33,9 @@ const registerReadPatch = (server: McpServer): void => {
       description:
         "Read decoded patches from a patch file. The patch itself arrives under `patch`, beside " +
         "`setName`, the name of the patch set the file holds. Naming a `ref` returns that one " +
-        `patch; omitting it returns the first ${DEFAULT_LIMIT} and says how many the file holds, ` +
-        "since a full library is more than a caller usually wants in one response.",
+        `patch; omitting it returns the first ${DEFAULT_LIMIT} and \`total\`, the file's whole ` +
+        "count, since a full library is more than a caller usually wants in one response. A page " +
+        "that leaves patches unread carries `nextOffset`: pass it back as `offset` to continue.",
       inputSchema: z.object({
         file: z.string().describe("Path to the patch file"),
         device: deviceField,
@@ -52,7 +51,7 @@ const registerReadPatch = (server: McpServer): void => {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ file, device, ref, limit, offset }) => attempt(async () => {
+    async ({ file, device, ref, limit, offset }) => {
       const driver = registry.getDriver(device);
       const patchFile = await patchService.readPatchFile(driver, file);
 
@@ -64,7 +63,7 @@ const registerReadPatch = (server: McpServer): void => {
       }
 
       return ok(JSON.stringify(page(patchFile, offset ?? 0, limit ?? DEFAULT_LIMIT)));
-    })
+    }
   );
 };
 

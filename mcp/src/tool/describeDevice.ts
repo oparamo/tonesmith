@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { CapabilityGroup, CapabilityType, DeviceCapabilities } from "@tonesmith/core";
 import { capabilityService, registry, messageOf } from "@tonesmith/core";
-import { attempt, deviceField, ok } from "../common";
+import { deviceField, ok } from "../common";
 
 /**
  * A group listing is an index, not a data dump: every type's full param specs would run to tens of
@@ -33,8 +33,8 @@ const groupIndex = (group: CapabilityGroup): object => {
 
 /**
  * The whole group, minus the per-type examples. A caller asking for every type's params at once is
- * reading the catalog rather than building one block, and the largest group's 39 examples would add
- * several KB to a response already large enough to need watching.
+ * reading the catalog rather than building one block, and an example per type in the largest group
+ * would add several KB to a response already large enough to need watching.
  */
 const fullGroup = (group: CapabilityGroup): object => {
   const types = group.types.map(capType => {
@@ -46,7 +46,7 @@ const fullGroup = (group: CapabilityGroup): object => {
 };
 
 /**
- * Splits an `items` entry into its group and optional type id, on the FIRST slash only: a type id
+ * Splits an `items` entry into its group and optional type id, on the first slash only: a type id
  * is a device's own label and may contain a slash itself, so "<group>/A/B" has to resolve to group
  * "<group>", type "A/B" rather than being torn apart.
  */
@@ -158,7 +158,7 @@ const registerDescribeDevice = (server: McpServer): void => {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ device, items, includeParams }) => attempt(() => {
+    ({ device, items, includeParams }) => {
       const { capabilities } = registry.getDriver(device);
 
       if (!items || items.length === 0) {
@@ -166,7 +166,7 @@ const registerDescribeDevice = (server: McpServer): void => {
       }
 
       return ok(JSON.stringify(viewsForEntries(capabilities, items, includeParams)));
-    })
+    }
   );
 };
 

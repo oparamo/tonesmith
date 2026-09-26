@@ -1,14 +1,6 @@
-import { messageOf } from "@tonesmith/core";
-
 const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
-const err = (error: unknown) => ({
-  content: [{ type: "text" as const, text: `Error: ${messageOf(error)}` }],
-  isError: true as const,
-});
+type ToolResponse = ReturnType<typeof ok>;
 
-/** What a tool hands back, either way. */
-type ToolResponse = ReturnType<typeof ok> | ReturnType<typeof err>;
-
-export { ok, err };
+export { ok };
 export type { ToolResponse };

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchService, registry } from "@tonesmith/core";
-import { attempt, deviceField, ok } from "../common";
+import { deviceField, ok } from "../common";
 
 const inputSchema = z.object({
   device: deviceField,
@@ -28,7 +28,7 @@ const registerGeneratePatch = (server: McpServer): void => {
       title: "Generate patches",
       description: `Build patches from structured parameters and save them as a device patch file.
 
-Two calls build any patch: describe_device for the device's blocks, types and params, then this.
+describe_device supplies the device's blocks, types and params; this call builds from them.
 A block's params go where read_patch shows them for that block, and the types and value ranges
 come from describe_device rather than from this schema, so make that call first.
 
@@ -41,7 +41,7 @@ needed.`,
       // A patch whose name is already in the file replaces it, so a save can overwrite work.
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    ({ device, outPath, setName, patches }) => attempt(async () => {
+    async ({ device, outPath, setName, patches }) => {
       const driver = registry.getDriver(device);
       const { file, created, saved } = await patchService.upsertPatches(driver, {
         path: outPath, specs: patches, setName,
@@ -61,7 +61,7 @@ needed.`,
         patches: results,
       };
       return ok(JSON.stringify(response));
-    })
+    }
   );
 };
 

@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { patchService, registry } from "@tonesmith/core";
 import type { FieldEdits } from "@tonesmith/core";
-import { attempt, deviceField, ok } from "../common";
+import { deviceField, ok } from "../common";
 
 /** What the edit wrote, read back from core's report so it says what the patch now holds. */
 const describeApplied = (applied: FieldEdits): string =>
@@ -47,7 +47,7 @@ const registerWriteFields = (server: McpServer): void => {
       // replaces are gone.
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    ({ file, device, ref, fields, setName }) => attempt(async () => {
+    async ({ file, device, ref, fields, setName }) => {
       const driver = registry.getDriver(device);
       const edits = fields === undefined ? undefined : Object.entries(fields);
       const report = await patchService.editPatchFile(driver, file, { ref, fields: edits, setName });
@@ -60,7 +60,7 @@ const registerWriteFields = (server: McpServer): void => {
         changes.push(`set name = ${JSON.stringify(report.setName)}`);
       }
       return ok(`Updated ${file}: ${changes.join("; ")}`);
-    })
+    }
   );
 };
 
