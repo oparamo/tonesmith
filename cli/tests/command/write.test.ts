@@ -1,20 +1,19 @@
 /**
  * What the command does with its arguments, not which edits a device accepts. Dot-paths, value
- * coercion and every rejection belong to the driver, whose contract a fake here stands in for; the
- * gx1 edit validator's own suite is `core/tests/device/gx1/spec/edits.test.ts`.
+ * coercion and every rejection belong to core and the driver, whose contract a fake here stands in
+ * for; the edit rules are proven in `core/tests/service/specService.test.ts`.
  */
-import { describe, it, expect, onTestFinished } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFile } from "node:fs/promises";
 import type { FieldEdit } from "@tonesmith/core";
 import { addWrite } from "../../src/command/write";
-import { fakeDriver, blankPatch, withTempDir, writePatchFile, patchAt, runCommand } from "../helpers";
+import { fakeDriver, blankPatch, tempDir, writePatchFile, patchAt, runCommand } from "../helpers";
 
 describe("addWrite", () => {
   it("passes every path=value argument to the driver and saves the result", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
 
     const { error, exitCode } = await runCommand(addWrite, driver, [
       "write", file, "0", "alpha.params.level=5", "beta.params.tone=7",
@@ -29,9 +28,8 @@ describe("addWrite", () => {
   // The report comes from what the driver wrote, so a value it normalized reads back normalized.
   it("reports each value as written rather than as typed", async () => {
     const driver = fakeDriver({ applyEdits: () => ({ "alpha.params.level": 45 }) });
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
 
     const { info, error, exitCode } = await runCommand(addWrite, driver, ["write", file, "0", "alpha.params.level=045"]);
 
@@ -43,9 +41,8 @@ describe("addWrite", () => {
   // Splitting at the first "=" leaves nothing before it (no separator at all, or one that leads).
   it.each(["amp.params.gain", "=5"])("rejects %o, naming it as typed", async (argument) => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
 
     const { error, exitCode } = await runCommand(addWrite, driver, ["write", file, "0", argument]);
 
@@ -56,9 +53,8 @@ describe("addWrite", () => {
   it("a value containing '=' reaches the driver intact past the first split", async () => {
     let received: FieldEdit[] = [];
     const driver = fakeDriver({ applyEdits: (_, edits) => { received = [...edits]; return {}; } });
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
 
     await runCommand(addWrite, driver, ["write", file, "0", "a=b=c"]);
 
@@ -68,9 +64,8 @@ describe("addWrite", () => {
   it("an empty value reaches the driver as an empty string", async () => {
     let received: FieldEdit[] = [];
     const driver = fakeDriver({ applyEdits: (_, edits) => { received = [...edits]; return {}; } });
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
 
     await runCommand(addWrite, driver, ["write", file, "0", "a="]);
 
@@ -81,9 +76,8 @@ describe("addWrite", () => {
   // list means none of them reach the file.
   it("a malformed argument anywhere in the list leaves the file unchanged", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
     const before = await readFile(file, "utf8");
 
     const { exitCode } = await runCommand(addWrite, driver, [
@@ -96,9 +90,8 @@ describe("addWrite", () => {
 
   it("the report names the patch index the edit landed on", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A"), blankPatch("B")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A"), blankPatch("B")] });
 
     const { info } = await runCommand(addWrite, driver, ["write", file, "1", "beta.params.x=1"]);
 
@@ -107,9 +100,8 @@ describe("addWrite", () => {
 
   it("reports several applied fields in order, comma-separated", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
 
     const { info } = await runCommand(addWrite, driver, [
       "write", file, "0", "alpha.params.level=5", "beta.params.tone=7",
@@ -122,9 +114,8 @@ describe("addWrite", () => {
   // than an unhandled rejection. Which paths the driver refuses is core's.
   it("a failed write prints the error and exits 1, leaving the file unchanged", async () => {
     const driver = fakeDriver({ applyEdits: () => { throw new Error("fake-rejection"); } });
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
     const before = await readFile(file, "utf8");
 
     const { error, exitCode } = await runCommand(addWrite, driver, ["write", file, "0", "alpha.params.level=5"]);
@@ -136,9 +127,8 @@ describe("addWrite", () => {
 
   it("no field arguments exits 1 and leaves the file unchanged", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patch.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patch.json", patches: [blankPatch("A")] });
     const before = await readFile(file, "utf8");
 
     const { exitCode } = await runCommand(addWrite, driver, ["write", file, "0"]);

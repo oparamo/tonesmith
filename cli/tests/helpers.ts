@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { onTestFinished, vi } from "vitest";
 import { Command } from "commander";
 import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -153,10 +153,11 @@ const runCommand = async <T extends Patch>(
   return { info, error, exitCode };
 };
 
-/** A scratch directory for tests that write files, cleaned up by the caller (`onTestFinished`). */
-const withTempDir = async (): Promise<{ dir: string; cleanup: () => Promise<void> }> => {
+/** A scratch directory of the calling test's own, removed when that test finishes. */
+const tempDir = async (): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "tonesmith-cli-"));
-  return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  return dir;
 };
 
 /** What `writePatchFile` needs beyond a bare list of patches. */
@@ -195,6 +196,6 @@ const pathExists = async (path: string): Promise<boolean> => {
 };
 
 export {
-  fakeDriver, blankPatch, FAKE_CAPABILITIES, runCommand, withTempDir, writePatchFile, patchAt, pathExists,
+  fakeDriver, blankPatch, FAKE_CAPABILITIES, runCommand, tempDir, writePatchFile, patchAt, pathExists,
 };
 export type { FakePatch, FakeBlock };

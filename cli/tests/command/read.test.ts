@@ -1,13 +1,12 @@
-import { describe, it, expect, onTestFinished } from "vitest";
+import { describe, it, expect } from "vitest";
 import { addRead } from "../../src/command/read";
-import { fakeDriver, blankPatch, withTempDir, writePatchFile, runCommand } from "../helpers";
+import { fakeDriver, blankPatch, tempDir, writePatchFile, runCommand } from "../helpers";
 
 describe("addRead", () => {
   it("prints every patch when ref is omitted", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patches.json", patches: [blankPatch("First"), blankPatch("Second")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patches.json", patches: [blankPatch("First"), blankPatch("Second")] });
 
     const { info, error, exitCode } = await runCommand(addRead, driver, ["read", file]);
 
@@ -20,9 +19,8 @@ describe("addRead", () => {
   // The driver's own name, not the file's `device` id, is what a person reads.
   it("prints the file/set/device header", async () => {
     const driver = fakeDriver({ name: "Fake Device" });
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patches.json", patches: [blankPatch("A")], setName: "My Set" });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patches.json", patches: [blankPatch("A")], setName: "My Set" });
 
     const { info, error, exitCode } = await runCommand(addRead, driver, ["read", file]);
 
@@ -35,9 +33,8 @@ describe("addRead", () => {
 
   it("prints a single patch when given a numeric index", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patches.json", patches: [blankPatch("First"), blankPatch("Second")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patches.json", patches: [blankPatch("First"), blankPatch("Second")] });
 
     const { info, error, exitCode } = await runCommand(addRead, driver, ["read", file, "0"]);
 
@@ -49,9 +46,8 @@ describe("addRead", () => {
 
   it("a name ref selects that patch", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patches.json", patches: [blankPatch("Alpha"), blankPatch("Beta")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patches.json", patches: [blankPatch("Alpha"), blankPatch("Beta")] });
 
     const { info, error, exitCode } = await runCommand(addRead, driver, ["read", file, "Beta"]);
 
@@ -64,9 +60,8 @@ describe("addRead", () => {
   // `read` passes the resolved index to `printPatch`, so a later patch must carry its own index.
   it("each printed patch carries its own index", async () => {
     const driver = fakeDriver();
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patches.json", patches: [blankPatch("First"), blankPatch("Second")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patches.json", patches: [blankPatch("First"), blankPatch("Second")] });
 
     const { info, error, exitCode } = await runCommand(addRead, driver, ["read", file, "1"]);
 
@@ -80,9 +75,8 @@ describe("addRead", () => {
   // Which refs and files are refused is core's, and is proven there.
   it("prints a driver rejection and exits 1", async () => {
     const driver = fakeDriver({ parseFile: () => { throw new Error("fake-rejection"); } });
-    const temp = await withTempDir();
-    onTestFinished(temp.cleanup);
-    const file = await writePatchFile({ dir: temp.dir, filename: "patches.json", patches: [blankPatch("A")] });
+    const dir = await tempDir();
+    const file = await writePatchFile({ dir: dir, filename: "patches.json", patches: [blankPatch("A")] });
 
     const { error, exitCode } = await runCommand(addRead, driver, ["read", file]);
 

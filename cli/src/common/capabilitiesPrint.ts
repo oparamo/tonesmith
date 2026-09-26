@@ -1,7 +1,10 @@
 import type { ChainBlock, ChainView, DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "./color";
 
-/** The key is the name the param answers to in a `write` dot-path, so a param printed without it is one the CLI can't be told to set. */
+/**
+ * The key is the name the param answers to in a `write` dot-path, so a param printed without it is
+ * one the CLI can't be told to set.
+ */
 const printParam = (param: ParamSpec, indent = "  "): void => {
   const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
   console.info(`${indent}${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
@@ -70,7 +73,10 @@ const printGroupTypes = (types: CapabilityGroup["types"]): void => {
   }
 };
 
-/** Print a group: its block controls, then each type's id, models tag, description and subtype ids, or the block's example where it offers no types. */
+/**
+ * Print a group: its block controls, then each type's id, models tag, description and subtype ids,
+ * or the block's example where it offers no types.
+ */
 const printGroup = (group: CapabilityGroup): void => {
   console.info(`\n${BOLD}${group.name}${RESET}  ${DIM}[${group.id}]${RESET}`);
   console.info(`${group.description}\n`);
