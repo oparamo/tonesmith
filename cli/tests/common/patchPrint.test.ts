@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach, type MockInstance } from "vitest";
 import type { BlockView, PatchView } from "@tonesmith/core";
-import { printPatch } from "../src/common/patchPrint";
+import { printPatch } from "../../src/common/patchPrint";
 
 const capturedOutput = (info: MockInstance<(message?: unknown) => void>): string =>
   info.mock.calls.map(call => String(call[0])).join("\n");
@@ -11,7 +11,6 @@ const block = (overrides: Partial<BlockView> = {}): BlockView =>
 const view = (overrides: Partial<PatchView> = {}): PatchView =>
   ({ name: "Test", details: [], blocks: [block()], ...overrides });
 
-/** What the renderer prints for one view, with color off: these tests run outside a terminal. */
 const printed = (patch: PatchView, index = 0): string => {
   const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
   printPatch(patch, index);
@@ -44,8 +43,14 @@ describe("printPatch", () => {
     expect(output).toContain("OD/DS [drive]");
   });
 
+  it("tags a block that is on", () => {
+    const output = printed(view({ blocks: [block({ on: true })] }));
+
+    expect(output).toContain("[ON]");
+  });
+
   // A bypassed block keeps its settings on the device, so the renderer shows them rather than
-  // hiding the block, matching every other block and matching read_patch.
+  // hiding the block.
   it("shows a bypassed block's controls under an OFF tag", () => {
     const drive = block({ label: "OD/DS", key: "drive", on: false, params: { drive: 50 } });
 
@@ -64,6 +69,14 @@ describe("printPatch", () => {
     expect(output).not.toContain("[OFF]");
   });
 
+  it("prints no selection tag on a block with no type", () => {
+    const volume = block({ label: "FV", key: "volume", type: undefined });
+
+    const output = printed(view({ blocks: [volume] }));
+
+    expect(output).not.toContain("(");
+  });
+
   it("prints the selected model in parentheses after the type", () => {
     const fx1 = block({ label: "FX1", key: "fx1", type: "COMPRESSOR", subType: "BOSS COMP" });
 
@@ -73,6 +86,15 @@ describe("printPatch", () => {
     expect(output).not.toContain("subType=");
   });
 
+  it("prints no parentheses for a type with no subType", () => {
+    const fx1 = block({ label: "FX1", key: "fx1", type: "COMPRESSOR", subType: undefined });
+
+    const output = printed(view({ blocks: [fx1] }));
+
+    expect(output).toContain("COMPRESSOR");
+    expect(output).not.toContain("(");
+  });
+
   it("omits the params line for a block that carries no controls", () => {
     const empty = block({ label: "FX1", key: "fx1", type: "BOGUS EFFECT", params: {} });
 
@@ -80,5 +102,22 @@ describe("printPatch", () => {
 
     expect(output).toContain("FX1 [fx1]");
     expect(output).not.toMatch(/FX1.*\n\s+\w+=/);
+  });
+
+  it("prints params as key=value pairs in the order given, a boolean as true/false", () => {
+    const fx1 = block({ params: { rate: 3, active: true, tag: "wide" } });
+
+    const output = printed(view({ blocks: [fx1] }));
+
+    expect(output).toContain("rate=3  active=true  tag=wide");
+  });
+
+  it("prints blocks in the view's order", () => {
+    const first = block({ label: "AMP", key: "amp" });
+    const second = block({ label: "FX1", key: "fx1" });
+
+    const output = printed(view({ blocks: [first, second] }));
+
+    expect(output.indexOf("AMP [amp]")).toBeLessThan(output.indexOf("FX1 [fx1]"));
   });
 });
