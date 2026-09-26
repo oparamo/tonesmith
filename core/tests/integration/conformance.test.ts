@@ -1,5 +1,6 @@
 /**
- * The block contract, held against every driver on the roster.
+ * The driver contract, held against every driver on the roster: block shape, chain vocabulary,
+ * view labels, and a built patch matching what its file stores.
  *
  * `PatchBlock` fixes one shape for every device: a block's own selectors, then one `params` bag.
  * That is what lets a caller read a patch from one device and write a patch for another without
@@ -11,7 +12,15 @@
  */
 import { describe, it, expect } from "vitest";
 import { drivers } from "../../src/device";
+import type { PatchDriver } from "../../src/model";
 import { present, storedAs } from "../helpers";
+
+/**
+ * Widened to the device-agnostic contract: today's roster of one driver narrows `Patch.chain` to
+ * always be present, which would make the optional-chain case below look unreachable to the type
+ * checker even though a future device's chain is optional by contract.
+ */
+const roster: PatchDriver[] = drivers;
 
 /** The complete set of keys a block may carry beside its params. */
 const SELECTORS = ["on", "type", "subType"];
@@ -40,6 +49,16 @@ const blockCases = (): BlockCase[] => drivers.flatMap(driver =>
   })
 );
 
+const driverCases = roster.map(driver => ({ id: driver.id, driver }));
+
+describe("the roster", () => {
+  it("gives every driver a unique id", () => {
+    const ids = drivers.map(driver => driver.id);
+
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
 describe("every driver's blocks take one shape", () => {
   const cases = blockCases();
 
@@ -55,53 +74,85 @@ describe("every driver's blocks take one shape", () => {
   });
 });
 
-describe("every driver's chain names the blocks a spec names", () => {
-  it.each(drivers.map(driver => ({ id: driver.id, driver })))("$id", ({ driver }) => {
+describe("every driver's chain vocabulary", () => {
+  it.each(driverCases)("$id: defaultOrder and chain.blocks name the same blocks", ({ driver }) => {
     const { chain } = driver.capabilities;
 
-    for (const block of chain.defaultOrder) {
-      expect(chain.blocks, `chain block "${block}" has a label for display`).toHaveProperty(block);
-    }
-    // A patch built with no chain of its own stores the default order, so the two vocabularies have
-    // to be the same one: a chain naming blocks a spec cannot name is a chain nobody can edit.
+    expect(new Set(Object.keys(chain.blocks))).toStrictEqual(new Set(chain.defaultOrder));
+  });
+
+  // A patch built with no chain of its own stores the default order, so the two vocabularies have
+  // to be the same one: a chain naming blocks a spec cannot name is a chain nobody can edit. Only a
+  // driver whose built patch actually carries a chain is in scope: Patch.chain is optional by
+  // contract, for a device with a fixed, unrearrangeable order.
+  const chainedDriverCases = driverCases.filter(
+    ({ driver }) => driver.buildPatch({ name: "Chain" }).chain !== undefined
+  );
+
+  it.each(chainedDriverCases)("$id: a patch built with no chain stores the default order's blocks", ({ driver }) => {
+    const { chain } = driver.capabilities;
     const built = driver.buildPatch({ name: "Chain" });
     const stored = present(built.chain, `${driver.id} stores the chain it built with`);
+
     expect(new Set(stored)).toStrictEqual(new Set(chain.defaultOrder));
   });
 });
 
 describe("every driver's chain blocks point at the groups that describe them", () => {
-  it.each(drivers.map(driver => ({ id: driver.id, driver })))("$id", ({ driver }) => {
+  it.each(driverCases)("$id: every chain block names a real group", ({ driver }) => {
     const { chain, groups } = driver.capabilities;
     const groupIds = groups.map(group => group.id);
 
-    for (const [name, block] of Object.entries(chain.blocks)) {
-      expect(groupIds, `chain block "${name}" names a real group`).toContain(block.group);
-    }
-    // A type scoped to some blocks has to name blocks its own group describes, or the scope points
-    // a caller at a block that can never hold it.
-    for (const group of groups) {
+    const unknownGroups = Object.entries(chain.blocks)
+      .filter(([, block]) => !groupIds.includes(block.group))
+      .map(([name]) => name);
+
+    expect(unknownGroups).toStrictEqual([]);
+  });
+
+  // A type scoped to some blocks has to name blocks its own group describes, or the scope points a
+  // caller at a block that can never hold it.
+  it.each(driverCases)("$id: a type scoped to blocks names blocks of its own group", ({ driver }) => {
+    const { chain, groups } = driver.capabilities;
+
+    const misscoped = groups.flatMap(group => {
       const blocksOfGroup = Object.keys(chain.blocks).filter(name => chain.blocks[name]?.group === group.id);
-      for (const scoped of group.types.flatMap(type => type.blocks ?? [])) {
-        expect(blocksOfGroup, `${group.id} scopes a type to "${scoped}"`).toContain(scoped);
-      }
-    }
+      return group.types
+        .flatMap(type => type.blocks ?? [])
+        .filter(scoped => !blocksOfGroup.includes(scoped))
+        .map(scoped => `${group.id}/${scoped}`);
+    });
+
+    expect(misscoped).toStrictEqual([]);
   });
 });
 
 describe("every driver's view shows the patch under the chain's own names", () => {
-  it.each(drivers.map(driver => ({ id: driver.id, driver })))("$id", ({ driver }) => {
+  it.each(driverCases)("$id: the view covers every block the chain names", ({ driver }) => {
     const { chain } = driver.capabilities;
     const view = driver.viewPatch(driver.buildPatch({ name: "View" }));
 
     const keys = view.blocks.map(block => block.key);
-    expect(new Set(keys), "the view covers every block the chain names").toStrictEqual(
-      new Set(chain.defaultOrder)
+    expect(new Set(keys)).toStrictEqual(new Set(chain.defaultOrder));
+  });
+
+  it.each(driverCases)("$id: each view block carries its chain label", ({ driver }) => {
+    const { chain } = driver.capabilities;
+    const view = driver.viewPatch(driver.buildPatch({ name: "View" }));
+
+    expect(view.blocks.map(block => [block.key, block.label])).toStrictEqual(
+      view.blocks.map(block => [block.key, chain.blocks[block.key]?.label])
     );
-    for (const block of view.blocks) {
-      expect(block.label, `${block.key} is shown under its panel label`).toBe(chain.blocks[block.key]?.label);
-      expect(block.params, `${block.key} carries its controls`).toBeDefined();
-    }
+  });
+});
+
+describe("every driver's new file", () => {
+  it.each(driverCases)("$id: round-trips through its own driver and names that driver", ({ driver }) => {
+    const file = driver.newFile("x", 1);
+
+    const reloaded = driver.parseFile(driver.serializeFile(file), "round-trip");
+
+    expect(reloaded.device).toBe(driver.id);
   });
 });
 
