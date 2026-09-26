@@ -42,9 +42,8 @@ const checkName = (issues: Issues, spec: Record<string, unknown>): void => {
 };
 
 /**
- * `chain` reaches the builder as an array it maps over, and `key` reaches the codec as a table
- * lookup, so an unchecked one surfaces as a TypeError or a codec throw at write time with nothing
- * naming the field that caused it.
+ * `chain` reaches the builder as an array it maps over, so an unchecked one surfaces as a
+ * TypeError or a codec throw at write time with nothing naming the field that caused it.
  */
 const checkChain = (issues: Issues, spec: Record<string, unknown>): void => {
   const chain = spec.chain;
@@ -89,8 +88,6 @@ const validatePatchSpec = (input: unknown): Issues => {
 };
 
 /**
- * Hands a validated block to its builder.
- *
  * Every block reaches this the same way, since every block takes the same shape: a `type` where the
  * device offers one, an optional `subType` and `on`, and one `params` bag. The `type` cast covers
  * only what `validatePatchSpec` has just established and TypeScript cannot see.
@@ -129,5 +126,5 @@ const buildPatch = (input: unknown): Patch => {
   return patch;
 };
 
-export { applyBlock, buildPatch, validatePatchSpec };
+export { buildPatch, validatePatchSpec };
 export type { BlockName };

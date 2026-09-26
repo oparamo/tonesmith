@@ -1,8 +1,8 @@
 /**
- * Assembles a patch from input `spec/` has already validated against the capability catalog, the
- * only way anything reaches these functions. They check nothing again: the drift guards hold the
- * catalog and the codec field maps equal, so a key the catalog accepted is a field the codec writes.
- * What they add is the device's own factory value for every control the caller left out.
+ * Assembles a patch from input `build.ts` has already validated against the capability catalog,
+ * the only way anything reaches these functions. They check nothing again: the drift guards hold
+ * the catalog and the codec field maps equal, so a key the catalog accepted is a field the codec
+ * writes. What they add is the device's own factory value for every control the caller left out.
  */
 import type { Patch, BlockParams, PatchSettings } from "../model";
 import { blankPatch } from "../format/tsl";
@@ -129,5 +129,5 @@ const block = (patch: Patch, name: BlockName, options: BlockOptions): void => {
   else perTypeBlock(patch, name, options);
 };
 
-export { defaultFxParams, basePatch, block };
+export { basePatch, block };
 export type { BasePatchOptions, BlockOptions };

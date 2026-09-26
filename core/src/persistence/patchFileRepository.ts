@@ -8,7 +8,6 @@ import { writeFileAtomic } from "./atomicWrite";
 import { withFileLock } from "./fileLock";
 import type { Patch, PatchFile, PatchDriver } from "../model";
 
-
 /**
  * Reads and decodes the patch file at `path`. Needs no lock: every write lands by rename, so a read
  * sees a whole file, old or new, never one partway written.
@@ -38,7 +37,6 @@ const updatePatchFile = <T extends Patch, R>(
     return result;
   });
 
-/** Whether a filesystem call failed because nothing exists at the path, as opposed to any other reason. */
 const isMissingFile = (error: unknown): boolean => (error as NodeJS.ErrnoException).code === "ENOENT";
 
 /** Reads `path`, or starts a fresh empty file named `setName` when it doesn't exist yet. */

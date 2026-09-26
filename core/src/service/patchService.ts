@@ -14,7 +14,6 @@ const INDEX_REF = /^-?\d+$/;
  */
 const hasName = (patch: Patch, name: string): boolean => patch.name === name;
 
-/** Every index whose patch carries this name. */
 const indicesNamed = (patches: Patch[], ref: string): number[] =>
   patches.flatMap((patch, index) => (hasName(patch, ref) ? [index] : []));
 
