@@ -10,7 +10,6 @@ const bypassTag = (on?: boolean): string => {
   return `  ${tag}`;
 };
 
-/** What the block is set to: its type, plus the model within it where the type carries one. */
 const selectionTag = (block: BlockView): string => {
   if (block.type === undefined) return "";
   const model = block.subType ? ` ${DIM}(${block.subType})${RESET}` : "";

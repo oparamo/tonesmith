@@ -4,10 +4,9 @@ import { patchService } from "@tonesmith/core";
 import { run } from "../common";
 
 /**
- * Splits a "path=value" argument at the first "=", so a value containing one survives intact.
- * Without the separator there is nothing to split on, and slicing at an index of -1 drops the
- * argument's last character, sending a bare path on one character short to be reported as an
- * unknown field.
+ * Splits a "path=value" argument at the first "=", so a value containing one survives intact. An
+ * argument with no "=", or nothing before it, is refused here: slicing at an index of -1 would drop
+ * its last character and send the path on as an unknown field one character short.
  */
 const parseFieldAssignment = (assignment: string): [string, string] => {
   const separatorIndex = assignment.indexOf("=");

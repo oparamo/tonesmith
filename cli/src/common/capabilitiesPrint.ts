@@ -1,10 +1,7 @@
 import type { ChainBlock, ChainView, DeviceCapabilities, CapabilityGroup, CapabilityType, ParamSpec } from "@tonesmith/core";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "./color";
 
-/**
- * One param's line: its label, its range, and its `key`. The key is the name the param answers to in
- * a `write` dot-path, so a param printed without it is one the CLI can't be told to set.
- */
+/** The key is the name the param answers to in a `write` dot-path, so a param printed without it is one the CLI can't be told to set. */
 const printParam = (param: ParamSpec, indent = "  "): void => {
   const keyTag = param.key ? `  ${GREEN}${param.key}${RESET}` : "";
   console.info(`${indent}${param.name.padEnd(14)} ${DIM}${param.range}${RESET}${keyTag}`);
@@ -27,10 +24,6 @@ const printChainBlock = (name: string, block: ChainBlock): void => {
   console.info(`  ${CYAN}${name.padEnd(10)}${RESET}  ${block.label.padEnd(8)}${DIM}group ${block.group}${alwaysOn}${RESET}`);
 };
 
-/**
- * Print the device's signal-chain model (default order, how ordering and bypass work) and what the
- * patch carries outside any block.
- */
 const printChain = (chain: ChainView): void => {
   console.info(`\n${BOLD}Signal chain${RESET}  ${DIM}[chain]${RESET}\n`);
   console.info(`${YELLOW}Default order:${RESET} ${chain.defaultOrder.join(" → ")}\n`);
@@ -43,7 +36,6 @@ const printChain = (chain: ChainView): void => {
   printPatchSettings(chain.patchSettings);
 };
 
-/** Print a summary table of all groups (id, name, type count), led by a chain pointer. */
 const printGroups = (caps: DeviceCapabilities): void => {
   console.info(`\n${BOLD}Capability groups${RESET}\n`);
   console.info(`  ${CYAN}${"chain".padEnd(10)}${RESET}  ${BOLD}Signal Chain${RESET}  ${DIM}(block order + bypass)${RESET}`);
@@ -78,7 +70,7 @@ const printGroupTypes = (types: CapabilityGroup["types"]): void => {
   }
 };
 
-/** Print every type in a group, with name, optional models tag, and short description. */
+/** Print a group: its block controls, then each type's id, models tag, description and subtype ids, or the block's example where it offers no types. */
 const printGroup = (group: CapabilityGroup): void => {
   console.info(`\n${BOLD}${group.name}${RESET}  ${DIM}[${group.id}]${RESET}`);
   console.info(`${group.description}\n`);
@@ -139,8 +131,9 @@ const printExample = (example: CapabilityType["example"]): void => {
 };
 
 /**
- * Print full detail for a single type: description, models, subTypes, params. `capType` comes from
- * `capabilityService.lookup`, whose params already lead with the block's own controls.
+ * Print full detail for a single type: description, models, subTypes, params and its example.
+ * `capType` comes from `capabilityService.lookup`, whose params already lead with the block's own
+ * controls.
  */
 const printType = (group: CapabilityGroup, capType: CapabilityType): void => {
   console.info(`\n${BOLD}${capType.name}${RESET}  ${DIM}[${group.id} / ${capType.id}]${RESET}\n`);
