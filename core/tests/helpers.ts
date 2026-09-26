@@ -40,15 +40,6 @@ const scratchDir = (): (() => string) => {
   return () => dir;
 };
 
-/**
- * A path in a scratch directory for every test in the calling suite, whether or not the test
- * writes anything there. Same call-in-a-`describe` rule as `scratchDir`.
- */
-const scratchFile = (basename: string): (() => string) => {
-  const dir = scratchDir();
-  return () => join(dir(), basename);
-};
-
 /** `patch` as a file stores it: saved into a file of its own through the driver's format and read back. */
 const storedAs = <T extends Patch>(driver: PatchDriver<T>, patch: T): T => {
   const file = driver.newFile("Stored", 0);
@@ -56,4 +47,4 @@ const storedAs = <T extends Patch>(driver: PatchDriver<T>, patch: T): T => {
   return present(driver.parseFile(driver.serializeFile(file), "stored").patches[0], "the stored patch");
 };
 
-export { present, pathExists, scratchDir, scratchFile, storedAs };
+export { present, pathExists, scratchDir, storedAs };

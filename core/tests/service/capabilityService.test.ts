@@ -44,7 +44,8 @@ describe("findGroup", () => {
     const findMissingGroup = () => findGroup(caps, "reverb");
 
     expect(findMissingGroup).toThrow(/reverb/);
-    expect(findMissingGroup, "names the groups that do exist").toThrow(/amp, delay/);
+    expect(findMissingGroup, "names the groups that do exist").toThrow(/amp/);
+    expect(findMissingGroup, "names the groups that do exist").toThrow(/delay/);
   });
 });
 
@@ -67,7 +68,8 @@ describe("findType", () => {
     const findMissingType = () => findType(ampGroup, "MISSING");
 
     expect(findMissingType).toThrow(/MISSING/);
-    expect(findMissingType, "names the types that do exist").toThrow(/JC-120, TWIN/);
+    expect(findMissingType, "names the types that do exist").toThrow(/JC-120/);
+    expect(findMissingType, "names the types that do exist").toThrow(/TWIN/);
   });
 });
 
@@ -108,9 +110,7 @@ describe("lookup", () => {
 
   it("gives a type its block's controls ahead of its own params", () => {
     const found = lookup(withControls, "amp", "twin");
-    const paramKeys = found.kind === "type" ? found.type.params?.map(param => param.key) : undefined;
 
-    expect(found.kind).toBe("type");
-    expect(paramKeys).toStrictEqual(["level", "gain"]);
+    expect(found).toMatchObject({ kind: "type", type: { params: [{ key: "level" }, { key: "gain" }] } });
   });
 });

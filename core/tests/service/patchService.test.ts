@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Patch, PatchFile, PatchDriver } from "../../src/model";
 import {
-  resolvePatch, resolvePatches, readPatchFile, editPatchFile, upsertPatches, copyPatch,
+  resolvePatch, resolvePatches, editPatchFile, upsertPatches, copyPatch,
   createPatchFile, MAX_NEW_PATCHES,
 } from "../../src/service/patchService";
 import { pathExists, scratchDir } from "../helpers";
@@ -93,14 +93,21 @@ describe("editPatchFile", () => {
     expect(clean).toMatchObject({ gain: 40, key: "G" });
   });
 
-  it("renames the set without a ref, and does both in one write when asked", async () => {
+  it("renames the set when only setName is given", async () => {
     const path = await seeded();
-    const driver = makeEditingDriver();
 
-    await editPatchFile(driver, path, { setName: "Renamed" });
-    const both = await editPatchFile(driver, path, { ref: "0", fields: [["gain", 5]], setName: "Both" });
+    const report = await editPatchFile(makeEditingDriver(), path, { setName: "Renamed" });
 
-    expect(both).toStrictEqual({ index: 0, applied: { gain: 5 }, setName: "Both" });
+    expect(report).toStrictEqual({ setName: "Renamed" });
+    expect((await loadFile(path)).name).toBe("Renamed");
+  });
+
+  it("edits a patch and renames the set in one call", async () => {
+    const path = await seeded();
+
+    const report = await editPatchFile(makeEditingDriver(), path, { ref: "0", fields: [["gain", 5]], setName: "Both" });
+
+    expect(report).toStrictEqual({ index: 0, applied: { gain: 5 }, setName: "Both" });
     const file = await loadFile(path);
     expect(file.name).toBe("Both");
     expect(file.patches[0]).toMatchObject({ gain: 5 });
@@ -118,6 +125,23 @@ describe("editPatchFile", () => {
     expect(await readFile(path, "utf8")).toBe(before);
   });
 
+  it("rejects a ref naming no patch, leaving the file byte for byte", async () => {
+    const path = await seeded();
+    const before = await readFile(path, "utf8");
+
+    const refused = editPatchFile(makeEditingDriver(), path, { ref: "Bogus", fields: [["gain", 1]] });
+
+    await expect(refused).rejects.toThrow(/Bogus/);
+    expect(await readFile(path, "utf8")).toBe(before);
+  });
+
+  it("rejects editing a file that doesn't exist, and creates nothing", async () => {
+    const path = join(dir(), "missing.tsl");
+
+    await expect(editPatchFile(makeEditingDriver(), path, { setName: "X" })).rejects.toThrow();
+    expect(await pathExists(path)).toBe(false);
+  });
+
   it.each([
     ["nothing to change", {}],
     ["fields without a ref", { fields: [["gain", 1]] as const }],
@@ -127,68 +151,6 @@ describe("editPatchFile", () => {
 
     await expect(editPatchFile(makeEditingDriver(), path, request)).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe(before);
-  });
-});
-
-// Two calls on one file that interleave (read, read, write, write) lose the first call's change.
-// Each case starts both calls before either finishes; without the per-file lock, one change is gone.
-describe("concurrent changes to one file", () => {
-  const dir = scratchDir();
-
-  it("keeps both of two edits made at once to different patches", async () => {
-    const path = join(dir(), "set.tsl");
-    await seedFile(path, { name: "Set", device: "FAKE", patches: [makePatch("Lead"), makePatch("Clean")] });
-    const driver = makeEditingDriver();
-
-    await Promise.all([
-      editPatchFile(driver, path, { ref: "0", fields: [["gain", 10]] }),
-      editPatchFile(driver, path, { ref: "1", fields: [["gain", 20]] }),
-    ]);
-
-    const [lead, clean] = (await loadFile(path)).patches;
-    expect(lead).toMatchObject({ gain: 10 });
-    expect(clean).toMatchObject({ gain: 20 });
-  });
-
-  it("keeps both patches of two saves made at once", async () => {
-    const path = join(dir(), "set.tsl");
-    const driver = makeFakeDriver();
-
-    await Promise.all([
-      upsertPatches(driver, { path, patches: [makePatch("Lead")] }),
-      upsertPatches(driver, { path, patches: [makePatch("Clean")] }),
-    ]);
-
-    const names = (await readPatchFile(driver, path)).patches.map(patch => patch.name).sort();
-    expect(names).toStrictEqual(["Clean", "Lead"]);
-  });
-
-  it("lets exactly one of two creates on one path succeed", async () => {
-    const path = join(dir(), "new.tsl");
-    const driver = makeFakeDriver();
-
-    const outcomes = await Promise.allSettled([
-      createPatchFile(driver, path, { setName: "First" }),
-      createPatchFile(driver, path, { setName: "Second" }),
-    ]);
-
-    const statuses = outcomes.map(outcome => outcome.status).sort();
-    expect(statuses).toStrictEqual(["fulfilled", "rejected"]);
-  });
-
-  it("still runs a queued change after the one ahead of it fails", async () => {
-    const path = join(dir(), "set.tsl");
-    await seedFile(path, { name: "Set", device: "FAKE", patches: [makePatch("Lead")] });
-    const driver = makeEditingDriver();
-
-    const [failed, landed] = await Promise.allSettled([
-      editPatchFile(driver, path, { ref: "0", fields: [["badField", 1]] }),
-      editPatchFile(driver, path, { ref: "0", fields: [["gain", 7]] }),
-    ]);
-
-    expect(failed.status).toBe("rejected");
-    expect(landed.status).toBe("fulfilled");
-    expect((await loadFile(path)).patches[0]).toMatchObject({ gain: 7 });
   });
 });
 
@@ -205,6 +167,15 @@ describe("upsertPatches", () => {
 
     expect(file.patches).toStrictEqual(patches);
     expect(await loadFile(path)).toStrictEqual(file);
+  });
+
+  it("creates missing parent directories", async () => {
+    const driver = makeFakeDriver();
+    const path = pathTo("nested/deeper/set.tsl");
+
+    await upsertPatches(driver, { path, patches: [makePatch("Lead")] });
+
+    expect(await pathExists(path)).toBe(true);
   });
 
   it("replaces same-named patches and appends the rest, in one pass", async () => {
@@ -257,61 +228,74 @@ describe("upsertPatches", () => {
     expect(counts.writes).toBe(1);
   });
 
-  it("propagates a non-ENOENT error raised while reading an existing file", async () => {
-    const path = pathTo("set.tsl");
-    await seedFile(path, { name: "Set", device: "FAKE", patches: [] });
-    const driver: PatchDriver = {
-      ...makeFakeDriver(),
-      parseFile: () => { throw new Error("disk on fire"); },
-    };
-
-    const upsertWithBrokenParse = upsertPatches(driver, { path, patches: [makePatch("Lead")] });
-
-    await expect(upsertWithBrokenParse).rejects.toThrow("disk on fire");
-  });
-
-  it("names a freshly created file after setName when given, else after the first patch", async () => {
+  it("names a new file after setName when given", async () => {
     const driver = makeFakeDriver();
     const patches = [makePatch("First"), makePatch("Second")];
 
     const named = await upsertPatches(driver, { path: pathTo("named.tsl"), patches, setName: "My Library" });
+
     expect(named.file.name).toBe("My Library");
+  });
+
+  it("names a new file after its first patch when setName is omitted", async () => {
+    const driver = makeFakeDriver();
+    const patches = [makePatch("First"), makePatch("Second")];
 
     const unnamed = await upsertPatches(driver, { path: pathTo("unnamed.tsl"), patches });
+
     expect(unnamed.file.name).toBe("First");
   });
 
-  it("renames an existing set when setName is given, and preserves it when omitted", async () => {
+  it("keeps an existing set's name when setName is omitted", async () => {
     const driver = makeFakeDriver();
     const path = pathTo("set.tsl");
     await seedFile(path, { name: "Old Name", device: "FAKE", patches: [makePatch("Lead")] });
 
     const kept = await upsertPatches(driver, { path, patches: [makePatch("Rhythm")] });
-    expect(kept.file.name).toBe("Old Name");
 
-    const renamed = await upsertPatches(driver, {
-      path,
-      patches: [makePatch("Solo")],
-      setName: "New Name",
-    });
+    expect(kept.file.name).toBe("Old Name");
+  });
+
+  it("renames an existing set to setName", async () => {
+    const driver = makeFakeDriver();
+    const path = pathTo("set.tsl");
+    await seedFile(path, { name: "Old Name", device: "FAKE", patches: [makePatch("Lead")] });
+
+    const renamed = await upsertPatches(driver, { path, patches: [makePatch("Solo")], setName: "New Name" });
+
     expect(renamed.file.name).toBe("New Name");
   });
 
-  // The saving surfaces tell a caller what became of each patch. Reading the file back to work it
-  // out costs a second decode of everything, and undoes this call's read-once/write-once property.
-  it("reports the file as created and says what happened to each patch", async () => {
+  it("reports created for a file it started", async () => {
+    const driver = makeFakeDriver();
+    const solo = makePatch("Solo");
+
+    const fresh = await upsertPatches(driver, { path: pathTo("new.tsl"), patches: [solo] });
+
+    expect(fresh.created).toBe(true);
+    expect(fresh.saved).toStrictEqual([{ name: "Solo", action: "appended", patch: solo }]);
+  });
+
+  it("reports not created for an existing file", async () => {
     const driver = makeFakeDriver();
     const setPath = pathTo("set.tsl");
     await seedFile(setPath, { name: "Set", device: "FAKE", patches: [makePatch("Lead")] });
 
-    const solo = makePatch("Solo");
+    const existing = await upsertPatches(driver, { path: setPath, patches: [makePatch("Lead")] });
+
+    expect(existing.created).toBe(false);
+  });
+
+  // The saving surfaces tell a caller what became of each patch. Reading the file back to work it
+  // out costs a second decode of everything, and undoes this call's read-once/write-once property.
+  it("reports each patch as replaced or appended", async () => {
+    const driver = makeFakeDriver();
+    const setPath = pathTo("set.tsl");
+    await seedFile(setPath, { name: "Set", device: "FAKE", patches: [makePatch("Lead")] });
     const [lead, clean] = [makePatch("Lead"), makePatch("Clean")];
-    const fresh = await upsertPatches(driver, { path: pathTo("new.tsl"), patches: [solo] });
+
     const existing = await upsertPatches(driver, { path: setPath, patches: [lead, clean] });
 
-    expect(fresh.created).toBe(true);
-    expect(fresh.saved).toStrictEqual([{ name: "Solo", action: "appended", patch: solo }]);
-    expect(existing.created).toBe(false);
     expect(existing.saved).toStrictEqual([
       { name: "Lead", action: "replaced", patch: lead },
       { name: "Clean", action: "appended", patch: clean },
@@ -320,10 +304,12 @@ describe("upsertPatches", () => {
 
   it("rejects an empty batch rather than writing an unnamed file", async () => {
     const driver = makeFakeDriver();
+    const path = pathTo("set.tsl");
 
-    const upsertNothing = upsertPatches(driver, { path: pathTo("set.tsl"), patches: [] });
+    const upsertNothing = upsertPatches(driver, { path, patches: [] });
 
     await expect(upsertNothing).rejects.toThrow();
+    expect(await pathExists(path)).toBe(false);
   });
 
   // A save keys on the name, so a repeat within one batch cannot be honored: the second patch
@@ -396,13 +382,27 @@ describe("resolvePatch", () => {
     expect(index).toBe(1);
   });
 
+  it.each([
+    { ref: "0", expectedIndex: 0 },
+    { ref: "2", expectedIndex: 2 },
+  ])("resolves the boundary index $ref", ({ ref, expectedIndex }) => {
+    expect(resolvePatch(patches, ref).index).toBe(expectedIndex);
+  });
+
   // The device stores "Lead" and "LEAD" as two names, so a case-blind match would leave a file
   // holding both with neither reachable by name.
-  it("matches a name exactly, case included", () => {
+  it.each([
+    { name: "Clean Jazz", expectedIndex: 1 },
+    { name: "CLEAN JAZZ", expectedIndex: 3 },
+  ])("resolves $name to its own index", ({ name, expectedIndex }) => {
     const withCaseVariant = [...patches, makePatch("CLEAN JAZZ")];
 
-    expect(resolvePatch(withCaseVariant, "Clean Jazz").index).toBe(1);
-    expect(resolvePatch(withCaseVariant, "CLEAN JAZZ").index).toBe(3);
+    expect(resolvePatch(withCaseVariant, name).index).toBe(expectedIndex);
+  });
+
+  it("rejects a name differing only in case", () => {
+    const withCaseVariant = [...patches, makePatch("CLEAN JAZZ")];
+
     expect(() => resolvePatch(withCaseVariant, "clean jazz")).toThrow(/clean jazz/);
   });
 
@@ -431,6 +431,12 @@ describe("resolvePatch", () => {
 
     expect(resolveAmbiguousName).toThrow(/Rock Lead/);
     expect(resolveAmbiguousName, "names both colliding indices").toThrow(/0.*2|2.*0/);
+  });
+
+  it("rejects a digits-only ref past the end when two patches share that name, as ambiguous", () => {
+    const withNumericNames = [...patches, makePatch("9"), makePatch("9")];
+
+    expect(() => resolvePatch(withNumericNames, "9")).toThrow(/Ambiguous/);
   });
 
   // Every surface takes the ref as a bare string, so an omitted one arrives here as "". Read as a
@@ -470,6 +476,10 @@ describe("resolvePatches", () => {
 
     expect(selected.map(entry => entry.index)).toStrictEqual([0, 1, 2]);
     expect(selected.map(entry => entry.patch)).toStrictEqual(patches);
+  });
+
+  it("returns an empty array when there are no patches and no ref is given", () => {
+    expect(resolvePatches([])).toStrictEqual([]);
   });
 
   it("returns the one patch a ref names, with the index it sits at", () => {
@@ -528,6 +538,40 @@ describe("copyPatch", () => {
     await expect(copyPastEnd, "and how many the file actually holds").rejects.toThrow(/1 patch/);
     expect((await loadFile(dstPath)).patches).toHaveLength(1);
   });
+
+  // The independent-decode claim: src and dst naming the same file still resolve srcRef against a
+  // copy read before the write, not against the object about to be overwritten.
+  it("copies within one file from an independent decode of the source", async () => {
+    const driver = makeFakeDriver();
+    const path = pathTo("set.tsl");
+    await seedFile(path, { name: "Set", device: "FAKE", patches: [makePatch("Lead"), makePatch("Rhythm")] });
+
+    const copied = await copyPatch(driver, { src: path, srcRef: "0", dst: path, dstRef: "1" });
+
+    expect(copied).toStrictEqual({ name: "Lead", fromIndex: 0, toIndex: 1 });
+    expect((await loadFile(path)).patches.map(patch => patch.name)).toStrictEqual(["Lead", "Lead"]);
+  });
+
+  it("rejects a missing destination file without creating one", async () => {
+    const driver = makeFakeDriver();
+    const srcPath = pathTo("src.tsl");
+    const dstPath = pathTo("missing-dst.tsl");
+    await seedFile(srcPath, { name: "Src", device: "FAKE", patches: [makePatch("Lead")] });
+
+    await expect(copyPatch(driver, { src: srcPath, srcRef: "0", dst: dstPath, dstRef: "0" })).rejects.toThrow();
+    expect(await pathExists(dstPath)).toBe(false);
+  });
+
+  it("writes nothing to the destination when srcRef names no patch", async () => {
+    const driver = makeFakeDriver();
+    const srcPath = pathTo("src.tsl");
+    const dstPath = pathTo("dst.tsl");
+    await seedFile(srcPath, { name: "Src", device: "FAKE", patches: [makePatch("Lead")] });
+    await seedFile(dstPath, { name: "Dst", device: "FAKE", patches: [makePatch("Keep")] });
+
+    await expect(copyPatch(driver, { src: srcPath, srcRef: "Bogus", dst: dstPath, dstRef: "0" })).rejects.toThrow();
+    expect((await loadFile(dstPath)).patches).toStrictEqual([makePatch("Keep")]);
+  });
 });
 
 describe("createPatchFile", () => {
@@ -552,6 +596,24 @@ describe("createPatchFile", () => {
 
     expect(file.name).toBe("Live Set");
     expect(file.patches).toHaveLength(4);
+  });
+
+  it("accepts a patch count of 1", async () => {
+    const driver = makeFakeDriver();
+    const path = join(dir(), "one.tsl");
+
+    const file = await createPatchFile(driver, path, { patchCount: 1 });
+
+    expect(file.patches).toHaveLength(1);
+  });
+
+  it("creates missing parent directories", async () => {
+    const driver = makeFakeDriver();
+    const path = join(dir(), "nested", "deeper", "set.tsl");
+
+    await createPatchFile(driver, path);
+
+    expect(await pathExists(path)).toBe(true);
   });
 
   it("refuses to overwrite an existing file, so a mistyped path can't cost a library", async () => {

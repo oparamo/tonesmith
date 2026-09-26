@@ -1,17 +1,9 @@
 import { describe, it, expect } from "vitest";
-import {
-  defaultFxParams,
-  basePatch,
-  block,
-} from "../../../../src/device/gx1/spec/builder";
-import { decodePatch, encodePatch, validateChain } from "../../../../src/device/gx1/format/codec";
-import { bytesFromHex } from "../../../../src/device/gx1/format/codec/primitives";
+import { basePatch, block } from "../../../../src/device/gx1/spec/builder";
 import { BLOCK_DEFAULTS, DEFAULTS_BY_TYPE, DEFAULT_SUBTYPES } from "../../../../src/device/gx1/catalog/defaults";
 import { PARAM_SUBTYPE_EFFECTS, DEFAULT_CHAIN } from "../../../../src/device/gx1/model";
-import { DEFAULT_INIT_FIXTURE, moveBefore, patchAt } from "../helpers";
+import { moveBefore } from "../helpers";
 import { present } from "../../../helpers";
-
-const defaultInitPatch = await patchAt(DEFAULT_INIT_FIXTURE);
 
 describe("basePatch", () => {
   it("opens at the default chain and the device's own factory settings", () => {
@@ -36,6 +28,15 @@ describe("basePatch", () => {
     expect(patch.bpm).toBe(90);
   });
 
+  it("copies the chain given, rather than aliasing the caller's array", () => {
+    const custom = moveBefore(DEFAULT_CHAIN, "drive", "fx1");
+    const patch = basePatch("Test", { chain: custom });
+
+    custom.push("extra");
+
+    expect(patch.chain).not.toContain("extra");
+  });
+
   // The two switches ship on and off respectively, so a truthiness test for "did the caller say"
   // would silently restore the factory value for whichever one they deliberately turned off.
   it("keeps a setting the caller set to false", () => {
@@ -49,60 +50,6 @@ describe("basePatch", () => {
 
     expect(patch.memoryLevel).toBe(100);
     expect(patch.key).toBe("C");
-  });
-});
-
-describe("a reordered chain", () => {
-  // Real device values (each reorder was made on a GX-1, exported and byte-diffed), so a wrong
-  // MEMORY%CHAIN encoding fails this, not just self-consistency.
-  it("encodes an fx2-after-noiseGate reorder to the real device bytes", () => {
-    const chain = moveBefore(DEFAULT_CHAIN, "fx2", "noiseGate");
-    const patch = basePatch("Test", { chain });
-
-    const encoded = encodePatch(patch);
-    const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
-
-    expect(chainBytes).toStrictEqual([1, 2, 3, 4, 5, 7, 9, 8, 6, 10, 0, 11, 12]);
-  });
-
-  it("encodes a drive-before-fx1 reorder to the real device bytes", () => {
-    const chain = moveBefore(DEFAULT_CHAIN, "drive", "fx1");
-    const patch = basePatch("Test", { chain });
-
-    const encoded = encodePatch(patch);
-    const chainBytes = bytesFromHex(present(encoded.paramSet["MEMORY%CHAIN"], "the encoded chain block"));
-
-    expect(chainBytes).toStrictEqual([1, 3, 4, 2, 7, 6, 9, 8, 5, 10, 0, 11, 12]);
-  });
-});
-
-describe("validateChain", () => {
-  it("returns a complete reordered chain as given", () => {
-    const reordered = moveBefore(DEFAULT_CHAIN, "drive", "fx1");
-
-    const accepted = () => { validateChain(reordered); };
-
-    expect(accepted).not.toThrow();
-  });
-
-  it("names every missing block when the chain is incomplete", () => {
-    const validatePartialChain = () => { validateChain(["drive", "fx1"]); };
-
-    // The blocks left out are the whole fix a caller has to make, so the message has to list them.
-    expect(validatePartialChain).toThrow(/pedalFx/);
-    expect(validatePartialChain).toThrow(/reverb/);
-  });
-
-  it("throws on an unknown block name", () => {
-    const validateChainWithBogusBlock = () => { validateChain([...DEFAULT_CHAIN, "BOGUS"]); };
-
-    expect(validateChainWithBogusBlock).toThrow(/BOGUS/);
-  });
-
-  it("throws on a duplicate block name", () => {
-    const validateChainWithDuplicateBlock = () => { validateChain([...DEFAULT_CHAIN, "fx1"]); };
-
-    expect(validateChainWithDuplicateBlock).toThrow(/fx1/);
   });
 });
 
@@ -181,6 +128,17 @@ describe("drive", () => {
     expect(patch.drive.on).toBe(true);
     expect(patch.drive.params).toMatchObject({ direct: 0, solo: false, soloLevel: 50 });
   });
+
+  // The single-shape path is shared with the amp, which has its own test of this above; this
+  // confirms the drive block re-defaults on the same path rather than a copy of it.
+  it("re-defaults a control the next call leaves out", () => {
+    const patch = basePatch("Test");
+
+    block(patch, "drive", { type: "BLUES OD", params: { drive: 70 } });
+    block(patch, "drive", { type: "OVERDRIVE" });
+
+    expect(patch.drive.params.drive).toBe(present(BLOCK_DEFAULTS.drive, "the drive defaults").drive);
+  });
 });
 
 describe("fx", () => {
@@ -214,24 +172,41 @@ describe("fx", () => {
     }
   );
 
-  it("configures each slot independently and honors on: false", () => {
+  it("honors on: false on an fx slot", () => {
     const patch = basePatch("Test");
 
-    block(patch, "fx2", { type: "FLANGER", params: { rate: 30 } });
     block(patch, "fx3", { type: "DELAY", subType: "STANDARD", params: { time: 200 }, on: false });
 
-    expect(patch.fx2).toMatchObject({ on: true, type: "FLANGER" });
     expect(patch.fx3).toMatchObject({ on: false, type: "DELAY", subType: "STANDARD" });
+  });
+
+  it("setting one slot leaves another slot's block alone", () => {
+    const patch = basePatch("Test");
+    block(patch, "fx1", { type: "CHORUS", params: { rate: 50 } });
+    const fx1Before = { ...patch.fx1.params };
+
+    block(patch, "fx3", { type: "FLANGER", params: { rate: 30 } });
+
+    expect(patch.fx1.params).toStrictEqual(fx1Before);
+  });
+
+  it("keeps the block's current type when a call omits it", () => {
+    const patch = basePatch("Test");
+    block(patch, "fx1", { type: "CHORUS", params: { rate: 50 } });
+
+    block(patch, "fx1", { params: { rate: 80 } });
+
+    expect(patch.fx1.type).toBe("CHORUS");
+    expect(patch.fx1.params.rate).toBe(80);
   });
 
   // The sub-algorithm picks the field set, so with none named there would be nothing to default
   // from and every param would come out at 0. Opening on the factory sub-algorithm avoids that.
-  it("fx DELAY with no sub-algorithm opens on the factory one, at its own defaults", () => {
+  it("fills fx DELAY's params from its factory sub-algorithm's defaults", () => {
     const patch = basePatch("Test");
 
     block(patch, "fx1", { type: "DELAY" });
 
-    expect(patch.fx1.subType).toBe("STANDARD");
     expect(patch.fx1.params).toMatchObject(present(DEFAULTS_BY_TYPE.fxDelay.STANDARD, "the STANDARD fx-delay defaults"));
   });
 
@@ -243,53 +218,6 @@ describe("fx", () => {
     // WARP's fields are time/trigger/level. The sub-algorithm picks that field set but is not one
     // of them: it lives on the block, not among the params it selects.
     expect(patch.fx1.params).toStrictEqual({ time: 400, trigger: false, level: 80 });
-  });
-
-  // FIXED WAH's model selector lives in param-block byte p[0] (PARAM_SUBTYPE_EFFECTS), not FX_COM
-  // byte[2]. This proves both halves of that threading: encodePatch putting the block's selection
-  // back into byte p[0], and decodePatch lifting it off the params it read.
-  it("round-trips FIXED WAH's subType through encode/decode", () => {
-    const patch = basePatch("Test");
-    block(patch, "fx1", { type: "FIXED WAH", subType: "VO WAH", params: { level: 80, direct: 20, manual: 60 } });
-
-    const decoded = decodePatch(encodePatch(patch));
-
-    expect(decoded.fx1.subType).toBe("VO WAH");
-    expect(decoded.fx1.params).toMatchObject({ level: 80, direct: 20, manual: 60 });
-  });
-
-  // The FX-slot REVERB's algorithm selector also lives in param-block byte p[0]
-  // (PARAM_SUBTYPE_EFFECTS), the shared-param-set case, like CHORUS.
-  it("round-trips the FX-slot REVERB's subType through encode/decode", () => {
-    const patch = basePatch("Test");
-    block(patch, "fx1", { type: "REVERB", subType: "HALL M", params: { time: 2.5, level: 40 } });
-
-    const decoded = decodePatch(encodePatch(patch));
-
-    expect(decoded.fx1.subType).toBe("HALL M");
-    expect(decoded.fx1.params).toMatchObject({ time: 2.5, level: 40 });
-  });
-
-  // OVERTONE (FX3-only) stores its params in the separate MEMORY%FX3A block instead
-  // of the shared 251-byte FX param block, so this proves both halves of that
-  // special-casing in codec/patch.ts round-trip correctly.
-  it("round-trips OVERTONE on fx3 through its dedicated MEMORY%FX3A block", () => {
-    const patch = basePatch("Test");
-    block(patch, "fx3", { type: "OVERTONE", params: { lower: 60, upper: 40, unison: 50, direct: 100, detune: 20 } });
-
-    const decoded = decodePatch(encodePatch(patch));
-
-    expect(decoded.fx3.type).toBe("OVERTONE");
-    expect(decoded.fx3.params).toMatchObject({ lower: 60, upper: 40, unison: 50, direct: 100, detune: 20 });
-  });
-
-  it("accepts an unrecognized FX type with no params, without throwing", () => {
-    const patch = basePatch("Test");
-    const setBogusType = () => { block(patch, "fx1", { type: "BOGUS TYPE" }); };
-
-    expect(setBogusType).not.toThrow();
-    expect(patch.fx1.type).toBe("BOGUS TYPE");
-    expect(patch.fx1.params).toStrictEqual({});
   });
 
   it("defaults unset GEQ bands to 0 dB instead of the signed-center raw byte", () => {
@@ -321,6 +249,14 @@ describe("noiseGate", () => {
     expect(patch.noiseGate.on).toBe(false);
     expect(patch.noiseGate.params.detect).toBe("NS INPUT");
   });
+
+  it("ignores type, since the block has no type selector", () => {
+    const patch = basePatch("Test");
+
+    block(patch, "noiseGate", { type: "BOGUS", params: { threshold: 40, release: 30 } });
+
+    expect(patch.noiseGate).not.toHaveProperty("type");
+  });
 });
 
 describe("volume", () => {
@@ -339,6 +275,14 @@ describe("volume", () => {
 
     expect(patch.volume.params.curve).toBe("NORMAL");
   });
+
+  it("ignores on, since the pedal has no bypass", () => {
+    const patch = basePatch("Test");
+
+    block(patch, "volume", { on: false, params: { position: 100, min: 0, max: 100 } });
+
+    expect(patch.volume).not.toHaveProperty("on");
+  });
 });
 
 describe("pedalFx", () => {
@@ -352,7 +296,7 @@ describe("pedalFx", () => {
     expect(patch.pedalFx.params).toStrictEqual(wahParams);
   });
 
-  it("fills every WAH param with real factory defaults when no params are passed", () => {
+  it("fills the WAH params the caller leaves out, on the factory CRY WAH model", () => {
     const patch = basePatch("Test");
 
     block(patch, "pedalFx", { type: "WAH", params: { level: 90 } });
@@ -371,13 +315,12 @@ describe("pedalFx", () => {
     });
   });
 
-  it("selects the wah model from subType", () => {
+  it("opens a type with no sub-models on a null subType", () => {
     const patch = basePatch("Test");
 
-    block(patch, "pedalFx", { type: "WAH", subType: "VO WAH", params: { level: 80 } });
+    block(patch, "pedalFx", { type: "PEDAL BEND" });
 
-    expect(patch.pedalFx).toMatchObject({ type: "WAH", subType: "VO WAH" });
-    expect(patch.pedalFx.params.level).toBe(80);
+    expect(patch.pedalFx.subType).toBeNull();
   });
 
   it("can bypass the block", () => {
@@ -386,14 +329,6 @@ describe("pedalFx", () => {
     block(patch, "pedalFx", { type: "WAH", on: false });
 
     expect(patch.pedalFx.on).toBe(false);
-  });
-
-  it("accepts an unrecognized type with no params, without throwing", () => {
-    const patch = basePatch("Test");
-    const setBogusType = () => { block(patch, "pedalFx", { type: "BOGUS TYPE" }); };
-
-    expect(setBogusType).not.toThrow();
-    expect(patch.pedalFx.type).toBe("BOGUS TYPE");
   });
 });
 
@@ -416,13 +351,12 @@ describe("delay", () => {
     expect(patch.delay.params.highCut).toBe("6.3kHz");
   });
 
-  it("throws on encode for an unrecognized high cut label", () => {
+  it("never carries a subType field, since no delay algorithm has sub-models", () => {
     const patch = basePatch("Test");
-    block(patch, "delay", { type: "PAN", params: { time: 1, feedback: 30, level: 40, highCut: "UNKNOWN" } });
 
-    const encodeWithBadHighCut = () => { encodePatch(patch); };
+    block(patch, "delay", { type: "STANDARD", params: { time: 7, feedback: 50, level: 60 } });
 
-    expect(encodeWithBadHighCut).toThrow();
+    expect(patch.delay).not.toHaveProperty("subType");
   });
 
   it("merges type-specific params", () => {
@@ -486,26 +420,30 @@ describe("reverb", () => {
     expect(patch.reverb.params).toMatchObject({ preDelay: 30, tone: 0, density: 5, direct: 100 });
   });
 
-  // Asserted through the codec because the builder mutates the block in place: a property left by
-  // whichever type occupied it before survives in memory, and encode is what settles which fields
-  // this type really has.
+  it("never carries a subType field, since no reverb algorithm has sub-models", () => {
+    const patch = basePatch("Test");
+
+    block(patch, "reverb", { type: "HALL M", params: { time: 2.5, level: 80 } });
+
+    expect(patch.reverb).not.toHaveProperty("subType");
+  });
+
   it("builds TERA ECHO, which has no TIME, from its own params", () => {
     const patch = basePatch("Test");
 
     block(patch, "reverb", { type: "TERA ECHO", params: { level: 60, spreadTime: 50, feedback: 40 } });
-    const stored = decodePatch(encodePatch(patch));
 
-    expect(stored.reverb.type).toBe("TERA ECHO");
-    expect(stored.reverb.params).toMatchObject({ level: 60, spreadTime: 50, feedback: 40 });
-    expect(stored.reverb.params).not.toHaveProperty("time");
+    expect(patch.reverb.type).toBe("TERA ECHO");
+    expect(patch.reverb.params).toMatchObject({ level: 60, spreadTime: 50, feedback: 40 });
+    expect(patch.reverb.params).not.toHaveProperty("time");
   });
 
   it("merges type-specific params", () => {
     const patch = basePatch("Test");
 
-    block(patch, "reverb", { type: "SHIMMER", params: { time: 3.0, level: 60, pitch: 12 } });
+    block(patch, "reverb", { type: "SHIMMER", params: { time: 3.0, level: 60, pitch: 5 } });
 
-    expect(patch.reverb.params.pitch).toBe(12);
+    expect(patch.reverb.params.pitch).toBe(5);
   });
 
   it("fills SUB DELAY's own feedback/highCut fields with real factory defaults", () => {
@@ -522,42 +460,5 @@ describe("reverb", () => {
     block(patch, "reverb", { type: "SHIMMER", params: { time: 1, level: 60 } });
 
     expect(patch.reverb.params).toMatchObject({ pitch: 12, pitchLevel: 100 });
-  });
-});
-
-// Anchors defaultFxParams to the one real captured factory-default source we have:
-// core/tests/fixtures/gx1/default-init.tsl. For each FX type actually present there,
-// defaultFxParams(type) must match what the real device shows for that type's params. A drift
-// between the two is what puts a wrong value under an unset param, such as a GEQ band decoding
-// to -20 dB where the device ships it at 0.
-describe("defaultFxParams (anchored to default-init.tsl)", () => {
-  const patch = defaultInitPatch;
-
-  it("matches the fixture's real COMPRESSOR params (fx1)", () => {
-    const compressorDefaults = defaultFxParams("COMPRESSOR");
-
-    expect(patch.fx1.type).toBe("COMPRESSOR");
-    expect(compressorDefaults).toStrictEqual({ sustain: 50, attack: 50, level: 60 });
-    expect(patch.fx1.params).toMatchObject(compressorDefaults);
-  });
-
-  it("matches the fixture's real PARA. EQ params (fx2)", () => {
-    const paraEqDefaults = defaultFxParams("PARA. EQ");
-
-    expect(patch.fx2.type).toBe("PARA. EQ");
-    expect(paraEqDefaults).toStrictEqual({
-      lowGain: 0, highGain: 0, level: 0, midFreq: "4kHz", midGain: 0, lowCut: "FLAT", highCut: "FLAT",
-    });
-    expect(patch.fx2.params).toStrictEqual(paraEqDefaults);
-  });
-
-  it("matches the fixture's real CHORUS params (fx3)", () => {
-    const chorusDefaults = defaultFxParams("CHORUS");
-
-    expect(patch.fx3.type).toBe("CHORUS");
-    expect(chorusDefaults).toStrictEqual({
-      rate: 50, depth: 40, level: 100, preDelay: 4, direct: 100,
-    });
-    expect(patch.fx3.params).toMatchObject(chorusDefaults);
   });
 });

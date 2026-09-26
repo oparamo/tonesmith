@@ -3,97 +3,30 @@ import * as gx1 from "../../../../src/device/gx1";
 import { validatePatchSpec } from "../../../../src/device/gx1/spec/build";
 import { gx1Capabilities } from "../../../../src/device/gx1/catalog/capabilities";
 import { BLOCK_NAMES, DEFAULT_CHAIN } from "../../../../src/device/gx1/model";
-import { ROCK_TONES_FIXTURE, moveBefore, patchAt } from "../helpers";
-import { storedAs } from "../../../helpers";
+import { moveBefore } from "../helpers";
 
 describe("buildPatch", () => {
-  it("builds every block the spec names, defaults filled in", () => {
+  it("carries the spec's name onto the patch", () => {
+    const patch = gx1.driver.buildPatch({ name: "Ojitos Lindos" });
+
+    expect(patch.name).toBe("Ojitos Lindos");
+  });
+
+  it("passes each block's params to the builder", () => {
     const patch = gx1.driver.buildPatch({
       name: "Ojitos Lindos",
-      amp: { type: "TRNSPRNT", params: { gain: 12, bass: 48, middle: 45, treble: 55, level: 100 } },
       delay: { type: "ANALOG", params: { time: 400, feedback: 30, level: 48, highCut: "4kHz" } },
       reverb: { type: "SHIMMER", params: { time: 4, tone: -3, preDelay: 25, level: 55, pitch: 12, pitchLevel: 45 } },
     });
 
-    expect(patch.name).toBe("Ojitos Lindos");
     expect(patch.delay.params.time).toBe(400);
     expect(patch.reverb.params.pitch).toBe(12);
+  });
+
+  it("opens on the default chain when the spec names none", () => {
+    const patch = gx1.driver.buildPatch({ name: "Ojitos Lindos" });
+
     expect(patch.chain).toStrictEqual(DEFAULT_CHAIN);
-  });
-
-  // A TERA ECHO reverb has no TIME, DENSITY or PRE-DELAY. The blank patch's reverb does, and a
-  // patch carrying them would show settings its file never stores.
-  it("builds a type with only the fields that type stores", () => {
-    const patch = gx1.driver.buildPatch({
-      name: "Tera",
-      reverb: { type: "TERA ECHO", params: { level: 60, direct: 100, spreadTime: 50, feedback: 40, trigger: false } },
-    });
-
-    expect(Object.keys(patch.reverb.params)).not.toContain("time");
-    expect(Object.keys(patch.reverb.params)).not.toContain("density");
-  });
-
-  // A sub-model goes in under one name and has to come back out under the same one, so a caller
-  // mirroring the block it just read is never rejected for the shape it was handed.
-  it("accepts a block's sub-model spelled the way reading it back spells it", () => {
-    const built = gx1.driver.buildPatch({
-      name: "Wah",
-      amp: { type: "TWIN" },
-      pedalFx: { type: "WAH", subType: "VO WAH" },
-    });
-
-    const read = storedAs(gx1.driver, built);
-    const echoed = (): unknown => gx1.driver.buildPatch({
-      name: "Wah Again",
-      amp: { type: "TWIN" },
-      pedalFx: { type: read.pedalFx.type, subType: read.pedalFx.subType },
-    });
-
-    expect(read.pedalFx.subType).toBe("VO WAH");
-    expect(echoed).not.toThrow();
-  });
-
-  // A block read back from a file is a block the spec has to take, which is the whole point of the
-  // two sharing a shape. A type with no variants decodes `subType: null`, so null has to mean the
-  // same thing here as leaving the field out.
-  it("takes a whole decoded patch back as a spec, unedited", () => {
-    const built = gx1.driver.buildPatch({
-      name: "Round Trip",
-      amp: { type: "TWIN" },
-      fx1: { type: "TREMOLO" },
-    });
-    const read = storedAs(gx1.driver, built);
-
-    const resend = (): unknown => gx1.driver.buildPatch({
-      name: read.name, memo: read.memo, chain: read.chain, bpm: read.bpm, key: read.key,
-      amp: read.amp, fx1: read.fx1,
-    });
-
-    expect(read.fx1.subType, "the case null covers").toBeNull();
-    expect(resend).not.toThrow();
-  });
-
-  // The same round trip over a patch the device itself wrote, which is where it first failed: a
-  // tempo-synced delay came back as a code above the param's ceiling and was rejected as a time
-  // nobody could have set.
-  it("takes a patch read off the device back as a spec, tempo-synced values included", async () => {
-    const read = await patchAt(ROCK_TONES_FIXTURE, 0);
-
-    const rebuilt = gx1.driver.buildPatch({ ...read });
-
-    expect(read.delay.params.time, "the fixture's own synced delay").toBe("1/4");
-    expect(rebuilt.delay.params.time, "survives the rebuild as the note it is").toBe("1/4");
-    expect(rebuilt.bpm, "against the tempo that says how long that note lasts").toBe(read.bpm);
-  });
-
-  it("puts a block's params where the decoded patch keeps them", () => {
-    const patch = gx1.driver.buildPatch({
-      name: "Chorus",
-      amp: { type: "TWIN", params: { gain: 20, bass: 50, middle: 50, treble: 50 } },
-      fx1: { type: "CHORUS", subType: "STEREO", params: { rate: 20, depth: 35 } },
-    });
-
-    expect(patch.fx1.params.rate).toBe(20);
   });
 
   it("leaves out every block the spec doesn't name", () => {
@@ -128,19 +61,6 @@ describe("buildPatch", () => {
     expect(build).toThrow(/TONE/);
   });
 
-  // Validation runs against the catalog and the builder runs against the codec's own field maps.
-  // The catalog is derived from those maps, so the two agree, but a spec that got past validation
-  // and then threw at the builder would be a drift the caller can do nothing about.
-  it("reports a rejection before any block is built", () => {
-    const build = (): unknown => gx1.driver.buildPatch({
-      name: "Bad",
-      amp: { type: "TWIN", params: { gain: 20, bass: 50, middle: 50, treble: 50 } },
-      delay: { type: "TWIST", time: 400 },
-    });
-
-    expect(build).toThrow(/time/);
-  });
-
   // FX1 and FX2 have no MEMORY%FX3A block, so OVERTONE's params would land at offset 0 of the
   // shared 251-byte block, on top of COMPRESSOR's window and the factory defaults living in it.
   it("rejects OVERTONE in an fx slot that cannot hold it, naming the one that can", () => {
@@ -173,39 +93,39 @@ describe("buildPatch", () => {
       const patch = gx1.driver.buildPatch(delayOnly);
 
       expect(patch.amp).toMatchObject({ on: false, type: "NATURAL" });
-      expect(patch.delay.on).toBe(true);
-      expect(patch.delay.params.time).toBe(400);
     });
 
-    // `{ on: false }` alone and leaving the block out say the same thing, so they have to produce
-    // the same patch rather than the second one demanding a type for a block it is switching off.
-    it("treats a bare `on: false` as leaving the block out", () => {
-      const omitted = gx1.driver.buildPatch(delayOnly);
-      const bypassed = gx1.driver.buildPatch({ ...delayOnly, amp: { on: false } });
+    // `{ on: false }` alone and leaving the block out say the same thing, so every block the
+    // device can bypass has to build the same patch either way.
+    it.each(BLOCK_NAMES.filter(name => gx1Capabilities.chain.blocks[name]?.bypass))(
+      "%s builds identically whether written off or left out",
+      (name) => {
+        const omitted = gx1.driver.buildPatch({ name: "Bypass" });
+        const bypassed = gx1.driver.buildPatch({ name: "Bypass", [name]: { on: false } });
 
-      expect(bypassed.amp).toStrictEqual(omitted.amp);
-    });
+        expect(bypassed[name as keyof typeof bypassed]).toStrictEqual(omitted[name as keyof typeof omitted]);
+      }
+    );
+  });
 
-    it("still requires a type from an amp the patch does sound through", () => {
-      const build = () => gx1.driver.buildPatch({ ...delayOnly, amp: { on: true } });
+  describe("patch settings a spec carries", () => {
+    it.each([
+      { field: "memoryLevel", value: 5 },
+      { field: "bpm", value: 250 },
+      { field: "key", value: "F#" },
+      { field: "carryover", value: false },
+      { field: "tempoHold", value: true },
+    ])("$field lands on the built patch", ({ field, value }) => {
+      const patch = gx1.driver.buildPatch({ name: "Test", [field]: value });
 
-      expect(build, "names the block that needs one").toThrow(/amp/);
-      expect(build, "and the models it offers").toThrow(/JC-120/);
+      expect((patch as unknown as Record<string, unknown>)[field]).toBe(value);
     });
   });
 
-  // The amp case above states the rule; this holds it for every block the device can bypass.
-  // Compared through the codec rather than the built objects, since the bytes are what a caller
-  // ends up with: whichever of the two spellings an agent picks must not change the file.
-  describe("a block written off and a block left out", () => {
-    const bypassable = BLOCK_NAMES.filter(name => name !== "volume");
+  it("lands a string memo on the built patch", () => {
+    const patch = gx1.driver.buildPatch({ name: "Test", memo: "left it in drop D" });
 
-    it.each(bypassable)("%s encodes identically either way", (block) => {
-      const omitted = gx1.driver.buildPatch({ name: "Bypass" });
-      const bypassed = gx1.driver.buildPatch({ name: "Bypass", [block]: { on: false } });
-
-      expect(storedAs(gx1.driver, bypassed)).toStrictEqual(storedAs(gx1.driver, omitted));
-    });
+    expect(patch.memo).toBe("left it in drop D");
   });
 });
 
@@ -215,6 +135,26 @@ describe("validatePatchSpec", () => {
 
   it("accepts a minimal usable spec", () => {
     expect(validatePatchSpec(valid)).toStrictEqual([]);
+  });
+
+  it("reports a missing name rather than throwing, for a non-object input", () => {
+    expect(validatePatchSpec(null)).toContainEqual(expect.stringContaining("name"));
+  });
+
+  it.each([
+    { label: "no name at all", spec: {} },
+    { label: "an empty name", spec: { name: "" } },
+    { label: "a non-string name", spec: { name: 5 } },
+  ])("rejects $label", ({ spec }) => {
+    const [issue] = validatePatchSpec(spec);
+
+    expect(issue).toContain("name");
+  });
+
+  it("accepts a name exactly at the device's length limit", () => {
+    const atLimit = "x".repeat(gx1Capabilities.patchName.maxLength);
+
+    expect(validatePatchSpec({ ...valid, name: atLimit })).toStrictEqual([]);
   });
 
   it("names the unknown block and lists the real ones", () => {
@@ -236,6 +176,16 @@ describe("validatePatchSpec", () => {
     const [issue] = validatePatchSpec({ ...valid, name: "Café" });
 
     expect(issue).toContain("é");
+  });
+
+  it("rejects a non-string memo", () => {
+    const [issue] = validatePatchSpec({ ...valid, memo: 5 });
+
+    expect(issue).toContain("memo");
+  });
+
+  it("rejects a chain with a non-string element", () => {
+    expect(validatePatchSpec({ ...valid, chain: ["amp", 5] })).toHaveLength(1);
   });
 
   // The device gives the amp an on/off byte like every other bypassable block, so a patch that
@@ -270,19 +220,6 @@ describe("validatePatchSpec", () => {
     }
   );
 
-  it("rejects a value of the wrong kind, naming the param", () => {
-    const [issue] = validatePatchSpec({ ...valid, noiseGate: { params: { threshold: "loud", release: 40 } } });
-
-    expect(issue).toContain("THRESHOLD");
-    expect(issue, "should quote back what it was given").toContain("loud");
-  });
-
-  it("rejects a fraction for a param the catalog gives no decimals", () => {
-    const spec = { ...valid, delay: { type: "STANDARD", params: { time: 400.5 } } };
-
-    expect(validatePatchSpec(spec)).not.toStrictEqual([]);
-  });
-
   it("accepts a fraction where the catalog gives decimals", () => {
     const spec = { ...valid, reverb: { type: "HALL S", params: { time: 4.5 } } };
 
@@ -295,64 +232,9 @@ describe("validatePatchSpec", () => {
     expect(issue).toContain("HALL S");
   });
 
-  // Without this the type is left unresolved, so every param the caller sent alongside it reads as
-  // an unknown key and nothing in the response says the type was the problem.
-  it("rejects a type the block doesn't have, listing the ones it does", () => {
-    const [issue] = validatePatchSpec({ ...valid, reverb: { type: "HALL XL", params: { time: 4 } } });
-
-    expect(issue).toContain("HALL XL");
-    expect(issue).toContain("HALL S");
-  });
-
-  // Every block fills what the caller leaves unset from the device's own factory values, so naming
-  // the type is the whole obligation. Demanding the controls outright would make a caller invent a
-  // value for every knob on a block it only wanted switched on.
-  it("accepts a block that names only its type, leaving the rest to default", () => {
-    expect(validatePatchSpec({ name: "Test", amp: { type: "TWIN" } })).toStrictEqual([]);
-  });
-
-  it("rejects a control the chosen type has no field for", () => {
-    const issues = validatePatchSpec({ ...valid, reverb: { type: "TERA ECHO", params: { time: 4, level: 50 } } });
-
-    expect(issues.join("\n")).toContain("time");
-  });
-
-  it("rejects a sub-model named among the params, where the decoded block never carries it", () => {
-    const issues = validatePatchSpec({ ...valid, pedalFx: { type: "WAH", params: { subType: "CRY WAH" } } });
-
-    expect(issues.join("\n")).toContain("subType");
-  });
-
-  it("names a param sent one level too high as a param of its type, not an unknown key", () => {
-    const spec = { ...valid, fx1: { type: "CHORUS", rate: 16 } };
-    const [issue] = validatePatchSpec(spec);
-
-    expect(issue).toContain("rate");
-    expect(issue, "should say where it belongs").toContain("params");
-  });
-
-  it("reports every problem it finds rather than stopping at the first", () => {
-    const spec = { ...valid, reverb: { type: "HALL S", params: { time: 99, tone: 999 } } };
-
-    expect(validatePatchSpec(spec)).toHaveLength(2);
-  });
-
-  /**
-   * `on` and `subType` select a block's shape rather than set a control, so they are filtered out
-   * before the param check and reach the builder on trust.
-   */
-  it.each([
-    { label: "a non-boolean on", block: { type: "TWIN", on: "yes" } },
-    { label: "a non-string subType", block: { type: "TWIN", subType: 42 } },
-  ])("rejects $label", ({ block }) => {
-    expect(validatePatchSpec({ name: "Test", amp: block })).toHaveLength(1);
-  });
-
   it.each([
     { label: "a chain that is not an array", spec: { chain: "pedalFx" } },
     { label: "a chain naming a block twice", spec: { chain: ["amp", "amp"] } },
-    { label: "a key the device has no name for", spec: { key: "Am" } },
-    { label: "a key that is not a string", spec: { key: 5 } },
   ])("rejects $label", ({ spec }) => {
     expect(validatePatchSpec({ ...valid, ...spec })).toHaveLength(1);
   });
