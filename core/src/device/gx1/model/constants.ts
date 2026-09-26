@@ -45,10 +45,9 @@ const REV_TYPES = [
   "SPRING", "SHIMMER", "SUB DELAY", "TERA ECHO",
 ] as const;
 
-// The FX-slot DELAY / REVERB (an effect selectable in an FX1/2/3 slot) expose their OWN,
-// smaller type sets, NOT the dedicated DLY/REV block's tables above. Each is a distinct
-// enum indexed by the FX-slot's own type byte (0-4); reusing DLY_TYPES/REV_TYPES here would
-// mislabel types 2-4 (e.g. FX-slot delay type 2 is WARP, not the dedicated block's PAN).
+// An FX slot's DELAY and REVERB have their own, smaller type sets, indexed by the slot's type
+// byte (0-4), not the dedicated DLY/REV blocks' tables above. Reusing DLY_TYPES/REV_TYPES here
+// would mislabel types 2-4: FX-slot delay type 2 is WARP, where the dedicated block's is PAN.
 const FX_DLY_TYPES = ["STANDARD", "MODULATE", "WARP", "TWIST", "GLITCH"] as const;
 const FX_REV_TYPES = ["HALL S", "HALL M", "PLATE", "ROOM", "STUDIO"] as const;
 
@@ -167,7 +166,8 @@ const FREQ_STEPS = [
   "5kHz", "6.3kHz", "8kHz", "10kHz", "12.5kHz",
 ] as const;
 
-// FREQ_STEPS plus a trailing FLAT (index 29), used by delay/PARA. EQ highCut.
+// FREQ_STEPS plus a trailing FLAT (index 29), used by every highCut: delay, reverb SUB DELAY,
+// and PARA. EQ.
 const FREQ_HIGH_CUT = [...FREQ_STEPS, "FLAT"] as const;
 
 // FLAT first (index 0), then FREQ_STEPS ascending, used by PARA. EQ lowCut.
@@ -188,13 +188,9 @@ const ENHANCER_HIGH_FREQ = [
 // depends on this key.
 const KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
 
-// Effects whose sub-model selector lives in param-block byte p[0], read and written via
-// FX_PARAM_MAPS' lookup(SUB_TYPE_FIELD, 0, ...) field. Used by the decoder (to promote the
-// selection out of the params bag onto block.subType for display) and by the fx() builder (to
-// thread a subType argument back into that bag so it actually encodes).
-//
-// FX_COM byte[2] is never the subtype for any effect: it is always the bass-mode mirror of the
-// type selector in byte[1], which is the guitar-mode one.
+// Effects whose sub-model selector lives in param-block byte p[0], read and written through the
+// field map's lookup(SUB_TYPE_FIELD, 0, ...) field. The builder reads this set to know which
+// types always carry a sub-model, so a spec that names none opens on the factory one.
 const PARAM_SUBTYPE_EFFECTS = new Set([
   "COMPRESSOR", "LIMITER", "AC RESO", "CHORUS", "CLASSIC-VIBE", "HUMANIZER", "OD/DS", "FIXED WAH",
   // DELAY's p[0] selector is its sub-algorithm (STANDARD/MODULATE/WARP/TWIST/GLITCH), each with

@@ -2,11 +2,9 @@ import type { PatchBlock } from "../../../model";
 import type { RAW } from "./raw";
 import type { BlockParams } from "./tsl";
 
-/**
- * Every block keeps its controls in `params`, which is the shape `PatchBlock` fixes for every
- * device. The blocks below add only what this device stores: the raw bytes under `RAW`, and a
- * narrower params type where the control set is fixed rather than chosen by `type`.
- */
+// Every block keeps its controls in `params`, which is the shape `PatchBlock` fixes for every
+// device. The blocks below add only what this device stores: the raw bytes under `RAW`, and a
+// narrower params type where the control set is fixed rather than chosen by `type`.
 
 interface FxBlock extends PatchBlock {
   on: boolean;

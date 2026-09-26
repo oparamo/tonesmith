@@ -61,7 +61,8 @@ interface NumericOrNamedParam extends ParamSpecBase {
 }
 
 /**
- * A single parameter on a capability type or group (informational; not used for encoding).
+ * A single parameter on a capability type or group. Core's spec checks validate against it; no
+ * codec reads it.
  *
  * `kind` is what a value is checked and built against, so it is a discriminant rather than a hint.
  * A param that takes a number and a set of named settings alike says so as its own kind, rather
@@ -84,7 +85,6 @@ type PatchSpecExample = Record<string, unknown>;
 interface CapabilityType {
   /** The string value used in patches (must match the codec's lookup arrays exactly). */
   id: string;
-  /** Human-readable display name. */
   name: string;
   /** Sonic description: what the type sounds like or does. */
   description: string;
@@ -104,9 +104,8 @@ interface CapabilityType {
 }
 
 /**
- * A top-level block in the device's signal chain. The `types` array lists the types selectable
- * within the block. The `params` array lists controls that are always present regardless of the
- * selected type.
+ * The types and controls of one or more chain blocks; blocks that copy one another, such as
+ * effect slots, share a group.
  */
 interface CapabilityGroup {
   /** Stable identifier: the string a consumer names this group by. */
@@ -114,7 +113,6 @@ interface CapabilityGroup {
   name: string;
   /** What this block does in the signal chain. */
   description: string;
-  /** Selectable types for this block. */
   types: CapabilityType[];
   /** Block-level controls shared across every type. */
   params?: ParamSpec[];
@@ -166,7 +164,6 @@ interface PatchNameSpec {
   maxLength: number;
 }
 
-/** All capability metadata for a device. */
 interface DeviceCapabilities {
   /** The device's signal chain: block order and how blocks are reordered/bypassed. */
   chain: ChainSpec;

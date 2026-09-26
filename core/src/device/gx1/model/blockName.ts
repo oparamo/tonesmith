@@ -1,10 +1,10 @@
 /**
  * How a patch spec names the device's blocks, and what the device's own panel calls each one.
  *
- * These sit in `common/` rather than with the spec validator because two independent surfaces read
- * them: the validator, which enforces the shape, and `capabilities.ts`, which shows it. Keeping the
- * fact in one place is what stops the example a caller is shown from drifting from the shape it is
- * checked against.
+ * These sit in `model/` rather than in `spec/` because three readers share them: the spec
+ * validator, which enforces the shape, `catalog/capabilities.ts`, which shows it, and the view,
+ * which labels it. Keeping the fact in one place is what stops the example a caller is shown from
+ * drifting from the shape it is checked against.
  *
  * A block's spec name is a plain word chosen for whoever is reading it. The GX-1's own labels are
  * abbreviations that only mean something next to the unit, and three of them (OD/DS, DLY, REV) are

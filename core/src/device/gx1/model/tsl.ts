@@ -9,7 +9,7 @@ interface TslPatch {
   paramSet: RawParamSet;
 }
 
-/** Top-level structure of the `.tsl` JSON file as written/read by the device. */
+/** Top-level structure of a `.tsl` patch file, which is JSON. */
 interface TslEnvelope {
   name: string;
   formatRev: string;
