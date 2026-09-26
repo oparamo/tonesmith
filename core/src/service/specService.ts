@@ -10,7 +10,7 @@
  * them together matters as much as catching them, since a caller fixing one rejection at a time
  * pays a round trip per mistake and the catalog can answer for all of them in one pass.
  */
-import { findGroup, findType } from "./capabilityService";
+import { findGroup } from "./capabilityService";
 import { ON_FIELD, PARAMS_FIELD, SELECTION_FIELDS, SUB_TYPE_FIELD, TYPE_FIELD } from "../common/blockField";
 import type {
   CapabilityGroup, CapabilityType, ChainBlock, DeviceCapabilities, FieldEdit, FieldEdits, FieldValue,
@@ -25,8 +25,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 
 const asString = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
-
-// ── Resolving a selection against the catalog ─────────────────────────────────
 
 /** A block's selection resolved against capabilities: its group, and the type its `type` names. */
 interface Selection {
@@ -43,12 +41,17 @@ const groupOrUndefined = (caps: DeviceCapabilities, id: string): CapabilityGroup
   }
 };
 
+/**
+ * Matches a type id exactly, case-insensitive, never by a name prefix: `capabilityService.findType`
+ * offers that fallback for a person typing a display name at the CLI or an agent guessing from
+ * `describe_device`, but a spec or an edit path is data a caller is expected to have gotten from
+ * the catalog verbatim, and a prefix match would let "ECH" build against ECHO's fields today and
+ * something else entirely once a device grows a type ECHO would have prefixed.
+ */
 const typeOrUndefined = (group: CapabilityGroup, id: string): CapabilityType | undefined => {
-  try {
-    return findType(group, id);
-  } catch {
-    return undefined;
-  }
+  if (id.length === 0) return undefined;
+  const needle = id.toUpperCase();
+  return group.types.find(candidate => candidate.id.toUpperCase() === needle);
 };
 
 /**
@@ -90,8 +93,6 @@ const specsForType = (selection: Selection, subType?: string): ParamSpec[] => {
 const chainBlock = (caps: DeviceCapabilities, name: string): ChainBlock | undefined =>
   Object.hasOwn(caps.chain.blocks, name) ? caps.chain.blocks[name] : undefined;
 
-// ── What a block accepts ──────────────────────────────────────────────────────
-
 /** A block's selection as a rejection message finds it: read off input that already failed. */
 interface Selected {
   group: string;
@@ -99,7 +100,6 @@ interface Selected {
   subType?: unknown;
 }
 
-/** What one type accepts: the params it takes, and the variants it offers, if any. */
 interface TypeSurface {
   paramKeys: string[];
   subTypes: string[];
@@ -124,8 +124,6 @@ const typeSurface = (caps: DeviceCapabilities, selected: Selected): TypeSurface 
   };
 };
 
-// ── Selector checks ───────────────────────────────────────────────────────────
-
 /**
  * Where a variant selection belongs on a type that declares no subTypes. Some such types do have
  * a variant to pick, carried as an ordinary param the device labels TYPE, and naming that param's
@@ -137,7 +135,6 @@ const subTypeAlternative = (capType: CapabilityType): string => {
   return `set params.${selector.key} instead (${selector.range})`;
 };
 
-/** One block's subType alongside the capability type it was sent to. */
 interface SubTypeCheck {
   group: string;
   type: string;
@@ -146,10 +143,10 @@ interface SubTypeCheck {
 }
 
 /**
- * Rejects a subType the chosen type can't take, whether because it declares none or because this
- * isn't one of them. Either way the value would encode nowhere: the patch saves clean, plays as the
- * default, and nothing in the response says the selection was dropped. An unlisted variant is worse
- * than a missing one, since the codec's own rejection names only the value it couldn't look up.
+ * Rejects a subType the chosen type can't take. On a type that declares none, the value encodes
+ * nowhere: the patch saves clean, plays as the default, and nothing in the response says the
+ * selection was dropped. On a type that has variants, the codec's own rejection names only the
+ * value it couldn't look up, not the variants that exist.
  */
 const subTypeIssues = (check: SubTypeCheck): Issues => {
   const { group, type, capType, subType } = check;
@@ -214,9 +211,6 @@ const selectorIssues = (selectors: Selectors): Issues => {
   return issues;
 };
 
-// ── Value checks ──────────────────────────────────────────────────────────────
-
-/** One param's value alongside the spec and selection it is checked against. */
 interface ParamCheck {
   group: string;
   type?: string;
@@ -286,7 +280,6 @@ const valueIssues = (check: ParamCheck): Issues => {
 const specsByKey = (specs: readonly ParamSpec[]): Map<string, ParamSpec> =>
   new Map(specs.flatMap(spec => (spec.key === undefined ? [] : [[spec.key, spec] as const])));
 
-/** A supplied value and the spec it is checked against. */
 interface SpecifiedValue {
   spec: ParamSpec;
   value: unknown;
@@ -298,7 +291,6 @@ const pairedWithSpecs = (byKey: Map<string, ParamSpec>, values: Record<string, u
     .map(([key, value]) => ({ spec: byKey.get(key), value }))
     .filter((pair): pair is SpecifiedValue => pair.spec !== undefined);
 
-/** What the caller selected and supplied for one block. */
 interface TypeParams {
   group: string;
   /** Absent for a block whose group offers no types to choose between. */
@@ -309,9 +301,9 @@ interface TypeParams {
 
 /**
  * Validates one block's selection against the catalog: that its `subType` is a variant this type
- * actually has, and that every supplied param value fits the spec for the chosen type (numeric
- * params by their per-type `min`/`max`, discrete params by their `values` list). `values` is keyed
- * by each param's `key`. Keys with no matching spec are ignored here; the key check reports them.
+ * actually has, and that every supplied param value is the kind its spec takes and inside its
+ * bounds or value list. `values` is keyed by each param's `key`; a key with no matching spec is
+ * left to the key check.
  */
 const validateTypeParams = (caps: DeviceCapabilities, params: TypeParams): Issues => {
   const { group, type, subType, values } = params;
@@ -344,8 +336,6 @@ const validatePatchSettings = (caps: DeviceCapabilities, values: Record<string, 
   return paired.flatMap(pair => valueIssues({ group: PATCH_GROUP, ...pair }));
 };
 
-// ── Rejection messages for a block's keys ─────────────────────────────────────
-//
 // Naming the rejected keys and stopping there leaves the caller to work out whether a key was wrong
 // or only in the wrong place. Both happen: a control written beside the block's own selectors rather
 // than inside `params` is the commonest mistake, and it reads identically to a typo unless the
@@ -392,10 +382,7 @@ const usableFields = (fields: string[], block: BlockContext): string[] => {
   return fields.filter(name => name !== SUB_TYPE_FIELD);
 };
 
-/**
- * The shape this block accepts, printed rather than described. Nesting is exactly what a prose
- * list of field names loses, and nesting is what the caller got wrong.
- */
+/** The shape this block accepts, printed as a skeleton. */
 const shapeSkeleton = (fields: string[], block: BlockContext): string => {
   const label = block.type === undefined ? block.group : `${block.group} ${block.type}`;
   const body = usableFields(fields, block).map(name => fieldText(name, block)).join(", ");
@@ -420,8 +407,6 @@ const unknownParamLine = (keys: string[], block: BlockContext): string => {
   const noun = keys.length === 1 ? "is not a param" : "are not params";
   return `${quoted(keys)} ${noun} of ${block.group} ${block.type ?? ""}`.trimEnd() + ".";
 };
-
-// ── A whole block spec ────────────────────────────────────────────────────────
 
 /** True when a block spec carries nothing but `on: false`. */
 const isBareBypass = (value: unknown): boolean => {
@@ -455,9 +440,7 @@ interface KeyCheck {
 
 /**
  * Splits the keys a block doesn't take into the two mistakes that produce them: a real param of the
- * chosen type sent one level too high, and a key the type has no param for at all. Either way the
- * accepted shape is printed back, since nesting is what a prose list of field names can't show and
- * nesting is what the caller got wrong.
+ * chosen type sent one level too high, and a key the type has no param for at all.
  */
 const keyIssues = (block: Record<string, unknown>, check: KeyCheck): Issues => {
   const { fields, context } = check;
@@ -473,9 +456,9 @@ const keyIssues = (block: Record<string, unknown>, check: KeyCheck): Issues => {
 };
 
 /**
- * Rejects a control the chosen type has no field for, before the builder does. The builder throws on
- * the first one it meets, and reporting them here puts them alongside every other problem the spec
- * has rather than costing a round trip each.
+ * Rejects a control the chosen type has no field for. Nothing after this would: the builder copies
+ * the key into the block and the encoder, walking only the type's field list, drops it without a
+ * word, so the caller would read back a patch missing a value it set.
  */
 const paramKeyIssues = (params: Record<string, unknown>, context: BlockContext): Issues => {
   const paramKeys = context.surface?.paramKeys;
@@ -528,8 +511,6 @@ const validateSpec = (caps: DeviceCapabilities, spec: Record<string, unknown>): 
   ...setBlocks(caps, spec).flatMap(name => blockSpecIssues(caps, name, spec[name])),
 ];
 
-// ── Dot-path edits ────────────────────────────────────────────────────────────
-//
 // A path is read against the patch itself rather than against the catalog, because the decoded
 // patch carries every field the device supports and nothing else: a segment that isn't there names
 // a control the device doesn't have. Accepting such a write would strand it, since the encoder
@@ -613,7 +594,9 @@ const coerceValue = (value: FieldValue, existing: unknown, named: ReadonlySet<st
   if (typeof value !== "string" || holdsText) return value;
   if (value === "true") return true;
   if (value === "false") return false;
-  const asNumber = Number(value);
+  // "" and Number("") is 0, not NaN, so an empty or blank value would otherwise silently become
+  // the number 0 rather than surface as the wrong kind of value for the field it is going into.
+  const asNumber = value.trim().length === 0 ? NaN : Number(value);
   const result = Number.isNaN(asNumber) ? value : asNumber;
   return result;
 };
