@@ -11,4 +11,4 @@ and renames it over the target, which is atomic within a directory: the path hol
 file or the new one. A failed write cleans up its sibling and leaves the target untouched.
 
 Core makes every write this way. Drivers don't write files at all: they turn a decoded file into
-bytes, and `patchUtils` puts those bytes on disk.
+bytes, and `patchService` puts those bytes on disk.

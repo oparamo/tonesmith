@@ -5,9 +5,9 @@
  *
  * Written as a bounded procedure rather than a tool inventory. Building a patch is a lookup-heavy
  * job, and left to judgment an agent will make one lookup per effect type, dozens of round trips
- * for a set of values it could have named upfront. The steps below are what agents actually
- * converge on once the batched shapes exist, so this text describes that path rather than a longer
- * one they would only ignore.
+ * for a set of values it could have named upfront. The steps below are the path agents converge on
+ * given the batched `items` and `patches` inputs, so this text describes that path rather than a
+ * longer one they would only ignore.
  */
 const instructions = `tonesmith reads, edits, and builds patch files for guitar multi-effects
 processors. The server carries the device knowledge (supported devices, their signal blocks,
@@ -38,8 +38,8 @@ dot-path.
 Two tools cover the rest of the file handling. copy_patch copies a patch into a slot in another
 file, replacing what was there. create_patch_file starts an empty file of blank patches at the
 device's factory defaults. Neither is part of building a patch from parameters: generate_patch
-creates and appends to its own output file, so reach for these only when the goal really is
-duplicating an existing patch or opening an empty file.
+creates its own output file and saves into it by name, so reach for these only when the goal
+really is duplicating an existing patch or opening an empty file.
 
 These tools are the complete interface. Everything you need is here: device knowledge, patch
 building, saving, and editing. No shell, file editing, or outside tooling is involved at any

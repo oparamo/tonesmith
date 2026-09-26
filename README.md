@@ -19,11 +19,11 @@ which walks from format reverse-engineering to CLI/MCP wiring.
 
 Three packages, published from this repo. Take the one that matches how you want to work.
 
-| Package                                                              | What it is                                             | Install                       |
-|----------------------------------------------------------------------|--------------------------------------------------------|-------------------------------|
-| [`@tonesmith/cli`](https://www.npmjs.com/package/@tonesmith/cli)      | Command line: read a patch, edit a field, copy one      | `pnpm add -g @tonesmith/cli`  |
-| [`@tonesmith/mcp`](https://www.npmjs.com/package/@tonesmith/mcp)      | MCP server, so an agent can build patches for you       | `pnpm add -g @tonesmith/mcp`  |
-| [`@tonesmith/core`](https://www.npmjs.com/package/@tonesmith/core)    | The library the other two are built on                  | `pnpm add @tonesmith/core`    |
+| Package                                                            | What it is                                         | Install                      |
+|--------------------------------------------------------------------|----------------------------------------------------|------------------------------|
+| [`@tonesmith/cli`](https://www.npmjs.com/package/@tonesmith/cli)   | Command line: read a patch, edit a field, copy one | `pnpm add -g @tonesmith/cli` |
+| [`@tonesmith/mcp`](https://www.npmjs.com/package/@tonesmith/mcp)   | MCP server, so an agent can build patches for you  | `pnpm add -g @tonesmith/mcp` |
+| [`@tonesmith/core`](https://www.npmjs.com/package/@tonesmith/core) | The library the other two are built on             | `pnpm add @tonesmith/core`   |
 
 ```bash
 tonesmith gx1 read my-tones.tsl   # from @tonesmith/cli
@@ -115,15 +115,15 @@ From a working copy instead, use `"command": "node"` with
 
 MCP tools:
 
-| Tool                  | Description                                                                                         |
-|-----------------------|-----------------------------------------------------------------------------------------------------|
-| `list_devices`        | List supported devices                                                                              |
-| `read_patch`          | Read one patch, or page through a whole file                                                        |
-| `write_fields`        | Edit fields in an existing patch by dot-path, applied as one batch, and rename the patch set        |
-| `describe_device`     | Look up a device's capability metadata (chain, groups, types, params). `items` takes a list, so one call covers many lookups |
-| `generate_patch`      | Build one or more patches from structured parameters and save them in one write. The per-patch spec comes from `describe_device` |
-| `copy_patch`          | Copy a patch into a slot in another file, replacing what was there                                  |
-| `create_patch_file`   | Start an empty patch file of blank patches at the device's factory defaults                         |
+| Tool                | Description                                                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `list_devices`      | List supported devices                                                                                                           |
+| `read_patch`        | Read one patch, or page through a whole file                                                                                     |
+| `write_fields`      | Edit fields in an existing patch by dot-path, applied as one batch, and rename the patch set                                     |
+| `describe_device`   | Look up a device's capability metadata (chain, groups, types, params). `items` takes a list, so one call covers many lookups     |
+| `generate_patch`    | Build one or more patches from structured parameters and save them in one write. The per-patch spec comes from `describe_device` |
+| `copy_patch`        | Copy a patch into a slot in another file, replacing what was there                                                               |
+| `create_patch_file` | Start an empty patch file of blank patches at the device's factory defaults                                                      |
 
 ## Converting documentation to Markdown
 
@@ -137,16 +137,10 @@ pnpm doc-to-md <url> -o out.md         # write to a file instead
 pnpm doc-to-md manual.pdf -o out.md    # local PDF manual to Markdown
 ```
 
-## Repository layout
+## Architecture
 
-```tree
-core/            @tonesmith/core: device-agnostic types, registry, and utils; one driver per device under src/devices/<id>/
-cli/             @tonesmith/cli:  commands and printing, all device-agnostic; a device is picked up from the core roster
-mcp/             @tonesmith/mcp:  MCP tools, all device-agnostic; a device is picked up from the core roster
-tools/           repo tooling (doc-to-md); not published
-fixtures/<id>/   one committed real patch-file export per device, the round-trip test baseline
-core/docs/<id>/  captured device documentation + FORMAT.md, the reverse-engineered format spec
-```
+[ARCHITECTURE.md](ARCHITECTURE.md) covers the layers, the patterns they follow, the repository layout,
+and a diagram for how the packages fit and for each package inside.
 
 ## Development
 
@@ -162,14 +156,14 @@ pnpm clean        # remove dist/ directories
 
 The conventions below aren't checked by lint, and they're what makes a change look like it belongs.
 
-**Devices plug in; nothing else changes.** Adding one means a `core/src/devices/<id>/` driver, one
+**Devices plug in; nothing else changes.** Adding one means a `core/src/device/<id>/` driver, one
 roster line, and a fixture. The CLI and the MCP server pick the device up from the core roster, so
 neither package gains a file. No entry-point file and no shared module is edited to make room for it. Drivers don't self-register: `core/src/index.ts`
 is the composition root and iterates the roster. Consumers call through the `PatchDriver` interface
 rather than importing a device's own functions.
 
-**The shared layer stays device-agnostic.** `Patch`, `PatchFile`, `PatchDriver` and `RawPatch` are
-the vocabulary everywhere outside `devices/<id>/`. One device's block names and file extension never
+**The shared layer stays device-agnostic.** `Patch`, `PatchFile` and `PatchDriver` are the
+vocabulary everywhere outside `device/<id>/`. One device's block names and file extension never
 reach core's shared modules, the CLI's shared commands, or an MCP tool, in code or in the prose they
 carry: an example spelled out of one device's blocks is an example that fails on every other one.
 
@@ -184,9 +178,11 @@ block-level keys; everything else a block has goes under `params`. It is the sha
 reads back as, the shape a spec is written in, and the shape a dot-path addresses, so a consumer
 learns it once rather than per block.
 
-**Files group by domain, not by file type,** and are named for their role rather than the type inside
-them: `driver.ts`, `builder.ts`, `constants.ts`, never `Gx1Driver.ts`. Types live beside the runtime
-code they describe.
+**Folders are layers named for their role; files are named for their domain.** A folder under `src/`
+is a layer (`service/`, `persistence/`, `model/`, a device's `format/`) and imports only the layers
+below it, which lint enforces. Folder names are singular. File names are camelCase, spelled like
+what they export and never after the type inside them: `patchService.ts`, `builder.ts`, never
+`Gx1Driver.ts`. ARCHITECTURE.md lists the layers.
 
 **Exports go at the bottom,** as one trailing `export { … }` / `export type { … }` block, so a file's
 public surface reads without skimming the whole file. Barrel files are the exception.
@@ -194,18 +190,48 @@ public surface reads without skimming the whole file. Barrel files are the excep
 **Names are camelCase and spelled out.** Every variable, parameter and property gets a name that says
 what it is: `highCut`, not `high_cut`; `ampParams`, not `a`. The only single letters are generic type
 parameters (`T`, `K`, `V`) and a loop index. Compounds on "sub" capitalize the noun: `subType`,
-`subTypes`. Builder helpers take the name of what they configure, with no verb prefix: `amp()`,
-`delay()`, not `setAmp()`.
-
-**Tests live in each package's `tests/` directory,** mirroring `src/`. `cli` and `mcp` treat
-`@tonesmith/core` as an external library: they test that they call it correctly and that their own
-contract holds, never re-testing what core does.
+`subTypes`. Builder helpers take the name of what they configure, with no verb prefix: `block()`,
+`basePatch()`, not `setBlock()`.
 
 **Dependency versions are exact.** No `^` or `~` in any `package.json`. `pnpm add` writes a range by
 default, so correct it after adding.
 
 **Consumer-visible changes need a changeset:** a published package's API, behavior, or output. Tests,
 lint config, and repo docs don't.
+
+### Testing
+
+Tests live in each package's `tests/` directory. The practices below come from Meszaros's *xUnit
+Test Patterns*, Khorikov's *Unit Testing Principles, Practices, and Patterns*, Beck's *Test
+Desiderata* and the Google Testing Blog. Lint enforces the mechanical ones.
+
+1. **One unit per unit suite.** A unit suite sits at the mirror path of one source module
+   (`src/service/specService.ts` is tested by `tests/service/specService.test.ts`) and asserts only
+   that module's behavior. A collaborator that does I/O, or whose logic is another unit's to test, is
+   faked: a fake driver, a hand-written catalog. Pure values such as constants and codec primitives
+   may run for real, as long as no assertion is about them.
+2. **One behavior per test.** A test has one reason to fail. Several `expect`s are fine when they
+   describe one outcome. The test's name states the behavior, so a failure reads without opening the
+   test.
+3. **Arrange, act, assert,** with one act per test and no loops or conditionals in the body; a table
+   of cases is an `it.each`.
+4. **Through the public interface.** Assert what a caller can observe, not internals or call order,
+   unless the call is the behavior (a file read exactly once).
+5. **Isolated and deterministic.** No state shared between tests, no dependence on their order, no
+   clock or network, a fresh temp directory per test, and each test fast enough not to notice.
+6. **Boundaries covered.** The minimum and maximum, empty input, and the value just past each limit.
+7. **Integration tests say so.** A test that crosses units on purpose (a round trip through a
+   device's real bytes, conformance across the driver roster, the CLI run end to end, MCP through a
+   client) lives in the package's `tests/integration/`, so its scope is plain from its path.
+8. **Assert data, never wording.** Check that a rejection names the bad id and lists the valid ones,
+   not the sentence it says them in; prose written for agents gets reworded constantly.
+9. **Surfaces test their own contract.** `cli` and `mcp` treat `@tonesmith/core` as an external
+   library: a surface test earns its place only if it can fail while core is entirely correct.
+   Reading a written file back through the driver to check a command's effect qualifies, since
+   that fails on a miswiring.
+10. **Coverage thresholds are floors, not targets.** They sit well below the measured numbers on
+    purpose. Don't write a test to raise them: chasing the last uncovered branch is what produces
+    wording assertions.
 
 `pnpm lint`, `pnpm build`, `pnpm test` and `pnpm coverage` should all be green before a pull request.
 

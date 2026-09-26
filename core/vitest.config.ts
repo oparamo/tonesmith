@@ -8,8 +8,8 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       include: ["src/**"],
       exclude: [
-        "src/**/types/**",
-        "src/**/types.ts",
+        "src/model/**",
+        "src/device/*/model/{patch,block,tsl}.ts",
         "src/**/index.ts",
         "src/**/raw.ts",
       ],

@@ -1,87 +1,187 @@
-import { vi } from "vitest";
-import type { Command } from "commander";
-import { access, copyFile, mkdtemp, rm } from "node:fs/promises";
+import { onTestFinished, vi } from "vitest";
+import { Command } from "commander";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gx1, patchUtils } from "@tonesmith/core";
-import { buildProgram } from "../src/program";
+import { patchService } from "@tonesmith/core";
+import type {
+  DeviceCapabilities, FieldEdit, FieldEdits, FieldValue, Patch, PatchDriver, PatchFile,
+} from "@tonesmith/core";
 
-const FIXTURE = join(import.meta.dirname, "../../fixtures/gx1/rock-tones.tsl");
+/** A block shape generic enough for a dot-path write to reach into, with no device knowledge behind it. */
+interface FakeBlock {
+  on?: boolean;
+  type?: string;
+  subType?: string | null;
+  params: Record<string, FieldValue>;
+}
 
-interface CliResult {
+/** Two independently named blocks, so a swapped operand or a swapped dot-path is the only way to pass by accident. */
+interface FakePatch extends Patch {
+  alpha: FakeBlock;
+  beta: FakeBlock;
+}
+
+const blankBlock = (): FakeBlock => ({ params: {} });
+
+const blankPatch = (name: string): FakePatch => ({ name, alpha: blankBlock(), beta: blankBlock() });
+
+const FAKE_CAPABILITIES: DeviceCapabilities = {
+  chain: {
+    description: "Two blocks, alpha then beta.",
+    defaultOrder: ["alpha", "beta"],
+    blocks: {
+      alpha: { label: "Alpha", group: "alpha", bypass: true },
+      beta: { label: "Beta", group: "beta", bypass: false },
+    },
+  },
+  patchName: { maxLength: 16 },
+  patchSettings: [],
+  groups: [
+    { id: "alpha", name: "Alpha", description: "The first block.", types: [] },
+    {
+      id: "beta",
+      name: "Beta",
+      description: "The second block.",
+      types: [{ id: "TYPE-A", name: "Type A", description: "A type." }],
+    },
+  ],
+};
+
+/** Walks `path` onto `patch`, writing `value` at the end; throws naming the path when a segment is missing. */
+const writeByPath = (patch: FakePatch, path: string, value: FieldValue): void => {
+  const segments = path.split(".");
+  const last = segments.pop();
+  let target: Record<string, unknown> = patch as unknown as Record<string, unknown>;
+  for (const segment of segments) {
+    const next = target[segment];
+    if (typeof next !== "object" || next === null) throw new Error(`Unknown field "${path}"`);
+    target = next as Record<string, unknown>;
+  }
+  if (last === undefined) throw new Error(`Unknown field "${path}"`);
+  target[last] = value;
+};
+
+/** The default `applyEdits`: writes each edit onto the patch in order and reports what it wrote. */
+const applyByPath = (patch: FakePatch, edits: readonly FieldEdit[]): FieldEdits => {
+  const applied: FieldEdits = {};
+  for (const [path, value] of edits) {
+    writeByPath(patch, path, value);
+    applied[path] = value;
+  }
+  return applied;
+};
+
+/** A JSON-codec driver: distinct block names catch an operand swap, and every method is overridable per test. */
+const fakeDriver = (overrides: Partial<PatchDriver<FakePatch>> = {}): PatchDriver<FakePatch> => ({
+  id: "fake",
+  name: "Fake Device",
+  capabilities: FAKE_CAPABILITIES,
+  parseFile: (bytes) => JSON.parse(Buffer.from(bytes).toString("utf8")) as PatchFile<FakePatch>,
+  serializeFile: (file) => new TextEncoder().encode(JSON.stringify(file)),
+  newFile: (setName, nPatches = 1) => ({
+    name: setName,
+    device: "fake",
+    patches: Array.from({ length: nPatches }, (_, index) => blankPatch(`Patch ${index + 1}`)),
+  }),
+  buildPatch: (spec) => ({ ...blankPatch((spec as { name: string }).name), ...(spec as object) }),
+  applyEdits: applyByPath,
+  viewPatch: (patch) => ({ name: patch.name, details: [], blocks: [] }),
+  ...overrides,
+});
+
+interface RunResult {
   info: string[];
   error: string[];
   exitCode?: number;
-  errorMessage?: string;
 }
 
-/** Commander hands exitOverride down only to subcommands added after the call, and buildProgram
- * has already added every device by the time a test gets the program, so set it on the whole tree. */
-const exitOverrideAll = (command: Command): void => {
+type AddCommand<T extends Patch> = (cmd: Command, driver: PatchDriver<T>) => void;
+
+/** Routes commander's own usage output into `info`/`error` instead of the real terminal. */
+const configureCapture = (command: Command, info: string[], error: string[]): void => {
   command.exitOverride();
-  for (const child of command.commands) exitOverrideAll(child);
+  command.configureOutput({
+    writeOut: (str) => { info.push(str); },
+    writeErr: (str) => { error.push(str); },
+  });
 };
 
-/** Runs the CLI program in-process, capturing console output and reporting the exit code the run
- * settled on, whether the program set it or commander threw its own exit (exitOverride). The
- * process's own code is cleared afterward so one failing case can't fail the test run. */
-const runCli = async (argv: string[]): Promise<CliResult> => {
-  const program = buildProgram();
-  exitOverrideAll(program);
+/**
+ * Runs one `addX` module against commander for real: builds a bare command, mounts it, and
+ * captures both commander's own output and whatever the action prints via `console`. Commander
+ * only inherits `exitOverride`/`configureOutput` onto a subcommand created before the call, so
+ * both are set again on each of `add`'s own subcommands.
+ */
+const runCommand = async <T extends Patch>(
+  add: AddCommand<T>,
+  driver: PatchDriver<T>,
+  argv: string[],
+): Promise<RunResult> => {
+  const cmd = new Command("fake");
+  add(cmd, driver);
 
   const info: string[] = [];
   const error: string[] = [];
-  vi.spyOn(console, "info").mockImplementation((...args: unknown[]) => {
+  configureCapture(cmd, info, error);
+  for (const sub of cmd.commands) configureCapture(sub, info, error);
+
+  const infoSpy = vi.spyOn(console, "info").mockImplementation((...args: unknown[]) => {
     info.push(args.map(String).join(" "));
   });
-  vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+  const errorSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
     error.push(args.map(String).join(" "));
   });
 
   let exitCode: number | undefined;
-  let errorMessage: string | undefined;
+  process.exitCode = undefined;
   try {
-    await program.parseAsync(argv, { from: "user" });
-    exitCode = process.exitCode as number | undefined;
+    await cmd.parseAsync(argv, { from: "user" });
+    exitCode = process.exitCode;
   } catch (caught) {
     if (caught && typeof caught === "object" && "exitCode" in caught) {
-      const commanderError = caught as { exitCode: number; message: string };
-      exitCode = commanderError.exitCode;
-      errorMessage = commanderError.message;
+      exitCode = (caught as { exitCode: number }).exitCode;
     } else {
-      vi.restoreAllMocks();
       throw caught;
     }
   } finally {
-    vi.restoreAllMocks();
+    infoSpy.mockRestore();
+    errorSpy.mockRestore();
     process.exitCode = undefined;
   }
 
-  return { info, error, exitCode, errorMessage };
+  return { info, error, exitCode };
 };
 
-/** A scratch dir with the rock-tones fixture copied in, for tests that write files. */
-const withTempDir = async (): Promise<{ dir: string; fixture: string; cleanup: () => Promise<void> }> => {
+/** A scratch directory of the calling test's own, removed when that test finishes. */
+const tempDir = async (): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), "tonesmith-cli-"));
-  const fixture = join(dir, "rock-tones.tsl");
-  await copyFile(FIXTURE, fixture);
-  return { dir, fixture, cleanup: () => rm(dir, { recursive: true, force: true }) };
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  return dir;
 };
 
-/** An empty scratch dir, for tests that create new files from scratch. */
-const emptyTempDir = async (): Promise<{ dir: string; cleanup: () => Promise<void> }> => {
-  const dir = await mkdtemp(join(tmpdir(), "tonesmith-cli-"));
-  return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
+/** What `writePatchFile` needs beyond a bare list of patches. */
+interface PatchFileSeed {
+  dir: string;
+  filename: string;
+  patches: FakePatch[];
+  setName?: string;
+}
+
+/** Seeds `dir/filename` directly with a fake patch file, bypassing any command under test. */
+const writePatchFile = async (seed: PatchFileSeed): Promise<string> => {
+  const path = join(seed.dir, seed.filename);
+  const file: PatchFile<FakePatch> = { name: seed.setName ?? "Set", device: "fake", patches: seed.patches };
+  await writeFile(path, JSON.stringify(file));
+  return path;
 };
 
-/**
- * A value the test has already established is there: the patch a command just wrote, the slot a
- * copy just filled. Failing here says which one was missing, where the alternative is a cascade of
- * assertions against `undefined`.
- */
-const present = <T>(value: T | undefined, what: string): T => {
-  if (value === undefined) throw new Error(`Expected ${what}, got nothing`);
-  return value;
+/** The patch at `index` of the file at `path`, read back through `driver`, proving a command's on-disk effect. */
+const patchAt = async (driver: PatchDriver<FakePatch>, path: string, index = 0): Promise<FakePatch> => {
+  const file = await patchService.readPatchFile(driver, path);
+  const patch = file.patches[index];
+  if (patch === undefined) throw new Error(`Expected patch ${index} of ${path}, got nothing`);
+  return patch;
 };
 
 /** Whether a path exists. Only a missing file answers no; any other failure is rethrown. */
@@ -95,10 +195,7 @@ const pathExists = async (path: string): Promise<boolean> => {
   }
 };
 
-/** The patch at `index` of the file at `path`, read back through the driver. */
-const patchAt = async (path: string, index = 0): Promise<gx1.Patch> => {
-  const file = await patchUtils.readPatchFile(gx1.driver, path);
-  return present(file.patches[index], `patch ${index} of ${path}`);
+export {
+  fakeDriver, blankPatch, FAKE_CAPABILITIES, runCommand, tempDir, writePatchFile, patchAt, pathExists,
 };
-
-export { runCli, withTempDir, emptyTempDir, present, pathExists, patchAt, FIXTURE };
+export type { FakePatch, FakeBlock };

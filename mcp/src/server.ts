@@ -7,8 +7,8 @@ import {
   registerCopyPatch,
   registerCreatePatchFile,
   registerGeneratePatch,
-} from "./tools";
-import { registerBuildPatch } from "./prompts";
+} from "./tool";
+import { registerBuildPatch } from "./prompt";
 import { instructions } from "./instructions";
 import packageJson from "../package.json" with { type: "json" };
 

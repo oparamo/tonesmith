@@ -7,7 +7,7 @@
 The capability catalog calls a block's selectable types types.
 
 `CapabilityItem` is `CapabilityType`, `CapabilityGroup.items` is `CapabilityGroup.types`, and
-`capabilityUtils.findItem` is `findType`. The id in that list is the value a patch spec writes as
+`capabilityService.findItem` is `findType`. The id in that list is the value a patch spec writes as
 `type`, so "item" was a second name for something that already had one, and the type's own doc
 comment described it as "one of the models or types a block offers". An entry also carries
 `subTypes`, which under the old name meant a thing that is not a type has sub-types.

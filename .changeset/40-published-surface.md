@@ -14,7 +14,7 @@ which goes through the driver, and each one published a signature that could not
 without a major version. The type barrel gained the names it was missing in exchange: `PatchNameSpec`
 and `PatchSpecExample` had no way to be named, and `FieldEdits` comes with the surface above.
 
-`patchUtils` publishes `resolvePatch`, which answers with the patch and its index together, and not
+`patchService` publishes `resolvePatch`, which answers with the patch and its index together, and not
 the index-only `resolvePatchIndex` beside it.
 
 `PatchFile.device` is specified, and it is the driver's id: a consumer holding a file can hand that
@@ -24,7 +24,7 @@ knows nothing about. That name is a fact about the file rather than about the dr
 the file's own raw envelope, which is where the writer takes it from, so no bytes move. The CLI's
 `read` header prints the driver's name, which is what that line was showing a person anyway.
 
-`patchUtils.upsertPatches` returns `{ file, created, saved }` rather than the file alone: whether
+`patchService.upsertPatches` returns `{ file, created, saved }` rather than the file alone: whether
 the save started the file, and for each patch, whether it replaced a same-named patch or was
 appended, and the patch as saved. Its own documented property is that it reads once and writes once however many patches
 are saved, and a caller that had to say what the save did could only work it out by reading and
@@ -32,7 +32,7 @@ decoding the whole file a second time first, which is what `generate_patch` was 
 
 `saveTsl` is gone rather than narrowed. It wrote a file and then called `console.info`, and the MCP
 server speaks JSON-RPC over stdio, so a consumer reaching for it inside a tool corrupted the
-protocol stream. `patchUtils.upsertPatches` is the supported way to save patches to a file.
+protocol stream. `patchService.upsertPatches` is the supported way to save patches to a file.
 
 `PatchDriver.serializeFile` accepts a `PatchFile<T>`, which anyone can assemble by hand, and no
 driver can honor that: a write starts from the envelope the file was read as and overwrites only the

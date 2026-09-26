@@ -2,11 +2,11 @@
 "@tonesmith/core": major
 ---
 
-File I/O is async and lives in `patchUtils`; drivers convert bytes and never touch the disk.
+File I/O is async and lives in `patchService`; drivers convert bytes and never touch the disk.
 
 `PatchDriver.readFile` and `writeFile` are replaced by `parseFile(bytes, source)` and
 `serializeFile(file)`, which turn a file's bytes into a decoded `PatchFile` and back. Every read and
-write goes through `patchUtils`, and every one returns a Promise:
+write goes through `patchService`, and every one returns a Promise:
 
 - `readPatchFile(driver, path)` reads and decodes a file.
 - `editPatchFile(driver, path, { ref, fields, setName })` applies dot-path edits to one patch and/or
@@ -15,8 +15,8 @@ write goes through `patchUtils`, and every one returns a Promise:
 - `upsertPatches`, `copyPatch` and `createPatchFile` resolve to the reports they return.
 
 ```ts
-const file = await patchUtils.readPatchFile(gx1.driver, "rock-tones.tsl");
-await patchUtils.editPatchFile(gx1.driver, "rock-tones.tsl", {
+const file = await patchService.readPatchFile(gx1.driver, "rock-tones.tsl");
+await patchService.editPatchFile(gx1.driver, "rock-tones.tsl", {
   ref: "SWORD LEAD",
   fields: [["amp.params.gain", 45]],
 });
