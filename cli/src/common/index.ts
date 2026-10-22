@@ -1,1 +1,4 @@
-export * from "./capabilities-print";
+export * from "./color";
+export * from "./capabilitiesPrint";
+export * from "./patchPrint";
+export * from "./run";
