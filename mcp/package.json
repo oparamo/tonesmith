@@ -1,6 +1,6 @@
 {
   "name": "@tonesmith/mcp",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "MCP server carrying the device knowledge an agent needs to build guitar multi-effects patches.",
   "keywords": [
     "guitar",
