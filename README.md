@@ -98,7 +98,7 @@ tonesmith-mcp            # installed: runs the server over stdio
 node mcp/dist/index.js   # from a working copy, after pnpm build
 ```
 
-**Claude Desktop config** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+**MCP client config:**
 
 ```json
 {
