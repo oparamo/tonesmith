@@ -1,6 +1,6 @@
 {
   "name": "@tonesmith/core",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Read, edit, and build guitar multi-effects patch files. Each device is a driver behind one interface.",
   "keywords": [
     "guitar",
