@@ -212,10 +212,7 @@ threshold can only be met by making the code worse (splitting a flat lookup `swi
 threshold question in review rather than working around the rule.
 
 **Dependency versions are exact.** No `^` or `~` in any `package.json`. `pnpm add` writes a range by
-default, so correct it after adding. Keep dependencies on their latest release. A major version is
-taken when the build, lint and tests stay green on it, with two standing exceptions: `typescript`
-stays within the range `typescript-eslint` supports, and `@types/node` stays on the major that
-`engines.node` names, since typings for a newer Node let code call APIs the supported one lacks.
+default, so correct it after adding.
 
 **Consumer-visible changes need a changeset:** a published package's API, behavior, or output. Tests,
 lint config, and repo docs don't. A changeset is written for someone upgrading from the last
@@ -231,8 +228,7 @@ device's blocks or file format, except as an explicit pointer to gx1 as the refe
 
 **Branches and pull requests.** Work happens on a branch and reaches `develop` through a pull
 request; nothing is committed to `develop` or `main` directly. Merging `develop` into `main` is what
-releases. A pull request description says what changed, why, and how it was verified, and leaves out
-how the problem was found.
+releases. A pull request description says what changed, why, and how it was verified.
 
 ### Testing
 

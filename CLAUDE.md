@@ -196,8 +196,6 @@ repeated here.
   script. Don't re-run by hand what a test already covers.
 - **Inspect patch files through tonesmith.** Read and edit them with the CLI or the MCP tools, not
   ad hoc decoding scripts; a shortfall found that way is a product gap worth reporting.
-- **No AI attribution.** Commits carry no `Co-Authored-By` trailer for an assistant, and PR
-  descriptions no "Generated with" footer.
 - **README scope.** README.md covers what the project is, how to use it, and how to contribute.
   Development history, experiments and process notes don't go there.
 
