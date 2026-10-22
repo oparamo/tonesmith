@@ -6,3 +6,6 @@ packages:
 # esbuild's install script checks that its platform binary landed; tsup, tsx and vitest all run on it.
 allowBuilds:
   esbuild: true
+  # import-x's resolver gets its platform binary as an optional dependency; its install script
+  # only fetches one when that failed, so it stays off.
+  unrs-resolver: false

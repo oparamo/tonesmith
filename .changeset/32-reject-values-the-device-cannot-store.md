@@ -28,8 +28,8 @@ rejection names the block, the param and what it accepts:
 
 ```
 amp GAIN for NATURAL takes a whole number (got "abc")
-odds TONE for OVERDRIVE must be -50-50 (got -500)
-ns DETECT must be one of: INPUT, NS INPUT (got "BOGUS")
+drive TONE for OVERDRIVE must be -50–50 (got -500)
+noiseGate DETECT must be one of: INPUT, NS INPUT (got "BOGUS")
 ```
 
 Four more inputs were reaching the codec unchecked, and each is now reported alongside every other

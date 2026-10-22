@@ -16,8 +16,8 @@ device's own tests.
 
 **Blocks are named for what they are, not for what the front panel abbreviates them to.** `odds` is
 `drive`, `ns` is `noiseGate`, `fv` is `volume`, and `pfx` is `pedalFx`. The device's own labels are
-still available: `capabilities.chain.blocks` maps every block name to the label printed on the unit,
-which is what a manual or a photo shows.
+still available: `capabilities.chain.blocks` gives every block name its `label`, what is printed on
+the unit and what a manual or a photo shows.
 
 **The chain names blocks the same way a patch spec does.** It read `["PFX", "FX1", "OD/DS", …]`
 while a spec keyed the same blocks `pfx`, `fx1`, `odds`, so three of the ten had to be converted by

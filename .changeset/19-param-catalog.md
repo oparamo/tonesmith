@@ -6,13 +6,13 @@
 
 Every parameter the GX-1 exposes is declared once, and everything else derives from it.
 
-`param-catalog.ts` holds every block and type's params: the name, the value domain, and a
+The GX-1's param catalog holds every block and type's params: the name, the value domain, and a
 description. Each is declared as `def(name, domain, description)`, where the domain is `num`,
 `oneOf`, `lookupOf` or `bool`. From that one declaration comes the human `range` string, the machine
 `values` list, and the numeric `min`/`max` bounds, which used to be three restatements of the same
 fact.
 
-`ParamSpec` carries all of it, as a union of the three kinds a param can be rather than a bag of
+`ParamSpec` carries all of it, as a union of the kinds a param can be rather than a bag of
 optional fields where `{min, max, values, boolean}` all at once still compiled. Every param states
 its **`kind`**, so a consumer of `describe_device` or the CLI's `capabilities` reads one field
 instead of inferring the answer from which others are present, and a driver validating a value
@@ -26,17 +26,17 @@ switches on it instead of walking a presence chain:
   spelling the codec accepts.
 - **`boolean`** is a real toggle, taking `true` or `false`. It was the one kind a consumer had to
   identify by reading `range` as English.
+- **`numericOrNamed`** carries both bounds and `values`, for a tempo-synced param that takes a
+  number or a note value.
 
 Every kind carries **`key`**, the exact field name to write when building a patch or editing one by
 dot-path, stamped automatically from the codec's field map. No transliterating "PRE-DELAY" into
 `preDelay` by hand.
 
-Each block also carries an **`example`**: the spec that builds it at the device's factory defaults,
-keyed by the block's own name. A key alone says what a control is called and never where it goes,
-and the GX-1 does not keep them all in one place: an fx slot nests its controls under `params` the
-way the decoded patch does, while amp, delay and reverb carry theirs as fields. That was learnable
-only by being rejected, at which point the patch was already built. The example is what a caller
-copies and edits, so it doubles as a statement of what each control is left at when you omit it.
+Each type also carries an **`example`**: the spec that builds its block at the device's factory
+defaults, keyed by the block's own name. A key alone says what a control is called and never where
+it goes. The example is what a caller copies and edits, so it doubles as a statement of what each
+control is left at when you omit it.
 
 Where a type offers a choice of models, the example names the one the device opens on, harvested
 from the factory-default export the way the param values are. A model selection sits beside `type`
@@ -45,11 +45,11 @@ in that list instead would have put a value the device never chose in a fragment
 factory state.
 
 `capabilities.ts` derives each type's params from the catalog rather than restating them, which
-makes delay and reverb **per type**: `describe_device gx1 reverb SHIMMER` answers for SHIMMER
+makes delay and reverb **per type**: `describe_device` with `items: ["reverb/SHIMMER"]` answers for SHIMMER
 instead of returning one flat list for the whole block. The FX-slot DELAY gained the same
 treatment, so its WARP, TWIST and GLITCH sub-algorithms carry the trigger, mode, rise-fall, glitch
 and balance fields that were previously unmodeled. Drilling into a type returns the block-level
-controls that apply to it as well, so `describe_device gx1 amp JC-120` no longer comes back with no
+controls that apply to it as well, so `"amp/JC-120"` no longer comes back with no
 params at all on the grounds that amp's gain, bass, middle and treble live on the group.
 
 The amp block's speaker cabinet and microphone are ordinary catalog params now. They were neither,

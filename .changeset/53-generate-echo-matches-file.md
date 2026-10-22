@@ -14,5 +14,5 @@ Every spec is built before the file is read, so a spec the driver rejects fails 
 file as it was, naming the spec's position and name.
 
 A batch that names the same patch twice is rejected, naming the name and both positions.
-`patchUtils.upsertPatches` keys on the name, so the second patch would replace the first and the
+`patchService.upsertPatches` keys on the name, so the second patch would replace the first and the
 response would report two saves into a file holding one of them.

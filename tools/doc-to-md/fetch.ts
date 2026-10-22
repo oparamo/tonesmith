@@ -1,7 +1,7 @@
 const fetchDocument = async (url: string): Promise<Uint8Array> => {
   const response = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "User-Agent": "tonesmith-doc-to-md (+https://github.com/oparamo/tonesmith)",
       "Accept": "text/html,application/xhtml+xml,application/pdf",
     },
   });

@@ -25,12 +25,9 @@ a `boolean` param domain and a validating `bool` codec field.
 
 **`subType` is the only way a model or sub-algorithm is selected**, and it is the only name that
 selection goes by. Ten effects and the pedal-FX block store the selector among their own params
-rather than in a shared header, and the codec used to expose it three different ways: FIXED WAH's
-was named `wahType` and never threaded into the encoded bytes at all, so its model was silently
-dropped; the FX-slot REVERB picked its algorithm through `params.type`; and pedal WAH's model was
-set as `subType` but read back as `wahType`, so sending back the block you just read was rejected
-for naming a field the block does not have. All of them are `subType` now, on the way in and on the
-way out. `type` means the block's own selector and nothing else. A decoded block carries the
+rather than in a shared header, and the codec exposed it under the param's own name: FIXED WAH's
+model was `wah_type`, and the FX-slot REVERB picked its algorithm through `params.type`. All of them
+are `subType` now, on the way in and on the way out, the newly decoded pedal WAH included. `type` means the block's own selector and nothing else. A decoded block carries the
 selection exactly once: ten effects keep the selector in a param byte, and the codec lifts it onto
 `subType` on the way out and writes it back on the way in, so nothing downstream is handed two
 copies to keep in agreement.

@@ -8,7 +8,7 @@ could not. `copy_patch` copies a patch into a slot in another file, replacing wh
 `create_patch_file` starts an empty file of blank patches at the device's factory defaults and
 refuses to overwrite an existing one.
 
-Both run through new device-agnostic `patchUtils.copyPatch` and `patchUtils.createPatchFile`, which
+Both run through new device-agnostic `patchService.copyPatch` and `patchService.createPatchFile`, which
 the CLI's own `copy` and `new` commands call rather than keeping a second copy of the logic.
 
 Saving a patch creates any missing parent directories rather than failing on a path whose folder
