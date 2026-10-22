@@ -25,7 +25,7 @@ pnpm add -g @tonesmith/mcp
 tonesmith-mcp   # runs over stdio
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`, opened from Settings > Developer > Edit Config):
+**MCP client config:**
 
 ```json
 {
