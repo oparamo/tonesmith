@@ -14,10 +14,6 @@ refused the same way, naming the variants it does have; it used to reach the cod
 back as `Unknown type value: "..."`, which named neither the block nor the field nor the
 alternatives.
 
-The pedal FX block gains the `subType` it already advertised. `describe_device` has always listed
-WAH's six pedal models as subTypes while `generate_patch` had no way to set one, leaving
-`params.wahType`, a key capabilities never mentions, as the only way to pick a model.
-
 Every block in `generate_patch` now rejects fields it doesn't have. An unrecognized field used
 to be discarded before validation, so `fx1: { type: "CHORUS", rate: 50 }` built a chorus at the
 default rate and reported success.
@@ -25,9 +21,7 @@ default rate and reported success.
 OVERTONE is refused in an fx slot that cannot hold it, naming the one that can. The GX-1 keeps its
 five controls in a block only FX3 has, so in FX1 or FX2 they were written over the start of the
 shared param block, on top of whatever that slot's COMPRESSOR settings were, and the patch still
-saved and reported success. `describe_device` said "FX3 only" in prose while handing back an
-`example` written under `fx1`, so following the example was the way to hit it; the example now
-names `fx3`.
+saved and reported success. OVERTONE's `example` in `describe_device` is written under `fx3`.
 
 Every one of these rules is enforced on the way to the bytes rather than at the tool boundary, so
 the CLI and the MCP server reject the same input for the same reason.

@@ -26,8 +26,7 @@ Nothing in the tool schemas names a device any more. `describe_device` carried o
 the example device, listed that device's group ids as though every device had them, and printed a
 hand-written `items` example naming its effects, which on any other device demonstrates a call that
 fails. The summary's example is built from the catalog in hand, and the descriptions say what an
-entry is shaped like. Two other tools pointed at "the device's generate tool", which has not existed
-since `generate_patch` replaced it.
+entry is shaped like.
 
 **Naming a type returns an `example`**: a spec fragment for that block at factory defaults, keyed
 by the block's own name, ready to copy into `generate_patch` and edit. A list of param keys says

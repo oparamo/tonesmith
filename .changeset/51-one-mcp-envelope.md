@@ -5,7 +5,7 @@
 One response envelope across the MCP tools, and agent-facing text that names no device.
 
 `read_patch` answers `{ setName, index, patch }`, and its paged form carries each patch as
-`{ index, patch }` beside `total`, `offset` and `more`. `generate_patch` reports each saved patch as
+`{ index, patch }` beside `setName`, `total`, `offset` and `nextOffset`. `generate_patch` reports each saved patch as
 `{ name, action, patch }`. The patch is no longer spread across the response's own keys, so a block
 named `index` or `setName` cannot shadow what the tool reports, and an agent that reads a patch and
 then generates one meets one shape rather than two. The hoisted `chain` is gone from
