@@ -182,7 +182,9 @@ learns it once rather than per block.
 is a layer (`service/`, `persistence/`, `model/`, a device's `format/`) and imports only the layers
 below it, which lint enforces. Folder names are singular. File names are camelCase, spelled like
 what they export and never after the type inside them: `patchService.ts`, `builder.ts`, never
-`Gx1Driver.ts`. ARCHITECTURE.md lists the layers.
+`Gx1Driver.ts`. Types live beside the runtime code they describe, never in a types-only tree. A new
+helper goes in a file named for its domain rather than onto whichever file in the folder is
+nearest. ARCHITECTURE.md lists the layers.
 
 **Exports go at the bottom,** as one trailing `export { … }` / `export type { … }` block, so a file's
 public surface reads without skimming the whole file. Barrel files are the exception.
@@ -193,11 +195,44 @@ parameters (`T`, `K`, `V`) and a loop index. Compounds on "sub" capitalize the n
 `subTypes`. Builder helpers take the name of what they configure, with no verb prefix: `block()`,
 `basePatch()`, not `setBlock()`.
 
+**Name the values you pass.** An object literal or a nested call handed straight to a function gets
+pulled into a variable whose name says what it is, whenever that name tells the reader something the
+expression doesn't. More lines are a fair price for a call site that reads without parsing. A bare
+string or number that the variable would only repeat stays inline.
+
+**The device is the only judge of what a patch may hold.** If the hardware can store it, tonesmith
+accepts it. A rule that rejects input points at the byte or value table that makes the input
+impossible, and its message states that device limit. Nobody's sense of what a sensible patch looks
+like is a rule: an amp-off patch that is only a delay is a patch the device plays.
+
+**Lint findings are fixed, not suppressed.** Restructure by extracting and naming rather than adding
+an `eslint-disable`. A convention worth checking by hand is worth a rule in `eslint.config.js`
+instead, and a new rule is shown firing on a violating example before it's trusted. Where a
+threshold can only be met by making the code worse (splitting a flat lookup `switch`, say), raise the
+threshold question in review rather than working around the rule.
+
 **Dependency versions are exact.** No `^` or `~` in any `package.json`. `pnpm add` writes a range by
-default, so correct it after adding.
+default, so correct it after adding. Keep dependencies on their latest release. A major version is
+taken when the build, lint and tests stay green on it, with two standing exceptions: `typescript`
+stays within the range `typescript-eslint` supports, and `@types/node` stays on the major that
+`engines.node` names, since typings for a newer Node let code call APIs the supported one lacks.
 
 **Consumer-visible changes need a changeset:** a published package's API, behavior, or output. Tests,
-lint config, and repo docs don't.
+lint config, and repo docs don't. A changeset is written for someone upgrading from the last
+published release and describes what they will find, not the path the branch took. Entries that
+describe successive takes on the same change are merged into one before release, and an entry that
+names an API, field or message is checked against the code it ships with.
+
+**Writing.** Comments, docs, changesets and user-facing text use American English, and carry no em
+dashes (lint enforces the dash). A reference doc reads top to bottom: define a thing before using
+it. Captured vendor documentation is split one file per subject, not one per source page or one for
+everything. Guidance meant for every device (the adding-a-device skill, this section) names no one
+device's blocks or file format, except as an explicit pointer to gx1 as the reference.
+
+**Branches and pull requests.** Work happens on a branch and reaches `develop` through a pull
+request; nothing is committed to `develop` or `main` directly. Merging `develop` into `main` is what
+releases. A pull request description says what changed, why, and how it was verified, and leaves out
+how the problem was found.
 
 ### Testing
 

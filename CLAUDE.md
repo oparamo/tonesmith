@@ -169,9 +169,37 @@ repeated here.
   through different code, so a CLI check proves nothing about what an agent receives. An MCP client
   keeps running the server binary it started with, so a rebuild needs a client reconnect before a
   live call means anything.
+- **The MCP server is patch operations only.** Its tools read, write, build and describe patches for
+  a supported device. Repo and onboarding tooling such as `tools/doc-to-md` stays a script or a
+  skill, never a tool.
+- **Agent-facing prose starts plain.** Tool descriptions, server instructions and capability text
+  describe the normal workflow simply, with no warnings written against failures seen in a past run;
+  defensive wording is added only once the plain version measurably fails. When deduplicating that
+  prose, cut repeated explanations but keep a hint that sits where the agent makes the decision
+  ("Omit to leave it off." inside the block being filled), even when it repeats text elsewhere.
+- **A gap in a design questions the interface that leaves it.** A plan that ends with "callers can
+  still bypass this through X" is a prompt to ask whether X belongs on that interface, not a residual
+  to document. Moving file I/O off `PatchDriver` entirely is the precedent.
+- **Measure a cost before it rules out a design.** A size, speed or token claim that decides between
+  options is measured on the option itself, not borrowed from something adjacent.
 - **Patch generation is MCP-only.** The CLI deliberately has no `generate` command: building a
   patch from a description is the job an agent does, and the CLI's users already have the device's
   own editor for that.
+
+## Working in this repo
+
+- **Use the repo's own tooling.** `pnpm lint:fix` before fixing lint findings by hand, and the
+  `package.json` scripts before writing one. Run each check as its own command (`pnpm lint`, then
+  `pnpm test`) rather than one `&&` chain, and lint again after editing tests, not only source.
+- **A check worth repeating is a test.** If a question ("does the catalog match the codec?") would
+  still matter after this session, answer it by writing the test in the real suite, not a scratch
+  script. Don't re-run by hand what a test already covers.
+- **Inspect patch files through tonesmith.** Read and edit them with the CLI or the MCP tools, not
+  ad hoc decoding scripts; a shortfall found that way is a product gap worth reporting.
+- **No AI attribution.** Commits carry no `Co-Authored-By` trailer for an assistant, and PR
+  descriptions no "Generated with" footer.
+- **README scope.** README.md covers what the project is, how to use it, and how to contribute.
+  Development history, experiments and process notes don't go there.
 
 ## MCP server tools
 
